@@ -98,6 +98,7 @@ import {
   computeSubtaskKey,
   type BuildTaskInput,
 } from './task-integration/build-task-from-requirement';
+import { isDeterministicFailure } from './server/task-action-resolver';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -2227,6 +2228,30 @@ async function autonomousTaskExecutor() {
               `⚠️ [Executor] Step ${nextStep.order} failed: ${actionResult?.error}`
             );
 
+            // P1-1: Deterministic failure fast-path
+            // Mapping and contract failures are NOT retryable — fail immediately without
+            // consuming retries or scheduling backoff. This prevents "backoff hiding defects".
+            // Note: failureCode may come from normalizeActionResponse (via gateway) or
+            // from leaf-level error.code. We check both paths.
+            const failureCode = (actionResult as any)?.failureCode ?? (actionResult?.data?.error?.code as string | undefined);
+            if (isDeterministicFailure(failureCode)) {
+              console.error(
+                `🛑 [Executor] Deterministic failure (${failureCode}) — failing task immediately without retry`
+              );
+              taskIntegration.updateTaskMetadata(currentTask.id, {
+                blockedReason: `deterministic-failure:${failureCode}`,
+                failureCode,
+                failureError: actionResult?.error as any,
+              });
+              taskIntegration.updateTaskProgress(
+                currentTask.id,
+                currentTask.progress || 0,
+                'failed'
+              );
+              await recomputeProgressAndMaybeComplete(currentTask);
+              return; // Exit without retry/backoff
+            }
+
             // For craft failures, try injecting prerequisite acquisition steps
             // Cap + increment handled inside injectDynamicPrereqForCraft
             if (leafExec.leafName === 'craft_recipe') {
@@ -3233,6 +3258,12 @@ const planningSystem: PlanningSystem = {
       try {
         console.log(`🎯 Executing goal: ${goal.title || goal.id}`);
 
+        // Ensure task is activated before dispatch (P0-2: activation at dispatch boundary)
+        // Goals often have task IDs when converted from tasks
+        if (goal.id) {
+          await taskIntegration.ensureActivated(goal.id);
+        }
+
         // Execute the goal through the enhanced reactive executor
         const result = await reactiveExecutor.executeTask(goal);
 
@@ -3269,6 +3300,12 @@ const planningSystem: PlanningSystem = {
     executeTask: async (task: any) => {
       try {
         console.log(`🔄 Executing task: ${task.title || task.id}`);
+
+        // Ensure task is activated before dispatch (P0-2: activation at dispatch boundary)
+        // This guarantees tasks cannot remain 'pending' after execution
+        if (task.id) {
+          await taskIntegration.ensureActivated(task.id);
+        }
 
         // Execute the task through the enhanced reactive executor
         const result = await reactiveExecutor.executeTask(task);

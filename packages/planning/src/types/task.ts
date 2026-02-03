@@ -47,6 +47,23 @@ export interface Task {
     nextEligibleAt?: number;
     blockedReason?: string;
     blockedAt?: number;
+    /**
+     * Failure code from the last failed action (Phase 2.5 execution hardening).
+     * Used for failure taxonomy: deterministic failures (mapping_*, postcondition_*)
+     * are non-retryable; transient failures (timeout, stuck) may retry.
+     * @see isDeterministicFailure() in task-action-resolver.ts
+     */
+    failureCode?: string;
+    /**
+     * Error details from the last failed action.
+     * Includes message, stack, and any structured error data.
+     */
+    failureError?: {
+      message?: string;
+      code?: string;
+      detail?: string;
+      [key: string]: unknown;
+    };
     prereqInjectionCount?: number;
     lastBindingFailure?: {
       stepId: string;
@@ -121,6 +138,21 @@ export interface Task {
       stepsDigest?: string;
       /** Building replan count */
       buildingReplanCount?: number;
+      /** Acquisition solver plan ID */
+      acquisitionPlanId?: string;
+      /**
+       * Solve-time join keys for deferred episode reporting.
+       * @deprecated Use per-domain keys (buildingSolveJoinKeys, etc.) to prevent cross-solver clobbering.
+       */
+      solveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
+      /** Building solver join keys (isolated from other solvers) */
+      buildingSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
+      /** Crafting solver join keys */
+      craftingSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
+      /** Tool progression solver join keys */
+      toolProgressionSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
+      /** Acquisition solver join keys */
+      acquisitionSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
       /** Additional solver-specific fields */
       [key: string]: unknown;
     };

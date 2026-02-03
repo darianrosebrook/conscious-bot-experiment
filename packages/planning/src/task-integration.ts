@@ -13,12 +13,23 @@ import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import { resolveRequirement } from './modules/requirements';
 import { CognitionOutbox } from './modules/cognition-outbox';
-import { ORE_DROP_MAP, BLOCK_DROP_MAP } from './sterling/minecraft-tool-progression-types';
+import {
+  ORE_DROP_MAP,
+  BLOCK_DROP_MAP,
+} from './sterling/minecraft-tool-progression-types';
+import type {
+  EpisodeLinkage,
+  EpisodeOutcomeClass,
+} from './sterling';
+import { SOLVER_IDS } from './sterling/solver-ids';
 import {
   CognitiveStreamClient,
   type CognitiveStreamThought,
 } from './modules/cognitive-stream-client';
-import type { ITaskIntegration, MutationOptions } from './interfaces/task-integration';
+import type {
+  ITaskIntegration,
+  MutationOptions,
+} from './interfaces/task-integration';
 import type {
   Task,
   TaskProgress,
@@ -34,7 +45,10 @@ import {
 import { TaskStore } from './task-integration/task-store';
 import { SterlingPlanner } from './task-integration/sterling-planner';
 import { convertThoughtToTask } from './task-integration/thought-to-task-converter';
-import { TaskManagementHandler, type ManagementResult } from './task-integration/task-management-handler';
+import {
+  TaskManagementHandler,
+  type ManagementResult,
+} from './task-integration/task-management-handler';
 import type { GoalTagV1 } from '@conscious-bot/cognition';
 import { adviseExecution } from './constraints/execution-advisor';
 import type { RigGMetadata } from './constraints/execution-advisor';
@@ -51,12 +65,23 @@ import {
 } from './goals/goal-lifecycle-hooks';
 import type { SyncEffect } from './goals/goal-task-sync';
 import type { VerifierRegistry } from './goals/verifier-registry';
-import { applyHold, clearHold, cloneHold, syncHoldToTaskFields } from './goals/goal-binding-normalize';
-import { partitionSelfHoldEffects, applySelfHoldEffects } from './goals/effect-partitioning';
+import {
+  applyHold,
+  clearHold,
+  cloneHold,
+  syncHoldToTaskFields,
+} from './goals/goal-binding-normalize';
+import {
+  partitionSelfHoldEffects,
+  applySelfHoldEffects,
+} from './goals/effect-partitioning';
 import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
-export type { MutationOrigin, MutationOptions } from './interfaces/task-integration';
+export type {
+  MutationOrigin,
+  MutationOptions,
+} from './interfaces/task-integration';
 import type { TaskStep } from './types/task-step';
 
 export type {
@@ -89,7 +114,11 @@ export function canonicalizeIntentParams(raw: unknown): string | undefined {
   try {
     return JSON.stringify(raw, (_key, value) => {
       if (typeof value === 'bigint') return value.toString();
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value)
+      ) {
         // Reject non-plain objects (Date, Map, Set, etc.) — they serialize unpredictably
         const proto = Object.getPrototypeOf(value);
         if (proto !== null && proto !== Object.prototype) {
@@ -126,7 +155,10 @@ export interface GoalBindingDriftEvent {
   /** Task source — drift events only fire for goal-sourced tasks */
   source: 'goal';
   /** Classification of why goalBinding was not attached */
-  reason: 'goal_resolver_disabled' | `type_not_gated:${string}` | 'resolver_fallthrough';
+  reason:
+    | 'goal_resolver_disabled'
+    | `type_not_gated:${string}`
+    | 'resolver_fallthrough';
   /** Origin kind inferred at creation */
   originKind?: string;
   /** Whether goalBinding was present (always false for drift events) */
@@ -150,7 +182,13 @@ export interface GoalBindingDriftEvent {
  */
 export interface TaskOrigin {
   /** How this task entered the system */
-  kind: 'api' | 'cognition' | 'executor' | 'goal_resolver' | 'goal_source' | 'unknown';
+  kind:
+    | 'api'
+    | 'cognition'
+    | 'executor'
+    | 'goal_resolver'
+    | 'goal_source'
+    | 'unknown';
   /** Finer-grained source name (e.g., leaf name, thought type, endpoint) */
   name?: string;
   /** Parent task ID if this is a subtask */
@@ -198,9 +236,7 @@ function inferTaskOrigin(task: Task): TaskOrigin {
     // Prefer goalBinding.goalType for name — the resolver skeleton task
     // has empty parameters, so task.parameters?.goalType is unreliable
     // on the most important (goal-resolved) path.
-    const name = binding?.goalType
-      ?? task.parameters?.goalType
-      ?? task.type;
+    const name = binding?.goalType ?? task.parameters?.goalType ?? task.type;
     return {
       kind: binding ? 'goal_resolver' : 'goal_source',
       name,
@@ -235,22 +271,68 @@ const PROPAGATED_META_KEYS = [
   'taskProvenance',
 ] as const satisfies readonly (keyof Task['metadata'])[];
 
+/** Rate limiter for dev-only dropped-key warnings (one per key per session). */
+const _warnedDroppedKeys = new Set<string>();
+
 /**
  * Project incoming metadata onto a new task's metadata object.
  * Fail-closed allowlist: only PROPAGATED_META_KEYS are copied.
  * Solver metadata is handled separately (namespace merge).
+ *
+ * In dev mode, warns (once per key) when incoming keys are dropped.
+ * This surfaces new pipelines that set metadata fields but forget
+ * to update the allowlist.
  *
  * @param target  The task.metadata object being built (mutated in place)
  * @param source  The incoming taskData.metadata (may be partial or undefined)
  */
 function projectIncomingMetadata(
   target: Task['metadata'],
-  source: Partial<Task['metadata']> | undefined,
+  source: Partial<Task['metadata']> | undefined
 ): void {
   if (!source) return;
+
+  // Dev-only: detect incoming keys that will be silently dropped.
+  // Warn once per key per session so new pipelines that set metadata
+  // fields not in PROPAGATED_META_KEYS are surfaced immediately.
+  if (process.env.NODE_ENV !== 'production') {
+    const allowSet = new Set<string>(PROPAGATED_META_KEYS);
+    // Infrastructure keys rebuilt by addTask() — not dropped, just rebuilt.
+    const REBUILT_KEYS = new Set([
+      'createdAt',
+      'updatedAt',
+      'retryCount',
+      'maxRetries',
+      'childTaskIds',
+      'tags',
+      'category',
+      'solver',
+    ]);
+    for (const key of Object.keys(source)) {
+      if (
+        !allowSet.has(key) &&
+        !REBUILT_KEYS.has(key) &&
+        !_warnedDroppedKeys.has(key)
+      ) {
+        _warnedDroppedKeys.add(key);
+        console.warn(
+          `[projectIncomingMetadata] Dropped metadata key "${key}" — ` +
+            `not in PROPAGATED_META_KEYS. If this key is needed, add it to the allowlist.`
+        );
+      }
+    }
+  }
+
   for (const key of PROPAGATED_META_KEYS) {
-    const value = source[key];
+    let value = source[key];
     if (value !== undefined) {
+      // Invariant: goalKey must never be empty string — coerce to undefined.
+      // canonicalGoalKey() returns '' for targetless goals; callers should
+      // convert to undefined at the callsite, but this is the last line of defense.
+      if (key === 'goalKey' && value === '') {
+        value = undefined as any;
+        continue;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (target as any)[key] = value;
     }
@@ -278,7 +360,7 @@ const GOAL_RESOLVER_GATED_TYPES = new Set(['building']);
 function applyTaskBlock(
   task: Task,
   reason: string,
-  opts?: { status?: Task['status']; clearSteps?: boolean },
+  opts?: { status?: Task['status']; clearSteps?: boolean }
 ): void {
   task.metadata.blockedReason = reason;
   task.metadata.blockedAt ??= Date.now();
@@ -289,6 +371,160 @@ function applyTaskBlock(
     task.steps = [];
   }
 }
+
+// ------------------------------------------------------------------
+// Join Keys Infrastructure
+// ------------------------------------------------------------------
+
+/** Solver ID for building domain — used for cross-domain clobber guard */
+const BUILDING_SOLVER_ID = SOLVER_IDS.BUILDING;
+
+// ------------------------------------------------------------------
+// MIGRATION COMPAT: deprecated solveJoinKeys fallback
+// Issue: [CB-XXX] Remove after 2026-02-15 if no migration logs observed
+//
+// Opt-in via env: JOIN_KEYS_DEPRECATED_COMPAT=1
+// When enabled, logs startup banner so you know it's active.
+//
+// Compat check is a runtime function (not module-load constant) to enable
+// testing without module reimport gymnastics.
+// ------------------------------------------------------------------
+
+/** Check if deprecated join keys compat is enabled (runtime, testable) */
+function isDeprecatedJoinKeysCompatEnabled(): boolean {
+  return process.env.JOIN_KEYS_DEPRECATED_COMPAT === '1';
+}
+
+/** Check if debug logging is enabled for join keys migration */
+function isDebugJoinKeysMigrationEnabled(): boolean {
+  return process.env.DEBUG_JOIN_KEYS_MIGRATION === '1';
+}
+
+// Emit startup banner when compat is enabled (at module init time)
+// This logs even if no tasks exercise the fallback, which is intentional:
+// it makes the compat path visible in logs so you know it's active.
+if (isDeprecatedJoinKeysCompatEnabled()) {
+  console.log('[JoinKeys] Deprecated solveJoinKeys fallback is ENABLED (JOIN_KEYS_DEPRECATED_COMPAT=1). Remove after 2026-02-15.');
+}
+
+/** Log once per process when fallback is actually exercised */
+let _migrationFallbackExercised = false;
+function logMigrationFallbackOnce(taskId: string, planId: string | undefined): void {
+  if (_migrationFallbackExercised) return;
+  _migrationFallbackExercised = true;
+  console.log(`[JoinKeys] Migration fallback exercised: task=${taskId}, planId=${planId}`);
+}
+
+/**
+ * Check if deprecated fallback is safe to use for this task.
+ * Narrowed scope: only building tasks with templateId, no other per-domain keys.
+ */
+function isSafeForDeprecatedFallback(task: Task): boolean {
+  if (task.type !== 'building') return false;
+  if (!task.metadata.solver?.buildingTemplateId) return false;
+  // If any per-domain keys exist (even for other domains), don't use deprecated slot
+  const solver = task.metadata.solver;
+  if (solver.craftingSolveJoinKeys) return false;
+  if (solver.toolProgressionSolveJoinKeys) return false;
+  if (solver.acquisitionSolveJoinKeys) return false;
+  return true;
+}
+
+/**
+ * Episode domain labels for multi-domain warning suppression.
+ * Using `domain` in the warning key prevents cross-domain masking.
+ */
+type EpisodeDomain = 'building' | 'crafting' | 'tool_progression' | 'acquisition';
+
+/**
+ * Coarse reason categories for warning suppression.
+ * Keyed by (taskId, domain, category) so more severe conditions aren't masked by earlier benign ones.
+ *
+ * Category is determined at the detection site (not string-matched in helper) to avoid
+ * classification drift if log text is refactored.
+ */
+type StaleKeysReasonCategory = 'PLANID_MISMATCH' | 'SOLVERID_MISMATCH' | 'MISSING_FIELDS';
+
+/**
+ * Bounded set to track warned (taskId, domain, reasonCategory) tuples.
+ * Prevents spam while ensuring severe conditions (solverId mismatch) aren't masked
+ * by earlier benign warnings (planId mismatch) — even across different domains.
+ */
+const _warnedStaleKeys = new Set<string>();
+const WARNED_STALE_KEYS_MAX = 1000;
+
+/** Structured context for stale keys warnings — category-specific for production debugging */
+type StaleKeysContext =
+  | { taskId: string; domain: EpisodeDomain; category: 'PLANID_MISMATCH'; severity: string; planId: string; keysPlanId: string }
+  | { taskId: string; domain: EpisodeDomain; category: 'SOLVERID_MISMATCH'; severity: string; planId: string | undefined; gotSolverId: string; expectedSolverId: string }
+  | { taskId: string; domain: EpisodeDomain; category: 'MISSING_FIELDS'; severity: string; planIdPresent: boolean; keysPlanIdPresent: boolean };
+
+/**
+ * Emit a stale keys warning once per (taskId, domain, category) tuple.
+ * Category is passed from the detection site to keep this helper dumb.
+ * Context provides category-specific structured data for production debugging.
+ */
+function warnStaleKeysOnce(
+  reason: string,
+  context: StaleKeysContext,
+): void {
+  const warnKey = `${context.taskId}:${context.domain}:${context.category}`;
+
+  if (_warnedStaleKeys.has(warnKey)) return;
+
+  // Bound the set to prevent unbounded growth
+  if (_warnedStaleKeys.size >= WARNED_STALE_KEYS_MAX) {
+    _warnedStaleKeys.clear();
+  }
+  _warnedStaleKeys.add(warnKey);
+
+  // Capitalize domain for log prefix (e.g., 'building' -> 'Building')
+  const domainLabel = context.domain.charAt(0).toUpperCase() + context.domain.slice(1).replace('_', ' ');
+
+  console.warn(
+    `[${domainLabel}] Omitting linkage hashes (${context.severity}): ${reason}`,
+    context
+  );
+}
+
+/**
+ * Select join keys for episode reporting if they match the current plan and solver.
+ *
+ * Returns the join keys if:
+ * 1. Both planId and joinKeys.planId are present
+ * 2. planIds match
+ * 3. If joinKeys.solverId is present, it must match expectedSolverId
+ *
+ * This is the core guard against cross-domain clobber and stale keys from replans.
+ */
+function selectJoinKeysForPlan(
+  planId: string | undefined,
+  joinKeys: { planId?: string; solverId?: string; bundleHash?: string; traceBundleHash?: string } | undefined,
+  expectedSolverId: string,
+): { bundleHash?: string; traceBundleHash?: string } | undefined {
+  if (!planId || !joinKeys?.planId) return undefined;
+  if (joinKeys.planId !== planId) return undefined;
+  // If solverId is present, it must match (migration keys lack solverId)
+  if (joinKeys.solverId && joinKeys.solverId !== expectedSolverId) return undefined;
+  return joinKeys;
+}
+
+/**
+ * Build episode linkage from join keys + execution outcome.
+ * Single place to update when linkage schema grows.
+ */
+function buildEpisodeLinkage(
+  joinKeys: { bundleHash?: string; traceBundleHash?: string } | undefined,
+  success: boolean,
+): EpisodeLinkage {
+  return {
+    bundleHash: joinKeys?.bundleHash,
+    traceBundleHash: joinKeys?.traceBundleHash,
+    outcomeClass: success ? 'EXECUTION_SUCCESS' : 'EXECUTION_FAILURE',
+  };
+}
+
+// ------------------------------------------------------------------
 
 /**
  * Task integration system for dashboard connectivity
@@ -303,6 +539,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private cognitiveStreamClient: CognitiveStreamClient;
   private thoughtPollingInterval?: NodeJS.Timeout;
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
+  private _inventoryProvider?: () => { items: any[]; ts: number } | undefined;
 
   private thoughtPollInFlight = false;
   private seenThoughtIds = new Set<string>();
@@ -351,7 +588,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   private get buildingSolver(): MinecraftBuildingSolver | undefined {
     return this.sterlingPlanner.getSolver<MinecraftBuildingSolver>(
-      'minecraft.building'
+      SOLVER_IDS.BUILDING
     );
   }
 
@@ -367,6 +604,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       console.warn(`Minecraft request failed for ${path}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Get inventory items from cached provider or live fetch.
+   * Prefers the cached provider when available and fresh (< 5 s).
+   */
+  private async getInventoryItems(): Promise<any[]> {
+    if (this._inventoryProvider) {
+      const cached = this._inventoryProvider();
+      if (cached && cached.items.length > 0 && Date.now() - cached.ts < 5000) {
+        return cached.items;
+      }
+    }
+    const res = await this.minecraftRequest('/inventory', { timeout: 4000 });
+    if (!res.ok) return [];
+    const data = (await res.json()) as any;
+    const raw = data?.data;
+    return Array.isArray(raw) ? raw : (raw?.items ?? []);
   }
 
   /**
@@ -442,8 +697,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           if (result.managementResult) {
             console.log(
               `[Thought-to-task] management ${result.managementResult.action}: ${result.managementResult.decision}` +
-              (result.managementResult.affectedTaskId ? ` → task ${result.managementResult.affectedTaskId}` : '') +
-              (result.managementResult.reason ? ` (${result.managementResult.reason})` : '')
+                (result.managementResult.affectedTaskId
+                  ? ` → task ${result.managementResult.affectedTaskId}`
+                  : '') +
+                (result.managementResult.reason
+                  ? ` (${result.managementResult.reason})`
+                  : '')
             );
             this.emit('managementAction', {
               thought,
@@ -484,7 +743,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   /**
    * Update task status
    */
-  async updateTaskStatus(taskId: string, status: string, options?: MutationOptions): Promise<void> {
+  async updateTaskStatus(
+    taskId: string,
+    status: string,
+    options?: MutationOptions
+  ): Promise<void> {
     const task = this.taskStore.getTask(taskId);
     if (task) {
       const previousStatus = task.status;
@@ -497,17 +760,22 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       let hookResult: ReturnType<typeof onTaskStatusChanged> | undefined;
       let remainingEffects: SyncEffect[] = [];
       if (origin === 'runtime') {
-        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        const binding = (task.metadata as any).goalBinding as
+          | GoalBinding
+          | undefined;
         if (binding) {
           hookResult = onTaskStatusChanged(
             { ...task, status: status as Task['status'] },
             previousStatus,
             status as Task['status'],
-            { verifierRegistry: this.verifierRegistry },
+            { verifierRegistry: this.verifierRegistry }
           );
 
           if (hookResult && hookResult.syncEffects.length > 0) {
-            const { self, remaining } = partitionSelfHoldEffects(taskId, hookResult.syncEffects);
+            const { self, remaining } = partitionSelfHoldEffects(
+              taskId,
+              hookResult.syncEffects
+            );
             remainingEffects = remaining;
             applySelfHoldEffects(task, self);
           }
@@ -535,6 +803,41 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // Emit lifecycle events for thought generation
       await this.emitLifecycleEvent(task, status, previousStatus);
     }
+  }
+
+  /**
+   * Ensure a task is activated before dispatch.
+   *
+   * This is the canonical "activation at dispatch boundary" helper.
+   * Call this right before executing an action for a task to guarantee
+   * the task has transitioned from 'pending' to 'active'.
+   *
+   * Behavior:
+   * - If status is 'pending', calls updateTaskStatus(taskId, 'active')
+   * - If already 'active', 'in_progress', 'completed', or 'failed', no-op
+   * - Returns true if activation occurred, false if already active/terminal
+   *
+   * Invariant this enforces:
+   * - "If a task is dispatched to the gateway, it cannot be 'pending' after the cycle"
+   *
+   * @see docs/testing/live-execution-evaluation-phase2.md for the problem this solves
+   */
+  async ensureActivated(taskId: string): Promise<boolean> {
+    const task = this.taskStore.getTask(taskId);
+    if (!task) {
+      console.warn(`[TaskIntegration] ensureActivated: task ${taskId} not found`);
+      return false;
+    }
+
+    // Already in a non-pending state — no action needed
+    if (task.status !== 'pending') {
+      return false;
+    }
+
+    // Transition pending → active
+    await this.updateTaskStatus(taskId, 'active');
+    console.log(`[TaskIntegration] ensureActivated: ${taskId} transitioned pending → active`);
+    return true;
   }
 
   /**
@@ -829,6 +1132,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     this.sterlingPlanner.registerSolver(solver);
   }
 
+  setInventoryProvider(
+    provider: () => { items: any[]; ts: number } | undefined
+  ): void {
+    this._inventoryProvider = provider;
+  }
+
   getSolver<T extends BaseDomainSolver>(solverId: string): T | undefined {
     return this.sterlingPlanner.getSolver<T>(solverId);
   }
@@ -846,10 +1155,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     feedbackStore?: any;
   }): void {
     if (this.isHierarchicalPlannerConfigured) {
-      console.log('[TaskIntegration] Hierarchical planner already configured; no-op');
+      console.log(
+        '[TaskIntegration] Hierarchical planner already configured; no-op'
+      );
       return;
     }
-    const macroPlanner = overrides?.macroPlanner ?? buildDefaultMinecraftGraph();
+    const macroPlanner =
+      overrides?.macroPlanner ?? buildDefaultMinecraftGraph();
     const feedbackStore = overrides?.feedbackStore ?? new FeedbackStore();
     this.sterlingPlanner.setMacroPlanner(macroPlanner);
     this.sterlingPlanner.setFeedbackStore(feedbackStore);
@@ -894,12 +1206,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    */
   private async resolveGoalTask(
     goalType: string,
-    taskData: Partial<Task>,
+    taskData: Partial<Task>
   ): Promise<Task | null> {
     if (!this.goalResolver) return null;
 
     // Extract bot position from task parameters or use origin
-    const botPosition = taskData.parameters?.botPosition ?? { x: 0, y: 64, z: 0 };
+    const botPosition = taskData.parameters?.botPosition ?? {
+      x: 0,
+      y: 64,
+      z: 0,
+    };
     const verifier = taskData.parameters?.verifier ?? `verify_${goalType}_v0`;
 
     const rawIntentParams = taskData.parameters?.intentParams;
@@ -916,8 +1232,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       effectiveIntentParams = `__unserializable__:${rawConstructor}`;
       console.warn(
         `[GoalIntake] Unserializable intentParams for goalType=${goalType} ` +
-        `(typeof=${rawType}, constructor=${rawConstructor}). ` +
-        `Using sentinel key "${effectiveIntentParams}" to prevent dedup collision.`
+          `(typeof=${rawType}, constructor=${rawConstructor}). ` +
+          `Using sentinel key "${effectiveIntentParams}" to prevent dedup collision.`
       );
       this.emit('taskLifecycleEvent', {
         type: 'intent_params_unserializable',
@@ -948,10 +1264,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           return task;
         },
         generateTaskId: () =>
-          taskData.id || `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          taskData.id ||
+          `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         generateInstanceId: () =>
           `ginst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      },
+      }
     );
 
     if (outcome.action === 'continue') {
@@ -975,11 +1292,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (!created) return null;
 
     // Generate steps for the goal-bound task
-    const goalStepResult = await this.sterlingPlanner.generateDynamicSteps(taskData);
+    const goalStepResult =
+      await this.sterlingPlanner.generateDynamicSteps(taskData);
     const steps = goalStepResult.steps;
-    const blockedSentinel = steps.length === 1 && steps[0].meta?.blocked === true;
+    const blockedSentinel =
+      steps.length === 1 && steps[0].meta?.blocked === true;
 
-    created.steps = taskData.steps && taskData.steps.length > 0 ? taskData.steps : steps;
+    created.steps =
+      taskData.steps && taskData.steps.length > 0 ? taskData.steps : steps;
 
     // Propagate solver metadata
     if (taskData.metadata?.solver) {
@@ -988,8 +1308,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Handle blocked sentinel
     if (blockedSentinel) {
-      const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
-      applyTaskBlock(created, reason, { status: 'pending_planning', clearSteps: true });
+      const reason =
+        (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
+      applyTaskBlock(created, reason, {
+        status: 'pending_planning',
+        clearSteps: true,
+      });
     }
 
     return this.finalizeNewTask(created, blockedSentinel);
@@ -1007,7 +1331,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * If you add a new post-creation invariant, add it HERE, not in the
    * individual creation paths.
    */
-  private async finalizeNewTask(task: Task, blockedSentinel: boolean): Promise<Task> {
+  private async finalizeNewTask(
+    task: Task,
+    blockedSentinel: boolean
+  ): Promise<Task> {
     // ── Executability check ──
     // If no step has a leaf / executable flag, the task cannot make progress
     // without manual intervention. Skip when blockedSentinel already set an
@@ -1071,8 +1398,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // If blockedReason is set, blockedAt must also be set. Catches any
     // path that sets a reason without timestamping it.
     if (task.metadata.blockedReason && !task.metadata.blockedAt) {
-      const msg =
-        `[FinalizeInvariant] Task ${task.id} has blockedReason="${task.metadata.blockedReason}" but missing blockedAt.`;
+      const msg = `[FinalizeInvariant] Task ${task.id} has blockedReason="${task.metadata.blockedReason}" but missing blockedAt.`;
       if (strict) throw new Error(msg);
       // Non-strict: backfill from best available timestamp
       task.metadata.blockedAt =
@@ -1087,7 +1413,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // ── Lifecycle events ──
     this.emit('taskAdded', task);
     if (task.priority >= 0.8) {
-      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: task.id, task });
+      this.emit('taskLifecycleEvent', {
+        type: 'high_priority_added',
+        taskId: task.id,
+        task,
+      });
     }
     if (blockedSentinel) {
       this.emit('taskLifecycleEvent', {
@@ -1121,8 +1451,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
       console.warn(
         `[GoalBindingDrift] Task ${task.id} has source='goal' but no goalBinding ` +
-        `(reason=${reason}, type=${task.type}). This task will not participate in ` +
-        `goal dedup, threat holds, or goal lifecycle events.`
+          `(reason=${reason}, type=${task.type}). This task will not participate in ` +
+          `goal dedup, threat holds, or goal lifecycle events.`
       );
       const driftEvent: GoalBindingDriftEvent = {
         type: 'goal_binding_drift',
@@ -1213,7 +1543,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * suppresses re-entering goal hooks). Metadata effects (hold, clear_hold,
    * goal_status) apply directly to the store.
    */
-  private async applyGoalProtocolEffects(effects: SyncEffect[]): Promise<number> {
+  private async applyGoalProtocolEffects(
+    effects: SyncEffect[]
+  ): Promise<number> {
     // Separate status effects (route through mutators) from metadata effects (direct store)
     const statusEffects: SyncEffect[] = [];
     const otherEffects: SyncEffect[] = [];
@@ -1232,9 +1564,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       updateGoalStatus: this.goalManager
         ? (goalId, status, reason) => {
             this.emit('goalStatusUpdate', { goalId, status, reason });
-            if (status === GoalStatus.SUSPENDED) this.goalManager!.pause(goalId);
-            else if (status === GoalStatus.FAILED) this.goalManager!.cancel(goalId, reason);
-            else if (status === GoalStatus.PENDING) this.goalManager!.resume(goalId);
+            if (status === GoalStatus.SUSPENDED)
+              this.goalManager!.pause(goalId);
+            else if (status === GoalStatus.FAILED)
+              this.goalManager!.cancel(goalId, reason);
+            else if (status === GoalStatus.PENDING)
+              this.goalManager!.resume(goalId);
           }
         : (goalId, status, reason) => {
             // No GoalManager wired — emit event only
@@ -1263,7 +1598,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     for (const e of statusEffects) {
       if (e.type === 'update_task_status') {
         try {
-          await this.updateTaskStatus(e.taskId, e.status, { origin: 'protocol' });
+          await this.updateTaskStatus(e.taskId, e.status, {
+            origin: 'protocol',
+          });
           count++;
         } catch (err) {
           console.error('[TaskIntegration] Protocol status effect failed:', {
@@ -1304,7 +1641,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           errorName: err instanceof Error ? err.name : undefined,
           stack: err instanceof Error ? err.stack : undefined,
         });
-      },
+      }
     );
     return batch;
   }
@@ -1329,7 +1666,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    */
   handleManagementAction(
     goal: GoalTagV1,
-    sourceThoughtId?: string,
+    sourceThoughtId?: string
   ): ManagementResult {
     // Pre-condition hold state on goal-bound tasks BEFORE calling handle().
     // The handler mutates status and persists via taskStore.setTask() —
@@ -1344,7 +1681,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (targetId) {
       const task = this.taskStore.getTask(targetId);
       if (task) {
-        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        const binding = (task.metadata as any).goalBinding as
+          | GoalBinding
+          | undefined;
         if (binding) {
           if (goal.action === 'pause') {
             // Snapshot existing hold before overwriting — rollback must
@@ -1380,7 +1719,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     // Snapshot status before handler (handler persists internally)
-    const beforeStatus = targetId ? this.taskStore.getTask(targetId)?.status : undefined;
+    const beforeStatus = targetId
+      ? this.taskStore.getTask(targetId)?.status
+      : undefined;
 
     const result = this.managementHandler.handle(goal, sourceThoughtId);
 
@@ -1388,7 +1729,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (preAction !== 'none' && result.decision !== 'applied') {
       const task = this.taskStore.getTask(targetId!);
       if (task) {
-        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        const binding = (task.metadata as any).goalBinding as
+          | GoalBinding
+          | undefined;
         if (binding) {
           if (preAction === 'hold_applied') {
             // Restore prior hold (may have been preempted/materials_missing)
@@ -1421,19 +1764,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (targetId && result.decision === 'applied') {
       const taskAfter = this.taskStore.getTask(targetId);
       if (taskAfter && beforeStatus && taskAfter.status !== beforeStatus) {
-        const binding = (taskAfter.metadata as any).goalBinding as GoalBinding | undefined;
+        const binding = (taskAfter.metadata as any).goalBinding as
+          | GoalBinding
+          | undefined;
         if (binding) {
           const hookResult = onTaskStatusChanged(
             taskAfter,
             beforeStatus,
             taskAfter.status,
-            { verifierRegistry: this.verifierRegistry },
+            { verifierRegistry: this.verifierRegistry }
           );
           if (hookResult.syncEffects.length > 0) {
             // Self-targeted hold effects were already handled by preconditioning.
             // Filter them out to avoid double-application; schedule only cross-task
             // and goal-status effects.
-            const { self, remaining } = partitionSelfHoldEffects(targetId, hookResult.syncEffects);
+            const { self, remaining } = partitionSelfHoldEffects(
+              targetId,
+              hookResult.syncEffects
+            );
 
             // Tripwire: if self-hold effects exist but don't match the already-
             // applied state, preconditioning and the hook have diverged.
@@ -1441,11 +1789,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
               for (const effect of self) {
                 if (effect.type === 'apply_hold' && !binding.hold) {
                   console.error(
-                    `[TaskIntegration] handleManagementAction: self-hold effect produced but preconditioning did not apply hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`,
+                    `[TaskIntegration] handleManagementAction: self-hold effect produced but preconditioning did not apply hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`
                   );
                 } else if (effect.type === 'clear_hold' && binding.hold) {
                   console.error(
-                    `[TaskIntegration] handleManagementAction: clear_hold effect produced but preconditioning did not clear hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`,
+                    `[TaskIntegration] handleManagementAction: clear_hold effect produced but preconditioning did not clear hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`
                   );
                 }
               }
@@ -1464,7 +1812,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   async addTask(taskData: Partial<Task>): Promise<Task> {
     // Goal-sourced task interception: route through GoalResolver when enabled
-    if (this.goalResolver && taskData.source === 'goal' && GOAL_RESOLVER_GATED_TYPES.has(taskData.type ?? '')) {
+    if (
+      this.goalResolver &&
+      taskData.source === 'goal' &&
+      GOAL_RESOLVER_GATED_TYPES.has(taskData.type ?? '')
+    ) {
       const goalType = this.inferGoalType(taskData);
       if (goalType) {
         const resolved = await this.resolveGoalTask(goalType, taskData);
@@ -1487,7 +1839,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const steps = stepResult.steps;
 
     // Detect blocked sentinel from solver (e.g., Rig E solver not implemented)
-    const blockedSentinel = steps.length === 1 && steps[0].meta?.blocked === true;
+    const blockedSentinel =
+      steps.length === 1 && steps[0].meta?.blocked === true;
 
     // Resolve requirements for the task
     const requirement = resolveRequirement(taskData);
@@ -1555,7 +1908,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     ) {
       console.error(
         `[INVARIANT VIOLATION] Internal sub-task "${taskData.title}" has no requirementCandidate. ` +
-        `Parent: ${(taskData as any).metadata.parentTaskId}. Fix the sub-task creation site.`
+          `Parent: ${(taskData as any).metadata.parentTaskId}. Fix the sub-task creation site.`
       );
     }
 
@@ -1567,8 +1920,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
     if (blockedSentinel) {
-      const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
-      applyTaskBlock(task, reason, { status: 'pending_planning', clearSteps: true });
+      const reason =
+        (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
+      applyTaskBlock(task, reason, {
+        status: 'pending_planning',
+        clearSteps: true,
+      });
     }
 
     return this.finalizeNewTask(task, blockedSentinel);
@@ -1590,15 +1947,19 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const { goalBinding: _gb, origin: _origin, ...safeMetadata } = metadata;
     if (metadata.goalBinding !== undefined) {
       console.warn(
-        `[TaskIntegration] updateTaskMetadata: goalBinding field ignored for task ${taskId}; use goal-binding APIs instead`,
+        `[TaskIntegration] updateTaskMetadata: goalBinding field ignored for task ${taskId}; use goal-binding APIs instead`
       );
     }
     if (metadata.origin !== undefined) {
       console.warn(
-        `[TaskIntegration] updateTaskMetadata: origin field ignored for task ${taskId}; origin is immutable after creation`,
+        `[TaskIntegration] updateTaskMetadata: origin field ignored for task ${taskId}; origin is immutable after creation`
       );
     }
-    task.metadata = { ...task.metadata, ...safeMetadata, updatedAt: Date.now() };
+    task.metadata = {
+      ...task.metadata,
+      ...safeMetadata,
+      updatedAt: Date.now(),
+    };
     this.taskStore.setTask(task);
     this.taskStore.updateStatistics();
     this.emit('taskMetadataUpdated', { task, metadata });
@@ -1620,7 +1981,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     taskId: string,
     progress: number,
     status?: Task['status'],
-    options?: MutationOptions,
+    options?: MutationOptions
   ): boolean {
     const task = this.taskStore.getTask(taskId);
     if (!task) {
@@ -1632,7 +1993,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Don't update progress for failed tasks unless explicitly changing status
     if (task.status === 'failed' && !status) {
-      console.log(`🔇 Suppressing progress update for failed task: ${taskId}`);
+      console.log(
+        `[TaskIntegration] Suppressing progress update for failed task: ${taskId}`
+      );
       return false;
     }
 
@@ -1644,10 +2007,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // 'active' is allowed ONLY as a no-op (when the task is already active).
     // Allowing 'active' as a transition would let a caller unpause a held task
     // without clearing the hold, recreating the active-with-hold illegal state.
-    const TERMINAL_PROGRESS_STATUSES: ReadonlySet<string> = new Set(['completed', 'failed']);
-    if (status && status !== oldStatus && !TERMINAL_PROGRESS_STATUSES.has(status)) {
+    const TERMINAL_PROGRESS_STATUSES: ReadonlySet<string> = new Set([
+      'completed',
+      'failed',
+    ]);
+    if (
+      status &&
+      status !== oldStatus &&
+      !TERMINAL_PROGRESS_STATUSES.has(status)
+    ) {
       console.warn(
-        `[TaskIntegration] updateTaskProgress: status transition to '${status}' not allowed via progress API for task ${taskId}; use updateTaskStatus instead`,
+        `[TaskIntegration] updateTaskProgress: status transition to '${status}' not allowed via progress API for task ${taskId}; use updateTaskStatus instead`
       );
       return false;
     }
@@ -1699,7 +2069,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Both hooks produce effects that are collected and scheduled once.
     const origin = options?.origin ?? 'runtime';
     if (origin === 'runtime') {
-      const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+      const binding = (task.metadata as any).goalBinding as
+        | GoalBinding
+        | undefined;
       if (binding) {
         const allEffects: SyncEffect[] = [];
 
@@ -1713,7 +2085,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             task,
             oldStatus,
             task.status,
-            { verifierRegistry: this.verifierRegistry },
+            { verifierRegistry: this.verifierRegistry }
           );
           if (statusHookResult.syncEffects.length > 0) {
             // Apply self-targeted hold effects synchronously before persist
@@ -1726,11 +2098,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         }
 
         // Progress hook (existing behavior)
-        const progressHookResult = onTaskProgressUpdated(
-          task,
-          task.progress,
-          { verifierRegistry: this.verifierRegistry },
-        );
+        const progressHookResult = onTaskProgressUpdated(task, task.progress, {
+          verifierRegistry: this.verifierRegistry,
+        });
         if (progressHookResult.syncEffects.length > 0) {
           allEffects.push(...progressHookResult.syncEffects);
         }
@@ -1761,7 +2131,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Complete a task step with action verification.
    * Pass skipVerification=true to force-complete a step after repeated verification failures.
    */
-  async completeTaskStep(taskId: string, stepId: string, opts?: { skipVerification?: boolean }): Promise<boolean> {
+  async completeTaskStep(
+    taskId: string,
+    stepId: string,
+    opts?: { skipVerification?: boolean }
+  ): Promise<boolean> {
     const task = this.taskStore.getTask(taskId);
     if (!task) {
       return false;
@@ -1812,7 +2186,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     let finalStatus: Task['status'] | undefined;
 
     if (task.status === 'failed') {
-      console.log(`🔇 Skipping progress update for failed task: ${taskId}`);
+      console.log(
+        `[TaskIntegration] Skipping progress update for failed task: ${taskId}`
+      );
       return true;
     }
 
@@ -1826,15 +2202,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const expectedItem = req?.item ?? req?.outputPattern;
       if (expectedItem) {
         try {
-          const response = await this.minecraftRequest('/inventory', {
-            timeout: 5000,
-          });
-          if (response.ok) {
-            const data = (await response.json()) as any;
-            const raw = data?.data;
-            const inventory: any[] = Array.isArray(raw)
-              ? raw
-              : (raw?.items ?? []);
+          const inventory = await this.getInventoryItems();
+          if (inventory.length > 0) {
             const target = expectedItem.toLowerCase();
             const expectedQty = req?.quantity ?? 1;
 
@@ -1993,17 +2362,55 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           args.item ?? args.blockType ?? producedItem ?? 'unknown'
         );
         const acquireTimeout = Math.max(timeout, 20000);
-        return this.retryUntil(
-          () => this.verifyInventoryDelta(taskId, stepId, item, 1, /* isMineStep */ true),
+        const acceptedNames = this.getInventoryNamesForVerification(item, true);
+        const snap = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as
+          | StepSnapshot
+          | undefined;
+        console.log(
+          `[Verify:acquire_material] START item=${item} accepted=[${acceptedNames}] ` +
+            `timeout=${acquireTimeout}ms hasSnapshot=${!!snap} ` +
+            `snapshotCounts=${snap ? acceptedNames.map((n) => `${n}:${snap.inventoryByName?.[n] ?? 0}`).join(',') : 'none'}`
+        );
+        const passed = await this.retryUntil(
+          () =>
+            this.verifyInventoryDelta(
+              taskId,
+              stepId,
+              item,
+              1,
+              /* isMineStep */ true
+            ),
           acquireTimeout
         );
+        if (!passed) {
+          // Final diagnostic: fetch inventory one more time and log what's actually there
+          try {
+            const inv = await this.getInventoryItems();
+            const idx = this.buildInventoryIndex(inv);
+            const relevant = acceptedNames
+              .map((n) => `${n}:${idx[n] ?? 0}`)
+              .join(',');
+            const allKeys = Object.entries(idx)
+              .map(([k, v]) => `${k}:${v}`)
+              .join(',');
+            console.warn(
+              `[Verify:acquire_material] FINAL_FAIL item=${item} relevant=[${relevant}] ` +
+                `allInventory=[${allKeys}] snapshotBefore=${snap ? acceptedNames.reduce((s, n) => s + (snap.inventoryByName?.[n] ?? 0), 0) : 'none'}`
+            );
+          } catch {
+            /* diagnostic only */
+          }
+        }
+        return passed;
       }
 
       default:
         // Unknown leaf — the action already succeeded at dispatch time.
         // Log for audit but allow progression rather than blocking all
         // newly-added leaves until a verification case is written.
-        console.log(`[Verification] No verifier for leaf '${leafId}' — allowing progression`);
+        console.log(
+          `[Verification] No verifier for leaf '${leafId}' — allowing progression`
+        );
         return true;
     }
   }
@@ -2288,7 +2695,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private async retryUntil(
     fn: () => Promise<boolean>,
     timeoutMs: number,
-    intervalMs = 400
+    intervalMs = 2000
   ): Promise<boolean> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -2318,15 +2725,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         | StepSnapshot
         | undefined;
 
-      const res = await this.minecraftRequest('/inventory', { timeout: 4000 });
-      if (!res.ok) return false;
-
-      const data = (await res.json()) as any;
-      const raw = data?.data;
-      const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
+      const inventory = await this.getInventoryItems();
       const afterIdx = this.buildInventoryIndex(inventory);
 
-      const acceptedNames = this.getInventoryNamesForVerification(itemId, isMineStep);
+      const acceptedNames = this.getInventoryNamesForVerification(
+        itemId,
+        isMineStep
+      );
       const before = acceptedNames.reduce(
         (sum, name) => sum + (start?.inventoryByName?.[name] ?? 0),
         0
@@ -2336,8 +2741,25 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         0
       );
 
-      return after - before >= minDelta;
-    } catch {
+      const passed = after - before >= minDelta;
+      if (!passed) {
+        // Include per-name breakdown and full inventory keys for disambiguation
+        const perName = acceptedNames
+          .map(
+            (n) =>
+              `${n}(before=${start?.inventoryByName?.[n] ?? 0},after=${afterIdx[n] ?? 0})`
+          )
+          .join(' ');
+        const invKeys = Object.keys(afterIdx).join(',');
+        console.warn(
+          `[verifyInventoryDelta] FAIL item=${itemId} accepted=[${acceptedNames}] ` +
+            `before=${before} after=${after} delta=${after - before} need=${minDelta} ` +
+            `hasSnapshot=${!!start} breakdown=[${perName}] inventoryKeys=[${invKeys}]`
+        );
+      }
+      return passed;
+    } catch (err) {
+      console.warn(`[verifyInventoryDelta] ERROR item=${itemId}:`, err);
       return false;
     }
   }
@@ -2351,16 +2773,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
-      const res = await this.minecraftRequest('/inventory', { timeout: 4000 });
-      if (!res.ok) return false;
-      const data = (await res.json()) as any;
-      const raw = data?.data;
-      const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
+      const inventory = await this.getInventoryItems();
       const total = Array.isArray(inventory)
         ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
         : 0;
       if (start && typeof start.inventoryTotal === 'number') {
-        return total > start.inventoryTotal;
+        const passed = total > start.inventoryTotal;
+        if (!passed) {
+          console.warn(
+            `[verifyPickupFromInventoryDelta] FAIL startTotal=${start.inventoryTotal} nowTotal=${total}`
+          );
+        }
+        return passed;
       }
       // No baseline; accept if any items present
       return total > 0;
@@ -2422,15 +2846,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    */
   private async verifySmeltedItem(): Promise<boolean> {
     try {
-      const res = await this.minecraftRequest('/inventory', { timeout: 5000 });
-      if (!res.ok) return false;
-      const data = (await res.json()) as any;
-      const inventory = data?.data || [];
+      const inventory = await this.getInventoryItems();
       const patterns = ['iron_ingot', 'cooked_', 'charcoal'];
-      return inventory.some((it: any) => {
+      const found = inventory.some((it: any) => {
         const name = String(it?.type || it?.name || '').toLowerCase();
         return patterns.some((p) => name.includes(p));
       });
+      if (!found) {
+        console.warn(
+          `[verifySmeltedItem] FAIL patterns=[${patterns}] inventorySize=${Array.isArray(inventory) ? inventory.length : 0}`
+        );
+      }
+      return found;
     } catch {
       return false;
     }
@@ -2445,7 +2872,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    *   These only apply in mine/dig contexts where the environment determines the drop.
    *   Craft/smelt verification should NOT set this — it would create false equivalences.
    */
-  private getInventoryNamesForVerification(resourceType: string, isMineStep = false): string[] {
+  private getInventoryNamesForVerification(
+    resourceType: string,
+    isMineStep = false
+  ): string[] {
     const lower = resourceType.toLowerCase();
     const names = [lower];
     const drop = ORE_DROP_MAP[lower as keyof typeof ORE_DROP_MAP];
@@ -2494,7 +2924,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         // Shadow: evaluate + log, no mutations
         console.log(
           `[Shadow:RigG] Task ${taskId}: proceed=${advice.shouldProceed}, ` +
-          `replan=${advice.shouldReplan}, reason=${advice.blockReason || 'none'}`
+            `replan=${advice.shouldReplan}, reason=${advice.blockReason || 'none'}`
         );
         this.emit('taskLifecycleEvent', {
           type: 'shadow_rig_g_evaluation',
@@ -2515,7 +2945,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       if (!advice.shouldProceed) {
         // Route through updateTaskStatus so goal-binding protocol hooks fire
-        task.metadata.blockedReason = advice.blockReason || 'Rig G feasibility gate failed';
+        task.metadata.blockedReason =
+          advice.blockReason || 'Rig G feasibility gate failed';
         task.metadata.updatedAt = Date.now();
         this.taskStore.setTask(task); // persist metadata before status transition
         await this.updateTaskStatus(taskId, 'unplannable');
@@ -2547,9 +2978,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Await so verification has a baseline when completeTaskStep runs.
     const key = `${taskId}-${stepId}`;
     try {
-      const [healthRes, invRes] = await Promise.all([
+      const [healthRes, inventory] = await Promise.all([
         this.minecraftRequest('/health', { timeout: 3000 }),
-        this.minecraftRequest('/inventory', { timeout: 3000 }),
+        this.getInventoryItems(),
       ]);
 
       const snap: StepSnapshot = { ts: Date.now() };
@@ -2569,10 +3000,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         const health = data?.botStatus?.health;
         if (typeof health === 'number') snap.health = health;
       }
-      if (invRes.ok) {
-        const invData = (await invRes.json()) as any;
-        const raw = invData?.data;
-        const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
+      if (inventory.length > 0) {
         snap.inventoryTotal = inventory.reduce(
           (s: number, it: any) => s + (it?.count || 0),
           0
@@ -2586,7 +3014,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Update task status to active if it was pending
     if (task.status === 'pending') {
-      this.updateTaskProgress(taskId, task.progress, 'active');
+      await this.updateTaskStatus(taskId, 'active');
     }
 
     this.emit('taskStepStarted', { task, step });
@@ -2731,11 +3159,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (parent.metadata?.blockedReason !== 'waiting_on_prereq') return;
 
     // Check if all sibling tasks with same parentTaskId are terminal
-    const siblings = this.taskStore.getAllTasks().filter(
-      (t) =>
-        t.metadata?.parentTaskId === parentId &&
-        t.id !== completedTask.id
-    );
+    const siblings = this.taskStore
+      .getAllTasks()
+      .filter(
+        (t) =>
+          t.metadata?.parentTaskId === parentId && t.id !== completedTask.id
+      );
     const allTerminal = siblings.every(
       (t) => t.status === 'completed' || t.status === 'failed'
     );
@@ -2756,6 +3185,85 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (!templateId) return;
 
     const planId = task.metadata.solver?.buildingPlanId;
+    let joinKeys = task.metadata.solver?.buildingSolveJoinKeys;
+
+    // ------------------------------------------------------------------
+    // MIGRATION COMPAT: deprecated solveJoinKeys fallback
+    // Issue: [CB-XXX] Remove after 2026-02-15 if no migration logs observed
+    // Narrowed: only building tasks with templateId, no other per-domain keys
+    // ------------------------------------------------------------------
+    if (!joinKeys && isDeprecatedJoinKeysCompatEnabled() && isSafeForDeprecatedFallback(task)) {
+      const deprecated = task.metadata.solver?.solveJoinKeys;
+      // Shape sanity: require bundleHash presence (core identity field)
+      if (deprecated && deprecated.planId === planId && deprecated.bundleHash) {
+        // During migration, deprecated keys lack solverId — accept if planId matches
+        joinKeys = deprecated;
+        logMigrationFallbackOnce(task.id, planId);
+        if (isDebugJoinKeysMigrationEnabled()) {
+          console.log(`[JoinKeys] Task ${task.id} using deprecated keys slot for planId=${planId}`);
+        }
+      }
+    }
+    // ------------------------------------------------------------------
+
+    // Guard: only use join keys if they match the current planId and solverId.
+    // This prevents stale keys from a previous plan or cross-solver clobbering.
+    const keysForThisPlan = selectJoinKeysForPlan(planId, joinKeys, BUILDING_SOLVER_ID);
+
+    // Warn once per (taskId, domain, category) — category determined here at detection site
+    if (joinKeys && !keysForThisPlan) {
+      // Determine category, reason, and context at the source (not via string matching in helper)
+      let reason: string;
+      let context: StaleKeysContext;
+
+      if (!planId) {
+        reason = 'buildingPlanId missing';
+        context = {
+          taskId: task.id,
+          domain: 'building',
+          category: 'MISSING_FIELDS',
+          severity: 'unexpected',
+          planIdPresent: false,
+          keysPlanIdPresent: !!joinKeys.planId,
+        };
+      } else if (!joinKeys.planId) {
+        reason = 'joinKeys.planId missing';
+        context = {
+          taskId: task.id,
+          domain: 'building',
+          category: 'MISSING_FIELDS',
+          severity: 'unexpected',
+          planIdPresent: true,
+          keysPlanIdPresent: false,
+        };
+      } else if (joinKeys.solverId && joinKeys.solverId !== BUILDING_SOLVER_ID) {
+        reason = `solverId mismatch (got ${joinKeys.solverId})`;
+        context = {
+          taskId: task.id,
+          domain: 'building',
+          category: 'SOLVERID_MISMATCH',
+          severity: 'unexpected',
+          planId,
+          gotSolverId: joinKeys.solverId,
+          expectedSolverId: BUILDING_SOLVER_ID,
+        };
+      } else {
+        reason = `planId mismatch (keys.planId=${joinKeys.planId}, buildingPlanId=${planId})`;
+        context = {
+          taskId: task.id,
+          domain: 'building',
+          category: 'PLANID_MISMATCH',
+          severity: 'expected under replans',
+          planId,
+          keysPlanId: joinKeys.planId,
+        };
+      }
+
+      warnStaleKeysOnce(reason, context);
+    }
+
+    // Build linkage: join keys (solve-time) + outcome (execution-time)
+    const linkage = buildEpisodeLinkage(keysForThisPlan, success);
 
     // Prefer structured step.meta for module IDs; fall back to label parsing
     const completedModuleIds = task.steps
@@ -2791,11 +3299,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       failedModuleId || undefined,
       success ? undefined : 'execution_failure',
       planId,
-      true // isStub — P0 leaves don't mutate world/inventory
+      true, // isStub — P0 leaves don't mutate world/inventory
+      linkage,
     );
 
     console.log(
-      `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}`
+      `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}, ` +
+        `bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8) ?? 'none'}`
     );
   }
 
@@ -2858,7 +3368,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
         // Pre-check: is task still unplannable? Something else may have fixed it.
         if (freshTask.status !== 'unplannable') {
-          console.log(`[RigG] Task ${taskId} no longer unplannable; skipping replan`);
+          console.log(
+            `[RigG] Task ${taskId} no longer unplannable; skipping replan`
+          );
           freshTask.metadata.solver ??= {};
           freshTask.metadata.solver.rigGReplan = undefined;
           this.taskStore.setTask(freshTask);
@@ -2869,7 +3381,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         freshTask.metadata.solver ??= {};
         freshTask.metadata.solver.replanAttempts = attempts;
 
-        const previousDigest = freshTask.metadata.solver.stepsDigest as string | undefined;
+        const previousDigest = freshTask.metadata.solver.stepsDigest as
+          | string
+          | undefined;
 
         const result = await this.regenerateSteps(taskId, {
           reason: advice.replanReason,
@@ -2884,7 +3398,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
           // Digest comparison: if steps are identical, world hasn't changed enough
           if (result.stepsDigest && result.stepsDigest === previousDigest) {
-            console.warn(`[RigG] Replan ${attempts} produced identical steps; stopping`);
+            console.warn(
+              `[RigG] Replan ${attempts} produced identical steps; stopping`
+            );
             this.taskStore.setTask(afterTask);
             return;
           }
@@ -2896,7 +3412,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
           // If new steps are viable, transition back to pending via updateTaskStatus
           // so goal-binding protocol hooks fire for the status change.
-          if (result.steps && result.steps.length > 0 && !result.steps[0].meta?.blocked) {
+          if (
+            result.steps &&
+            result.steps.length > 0 &&
+            !result.steps[0].meta?.blocked
+          ) {
             afterTask.metadata.blockedReason = undefined;
             afterTask.metadata.solver.rigGChecked = false; // allow re-evaluation
             this.taskStore.setTask(afterTask); // persist metadata before status transition

@@ -41,6 +41,12 @@ import {
 import type { IReactiveExecutor } from '../interfaces/reactive-executor';
 import { executeViaGateway } from '../server/execution-gateway';
 import { executeReactiveViaGateway } from '../server/gateway-wrappers';
+import {
+  resolveActionFromTask,
+  createDeterministicFailure,
+  isMappingFailure,
+  type ResolveResult,
+} from '../server/task-action-resolver';
 
 export interface ExecutionResult {
   success: boolean;
@@ -1095,39 +1101,81 @@ export class ReactiveExecutor implements IReactiveExecutor {
   }
 
   /**
-   * Execute crafting task with proper validation
+   * Execute crafting task with centralized parameter resolution.
+   *
+   * Uses task-action-resolver to extract args from all known locations:
+   * 1. Legacy: task.parameters.item
+   * 2. Requirement candidate: task.parameters.requirementCandidate.outputPattern
+   * 3. Step meta.args: task.steps[0].meta.args.recipe
+   * 4. Title inference (last resort)
+   *
+   * On mapping failure, returns deterministic error (no backoff, no retries).
    */
   private async executeCraftTask(task: any, _minecraftUrl: string) {
-    const itemToCraft = task.parameters?.item || 'item';
     const taskScope = task.id;
 
+    // Use centralized resolver — fail-closed if no valid args
+    const resolved = resolveActionFromTask(task);
+    if (!resolved.ok) {
+      console.warn(
+        `[ReactiveExecutor] Craft task ${taskScope} failed resolution: ${resolved.failureCode}`,
+        resolved.evidence
+      );
+      return createDeterministicFailure(resolved);
+    }
+
+    // Inject nav lease scope
+    const parameters = {
+      ...resolved.action.parameters,
+      __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
+    };
+
     const result = await executeReactiveViaGateway(taskScope, {
-      type: 'craft_item',
-      parameters: {
-        item: itemToCraft,
-        quantity: task.parameters?.quantity || 1,
-        __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
-      },
+      type: resolved.action.type,
+      parameters,
+      timeout: resolved.action.timeout,
     });
 
     return {
       success: result.ok,
       shadow: result.outcome === 'shadow',
       error: result.error,
-      item: itemToCraft,
+      item: resolved.action.parameters.item ?? resolved.action.parameters.recipe,
       type: 'craft',
       data: result.data,
+      resolvedFrom: resolved.resolvedFrom,
     };
   }
 
   /**
-   * Execute movement task with proper validation
+   * Execute movement task with centralized parameter resolution.
+   *
+   * Move actions are permissive — can run with minimal args.
+   * Uses task-action-resolver for consistent parameter extraction.
    */
   private async executeMoveTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
+
+    // Use centralized resolver — move is permissive (always succeeds)
+    const resolved = resolveActionFromTask(task);
+    if (!resolved.ok) {
+      // Move should never fail resolution, but handle gracefully
+      console.warn(
+        `[ReactiveExecutor] Move task ${taskScope} failed resolution: ${resolved.failureCode}`,
+        resolved.evidence
+      );
+      return createDeterministicFailure(resolved);
+    }
+
+    // Inject nav lease scope
+    const parameters = {
+      ...resolved.action.parameters,
+      __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
+    };
+
     const result = await executeReactiveViaGateway(taskScope, {
-      type: 'move_forward',
-      parameters: { distance: task.parameters?.distance || 1, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
+      type: resolved.action.type,
+      parameters,
     });
 
     return {
@@ -1136,17 +1184,38 @@ export class ReactiveExecutor implements IReactiveExecutor {
       error: result.error,
       type: 'move',
       data: result.data,
+      resolvedFrom: resolved.resolvedFrom,
     };
   }
 
   /**
-   * Execute gathering task
+   * Execute gathering task with centralized parameter resolution.
+   *
+   * Uses task-action-resolver to extract resource from all known locations.
+   * On mapping failure, returns deterministic error (no backoff, no retries).
    */
   private async executeGatherTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
+
+    // Use centralized resolver — fail-closed if no valid args
+    const resolved = resolveActionFromTask(task);
+    if (!resolved.ok) {
+      console.warn(
+        `[ReactiveExecutor] Gather task ${taskScope} failed resolution: ${resolved.failureCode}`,
+        resolved.evidence
+      );
+      return createDeterministicFailure(resolved);
+    }
+
+    // Inject nav lease scope
+    const parameters = {
+      ...resolved.action.parameters,
+      __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
+    };
+
     const result = await executeReactiveViaGateway(taskScope, {
-      type: 'gather',
-      parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
+      type: resolved.action.type,
+      parameters,
     });
 
     return {
@@ -1154,18 +1223,41 @@ export class ReactiveExecutor implements IReactiveExecutor {
       shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'gather',
+      resource: resolved.action.parameters.resource,
       data: result.data,
+      resolvedFrom: resolved.resolvedFrom,
     };
   }
 
   /**
-   * Execute exploration task
+   * Execute exploration task with centralized parameter resolution.
+   *
+   * Explore actions are permissive — can run with minimal args.
+   * Uses task-action-resolver for consistent parameter extraction.
    */
   private async executeExploreTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
+
+    // Use centralized resolver — explore is permissive (always succeeds)
+    const resolved = resolveActionFromTask(task);
+    if (!resolved.ok) {
+      // Explore should never fail resolution, but handle gracefully
+      console.warn(
+        `[ReactiveExecutor] Explore task ${taskScope} failed resolution: ${resolved.failureCode}`,
+        resolved.evidence
+      );
+      return createDeterministicFailure(resolved);
+    }
+
+    // Inject nav lease scope
+    const parameters = {
+      ...resolved.action.parameters,
+      __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
+    };
+
     const result = await executeReactiveViaGateway(taskScope, {
-      type: 'explore',
-      parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
+      type: resolved.action.type,
+      parameters,
     });
 
     return {
@@ -1174,24 +1266,46 @@ export class ReactiveExecutor implements IReactiveExecutor {
       error: result.error,
       type: 'explore',
       data: result.data,
+      resolvedFrom: resolved.resolvedFrom,
     };
   }
 
   /**
-   * Execute mining task
+   * Execute mining task with centralized parameter resolution.
+   *
+   * Uses task-action-resolver to extract block from all known locations:
+   * 1. Legacy: task.parameters.block
+   * 2. Requirement candidate: task.parameters.requirementCandidate.outputPattern
+   * 3. Step meta.args: task.steps[0].meta.args.block
+   * 4. Title inference (last resort)
+   *
+   * On mapping failure, returns deterministic error (no backoff, no retries).
    */
   private async executeMineTask(task: any, _minecraftUrl: string) {
     console.log(`⛏️ Executing mining task: ${task.title}`);
 
     const taskScope = task.id;
+
+    // Use centralized resolver — fail-closed if no valid args
+    const resolved = resolveActionFromTask(task);
+    if (!resolved.ok) {
+      console.warn(
+        `[ReactiveExecutor] Mine task ${taskScope} failed resolution: ${resolved.failureCode}`,
+        resolved.evidence
+      );
+      return createDeterministicFailure(resolved);
+    }
+
+    // Inject nav lease scope
+    const parameters = {
+      ...resolved.action.parameters,
+      __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
+    };
+
     const result = await executeReactiveViaGateway(taskScope, {
-      type: 'dig_block',
-      parameters: {
-        block: task.parameters?.block || 'stone',
-        position: task.parameters?.position || 'current',
-        __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
-      },
-      timeout: 30000,
+      type: resolved.action.type,
+      parameters,
+      timeout: resolved.action.timeout ?? 30000,
     });
 
     return {
@@ -1199,7 +1313,9 @@ export class ReactiveExecutor implements IReactiveExecutor {
       shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'mining',
+      block: resolved.action.parameters.block,
       data: result.data,
+      resolvedFrom: resolved.resolvedFrom,
     };
   }
 

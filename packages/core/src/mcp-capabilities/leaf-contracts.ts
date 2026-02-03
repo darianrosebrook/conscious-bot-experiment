@@ -115,6 +115,8 @@ export type ExecErrorCode =
   | 'invalid_input'
   | 'invalid_output'
   | 'postcondition_failed'
+  | 'postcondition_failed:equip_tool'
+  | 'postcondition_failed:place_workstation'
   | 'aborted'
   | 'unknown';
 

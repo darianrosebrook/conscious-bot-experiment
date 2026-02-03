@@ -1110,6 +1110,22 @@ export class EquipToolLeaf implements LeafImpl {
       // Equip the tool
       await bot.equip(bestItem, 'hand');
 
+      // Postcondition verification: confirm the tool is actually held
+      // This prevents false positives where bot.equip() returns without error
+      // but the tool isn't actually equipped (e.g., inventory desync, lag)
+      const heldItem = bot.heldItem;
+      if (!heldItem || heldItem.name !== bestItem.name) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'postcondition_failed:equip_tool',
+            retryable: false, // Deterministic: equip call succeeded but state didn't change
+            detail: `Equip call succeeded but held item is '${heldItem?.name ?? 'nothing'}', expected '${bestItem.name}'`,
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
       const tier = TOOL_TIERS[bestTierIdx] || 'unknown';
       ctx.emitMetric('equip_tool_tier', bestTierIdx);
 

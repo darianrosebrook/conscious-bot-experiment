@@ -17,6 +17,12 @@ export interface ITaskIntegration {
   updateTaskMetadata(taskId: string, metadata: Record<string, any>): void;
   updateTaskProgress(taskId: string, progress: number, status?: string, options?: MutationOptions): void;
   updateTaskStatus(taskId: string, status: string, options?: MutationOptions): Promise<void>;
+  /**
+   * Ensure a task is activated before dispatch.
+   * If status is 'pending', transitions to 'active'.
+   * Returns true if activation occurred, false if already active/terminal.
+   */
+  ensureActivated(taskId: string): Promise<boolean>;
   completeTaskStep(taskId: string, stepId: string, opts?: { skipVerification?: boolean }): Promise<boolean>;
   startTaskStep(taskId: string, stepId: string, options?: { dryRun?: boolean }): Promise<boolean>;
   regenerateSteps(taskId: string, options?: any): Promise<any>;
@@ -28,6 +34,7 @@ export interface ITaskIntegration {
     args?: Record<string, any>
   ): boolean;
   registerSolver(solver: any): void;
+  setInventoryProvider?(provider: () => { items: any[]; ts: number } | undefined): void;
   configureHierarchicalPlanner(overrides?: {
     macroPlanner?: any;
     feedbackStore?: any;
