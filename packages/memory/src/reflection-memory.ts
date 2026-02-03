@@ -8,6 +8,7 @@
  * @author @darianrosebrook
  */
 
+import { EventEmitter } from 'events';
 import { z } from 'zod';
 
 // ============================================================================
@@ -171,7 +172,7 @@ export const DEFAULT_REFLECTION_MEMORY_CONFIG: ReflectionMemoryConfig = {
 /**
  * Manages reflection, learning, and narrative development
  */
-export class ReflectionMemoryManager {
+export class ReflectionMemoryManager extends EventEmitter {
   private config: ReflectionMemoryConfig;
   private reflections: Map<string, ReflectionEntry> = new Map();
   private lessons: Map<string, LessonLearned> = new Map();
@@ -181,21 +182,25 @@ export class ReflectionMemoryManager {
   private selfModelHistory: SelfModelUpdate[] = [];
 
   constructor(config: Partial<ReflectionMemoryConfig> = {}) {
+    super();
     this.config = { ...DEFAULT_REFLECTION_MEMORY_CONFIG, ...config };
   }
 
   /**
    * Add a new reflection
+   * @param dedupeKey Optional deterministic key for idempotent persistence.
+   *   When provided, used as reflection.id to guarantee end-to-end dedupe.
    */
   async addReflection(
     type: ReflectionEntry['type'],
     content: string,
     context: ReflectionEntry['context'],
     insights: string[] = [],
-    lessons: string[] = []
+    lessons: string[] = [],
+    dedupeKey?: string
   ): Promise<ReflectionEntry> {
     const reflection: ReflectionEntry = {
-      id: `reflection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: dedupeKey || `reflection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: Date.now(),
       type,
       content,
@@ -214,6 +219,9 @@ export class ReflectionMemoryManager {
     // Only store if relevance is above threshold
     if (reflection.relevance >= this.config.minReflectionRelevance) {
       this.reflections.set(reflection.id, reflection);
+
+      // Emit for async persistence — never awaited by caller
+      this.emit('reflection:created', reflection);
 
       // Find associations with existing reflections
       if (this.config.enableNarrativeTracking) {
@@ -243,6 +251,13 @@ export class ReflectionMemoryManager {
     }
 
     return reflection;
+  }
+
+  /**
+   * Check if a reflection exists by ID (used for in-memory dedupe before DB flush)
+   */
+  hasReflection(id: string): boolean {
+    return this.reflections.has(id);
   }
 
   /**
@@ -378,6 +393,9 @@ export class ReflectionMemoryManager {
 
     this.narrativeCheckpoints.push(checkpoint);
     this.lastCheckpoint = Date.now();
+
+    // Emit for async persistence
+    this.emit('checkpoint:created', checkpoint);
 
     console.log(`📖 Generated narrative checkpoint: ${checkpoint.title}`);
     return checkpoint;
@@ -647,6 +665,9 @@ export class ReflectionMemoryManager {
       };
 
       this.lessons.set(lesson.id, lesson);
+
+      // Emit for async persistence
+      this.emit('lesson:created', lesson);
     }
   }
 

@@ -889,7 +889,7 @@ app.get('/enhanced/stats', async (req, res) => {
   }
 });
 
-// GET /enhanced/memories — Browse memory chunks with pagination
+// GET /enhanced/memories — Browse memory chunks with pagination (S4, S7)
 app.get('/enhanced/memories', async (req, res) => {
   try {
     enhancedMemorySystem = await getEnhancedMemorySystem();
@@ -898,6 +898,8 @@ app.get('/enhanced/memories', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const type = req.query.type as string | undefined;
     const sortBy = (req.query.sortBy as string) || 'created';
+    const contentPreviewLength = parseInt(req.query.contentPreviewLength as string) || 200;
+    const includeReflections = req.query.includeReflections === 'true';
 
     let memories: any[] = [];
     try {
@@ -907,17 +909,29 @@ app.get('/enhanced/memories', async (req, res) => {
         types: type ? [type] : undefined,
       });
 
-      memories = (searchResults.results || []).map((r: any) => ({
-        id: r.id || r.chunk?.id || 'unknown',
-        content: (r.content || r.chunk?.content || '').slice(0, 200),
-        memoryType: r.type || r.chunk?.decayProfile?.memoryType || 'unknown',
-        importance: r.importance ?? r.chunk?.decayProfile?.importance ?? 0,
-        accessCount: r.chunk?.decayProfile?.accessCount ?? 0,
-        lastAccessed: r.chunk?.decayProfile?.lastAccessed ?? 0,
-        createdAt: r.chunk?.createdAt ?? 0,
-        entityCount: r.chunk?.entities?.length ?? 0,
-        relationshipCount: r.chunk?.relationships?.length ?? 0,
-      }));
+      memories = (searchResults.results || [])
+        .filter((r: any) => {
+          // S4: Exclude reflection subtypes by default
+          if (!includeReflections) {
+            const meta = r.metadata || r.chunk?.metadata || {};
+            const subtype = meta.memorySubtype;
+            if (subtype && ['reflection', 'lesson', 'narrative_checkpoint'].includes(subtype)) {
+              return false;
+            }
+          }
+          return true;
+        })
+        .map((r: any) => ({
+          id: r.id || r.chunk?.id || 'unknown',
+          content: (r.content || r.chunk?.content || '').slice(0, contentPreviewLength),
+          memoryType: r.type || r.chunk?.decayProfile?.memoryType || 'unknown',
+          importance: r.importance ?? r.chunk?.decayProfile?.importance ?? 0,
+          accessCount: r.chunk?.decayProfile?.accessCount ?? 0,
+          lastAccessed: r.chunk?.decayProfile?.lastAccessed ?? 0,
+          createdAt: r.chunk?.createdAt ?? 0,
+          entityCount: r.chunk?.entities?.length ?? 0,
+          relationshipCount: r.chunk?.relationships?.length ?? 0,
+        }));
     } catch {
       // Database not available — return empty
     }
@@ -973,6 +987,62 @@ app.get('/enhanced/knowledge-graph', async (req, res) => {
         totalEntities: 0,
         totalRelationships: 0,
       },
+    });
+  }
+});
+
+// GET /enhanced/embeddings-3d — Fetch embeddings, reduce via UMAP service, return 3D points for visualization
+app.get('/enhanced/embeddings-3d', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+    const vectorDb = enhancedMemorySystem.getVectorDatabase();
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 500, 2000);
+    const memoryTypes = req.query.types
+      ? (req.query.types as string).split(',')
+      : undefined;
+    const minImportance = parseFloat(req.query.minImportance as string) || 0;
+
+    // Fetch raw embeddings from the vector database
+    const data = await vectorDb.getEmbeddingsForVisualization({
+      limit,
+      memoryTypes,
+      minImportance,
+    });
+
+    if (data.embeddings.length < 5) {
+      return res.json({
+        points: [],
+        message: 'Not enough memories for visualization (need 5+)',
+        count: data.embeddings.length,
+      });
+    }
+
+    // Call UMAP service for dimensionality reduction
+    const umapHost = process.env.UMAP_SERVICE_HOST || 'localhost';
+    const umapPort = process.env.UMAP_SERVICE_PORT || '5003';
+
+    const umapResponse = await fetch(`http://${umapHost}:${umapPort}/reduce`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeddings: data.embeddings,
+        ids: data.ids,
+        metadata: data.metadata,
+      }),
+    });
+
+    if (!umapResponse.ok) {
+      throw new Error(`UMAP service error: ${umapResponse.statusText}`);
+    }
+
+    const result = await umapResponse.json();
+    res.json(result);
+  } catch (error) {
+    console.error('[embeddings-3d] Error:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      points: [],
     });
   }
 });
@@ -1092,6 +1162,278 @@ app.post('/enhanced/drop', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to drop database',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================================================
+// Reflection, Consolidation & Single-Memory Endpoints
+// ============================================================================
+
+// GET /enhanced/reflections — Query DB for reflections with pagination (S3: DB is canonical)
+app.get('/enhanced/reflections', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const includePlaceholders = req.query.includePlaceholders === 'true';
+
+    // S3: All listing queries go to PostgreSQL with proper offset-based pagination
+    let reflections: any[] = [];
+    let total = 0;
+    let lessons: any[] = [];
+    let narrative: any = null;
+
+    try {
+      // Reflections from DB with real pagination (ordered by created_at DESC)
+      const reflectionResult = await enhancedMemorySystem.queryReflections({
+        subtypes: ['reflection'],
+        limit,
+        page,
+        includePlaceholders,
+      });
+      reflections = reflectionResult.items.map((r: any) => {
+        const meta = r.metadata || {};
+        return {
+          id: r.id,
+          type: meta.reflectionType || meta.memorySubtype || 'unknown',
+          content: r.content || '',
+          timestamp: r.createdAt || meta.timestamp || 0,
+          emotionalValence: meta.emotionalValence ?? 0,
+          confidence: meta.confidence ?? 0.5,
+          insights: meta.insights || [],
+          lessons: meta.lessons || [],
+          tags: meta.tags || [],
+          isPlaceholder: meta.isPlaceholder ?? false,
+          memorySubtype: meta.memorySubtype,
+          dedupeKey: meta.dedupeKey,
+          significance: meta.significance,
+          narrativeArc: meta.narrativeArc,
+          emotionalTone: meta.emotionalTone,
+          title: meta.title,
+        };
+      });
+      total = reflectionResult.total;
+
+      // Lessons from DB (not in-memory) — separate subtype query
+      const lessonResult = await enhancedMemorySystem.queryReflections({
+        subtypes: ['lesson'],
+        limit: 50,
+        page: 1,
+        includePlaceholders,
+      });
+      lessons = lessonResult.items.map((r: any) => {
+        const meta = r.metadata || {};
+        return {
+          id: r.id,
+          content: r.content || '',
+          category: meta.category || 'general',
+          effectiveness: meta.effectiveness ?? 0,
+          applicationCount: meta.applicationCount ?? 0,
+        };
+      });
+
+      // Latest narrative checkpoint from DB (not in-memory)
+      const narrativeResult = await enhancedMemorySystem.queryReflections({
+        subtypes: ['narrative_checkpoint'],
+        limit: 1,
+        page: 1,
+        includePlaceholders,
+      });
+      if (narrativeResult.items.length > 0) {
+        const r = narrativeResult.items[0];
+        const meta = r.metadata || {};
+        narrative = {
+          id: r.id,
+          title: meta.title || 'Narrative Checkpoint',
+          summary: r.content || '',
+          timestamp: r.createdAt || meta.timestamp || 0,
+          significance: meta.significance ?? 0,
+          narrativeArc: meta.narrativeArc || 'unknown',
+          emotionalTone: meta.emotionalTone || 'neutral',
+        };
+      }
+    } catch {
+      // Database not available — return empty
+    }
+
+    res.json({
+      success: true,
+      data: {
+        reflections,
+        lessons,
+        narrative,
+        page,
+        limit,
+        total,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get reflections:', error);
+    res.json({
+      success: true,
+      data: { reflections: [], lessons: [], narrative: null, page: 1, limit: 20, total: 0 },
+    });
+  }
+});
+
+// POST /enhanced/reflections — Create a new reflection (S2: dedupeKey rejection)
+app.post('/enhanced/reflections', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+
+    const { type, content, context, lessons, insights, dedupeKey, isPlaceholder } = req.body;
+
+    if (!type || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: type, content',
+      });
+    }
+
+    // S2: Direct DB-backed dedupe check using metadata JSONB index
+    // Checks pending registry → in-memory map → DB in that order
+    if (dedupeKey) {
+      try {
+        const exists = await enhancedMemorySystem.findByDedupeKey(dedupeKey);
+        if (exists) {
+          return res.json({
+            success: true,
+            status: 'duplicate',
+            source: 'preflight',
+            message: `Reflection with dedupeKey "${dedupeKey}" already exists`,
+          });
+        }
+      } catch {
+        // DB check failure — proceed with creation (write queue will also dedupe)
+      }
+    }
+
+    // dedupeKey is threaded through to become reflection.id and metadata.dedupeKey
+    // isPlaceholder is preserved for metadata contract
+    const reflection = await enhancedMemorySystem.addReflection(
+      type,
+      content,
+      context || { emotionalState: 'neutral', currentGoals: [], recentEvents: [], location: null, timeOfDay: 'unknown' },
+      lessons || [],
+      insights || [],
+      dedupeKey,
+      isPlaceholder
+    );
+
+    res.json({
+      success: true,
+      data: reflection,
+    });
+  } catch (error: any) {
+    // S2b: Translate DB unique constraint violation (23505) into duplicate response
+    // This is the backstop for multi-process scenarios where the preflight check
+    // passed but another process persisted the same dedupeKey before us.
+    if (error?.code === '23505' || error?.message?.includes('duplicate key')) {
+      const dedupeKey = req.body?.dedupeKey || 'unknown';
+      console.log(`DB unique constraint caught duplicate: ${dedupeKey}`);
+      return res.json({
+        success: true,
+        status: 'duplicate',
+        source: 'db_constraint',
+        message: `Reflection with dedupeKey "${dedupeKey}" already exists (DB constraint)`,
+      });
+    }
+
+    console.error('Failed to create reflection:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create reflection',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /enhanced/consolidate — Trigger memory consolidation (S6: single-flight lock)
+let consolidationRunning = false;
+let pendingConsolidationTrigger: string | null = null;
+
+app.post('/enhanced/consolidate', async (req, res) => {
+  const { trigger, dedupeKey } = req.body || {};
+
+  if (consolidationRunning) {
+    pendingConsolidationTrigger = trigger || 'unknown';
+    return res.json({
+      success: true,
+      status: 'coalesced',
+      message: 'Consolidation already running; will run again after.',
+    });
+  }
+
+  consolidationRunning = true;
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+    const decayResult = await enhancedMemorySystem.evaluateMemoryDecay();
+    const narrative = enhancedMemorySystem.getNarrativeCheckpoint();
+
+    res.json({
+      success: true,
+      data: {
+        trigger: trigger || 'manual',
+        dedupeKey,
+        decayResult,
+        narrative,
+        consolidatedAt: Date.now(),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to run consolidation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Consolidation failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  } finally {
+    consolidationRunning = false;
+    // If a trigger was coalesced, run one more pass
+    if (pendingConsolidationTrigger) {
+      const coalescedTrigger = pendingConsolidationTrigger;
+      pendingConsolidationTrigger = null;
+      setImmediate(async () => {
+        consolidationRunning = true;
+        try {
+          enhancedMemorySystem = await getEnhancedMemorySystem();
+          await enhancedMemorySystem.evaluateMemoryDecay();
+          console.log(`Coalesced consolidation pass completed (trigger: ${coalescedTrigger})`);
+        } catch (err) {
+          console.warn('Coalesced consolidation pass failed:', err);
+        } finally {
+          consolidationRunning = false;
+        }
+      });
+    }
+  }
+});
+
+// GET /enhanced/memories/:id — Full content of a single memory chunk (S7)
+app.get('/enhanced/memories/:id', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+    const memory = await enhancedMemorySystem.getMemoryById(req.params.id);
+
+    if (!memory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Memory not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: memory,
+    });
+  } catch (error) {
+    console.error('Failed to get memory by id:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get memory',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

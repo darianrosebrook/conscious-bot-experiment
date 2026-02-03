@@ -452,6 +452,105 @@ export class EnhancedVectorDatabase {
         USING BTREE ((spatial_context->>'world'))
       `);
 
+      // Unique partial index on dedupeKey for idempotent reflection/lesson/checkpoint writes.
+      // Only applies to rows that have a non-null dedupeKey in metadata JSONB.
+      // INVARIANT: dedupeKey is globally unique across all memory writes. Callers must
+      // namespace keys by event type (e.g. "sleep-", "death-") to avoid cross-domain collision.
+      // Violations raise a unique constraint error caught by the write queue's error handler.
+      //
+      // Safety: if pre-existing duplicate dedupeKeys exist (from before the metadata merge fix),
+      // the CREATE UNIQUE INDEX will fail. We handle this by cleaning duplicates first,
+      // keeping the newest row per dedupeKey.
+      try {
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS ${this.config.tableName}_dedupe_key_idx
+          ON ${this.config.tableName}
+          ((metadata->>'dedupeKey'))
+          WHERE metadata->>'dedupeKey' IS NOT NULL
+        `);
+      } catch (indexErr: any) {
+        if (indexErr?.code === '23505' || indexErr?.message?.includes('duplicate key')) {
+          // Guard duplicate cleanup behind explicit env flag to prevent accidental data loss.
+          // Only enable this in controlled migration scenarios.
+          const allowCleanup = process.env.MEMORY_ALLOW_DEDUPE_CLEANUP === 'true';
+          if (!allowCleanup) {
+            // Provide actionable diagnostic: show duplicate counts
+            // Wrapped defensively — the GROUP BY query can be expensive on large tables
+            try {
+              const dupQuery = await client.query(`
+                SELECT metadata->>'dedupeKey' as dedupe_key,
+                       COUNT(*) as count,
+                       MIN(created_at) as oldest,
+                       MAX(created_at) as newest
+                FROM ${this.config.tableName}
+                WHERE metadata->>'dedupeKey' IS NOT NULL
+                GROUP BY metadata->>'dedupeKey'
+                HAVING COUNT(*) > 1
+                LIMIT 10
+              `);
+              console.error(
+                `❌ Duplicate dedupeKeys exist in ${this.config.tableName}. ` +
+                  `Cannot create unique index.\n` +
+                  `   Set MEMORY_ALLOW_DEDUPE_CLEANUP=true to auto-clean duplicates (keeps newest).\n` +
+                  `   Sample duplicates (up to 10):`
+              );
+              for (const row of dupQuery.rows) {
+                console.error(`     "${row.dedupe_key}": ${row.count} copies (oldest: ${row.oldest}, newest: ${row.newest})`);
+              }
+              console.error(`\n   To inspect all duplicates manually:\n` +
+                `   SELECT metadata->>'dedupeKey', COUNT(*) FROM ${this.config.tableName}\n` +
+                `   WHERE metadata->>'dedupeKey' IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;`
+              );
+            } catch (diagErr) {
+              // Diagnostic query failed (possibly large table, timeout, etc.) — still report the index error
+              console.error(
+                `❌ Duplicate dedupeKeys exist in ${this.config.tableName}. ` +
+                  `Cannot create unique index.\n` +
+                  `   Set MEMORY_ALLOW_DEDUPE_CLEANUP=true to auto-clean duplicates (keeps newest).\n` +
+                  `   (Diagnostic query failed: ${diagErr instanceof Error ? diagErr.message : String(diagErr)})`
+              );
+            }
+            throw new Error(
+              `Duplicate dedupeKeys prevent unique index creation. ` +
+                `Set MEMORY_ALLOW_DEDUPE_CLEANUP=true to enable auto-cleanup.`
+            );
+          }
+
+          console.warn(
+            `⚠️ MEMORY_ALLOW_DEDUPE_CLEANUP=true: Cleaning duplicate dedupeKeys in ${this.config.tableName}...`
+          );
+          // Delete older duplicates, keeping the newest row per dedupeKey
+          const deleteResult = await client.query(`
+            DELETE FROM ${this.config.tableName} a
+            USING ${this.config.tableName} b
+            WHERE a.metadata->>'dedupeKey' IS NOT NULL
+              AND a.metadata->>'dedupeKey' = b.metadata->>'dedupeKey'
+              AND a.created_at < b.created_at
+            RETURNING a.id, a.metadata->>'dedupeKey' as dedupe_key
+          `);
+          console.warn(`⚠️ Deleted ${deleteResult.rowCount} duplicate rows.`);
+
+          // Retry index creation after cleanup
+          await client.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS ${this.config.tableName}_dedupe_key_idx
+            ON ${this.config.tableName}
+            ((metadata->>'dedupeKey'))
+            WHERE metadata->>'dedupeKey' IS NOT NULL
+          `);
+          console.log(`✅ Duplicate dedupeKeys cleaned, unique index created.`);
+        } else {
+          throw indexErr;
+        }
+      }
+
+      // Index for querying by memorySubtype (reflections, lessons, narrative_checkpoints)
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS ${this.config.tableName}_meta_subtype_idx
+        ON ${this.config.tableName}
+        USING BTREE ((metadata->>'memorySubtype'))
+        WHERE metadata->>'memorySubtype' IS NOT NULL
+      `);
+
       console.log(
         `✅ Enhanced vector database initialized: ${this.seedDatabase}.${this.config.tableName}`
       );
@@ -1153,6 +1252,178 @@ export class EnhancedVectorDatabase {
    */
   async storeChunk(chunk: EnhancedMemoryChunk): Promise<void> {
     return this.upsertChunk(chunk);
+  }
+
+  /**
+   * Find a chunk by metadata dedupeKey. Returns the first match or null.
+   * Used for idempotent reflection/lesson/checkpoint persistence.
+   */
+  async findByDedupeKey(dedupeKey: string): Promise<EnhancedMemoryChunk | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT * FROM ${this.config.tableName} WHERE metadata->>'dedupeKey' = $1 LIMIT 1`,
+        [dedupeKey]
+      );
+
+      if (result.rows.length === 0) return null;
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        content: row.content,
+        embedding: row.embedding,
+        metadata: row.metadata,
+        entities: row.entities || [],
+        relationships: row.relationships || [],
+        decayProfile: row.decay_profile,
+        provenance: row.provenance,
+        graphLinks: row.graph_links || [],
+        temporalContext: row.temporal_context,
+        spatialContext: row.spatial_context,
+        createdAt: row.created_at.getTime(),
+        updatedAt: row.updated_at.getTime(),
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Query chunks by metadata subtypes with pagination, ordered by creation time desc.
+   * Purpose-built listing for reflection/lesson/checkpoint surfaces.
+   */
+  async queryByMetadataSubtype(options: {
+    subtypes: string[];
+    limit: number;
+    offset: number;
+    includePlaceholders?: boolean;
+  }): Promise<{ rows: EnhancedMemoryChunk[]; total: number }> {
+    const client = await this.pool.connect();
+    try {
+      let whereClause = `metadata->>'memorySubtype' = ANY($1)`;
+      const params: any[] = [options.subtypes];
+
+      if (!options.includePlaceholders) {
+        whereClause += ` AND (metadata->>'isPlaceholder' IS NULL OR metadata->>'isPlaceholder' != 'true')`;
+      }
+
+      // Get total count
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM ${this.config.tableName} WHERE ${whereClause}`,
+        params
+      );
+      const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+      // Get paginated results
+      const dataResult = await client.query(
+        `SELECT * FROM ${this.config.tableName}
+         WHERE ${whereClause}
+         ORDER BY created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, options.limit, options.offset]
+      );
+
+      const rows = dataResult.rows.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        embedding: row.embedding,
+        metadata: row.metadata,
+        entities: row.entities || [],
+        relationships: row.relationships || [],
+        decayProfile: row.decay_profile,
+        provenance: row.provenance,
+        graphLinks: row.graph_links || [],
+        temporalContext: row.temporal_context,
+        spatialContext: row.spatial_context,
+        createdAt: row.created_at.getTime(),
+        updatedAt: row.updated_at.getTime(),
+      }));
+
+      return { rows, total };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Fetch embeddings with metadata for 3D visualization.
+   * Returns raw 768D vectors for UMAP reduction.
+   */
+  async getEmbeddingsForVisualization(options: {
+    limit?: number;
+    memoryTypes?: string[];
+    minImportance?: number;
+    since?: Date;
+  }): Promise<{
+    embeddings: number[][];
+    ids: string[];
+    metadata: Array<{
+      type: string;
+      importance: number;
+      content: string;
+      createdAt: string;
+    }>;
+  }> {
+    const { limit = 500, memoryTypes, minImportance = 0, since } = options;
+
+    // Note: pgvector's vector type can't be directly cast to float8[].
+    // We retrieve as text and parse in JS, or use vector_dims to ensure it exists.
+    let query = `
+      SELECT
+        id,
+        embedding::text as embedding_text,
+        metadata->>'type' as type,
+        (decay_profile->>'importance')::float as importance,
+        LEFT(content, 100) as content_preview,
+        created_at
+      FROM ${this.config.tableName}
+      WHERE embedding IS NOT NULL
+    `;
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (memoryTypes?.length) {
+      query += ` AND metadata->>'type' = ANY($${paramIdx++})`;
+      params.push(memoryTypes);
+    }
+    if (minImportance > 0) {
+      query += ` AND (decay_profile->>'importance')::float >= $${paramIdx++}`;
+      params.push(minImportance);
+    }
+    if (since) {
+      query += ` AND created_at >= $${paramIdx++}`;
+      params.push(since);
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIdx}`;
+    params.push(limit);
+
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(query, params);
+
+      // Parse pgvector text format "[0.1,0.2,...]" into number arrays
+      const parseVectorText = (text: string): number[] => {
+        if (!text) return [];
+        // pgvector format: "[0.1,0.2,0.3,...]"
+        const cleaned = text.replace(/^\[|\]$/g, '');
+        return cleaned.split(',').map(v => parseFloat(v.trim()));
+      };
+
+      return {
+        embeddings: result.rows.map((r: any) => parseVectorText(r.embedding_text)),
+        ids: result.rows.map((r: any) => r.id),
+        metadata: result.rows.map((r: any) => ({
+          type: r.type || 'unknown',
+          importance: r.importance || 0,
+          content: r.content_preview,
+          createdAt: r.created_at?.toISOString() || '',
+        })),
+      };
+    } finally {
+      client.release();
+    }
   }
 
   /**

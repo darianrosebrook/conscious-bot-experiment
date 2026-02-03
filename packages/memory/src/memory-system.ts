@@ -32,7 +32,12 @@ import {
 } from './semantic/graph-rag';
 import { EnhancedKnowledgeGraphCore } from './knowledge-graph-core';
 import { MemoryDecayManager } from './memory-decay-manager';
-import { ReflectionMemoryManager } from './reflection-memory';
+import {
+  ReflectionMemoryManager,
+  ReflectionEntry,
+  LessonLearned,
+  NarrativeCheckpoint,
+} from './reflection-memory';
 import { ToolEfficiencyMemoryManager } from './tool-efficiency-memory';
 import {
   CrossModalEntityLinker,
@@ -207,6 +212,22 @@ export class EnhancedMemorySystem extends EventEmitter {
   private searchStats: Array<{ timestamp: number; latency: number }> = [];
   private initialized = false;
 
+  // Reflection persistence write queue (S1: async, bounded, fire-and-forget)
+  private reflectionWriteQueue: Array<{
+    type: 'reflection' | 'lesson' | 'narrative_checkpoint';
+    data: ReflectionEntry | LessonLearned | NarrativeCheckpoint;
+    dedupeKey: string;
+  }> = [];
+  private flushInProgress = false;
+  private readonly MAX_QUEUE_SIZE = 100;
+  private readonly FLUSH_INTERVAL_MS = 5000;
+  private writeLoopTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Pending dedupe registry: tracks dedupeKeys that are in the write queue but not yet persisted.
+  // This is separate from the reflection cache to avoid eviction-related race conditions.
+  // Keys are added on enqueue, removed on successful persist or permanent failure.
+  private pendingDedupeKeys: Set<string> = new Set();
+
   // Reliability and integrity properties
   private circuitBreakers: Map<
     string,
@@ -331,6 +352,29 @@ export class EnhancedMemorySystem extends EventEmitter {
       enableSelfModelUpdates: config.enableSelfModelUpdates,
     });
 
+    // Subscribe to reflection persistence events (S1: async write queue)
+    this.reflectionMemoryManager.on('reflection:created', (reflection: ReflectionEntry) => {
+      this.enqueueReflectionWrite({
+        type: 'reflection',
+        data: reflection,
+        dedupeKey: reflection.id,
+      });
+    });
+    this.reflectionMemoryManager.on('lesson:created', (lesson: LessonLearned) => {
+      this.enqueueReflectionWrite({
+        type: 'lesson',
+        data: lesson,
+        dedupeKey: lesson.id,
+      });
+    });
+    this.reflectionMemoryManager.on('checkpoint:created', (checkpoint: NarrativeCheckpoint) => {
+      this.enqueueReflectionWrite({
+        type: 'narrative_checkpoint',
+        data: checkpoint,
+        dedupeKey: checkpoint.id,
+      });
+    });
+
     // Initialize tool efficiency memory manager for learning tool usage patterns
     this.toolEfficiencyManager = new ToolEfficiencyMemoryManager({
       enabled: config.enableToolEfficiencyTracking,
@@ -371,6 +415,9 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     this.initialized = true;
 
+    // Start reflection persistence write loop (S1)
+    this.startReflectionWriteLoop();
+
     // Start integrity monitoring
     this.startIntegrityMonitoring();
 
@@ -409,11 +456,17 @@ export class EnhancedMemorySystem extends EventEmitter {
       for (const chunk of chunks) {
         const embedding = await this.embeddingService.embed(chunk.content);
 
+        // Merge customMetadata into chunk metadata so fields like dedupeKey,
+        // memorySubtype, isPlaceholder etc. are persisted to the DB JSONB column.
+        const mergedMetadata = options.customMetadata
+          ? { ...chunk.metadata, ...options.customMetadata }
+          : chunk.metadata;
+
         const memoryChunk: EnhancedMemoryChunk = {
           id: chunk.id,
           content: chunk.content,
           embedding: embedding.embedding,
-          metadata: chunk.metadata,
+          metadata: mergedMetadata,
           entities: [],
           relationships: [],
           decayProfile: {
@@ -723,6 +776,189 @@ export class EnhancedMemorySystem extends EventEmitter {
   }
 
   // ============================================================================
+  // Reflection DB Queries (S2, S3: DB-canonical dedupe and listing)
+  // ============================================================================
+
+  /**
+   * Check if a chunk with the given dedupeKey already exists.
+   * Checks three layers in order:
+   *   1. Pending dedupe registry (keys in write queue, not yet persisted)
+   *   2. In-memory reflection map (for backwards compatibility)
+   *   3. Database (persisted reflections from this or previous sessions)
+   *
+   * The pending registry is the primary flush-gap protection and is not subject
+   * to reflection cache eviction semantics.
+   */
+  async findByDedupeKey(dedupeKey: string): Promise<boolean> {
+    // S2a: Check pending registry first (keys enqueued but not yet flushed)
+    if (this.pendingDedupeKeys.has(dedupeKey)) {
+      return true;
+    }
+    // S2b: Check in-memory reflection map (backwards compatibility)
+    if (this.reflectionMemoryManager.hasReflection(dedupeKey)) {
+      return true;
+    }
+    // S2c: Check DB (handles persisted reflections from previous sessions)
+    const chunk = await this.vectorDb.findByDedupeKey(dedupeKey);
+    return chunk !== null;
+  }
+
+  /**
+   * Query reflection/lesson/checkpoint chunks from DB with proper pagination.
+   * Returns chunks ordered by createdAt desc.
+   */
+  async queryReflections(options: {
+    subtypes?: string[];
+    limit?: number;
+    page?: number;
+    includePlaceholders?: boolean;
+  }): Promise<{
+    items: Array<{
+      id: string;
+      content: string;
+      metadata: any;
+      createdAt: number;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const subtypes = options.subtypes || ['reflection', 'lesson', 'narrative_checkpoint'];
+    const limit = options.limit || 20;
+    const page = options.page || 1;
+    const offset = (page - 1) * limit;
+
+    const result = await this.vectorDb.queryByMetadataSubtype({
+      subtypes,
+      limit,
+      offset,
+      includePlaceholders: options.includePlaceholders,
+    });
+
+    return {
+      items: result.rows.map((row) => ({
+        id: row.id,
+        content: row.content,
+        metadata: row.metadata,
+        createdAt: row.createdAt,
+      })),
+      total: result.total,
+      page,
+      limit,
+    };
+  }
+
+  // ============================================================================
+  // Reflection Persistence Write Queue (S1)
+  // ============================================================================
+
+  private enqueueReflectionWrite(job: {
+    type: 'reflection' | 'lesson' | 'narrative_checkpoint';
+    data: ReflectionEntry | LessonLearned | NarrativeCheckpoint;
+    dedupeKey: string;
+  }): void {
+    if (this.reflectionWriteQueue.length >= this.MAX_QUEUE_SIZE) {
+      console.warn('Reflection write queue full, dropping oldest entry');
+      const dropped = this.reflectionWriteQueue.shift();
+      // Clean up pending registry for dropped job
+      if (dropped) {
+        this.pendingDedupeKeys.delete(dropped.dedupeKey);
+      }
+    }
+    // Add to pending registry before queue (flush-gap protection)
+    this.pendingDedupeKeys.add(job.dedupeKey);
+    this.reflectionWriteQueue.push(job);
+  }
+
+  private startReflectionWriteLoop(): void {
+    if (this.writeLoopTimer) return;
+    this.writeLoopTimer = setInterval(
+      () => this.flushReflectionQueue(),
+      this.FLUSH_INTERVAL_MS
+    );
+  }
+
+  private async flushReflectionQueue(): Promise<void> {
+    if (this.flushInProgress || this.reflectionWriteQueue.length === 0) return;
+    this.flushInProgress = true;
+
+    const batch = this.reflectionWriteQueue.splice(0, 20);
+    for (const job of batch) {
+      try {
+        // S2: DB-side dedupe check before writing
+        const existing = await this.vectorDb.findByDedupeKey(job.dedupeKey);
+        if (existing) {
+          console.log(`Skipping duplicate ${job.type} (dedupeKey: ${job.dedupeKey})`);
+          // Remove from pending registry (already persisted, possibly from another process)
+          this.pendingDedupeKeys.delete(job.dedupeKey);
+          continue;
+        }
+
+        const data = job.data as any;
+        // Use explicit isPlaceholder if provided, else infer from content prefix
+        const isPlaceholder = data.isPlaceholder !== undefined
+          ? data.isPlaceholder
+          : (data.content || '').startsWith('[PLACEHOLDER]');
+        await this.ingestMemory({
+          type: 'thought',
+          content: data.content || data.summary || '',
+          source: `reflection-${job.type}`,
+          confidence: data.confidence ?? 0.5,
+          customMetadata: {
+            memorySubtype: job.type,
+            reflectionSchemaVersion: 1,
+            dedupeKey: job.dedupeKey,
+            isPlaceholder,
+            reflectionType: data.type,
+            emotionalValence: data.emotionalValence,
+            insights: data.insights,
+            lessons: data.lessons,
+            tags: data.tags,
+            narrativeArc: data.narrativeArc,
+            significance: data.significance,
+            emotionalTone: data.emotionalTone,
+            title: data.title,
+          },
+        });
+        // Successfully persisted — remove from pending registry
+        this.pendingDedupeKeys.delete(job.dedupeKey);
+      } catch (err) {
+        console.warn(`Failed to persist ${job.type}:`, err);
+        // Remove from pending registry on permanent failure (don't block future attempts)
+        this.pendingDedupeKeys.delete(job.dedupeKey);
+        // Don't re-enqueue — log and move on
+      }
+    }
+
+    this.flushInProgress = false;
+  }
+
+  // ============================================================================
+  // Single Memory Retrieval
+  // ============================================================================
+
+  /**
+   * Get a single memory chunk by ID (full content, not truncated)
+   */
+  async getMemoryById(id: string): Promise<{
+    id: string;
+    content: string;
+    metadata: any;
+    createdAt: number;
+    updatedAt: number;
+  } | null> {
+    const chunk = await this.vectorDb.getChunk(id);
+    if (!chunk) return null;
+    return {
+      id: chunk.id,
+      content: chunk.content,
+      metadata: chunk.metadata,
+      createdAt: chunk.createdAt,
+      updatedAt: chunk.updatedAt,
+    };
+  }
+
+  // ============================================================================
   // Private Methods
   // ============================================================================
 
@@ -842,6 +1078,14 @@ export class EnhancedMemorySystem extends EventEmitter {
    */
   getDatabaseName(): string {
     return this.vectorDb.getDatabaseName();
+  }
+
+  /**
+   * Get direct access to the vector database for advanced operations
+   * (e.g., embedding visualization)
+   */
+  getVectorDatabase(): EnhancedVectorDatabase {
+    return this.vectorDb;
   }
 
   // ============================================================================
@@ -1209,6 +1453,8 @@ export class EnhancedMemorySystem extends EventEmitter {
 
   /**
    * Add reflection entry and trigger memory cleanup
+   * @param dedupeKey Optional deterministic key for idempotent persistence.
+   * @param isPlaceholder Optional flag indicating this is a placeholder (not LLM-generated).
    */
   async addReflection(
     type:
@@ -1222,7 +1468,9 @@ export class EnhancedMemorySystem extends EventEmitter {
     content: string,
     context: any,
     lessons: string[],
-    insights: string[]
+    insights: string[],
+    dedupeKey?: string,
+    isPlaceholder?: boolean
   ): Promise<any> {
     if (!this.config.enableMetacognition) {
       console.log('⚠️ Metacognition is disabled');
@@ -1231,14 +1479,20 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     console.log(`🧘 Adding ${type} reflection...`);
 
-    // Add reflection to memory
+    // Add reflection to memory (dedupeKey becomes the reflection.id when provided)
     const reflection = await this.reflectionMemoryManager.addReflection(
       type,
       content,
       context,
       lessons,
-      insights
+      insights,
+      dedupeKey
     );
+
+    // Attach isPlaceholder for persistence threading (if explicitly set)
+    if (isPlaceholder !== undefined) {
+      (reflection as any).isPlaceholder = isPlaceholder;
+    }
 
     // Check if it's time for a narrative checkpoint and memory cleanup
     if (this.config.enableNarrativeTracking) {
@@ -2267,6 +2521,12 @@ export class EnhancedMemorySystem extends EventEmitter {
    * Close the memory system and clean up resources
    */
   async close(): Promise<void> {
+    // Stop the reflection write loop and flush remaining items
+    if (this.writeLoopTimer) {
+      clearInterval(this.writeLoopTimer);
+      this.writeLoopTimer = null;
+    }
+    await this.flushReflectionQueue();
     await this.vectorDb.close();
   }
 }
