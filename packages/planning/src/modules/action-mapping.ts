@@ -1,5 +1,38 @@
 import { logOptimizer } from './logging';
 
+/** Nav lease metadata injected via reserved __nav namespace. */
+export interface NavLeaseNav {
+  scope?: string;
+  holder?: string;
+  priority?: 'normal' | 'high' | 'emergency';
+}
+
+/** Minecraft action with optional nav lease routing metadata. */
+export interface MinecraftActionWithNav {
+  type: string;
+  parameters: Record<string, any> & { __nav?: NavLeaseNav };
+  timeout?: number;
+}
+
+/**
+ * Inject nav lease scope into an action's parameters.
+ * Uses the reserved __nav namespace to avoid collisions with action semantics.
+ * Merges with existing __nav to preserve holder/priority if already set.
+ */
+export function withNavLeaseScope<
+  A extends { type: string; parameters?: Record<string, any>; timeout?: number } | null,
+>(action: A, taskId: string): A {
+  if (!action) return action;
+  const existingNav = action.parameters?.__nav as NavLeaseNav | undefined;
+  return {
+    ...action,
+    parameters: {
+      ...(action.parameters ?? {}),
+      __nav: { ...existingNav, scope: taskId },
+    },
+  } as A;
+}
+
 export function extractItemFromTask(task: any): string {
   const title = (task.title || '').toLowerCase();
   const description = (task.description || '').toLowerCase();

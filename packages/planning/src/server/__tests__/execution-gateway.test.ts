@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   executeViaGateway,
   onGatewayAudit,
+  getExecutorMode,
   type GatewayRequest,
   type GatewayAuditEntry,
 } from '../execution-gateway';
@@ -51,6 +52,7 @@ describe('ExecutionGateway', () => {
     process.env.EXECUTOR_MODE = 'shadow';
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('shadow');
     expect(result.shadowBlocked).toBe(true);
     expect(result.error).toMatch(/shadow/i);
     // Should NOT have called mcPostJson
@@ -62,6 +64,7 @@ describe('ExecutionGateway', () => {
     process.env.EXECUTOR_LIVE_CONFIRM = 'no';
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('shadow');
     expect(result.shadowBlocked).toBe(true);
   });
 
@@ -73,6 +76,7 @@ describe('ExecutionGateway', () => {
     mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('error');
     expect(result.error).toMatch(/not connected/i);
     expect(result.shadowBlocked).toBe(false);
     expect(mockMcPostJson).not.toHaveBeenCalled();
@@ -82,6 +86,7 @@ describe('ExecutionGateway', () => {
     mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'timeout' });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('error');
     expect(result.error).toMatch(/timed out/i);
   });
 
@@ -99,6 +104,7 @@ describe('ExecutionGateway', () => {
     });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(true);
+    expect(result.outcome).toBe('executed');
     expect(result.data).toEqual({ success: true, collected: 3 });
     expect(result.shadowBlocked).toBe(false);
     expect(result.origin).toBe('reactive');
@@ -120,6 +126,7 @@ describe('ExecutionGateway', () => {
     });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('executed');
     expect(result.error).toBe('No reachable oak_log found');
     expect(result.failureCode).toBe('acquire.noneCollected');
     expect(result.data).toEqual({
@@ -136,6 +143,7 @@ describe('ExecutionGateway', () => {
     });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('error');
     expect(result.error).toBe('HTTP 500: Internal server error');
   });
 
@@ -152,6 +160,7 @@ describe('ExecutionGateway', () => {
     });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('executed');
     expect(result.error).toBe('Cannot reach target block');
   });
 
@@ -163,6 +172,7 @@ describe('ExecutionGateway', () => {
     mockMcPostJson.mockRejectedValue(new Error('ECONNREFUSED'));
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('error');
     expect(result.error).toBe('ECONNREFUSED');
     expect(result.shadowBlocked).toBe(false);
   });
@@ -190,6 +200,7 @@ describe('ExecutionGateway', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].origin).toBe('executor');
     expect(entries[0].mode).toBe('live');
+    expect(entries[0].outcome).toBe('executed');
     expect(entries[0].ok).toBe(true);
     expect(entries[0].action.type).toBe('dig_block');
     expect(entries[0].context?.taskId).toBe('task-1');
@@ -206,6 +217,7 @@ describe('ExecutionGateway', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0].mode).toBe('shadow');
+    expect(entries[0].outcome).toBe('shadow');
     expect(entries[0].ok).toBe(false);
     expect(entries[0].durationMs).toBe(0);
   });
@@ -228,6 +240,7 @@ describe('ExecutionGateway', () => {
     unsub();
 
     expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('executed');
     expect(entries[0].ok).toBe(false);
     expect(entries[0].failureCode).toBe('acquire.noneCollected');
   });
@@ -257,5 +270,103 @@ describe('ExecutionGateway', () => {
     });
     const result = await executeViaGateway(makeRequest({ origin: 'safety' }));
     expect(result.origin).toBe('safety');
+  });
+
+  // -----------------------------------------------------------------------
+  // Outcome invariants
+  // -----------------------------------------------------------------------
+
+  it('outcome invariant: shadow implies ok===false and no failureCode', async () => {
+    process.env.EXECUTOR_MODE = 'shadow';
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('shadow');
+    expect(result.ok).toBe(false);
+    expect(result.failureCode).toBeUndefined();
+  });
+
+  it('outcome invariant: error implies ok===false', async () => {
+    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('error');
+    expect(result.ok).toBe(false);
+  });
+
+  it('outcome invariant: executed can have ok===true', async () => {
+    mockMcPostJson.mockResolvedValue({
+      ok: true,
+      data: { success: true, result: { success: true } },
+    });
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('executed');
+    expect(result.ok).toBe(true);
+  });
+
+  it('outcome invariant: executed can have ok===false', async () => {
+    mockMcPostJson.mockResolvedValue({
+      ok: true,
+      data: { success: true, result: { success: false, error: { detail: 'fail' } } },
+    });
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('executed');
+    expect(result.ok).toBe(false);
+  });
+
+  it('outcome invariant: shadow audit entry has mode=shadow', async () => {
+    process.env.EXECUTOR_MODE = 'shadow';
+    const entries: GatewayAuditEntry[] = [];
+    const unsub = onGatewayAudit((e) => entries.push(e));
+
+    await executeViaGateway(makeRequest());
+    unsub();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('shadow');
+    expect(entries[0].mode).toBe('shadow');
+  });
+
+  it('outcome invariant: error implies no failureCode (infra vs action-level)', async () => {
+    // Bot not connected is an infra error, not an action-level failure
+    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('error');
+    expect(result.failureCode).toBeUndefined();
+  });
+
+  it('outcome invariant: executed with ok=false may have failureCode', async () => {
+    mockMcPostJson.mockResolvedValue({
+      ok: true,
+      data: {
+        success: true,
+        result: {
+          success: false,
+          error: { detail: 'No tree', code: 'acquire.noneCollected' },
+        },
+      },
+    });
+    const result = await executeViaGateway(makeRequest());
+    expect(result.outcome).toBe('executed');
+    expect(result.ok).toBe(false);
+    expect(result.failureCode).toBe('acquire.noneCollected');
+  });
+
+  // -----------------------------------------------------------------------
+  // getExecutorMode (for auto-unblock logic)
+  // -----------------------------------------------------------------------
+
+  it('getExecutorMode returns shadow by default', () => {
+    process.env.EXECUTOR_MODE = 'shadow';
+    expect(getExecutorMode()).toBe('shadow');
+  });
+
+  it('getExecutorMode returns live when confirmed', () => {
+    process.env.EXECUTOR_MODE = 'live';
+    process.env.EXECUTOR_LIVE_CONFIRM = 'YES';
+    expect(getExecutorMode()).toBe('live');
+  });
+
+  it('getExecutorMode returns shadow when live not confirmed', () => {
+    process.env.EXECUTOR_MODE = 'live';
+    process.env.EXECUTOR_LIVE_CONFIRM = 'NO';
+    expect(getExecutorMode()).toBe('shadow');
   });
 });

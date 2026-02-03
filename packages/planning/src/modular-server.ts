@@ -61,6 +61,7 @@ import {
   extractItemFromTask,
   mapTaskTypeToMinecraftAction,
   mapBTActionToMinecraft,
+  withNavLeaseScope,
 } from './modules/action-mapping';
 import {
   InventoryItem,
@@ -122,7 +123,7 @@ import type {
   MinecraftNavigationSolver,
 } from './sterling';
 import { normalizeActionResponse } from './server/action-response';
-import { executeViaGateway } from './server/execution-gateway';
+import { executeViaGateway, getExecutorMode } from './server/execution-gateway';
 import { createSterlingBootstrap } from './server/sterling-bootstrap';
 import {
   detectActionableSteps,
@@ -549,8 +550,10 @@ async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
   if (!action) {
     return {
       ok: false,
+      outcome: 'error' as const,
       error: 'No action provided',
       data: null,
+      shadowBlocked: false,
       environmentDeltas: {},
     };
   }
@@ -563,6 +566,9 @@ async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
         parameters: action.parameters,
         timeout: action.timeout,
       },
+      context: action.parameters?.__nav?.scope
+        ? { taskId: action.parameters.__nav.scope }
+        : undefined,
     },
     signal
   );
@@ -1632,6 +1638,24 @@ async function autonomousTaskExecutor() {
       console.log(
         `[AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks, executing...`
       );
+    }
+
+    // Auto-unblock shadow-blocked tasks when mode switches to live.
+    // This makes shadow mode useful for observation: tasks resume when you go live.
+    const currentMode = getExecutorMode();
+    if (currentMode === 'live') {
+      for (const t of activeTasks) {
+        if (t.metadata?.blockedReason === 'shadow_mode') {
+          taskIntegration.updateTaskMetadata(t.id, {
+            blockedReason: undefined,
+            blockedAt: undefined,
+            // Keep shadowObservationCount for audit trail
+          });
+          console.log(
+            `[AUTONOMOUS EXECUTOR] Auto-unblocked shadow task ${t.id}: mode is now live`
+          );
+        }
+      }
     }
 
     // Auto-fail tasks that have been blocked for longer than the TTL.
@@ -2943,13 +2967,27 @@ async function autonomousTaskExecutor() {
         // Map task type to real Minecraft action
         const minecraftAction = mapTaskTypeToMinecraftAction(currentTask);
 
-        if (minecraftAction) {
+        // Thread task scope for nav lease isolation
+        const scopedAction = withNavLeaseScope(minecraftAction, currentTask.id);
+        if (scopedAction) {
           console.log(`🔄 Executing task: ${currentTask.title}`);
 
           // Execute real Minecraft action
-          const actionResult = await executeActionWithBotCheck(minecraftAction);
+          const actionResult = await executeActionWithBotCheck(scopedAction);
 
-          if (actionResult.ok) {
+          if (actionResult.outcome === 'shadow') {
+            // Shadow mode: observation recorded. Task is blocked until mode changes.
+            // NOT a failure — do not consume retries.
+            console.log(`[Shadow] Observed: ${currentTask.title} (${scopedAction.type})`);
+            taskIntegration.updateTaskMetadata(currentTask.id, {
+              blockedReason: 'shadow_mode',
+              blockedAt: Date.now(),
+              shadowObservationCount: (currentTask.metadata?.shadowObservationCount || 0) + 1,
+            });
+            // Task stays 'active' with blockedReason. Executor skips blocked tasks.
+            // Auto-fail TTL (2 min) applies: if shadow mode persists, task will
+            // auto-fail rather than spin indefinitely.
+          } else if (actionResult.ok) {
             console.log(`✅ Task executed successfully: ${currentTask.title}`);
 
             await recomputeProgressAndMaybeComplete(currentTask);

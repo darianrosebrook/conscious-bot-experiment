@@ -42,6 +42,19 @@ export type ExecutionOrigin =
 /** Priority level for the action. */
 export type ExecutionPriority = 'normal' | 'high' | 'emergency';
 
+/**
+ * Three-way outcome discriminator.
+ * - 'executed': action was dispatched to MC interface (ok may be true or false)
+ * - 'shadow': action was blocked by shadow mode (not a failure, not executed)
+ * - 'error': infrastructure failure before dispatch (bot disconnected, network)
+ *
+ * Invariants:
+ * - outcome !== 'executed' ⇒ ok === false
+ * - outcome === 'shadow' ⇒ no failureCode (use shadowBlocked flag)
+ * - outcome === 'error' ⇒ system/transport error (not action-level failure)
+ */
+export type GatewayOutcome = 'executed' | 'shadow' | 'error';
+
 /** Optional tracing context for audit linkage. */
 export interface ExecutionContext {
   taskId?: string;
@@ -67,7 +80,9 @@ export interface GatewayRequest {
 
 /** Output from the gateway. Extends NormalizedActionResponse with audit fields. */
 export interface GatewayResponse extends NormalizedActionResponse {
-  /** Whether the action was blocked by mode gating (shadow mode). */
+  /** Three-way outcome discriminator: 'executed' | 'shadow' | 'error'. */
+  outcome: GatewayOutcome;
+  /** @deprecated Use outcome === 'shadow'. Kept for backward compatibility. */
   shadowBlocked: boolean;
   /** The origin that submitted this request. */
   origin: ExecutionOrigin;
@@ -87,6 +102,11 @@ function resolveMode(): 'shadow' | 'live' {
   return 'shadow';
 }
 
+/** Exported for callers that need to check mode without executing (e.g., auto-unblock logic). */
+export function getExecutorMode(): 'shadow' | 'live' {
+  return resolveMode();
+}
+
 // ---------------------------------------------------------------------------
 // Audit emission
 // ---------------------------------------------------------------------------
@@ -99,6 +119,7 @@ export interface GatewayAuditEntry {
   priority: ExecutionPriority;
   action: { type: string };
   mode: 'shadow' | 'live';
+  outcome: GatewayOutcome;
   ok: boolean;
   error?: string;
   failureCode?: string;
@@ -151,6 +172,7 @@ export async function executeViaGateway(
       priority: req.priority,
       action: { type: req.action.type },
       mode: 'shadow',
+      outcome: 'shadow',
       ok: false,
       error: 'Blocked by shadow mode',
       durationMs: 0,
@@ -161,6 +183,7 @@ export async function executeViaGateway(
       ok: false,
       error: 'Blocked by shadow mode',
       data: null,
+      outcome: 'shadow',
       shadowBlocked: true,
       origin: req.origin,
       durationMs: 0,
@@ -182,6 +205,7 @@ export async function executeViaGateway(
         priority: req.priority,
         action: { type: req.action.type },
         mode: 'live',
+        outcome: 'error',
         ok: false,
         error,
         durationMs,
@@ -191,6 +215,7 @@ export async function executeViaGateway(
         ok: false,
         error,
         data: null,
+        outcome: 'error',
         shadowBlocked: false,
         origin: req.origin,
         durationMs,
@@ -213,6 +238,7 @@ export async function executeViaGateway(
         priority: req.priority,
         action: { type: req.action.type },
         mode: 'live',
+        outcome: 'error',
         ok: false,
         error: post.error || 'Action request failed',
         durationMs,
@@ -222,6 +248,7 @@ export async function executeViaGateway(
         ok: false,
         error: post.error || 'Action request failed',
         data: null,
+        outcome: 'error',
         shadowBlocked: false,
         origin: req.origin,
         durationMs,
@@ -239,6 +266,7 @@ export async function executeViaGateway(
       priority: req.priority,
       action: { type: req.action.type },
       mode: 'live',
+      outcome: 'executed',
       ok: normalized.ok,
       error: normalized.error,
       failureCode: normalized.failureCode,
@@ -248,6 +276,7 @@ export async function executeViaGateway(
 
     return {
       ...normalized,
+      outcome: 'executed',
       shadowBlocked: false,
       origin: req.origin,
       durationMs,
@@ -261,6 +290,7 @@ export async function executeViaGateway(
       priority: req.priority,
       action: { type: req.action.type },
       mode: 'live',
+      outcome: 'error',
       ok: false,
       error: errorMsg,
       durationMs,
@@ -270,6 +300,7 @@ export async function executeViaGateway(
       ok: false,
       error: errorMsg,
       data: null,
+      outcome: 'error',
       shadowBlocked: false,
       origin: req.origin,
       durationMs,

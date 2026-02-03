@@ -17,6 +17,8 @@ export interface MinecraftAction {
 
 export interface ExecutionResult {
   success: boolean;
+  /** Whether the action was shadow-blocked (not a real failure). */
+  shadow?: boolean;
   stepId: string;
   action: MinecraftAction;
   data?: any;
@@ -90,6 +92,7 @@ export class MinecraftExecutor {
 
       return {
         success: result.success,
+        shadow: result.shadow,
         stepId: step.id,
         action,
         data: result.data,
@@ -334,7 +337,7 @@ export class MinecraftExecutor {
    */
   private async executeMinecraftAction(
     action: MinecraftAction
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+  ): Promise<{ success: boolean; shadow?: boolean; data?: any; error?: string }> {
     const result = await executeViaGateway({
       origin: 'reactive',
       priority: 'normal',
@@ -346,6 +349,7 @@ export class MinecraftExecutor {
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       data: result.data,
       error: result.error,
     };

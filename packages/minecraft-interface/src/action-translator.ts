@@ -17,6 +17,7 @@ import {
   Orientation,
 } from '@conscious-bot/world';
 import { resilientFetch } from '@conscious-bot/core';
+import { NavigationLeaseManager } from './navigation-lease-manager';
 
 // Simple inline goal classes for ES modules compatibility
 class SimpleGoalNear {
@@ -129,6 +130,8 @@ export type NavigationPriority = 'normal' | 'high' | 'emergency';
 export interface NavLeaseParams {
   navLeaseHolder?: string;
   navigationPriority?: NavigationPriority;
+  /** Scope token (e.g. taskId) to disambiguate concurrent actions of the same type. */
+  navLeaseScope?: string;
 }
 
 /**
@@ -140,12 +143,19 @@ export function deriveNavLeaseContext(
   actionType: string,
   params: Record<string, any> | undefined,
 ): { holder: string; priority: NavigationPriority } {
-  const rawHolder = params?.navLeaseHolder;
+  // Reserved __nav namespace for lease metadata (avoids collisions with action params)
+  const nav = params?.__nav as { holder?: string; scope?: string; priority?: string } | undefined;
+  // Legacy flat params for backward compat
+  const rawHolder = nav?.holder ?? params?.navLeaseHolder;
+  // Scope chain: explicit holder > taskId-scoped > type-only fallback
+  const scope = nav?.scope ?? params?.navLeaseScope;
   const holder: string =
     typeof rawHolder === 'string' && rawHolder.length > 0
       ? rawHolder
-      : `action:${actionType}`;
-  const rawPriority = params?.navigationPriority;
+      : typeof scope === 'string' && scope.length > 0
+        ? `action:${actionType}:${scope}`
+        : `action:${actionType}`;
+  const rawPriority = nav?.priority ?? params?.navigationPriority;
   const priority: NavigationPriority =
     rawPriority === 'normal' || rawPriority === 'high' || rawPriority === 'emergency'
       ? rawPriority
@@ -168,10 +178,7 @@ export class ActionTranslator {
   private lastLogAt = new Map<string, number>();
 
   // ── Navigation lease: prevents concurrent pathfinder corruption ──
-  private _navLeaseHolder: string | null = null;
-  private _navLeasePriority: NavigationPriority = 'normal';
-  private _navLeaseRelease: (() => void) | null = null;
-  private _navLeaseRefCount = 0;
+  private navLeaseManager: NavigationLeaseManager;
 
   constructor(
     bot: Bot,
@@ -194,6 +201,15 @@ export class ActionTranslator {
       tickBudgetMs: 5,
     });
     this.raycastEngine = new RaycastEngine(this.raycastConfig, bot as any);
+    this.navLeaseManager = new NavigationLeaseManager({
+      onPreempt: (evicted) => {
+        try {
+          this.navigationBridge?.stopNavigation();
+        } catch (err) {
+          console.warn(`[NavLease] stopNavigation failed during preempt of ${evicted}:`, err);
+        }
+      },
+    });
 
     // Initialize NavigationBridge if bot is spawned.
     // NavigationBridge.initializePathfinder() handles loadPlugin + Movements + setMovements.
@@ -229,100 +245,24 @@ export class ActionTranslator {
     }
   }
 
-  // ── Navigation lease API ──
+  // ── Navigation lease API (delegates to NavigationLeaseManager) ──
 
-  /**
-   * Acquire the navigation lease. Returns a release function on success.
-   *
-   * Rules:
-   * - If no lease is held, the caller acquires it.
-   * - 'emergency' preempts any held lease (stops current pathfinding).
-   * - Otherwise, returns null (caller should not navigate).
-   */
+  /** Acquire the navigation lease. Returns a release function on success, null if busy. */
   acquireNavigationLease(
     holder: string,
     priority: NavigationPriority = 'normal',
   ): (() => void) | null {
-    const PRIORITY_RANK: Record<NavigationPriority, number> = {
-      normal: 0,
-      high: 1,
-      emergency: 2,
-    };
-
-    // No current holder — grant immediately
-    if (!this._navLeaseHolder) {
-      return this._grantLease(holder, priority);
-    }
-
-    // Emergency preempts anything
-    if (
-      priority === 'emergency' &&
-      PRIORITY_RANK[priority] > PRIORITY_RANK[this._navLeasePriority]
-    ) {
-      // Stop the current navigation before granting
-      try { this.navigationBridge?.stopNavigation(); } catch {}
-      // Force-clear the old lease (bypass ref-counting — holder is evicted)
-      this._navLeaseHolder = null;
-      this._navLeasePriority = 'normal';
-      this._navLeaseRelease = null;
-      this._navLeaseRefCount = 0;
-      return this._grantLease(holder, priority);
-    }
-
-    // Same holder re-acquiring (idempotent)
-    if (this._navLeaseHolder === holder) {
-      return this._grantLease(holder, priority);
-    }
-
-    // Otherwise, lease is busy
-    return null;
+    return this.navLeaseManager.acquire(holder, priority);
   }
 
   /** Release the navigation lease. Ref-counted: only clears when all nested acquires are released. */
   releaseNavigationLease(holder: string): void {
-    if (this._navLeaseHolder === holder) {
-      this._navLeaseRefCount--;
-      if (this._navLeaseRefCount < 0) {
-        console.warn(`[NavLease] refcount underflow for holder=${holder} — possible double-release`);
-        this._navLeaseRefCount = 0;
-      }
-      if (this._navLeaseRefCount === 0) {
-        this._navLeaseHolder = null;
-        this._navLeasePriority = 'normal';
-        this._navLeaseRelease = null;
-      }
-    }
+    this.navLeaseManager.release(holder);
   }
 
   /** Whether navigation is currently leased. */
   get isNavigationBusy(): boolean {
-    return this._navLeaseHolder !== null;
-  }
-
-  private _grantLease(
-    holder: string,
-    priority: NavigationPriority,
-  ): () => void {
-    const isReacquire = this._navLeaseHolder === holder;
-    this._navLeaseHolder = holder;
-    this._navLeasePriority = priority;
-    if (isReacquire) {
-      this._navLeaseRefCount++;
-    } else {
-      this._navLeaseRefCount = 1;
-    }
-    // One-shot release closure: warns on double-call instead of silently underflowing.
-    let released = false;
-    const release = () => {
-      if (released) {
-        console.warn(`[NavLease] double-release for holder=${holder} — ignoring`);
-        return;
-      }
-      released = true;
-      this.releaseNavigationLease(holder);
-    };
-    this._navLeaseRelease = release;
-    return release;
+    return this.navLeaseManager.isBusy;
   }
 
   /**
@@ -336,13 +276,7 @@ export class ActionTranslator {
     fn: () => Promise<{ success: boolean; error?: string }>,
     busyResult: { success: false; error: string },
   ): Promise<{ success: boolean; error?: string }> {
-    const release = this.acquireNavigationLease(holder, priority);
-    if (!release) return busyResult;
-    try {
-      return await fn();
-    } finally {
-      release();
-    }
+    return this.navLeaseManager.withLease(holder, priority, fn, busyResult);
   }
 
   /**

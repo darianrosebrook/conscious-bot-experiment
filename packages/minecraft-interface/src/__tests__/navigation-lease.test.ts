@@ -388,4 +388,54 @@ describe('deriveNavLeaseContext', () => {
     expect(deriveNavLeaseContext('n', { navigationPriority: 'high' }).priority).toBe('high');
     expect(deriveNavLeaseContext('n', { navigationPriority: 'emergency' }).priority).toBe('emergency');
   });
+
+  // --- navLeaseScope tests (Part 1 scope-based holders) ---
+
+  it('uses __nav.scope to create scoped holder when no explicit holder', () => {
+    const ctx = deriveNavLeaseContext('navigate', { __nav: { scope: 'task-123' } });
+    expect(ctx.holder).toBe('action:navigate:task-123');
+    expect(ctx.priority).toBe('normal');
+  });
+
+  it('__nav.scope with __nav.priority works together', () => {
+    const ctx = deriveNavLeaseContext('gather', {
+      __nav: { scope: 'task-abc', priority: 'high' },
+    });
+    expect(ctx.holder).toBe('action:gather:task-abc');
+    expect(ctx.priority).toBe('high');
+  });
+
+  it('__nav.holder overrides scope', () => {
+    const ctx = deriveNavLeaseContext('navigate', {
+      __nav: { holder: 'safety-monitor', scope: 'task-123' },
+    });
+    expect(ctx.holder).toBe('safety-monitor');
+  });
+
+  it('empty __nav.scope falls back to type-only holder', () => {
+    const ctx = deriveNavLeaseContext('move_to', { __nav: { scope: '' } });
+    expect(ctx.holder).toBe('action:move_to');
+  });
+
+  // Legacy flat param backward compat tests
+  it('legacy navLeaseScope still works (backward compat)', () => {
+    const ctx = deriveNavLeaseContext('navigate', { navLeaseScope: 'task-123' });
+    expect(ctx.holder).toBe('action:navigate:task-123');
+  });
+
+  it('legacy navLeaseHolder overrides scope', () => {
+    const ctx = deriveNavLeaseContext('navigate', {
+      navLeaseHolder: 'safety-monitor',
+      navLeaseScope: 'task-123',
+    });
+    expect(ctx.holder).toBe('safety-monitor');
+  });
+
+  it('__nav takes precedence over legacy flat params', () => {
+    const ctx = deriveNavLeaseContext('navigate', {
+      navLeaseScope: 'legacy-scope',
+      __nav: { scope: 'nav-scope' },
+    });
+    expect(ctx.holder).toBe('action:navigate:nav-scope');
+  });
 });

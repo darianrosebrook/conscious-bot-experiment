@@ -960,6 +960,21 @@ export class ReactiveExecutor implements IReactiveExecutor {
       // Execute the task directly via Minecraft interface
       const taskResult = await this.executeTaskInMinecraft(task);
 
+      // Shadow outcome: not a failure, not executed — return early
+      if (taskResult.shadow) {
+        return {
+          success: false,
+          shadowObserved: true,
+          planExecuted: false,
+          safetyReflexActivated: false,
+          planRepaired: false,
+          duration: 0,
+          actionsCompleted: 0,
+          error: taskResult.error,
+          data: taskResult,
+        };
+      }
+
       // Return result in the expected format
       return {
         success: taskResult.success,
@@ -1001,6 +1016,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
         // If we can't connect to the Minecraft server, return failure
         return {
           success: false,
+          shadow: false,
           error: 'Cannot connect to Minecraft server',
           type: task.type,
         };
@@ -1012,6 +1028,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
       if (!typedBotStatus.executionStatus?.bot?.connected) {
         return {
           success: false,
+          shadow: false,
           error: 'Bot not connected to Minecraft server',
           botStatus: botStatus,
           type: task.type,
@@ -1022,6 +1039,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
       if (!typedBotStatus.isAlive || typedBotStatus.botStatus?.health <= 0) {
         return {
           success: false,
+          shadow: false,
           error: 'Bot is dead and cannot execute actions',
           botStatus: botStatus,
           type: task.type,
@@ -1060,6 +1078,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
           // For unknown task types, return failure since we can't execute them
           return {
             success: false,
+            shadow: false,
             error: `Unknown task type: ${task.type}`,
             type: task.type,
           };
@@ -1067,6 +1086,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
     } catch (error) {
       return {
         success: false,
+        shadow: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         type: task.type,
       };
@@ -1078,6 +1098,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
    */
   private async executeCraftTask(task: any, _minecraftUrl: string) {
     const itemToCraft = task.parameters?.item || 'item';
+    const taskScope = task.id;
 
     const result = await executeViaGateway({
       origin: 'reactive',
@@ -1087,12 +1108,15 @@ export class ReactiveExecutor implements IReactiveExecutor {
         parameters: {
           item: itemToCraft,
           quantity: task.parameters?.quantity || 1,
+          __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
         },
       },
+      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       error: result.error,
       item: itemToCraft,
       type: 'craft',
@@ -1104,17 +1128,20 @@ export class ReactiveExecutor implements IReactiveExecutor {
    * Execute movement task with proper validation
    */
   private async executeMoveTask(task: any, _minecraftUrl: string) {
+    const taskScope = task.id;
     const result = await executeViaGateway({
       origin: 'reactive',
       priority: 'normal',
       action: {
         type: 'move_forward',
-        parameters: { distance: task.parameters?.distance || 1 },
+        parameters: { distance: task.parameters?.distance || 1, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
       },
+      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'move',
       data: result.data,
@@ -1125,17 +1152,20 @@ export class ReactiveExecutor implements IReactiveExecutor {
    * Execute gathering task
    */
   private async executeGatherTask(task: any, _minecraftUrl: string) {
+    const taskScope = task.id;
     const result = await executeViaGateway({
       origin: 'reactive',
       priority: 'normal',
       action: {
         type: 'gather',
-        parameters: task.parameters || {},
+        parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
       },
+      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'gather',
       data: result.data,
@@ -1146,17 +1176,20 @@ export class ReactiveExecutor implements IReactiveExecutor {
    * Execute exploration task
    */
   private async executeExploreTask(task: any, _minecraftUrl: string) {
+    const taskScope = task.id;
     const result = await executeViaGateway({
       origin: 'reactive',
       priority: 'normal',
       action: {
         type: 'explore',
-        parameters: task.parameters || {},
+        parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
       },
+      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'explore',
       data: result.data,
@@ -1169,6 +1202,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
   private async executeMineTask(task: any, _minecraftUrl: string) {
     console.log(`⛏️ Executing mining task: ${task.title}`);
 
+    const taskScope = task.id;
     const result = await executeViaGateway({
       origin: 'reactive',
       priority: 'normal',
@@ -1177,13 +1211,16 @@ export class ReactiveExecutor implements IReactiveExecutor {
         parameters: {
           block: task.parameters?.block || 'stone',
           position: task.parameters?.position || 'current',
+          __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
         },
         timeout: 30000,
       },
+      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
       success: result.ok,
+      shadow: result.outcome === 'shadow',
       error: result.error,
       type: 'mining',
       data: result.data,
@@ -1486,14 +1523,21 @@ export class ReactiveExecutor implements IReactiveExecutor {
       );
 
       // Execute the inferred action via the gateway
+      const taskScope = task.id;
       const result = await executeViaGateway({
         origin: 'reactive',
         priority: 'normal',
-        action: { type: actionType, parameters, timeout: 30000 },
+        action: {
+          type: actionType,
+          parameters: { ...parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
+          timeout: 30000,
+        },
+        context: taskScope ? { taskId: taskScope } : undefined,
       });
 
       return {
         success: result.ok,
+        shadow: result.outcome === 'shadow',
         error: result.error,
         type: 'action',
         actionType,
@@ -1502,6 +1546,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
     } catch (error) {
       return {
         success: false,
+        shadow: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         type: 'action',
       };

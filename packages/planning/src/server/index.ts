@@ -27,12 +27,14 @@ export {
 export {
   executeViaGateway,
   onGatewayAudit,
+  getExecutorMode,
   type ExecutionOrigin,
   type ExecutionPriority,
   type ExecutionContext,
   type GatewayAction,
   type GatewayRequest,
   type GatewayResponse,
+  type GatewayOutcome,
   type GatewayAuditEntry,
   type GatewayAuditListener,
 } from './execution-gateway';
