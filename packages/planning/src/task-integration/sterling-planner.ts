@@ -752,15 +752,20 @@ export class SterlingPlanner {
     // ────────────────────────────────────────────────────────────────────
     const bundle = result.solveMeta?.bundles?.[0];
     const issues = bundle?.compatReport?.issues;
+    const rawSearchHealth = bundle?.output?.searchHealth;
+
     solverMeta.buildingSolveResultSubstrate = {
       // Identity fields for coherence check
       planId: result.solveJoinKeys?.planId,
       bundleHash: result.solveJoinKeys?.bundleHash,
-      // Solve outcome
+      // Solve outcome — cap error to 512 chars (don't store full stack traces)
       solved: result.solved,
-      error: result.error,
+      error: result.error?.slice(0, 512),
       totalNodes: result.totalNodes,
-      searchHealth: bundle?.output?.searchHealth,
+      // Map searchHealth to only the fields we classify on — avoids coupling to Sterling internals
+      searchHealth: rawSearchHealth?.terminationReason
+        ? { terminationReason: rawSearchHealth.terminationReason }
+        : undefined,
       // Classification options — explicitly map to stable shape, cap at 10
       opts: issues
         ? {

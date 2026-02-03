@@ -3351,12 +3351,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     let linkage: EpisodeLinkage;
     const substrate = task.metadata.solver?.buildingSolveResultSubstrate;
 
-    // Coherence check: substrate must belong to this episode (same bundleHash)
-    // If either side lacks bundleHash, we can't verify — fall back to binary
-    const substrateIsCoherent =
-      substrate?.bundleHash && keysForThisPlan?.bundleHash
-        ? substrate.bundleHash === keysForThisPlan.bundleHash
-        : false; // conservative: if we can't verify, don't use substrate
+    // Coherence check: substrate must belong to this episode
+    // Primary key: bundleHash must match
+    // Secondary key: if both planIds present, they must match too (belt + suspenders)
+    // If either side lacks bundleHash, we can't verify — fail closed to binary
+    const substrateIsCoherent = (() => {
+      if (!substrate?.bundleHash || !keysForThisPlan?.bundleHash) return false;
+      if (substrate.bundleHash !== keysForThisPlan.bundleHash) return false;
+      // If both have planId, they must also match (catches hash collisions, partial updates)
+      if (substrate.planId && keysForThisPlan.planId && substrate.planId !== keysForThisPlan.planId) return false;
+      return true;
+    })()
 
     if (success) {
       // Success is always EXECUTION_SUCCESS regardless of substrate

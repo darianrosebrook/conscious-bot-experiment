@@ -356,14 +356,16 @@ npx tsc --noEmit
    - Fire-and-forget pattern: uses `.then()` continuation to avoid blocking hot path
    - Re-reads latest task before writing to avoid clobbering concurrent updates
    - Domain→slot mapping via `EPISODE_HASH_SLOT` constant for cleaner signature
+   - **NOTE**: Currently only building domain calls `persistEpisodeAck()`. Other domains (crafting, tool progression, acquisition) have slots defined but not wired. Wire them when those domains get episode reporting.
 
 8. ~~**Richer Outcome Taxonomy via Substrate**~~: ✅ **DONE** (2026-02-03). CB now:
    - Captures `buildingSolveResultSubstrate` at solve-time with identity fields (`planId`, `bundleHash`)
-   - Stores solve outcome (`solved`, `error`, `totalNodes`, `searchHealth`, `compatIssues`)
-   - **Coherence check**: Substrate only used when `substrate.bundleHash === keysForThisPlan.bundleHash`
+   - Stores solve outcome (`solved`, `error` capped at 512 chars, `totalNodes`, `searchHealth.terminationReason`, `compatIssues`)
+   - **Coherence check (belt + suspenders)**: Substrate used only when `bundleHash` matches AND (if both have `planId`) `planId` matches
    - Classification boundary: success → EXECUTION_SUCCESS; failure + solver failed + coherent → use `buildEpisodeLinkageFromResult()`; else → EXECUTION_FAILURE
    - Debug logging gated behind `STERLING_EPISODE_DEBUG=1` environment variable
    - `compatIssues` explicitly mapped to stable `{ code, severity }` shape (max 10 issues)
+   - `searchHealth` mapped to only classification-relevant fields (`terminationReason`) to avoid coupling to Sterling internals
 
 ### Operational Checklist
 
@@ -372,7 +374,7 @@ npx tsc --noEmit
 - [ ] Confirm no `JOIN_KEYS_DEPRECATED_COMPAT=1` needed after migration window
 - [ ] Remove compat code after 2026-02-15
 - [ ] Enable `STERLING_REPORT_IDENTITY_FIELDS=1` once Sterling confirms acceptance
-- [ ] Monitor `[Sterling] Identity fields for <solverId>` logs to confirm field presence
+- [ ] Monitor `[Sterling] Identity fields for <latchKey>` logs to confirm field presence
 
 ### Logging Semantics
 
@@ -389,15 +391,15 @@ This logs even if no tasks exercise the fallback. Intentional: makes compat path
 
 **Phase 1 Identity Field Status** (emitted once per latchKey on first solve with identity parsing):
 ```
-[Sterling] Identity fields for minecraft.building: all present (traceBundleHash, engineCommitment, operatorRegistryHash)
-[Sterling] Identity fields for minecraft.crafting: none present (server may be pre-Phase-1)
-[Sterling] Identity fields for minecraft.navigation: present=[traceBundleHash], absent=[engineCommitment, operatorRegistryHash]
+[Sterling] Identity fields for minecraft.building@1: all present (traceBundleHash, engineCommitment, operatorRegistryHash)
+[Sterling] Identity fields for minecraft.crafting@1: none present (server may be pre-Phase-1)
+[Sterling] Identity fields for minecraft.navigation@1: present=[traceBundleHash], absent=[engineCommitment, operatorRegistryHash]
 ```
-This helps diagnose whether Sterling is emitting identity fields without spamming logs.
+This helps diagnose whether Sterling is emitting identity fields without spamming logs. The `@1` suffix is the contract version — version bumps automatically re-probe.
 
 **Identity Fields Rejected (Downgrade)** (emitted once per latchKey when Sterling rejects unknown fields):
 ```
-[Sterling] Identity fields rejected for minecraft.building — downgrading to core linkage only. Hint: validation error: unknown field engine_commitment. Toggle STERLING_REPORT_IDENTITY_FIELDS=0 or wait for server upgrade.
+[Sterling] Identity fields rejected for minecraft.building@1 — downgrading to core linkage only. Hint: validation error: unknown field engine_commitment. Toggle STERLING_REPORT_IDENTITY_FIELDS=0 or wait for server upgrade.
 ```
 This makes misconfiguration visible and confirms the retry succeeded without identity fields.
 

@@ -2550,4 +2550,91 @@ describe('Building episode reporting with join keys', () => {
     const linkageArg = reportEpisodeSpy.mock.calls[0][7];
     expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
   });
+
+  it('uses EXECUTION_FAILURE when planIds mismatch even if bundleHash matches (belt + suspenders)', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-B',
+      buildingSolveJoinKeys: {
+        planId: 'plan-B',
+        bundleHash: 'hash-collision', // Same hash
+      },
+      // Substrate has same bundleHash but different planId (hash collision edge case)
+      buildingSolveResultSubstrate: {
+        planId: 'plan-A', // Different from join keys!
+        bundleHash: 'hash-collision', // Same as join keys
+        solved: false,
+        searchHealth: { terminationReason: 'max_nodes' },
+        capturedAt: Date.now(),
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    // planId mismatch should trigger incoherence fallback
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
+  });
+
+  it('persistEpisodeAck merges rather than overwrites task metadata', async () => {
+    // This test verifies that episode hash persistence:
+    // 1. Re-reads latest task state from store before writing
+    // 2. Merges the episode hash into existing solver metadata
+
+    // Mock reportEpisode FIRST to return an episode hash (before task creation triggers any reporting)
+    reportEpisodeSpy.mockResolvedValueOnce({ episodeHash: 'ep-hash-123', requestId: 'req-1' });
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up solver metadata with existing fields that should survive persistence
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+    };
+    (task.metadata.solver as any).existingField = 'should-survive';
+
+    const taskStore = (ti as any).taskStore;
+    taskStore.setTask(task);
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    // Wait for async persistence (fire-and-forget .then())
+    // Use vi.waitFor with polling to avoid test timeout on slow CI
+    await vi.waitFor(
+      () => {
+        const currentTask = taskStore.getTask(task.id);
+        if (!(currentTask.metadata.solver as any).buildingEpisodeHash) {
+          throw new Error('Episode hash not yet persisted');
+        }
+      },
+      { timeout: 200, interval: 10 }
+    );
+
+    const finalTask = taskStore.getTask(task.id);
+    // Existing field should survive — persistence merged, didn't overwrite
+    expect((finalTask.metadata.solver as any).existingField).toBe('should-survive');
+    // Episode hash should be persisted
+    expect((finalTask.metadata.solver as any).buildingEpisodeHash).toBe('ep-hash-123');
+    // Original fields should also survive
+    expect(finalTask.metadata.solver?.buildingTemplateId).toBe('shelter-template');
+  });
 });
