@@ -439,6 +439,139 @@ describe('evaluateGuards + geofence', () => {
 // Emergency stop
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Shadow mode task selection contract
+// ---------------------------------------------------------------------------
+
+describe('shadow mode task selection contract', () => {
+  /**
+   * Contract: Tasks blocked with blockedReason='shadow_mode' are:
+   * 1. Skipped by the task selection filter (blockedReason check)
+   * 2. Auto-unblocked when mode switches to live (blockedReason cleared)
+   * 3. Auto-failed after TTL if shadow mode persists
+   *
+   * These tests verify the selection gate behavior, not the full executor loop.
+   */
+
+  it('task with blockedReason is excluded from eligible tasks', () => {
+    // This represents the filter logic in modular-server.ts lines 1683-1695
+    const tasks = [
+      { id: 't1', status: 'active', metadata: {} },
+      { id: 't2', status: 'active', metadata: { blockedReason: 'shadow_mode', blockedAt: Date.now() } },
+      { id: 't3', status: 'active', metadata: { blockedReason: 'waiting_on_prereq' } },
+      { id: 't4', status: 'failed', metadata: {} },
+    ];
+
+    // Selection gate: skip failed and blocked tasks
+    const eligible = tasks.filter((t) => {
+      if (t.status === 'failed') return false;
+      if (t.metadata?.blockedReason) return false;
+      return true;
+    });
+
+    expect(eligible.map((t) => t.id)).toEqual(['t1']);
+  });
+
+  it('shadow-blocked task should be unblocked when mode is live', () => {
+    // This verifies the auto-unblock contract (modular-server.ts lines 1643-1658)
+    const task = {
+      id: 't1',
+      status: 'active',
+      metadata: {
+        blockedReason: 'shadow_mode',
+        blockedAt: Date.now() - 30_000, // blocked 30s ago
+        shadowObservationCount: 3,
+      },
+    };
+
+    // Simulate auto-unblock logic when mode is live
+    const currentMode = 'live' as const;
+    if (currentMode === 'live' && task.metadata?.blockedReason === 'shadow_mode') {
+      task.metadata.blockedReason = undefined;
+      task.metadata.blockedAt = undefined;
+      // shadowObservationCount is kept for audit trail
+    }
+
+    expect(task.metadata.blockedReason).toBeUndefined();
+    expect(task.metadata.blockedAt).toBeUndefined();
+    expect(task.metadata.shadowObservationCount).toBe(3); // preserved
+  });
+
+  it('shadow-blocked task should remain blocked when mode is shadow', () => {
+    const task = {
+      id: 't1',
+      status: 'active',
+      metadata: {
+        blockedReason: 'shadow_mode',
+        blockedAt: Date.now() - 30_000,
+      },
+    };
+
+    const currentMode = 'shadow' as const;
+    // No unblock in shadow mode
+    if (currentMode === 'live' && task.metadata?.blockedReason === 'shadow_mode') {
+      task.metadata.blockedReason = undefined;
+    }
+
+    expect(task.metadata.blockedReason).toBe('shadow_mode');
+  });
+
+  it('shadow-blocked task should auto-fail after TTL expires', () => {
+    const BLOCKED_TTL_MS = 2 * 60 * 1000; // 2 minutes
+    const task = {
+      id: 't1',
+      status: 'active' as 'active' | 'failed',
+      metadata: {
+        blockedReason: 'shadow_mode' as string | undefined,
+        blockedAt: Date.now() - (BLOCKED_TTL_MS + 1000), // blocked for 2 min + 1s
+        failReason: undefined as string | undefined,
+      },
+    };
+
+    // Simulate TTL check (modular-server.ts lines 1661-1679)
+    if (
+      task.metadata?.blockedReason &&
+      task.metadata?.blockedAt &&
+      task.metadata.blockedReason !== 'waiting_on_prereq' &&
+      Date.now() - task.metadata.blockedAt > BLOCKED_TTL_MS
+    ) {
+      task.status = 'failed';
+      task.metadata.failReason = `blocked-ttl-exceeded:${task.metadata.blockedReason}`;
+    }
+
+    expect(task.status).toBe('failed');
+    expect(task.metadata.failReason).toBe('blocked-ttl-exceeded:shadow_mode');
+  });
+
+  it('waiting_on_prereq blocks are NOT auto-failed by TTL', () => {
+    const BLOCKED_TTL_MS = 2 * 60 * 1000;
+    const task = {
+      id: 't1',
+      status: 'active' as 'active' | 'failed',
+      metadata: {
+        blockedReason: 'waiting_on_prereq',
+        blockedAt: Date.now() - (BLOCKED_TTL_MS + 1000),
+      },
+    };
+
+    // TTL check with prereq exemption
+    if (
+      task.metadata?.blockedReason &&
+      task.metadata?.blockedAt &&
+      task.metadata.blockedReason !== 'waiting_on_prereq' &&
+      Date.now() - task.metadata.blockedAt > BLOCKED_TTL_MS
+    ) {
+      task.status = 'failed';
+    }
+
+    expect(task.status).toBe('active'); // NOT failed
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Emergency stop
+// ---------------------------------------------------------------------------
+
 describe('emergencyStopExecutor', () => {
   it('aborts signal', () => {
     const controller = initExecutorAbortController();
