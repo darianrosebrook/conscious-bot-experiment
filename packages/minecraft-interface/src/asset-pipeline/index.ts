@@ -53,22 +53,65 @@ export type { PipelineProgress } from './pipeline.js';
 // Express integration
 export { createAssetServer, createAssetMiddleware } from './asset-server.js';
 
-// Animation support
+// Texture animation support
 export {
   animatedVertexShader,
   animatedFragmentShader,
   buildAnimationLookup,
   generateAnimationMap,
+  generateAnimationTextures,
+  generateFrameSequenceMap,
   createAnimatedMaterial,
   updateAnimatedMaterial,
+  updateDayNightCycle,
+  worldTimeToDayProgress,
+  getDayLightLevel,
   syncLightingWithScene,
   calculateAnimationFrame,
   calculateAnimatedVOffset,
+  DAY_AMBIENT_COLOR,
+  NIGHT_AMBIENT_COLOR,
+  TWILIGHT_AMBIENT_COLOR,
+  DAY_DIRECTIONAL_COLOR,
+  NIGHT_DIRECTIONAL_COLOR,
+  TWILIGHT_DIRECTIONAL_COLOR,
+  MAX_SEQUENCE_LENGTH,
+  MAX_SEQUENCE_COUNT,
 } from './animated-material.js';
 export type {
   ClientAnimationData,
   AnimatedMaterialOptions,
+  AnimationTextureSet,
 } from './animated-material.js';
+
+// Entity skeletal animation support
+export {
+  EntityAnimationManager,
+  getAnimationManager,
+  resetAnimationManager,
+  createAnimationClip,
+  determineAnimationState,
+  calculateAnimationSpeed,
+  getEntityCategory,
+  BIPED_BONES,
+  QUADRUPED_BONES,
+  BIPED_ENTITIES,
+  QUADRUPED_ENTITIES,
+  BIPED_IDLE_ANIMATION,
+  BIPED_WALK_ANIMATION,
+  BIPED_RUN_ANIMATION,
+  BIPED_JUMP_ANIMATION,
+  BIPED_FALL_ANIMATION,
+  QUADRUPED_IDLE_ANIMATION,
+  QUADRUPED_WALK_ANIMATION,
+} from './entity-animations.js';
+export type {
+  AnimationState,
+  EntityMovementData,
+  BoneKeyframe,
+  EntityAnimationDefinition,
+  ManagedEntityAnimation,
+} from './entity-animations.js';
 
 // Viewer integration
 export {
