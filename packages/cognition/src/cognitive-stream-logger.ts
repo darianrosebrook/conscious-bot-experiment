@@ -8,6 +8,9 @@
  */
 
 import { resilientFetch } from '@conscious-bot/core';
+import { createServerLogger } from './server-utils/server-logger';
+
+const serverLogger = createServerLogger({ subsystem: 'cognitive-stream' });
 
 export class CognitiveStreamLogger {
   private static instance: CognitiveStreamLogger;
@@ -45,6 +48,7 @@ export class CognitiveStreamLogger {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         label: 'dashboard/cognitive-stream',
+        silent: true,
         body: JSON.stringify({
           type: type || 'system_log',
           content: content,
@@ -66,13 +70,18 @@ export class CognitiveStreamLogger {
       });
 
       if (!response?.ok) {
-        console.warn(
-          '❌ Failed to send log to cognitive stream:',
-          response?.status ?? 'unavailable'
-        );
+        serverLogger.warn('Failed to send log to cognitive stream', {
+          event: 'cognitive_stream_log_failed',
+          tags: ['cognitive-stream', 'log', 'failed'],
+          fields: { status: response?.status ?? 'unavailable' },
+        });
       }
     } catch (error: unknown) {
-      console.warn('❌ Error sending log to cognitive stream:', error);
+      serverLogger.warn('Error sending log to cognitive stream', {
+        event: 'cognitive_stream_log_error',
+        tags: ['cognitive-stream', 'log', 'error'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     }
   }
 

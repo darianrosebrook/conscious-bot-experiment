@@ -11,6 +11,7 @@
 
 import * as fs from 'fs';
 import type { InteroState, StressAxes } from './interoception-store';
+import { createServerLogger } from './server-utils/server-logger';
 
 export interface InteroSnapshot {
   ts: number;
@@ -30,6 +31,7 @@ export interface InteroHistorySummary {
 const MAX_ENTRIES = 1800; // ~30 hours at 60s intervals
 const MAX_FILE_BYTES = 500 * 1024; // 500KB before rotation
 const LOG_PREFIX = '[INTERO_HISTORY]';
+const interoLogger = createServerLogger({ subsystem: 'intero-history' });
 const PERSIST_PATH =
   process.env.INTERO_HISTORY_LOG_PATH || 'intero-history.jsonl';
 
@@ -57,7 +59,11 @@ function appendLine(snapshot: InteroSnapshot): void {
     }
     fs.appendFileSync(PERSIST_PATH, line);
   } catch {
-    console.log(LOG_PREFIX, line.trim());
+    interoLogger.warn('Failed to append intero history line', {
+      event: 'intero_history_append_failed',
+      tags: ['intero-history', 'warn'],
+      fields: { line: line.trim() },
+    });
   }
 }
 
@@ -120,9 +126,17 @@ export function loadInteroHistory(): void {
     if (history.length > MAX_ENTRIES) {
       history.splice(0, history.length - MAX_ENTRIES);
     }
-    console.log(LOG_PREFIX, `Loaded ${loaded} snapshots from ${PERSIST_PATH}`);
+    interoLogger.info('Loaded intero history snapshots', {
+      event: 'intero_history_loaded',
+      tags: ['intero-history', 'loaded'],
+      fields: { loaded, path: PERSIST_PATH },
+    });
   } catch (err) {
-    console.warn(LOG_PREFIX, 'Failed to load history:', err);
+    interoLogger.warn('Failed to load intero history', {
+      event: 'intero_history_load_failed',
+      tags: ['intero-history', 'warn'],
+      fields: { error: err instanceof Error ? err.message : String(err) },
+    });
   }
 }
 

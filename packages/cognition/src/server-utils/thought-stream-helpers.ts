@@ -10,12 +10,15 @@ import { GOAL_TAG_STRIP, TTS_EXCLUDED_TYPES, TTS_STATUS_LIKE } from './constants
 import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
 import { broadcastThought } from '../routes/cognitive-stream-routes';
+import { createServerLogger } from './server-logger';
 
 export interface ThoughtStreamDeps {
   dashboardUrl: string;
   ttsClient: TTSClient;
   llmInterface: LLMInterface;
 }
+
+const thoughtStreamLogger = createServerLogger({ subsystem: 'thought-stream' });
 
 export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
   async function sendThoughtToCognitiveStream(thought: any) {
@@ -25,6 +28,7 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          silent: true,
           body: JSON.stringify({
             payloadVersion: 2,
             type: thought.type || 'reflection',
@@ -63,10 +67,11 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
       });
 
       if (response?.ok) {
-        console.log(
-          '✅ Thought sent to cognitive stream:',
-          thought.content.substring(0, 50) + '...'
-        );
+        thoughtStreamLogger.info('Thought sent to cognitive stream', {
+          event: 'thought_stream_send_ok',
+          tags: ['thought', 'stream', 'send'],
+          fields: { preview: thought.content?.substring(0, 50) ?? '' },
+        });
 
         // Speak only genuine thoughts via TTS; exclude status/system/environmental
         const thoughtType =
@@ -85,10 +90,17 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
           deps.ttsClient.speak(displayText);
         }
       } else {
-        console.error('❌ Failed to send thought to cognitive stream');
+        thoughtStreamLogger.error('Failed to send thought to cognitive stream', {
+          event: 'thought_stream_send_failed',
+          tags: ['thought', 'stream', 'error'],
+        });
       }
     } catch (error) {
-      console.error('❌ Error sending thought to cognitive stream:', error);
+      thoughtStreamLogger.error('Error sending thought to cognitive stream', {
+        event: 'thought_stream_send_error',
+        tags: ['thought', 'stream', 'error'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     }
   }
 

@@ -106,7 +106,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
     // Add client to the set
     sseClients.add(res);
-    console.log(`[SSE] Client connected to cognitive stream (${sseClients.size} total)`);
+    // SSE connection events suppressed - routine client polling
 
     // Send initial batch of recent thoughts
     const recentThoughts = deps.state.cognitiveThoughts.slice(-20);
@@ -145,7 +145,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
     req.on('close', () => {
       clearInterval(keepaliveInterval);
       sseClients.delete(res);
-      console.log(`[SSE] Client disconnected from cognitive stream (${sseClients.size} remaining)`);
+      // SSE disconnection events suppressed - routine client polling
     });
   });
 
@@ -301,11 +301,8 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         convertEligible: (thought as any).convertEligible,
       }));
 
-      console.log(
-        `[CognitiveStream] /actionable: returned=${result.length} queue_size=${allThoughts.length}` +
-        ` filtered_out=${allThoughts.length - actionable.length}` +
-        (evalRunId ? ` evalRunId=${evalRunId}` : '')
-      );
+      // Verbose logging suppressed - routine endpoint polling
+      // Debug: [CognitiveStream] /actionable: returned=${result.length} queue_size=${allThoughts.length} filtered_out=${allThoughts.length - actionable.length}
 
       res.json({
         success: true,
@@ -433,9 +430,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
       // Also get thoughts from enhanced thought generator (limit to recent ones)
       const generatedThoughts = deps.enhancedThoughtGenerator.getThoughtHistory(5);
-      console.log(
-        `Enhanced thought generator has ${generatedThoughts.length} recent thoughts`
-      );
+      // Verbose logging suppressed - routine endpoint polling
 
       recentThoughts = [...recentThoughts, ...generatedThoughts];
 
@@ -459,11 +454,8 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, limitNum);
 
-      console.log(
-        `[CognitiveStream] /recent: filter=${processedFilter} returned=${recentThoughts.length}` +
-        ` queue_size=${deps.state.cognitiveThoughts.length}` +
-        (evalRunId ? ` evalRunId=${evalRunId}` : '')
-      );
+      // Verbose logging suppressed - routine endpoint polling
+      // Debug: [CognitiveStream] /recent: filter=${processedFilter} returned=${recentThoughts.length} queue_size=${deps.state.cognitiveThoughts.length}
 
       // Ensure we have the required fields for the planning system
       const formattedThoughts = recentThoughts.map((thought) => ({
