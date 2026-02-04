@@ -38,6 +38,14 @@ export interface CognitiveStreamThought {
     extractedGoalSource?: string;
     /** Canonical goal key for exact-match idempotency (action:target) */
     goalKey?: string;
+    /** Sterling-committed goal proposition ID (stable identity from semantic authority) */
+    committedGoalPropId?: string | null;
+    /** Sterling-committed IR digest (provenance) */
+    committedIrDigest?: string | null;
+    /** Sterling envelope ID (provenance) */
+    envelopeId?: string | null;
+    /** Whether grounding was performed */
+    groundingPerformed?: boolean;
   };
   id: string;
   timestamp: number;

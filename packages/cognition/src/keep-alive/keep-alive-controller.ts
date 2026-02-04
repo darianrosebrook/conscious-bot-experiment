@@ -160,6 +160,12 @@ export interface KeepAliveThought {
   envelopeId?: string | null;
   /** Processing duration in ms */
   processingDurationMs?: number;
+  /** Sterling-committed goal proposition ID (stable identity) */
+  committedGoalPropId?: string | null;
+  /** Sterling-committed IR digest (provenance) */
+  committedIrDigest?: string | null;
+  /** Whether grounding was performed */
+  groundingPerformed?: boolean;
 }
 
 /**
@@ -417,12 +423,16 @@ export class KeepAliveController extends EventEmitter {
       source: 'keepalive',
       timestamp: Date.now(),
       frameProfile: this.frameProfile.name,
-      // Sterling metadata for observability
+      // Sterling metadata for observability and identity
       sterlingUsed: result.sterlingUsed,
       isExecutable: result.isExecutable,
       blockReason: result.blockReason,
       envelopeId: result.envelopeId,
       processingDurationMs: result.durationMs,
+      // Sterling-provided identity (replaces canonicalGoalKey)
+      committedGoalPropId: result.reducerResult?.committed_goal_prop_id ?? null,
+      committedIrDigest: result.reducerResult?.committed_ir_digest ?? null,
+      groundingPerformed: result.groundingPerformed,
     };
 
     // Validate invariants

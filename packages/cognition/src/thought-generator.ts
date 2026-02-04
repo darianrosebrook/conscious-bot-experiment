@@ -12,7 +12,7 @@ import { LLMInterface } from './cognitive-core/llm-interface';
 import { auditLogger } from './audit/thought-action-audit-logger';
 import { getInteroState } from './interoception-store';
 import { buildStressContext } from './stress-axis-computer';
-import { canonicalGoalKey } from './llm-output-sanitizer';
+// Removed: canonicalGoalKey (semantic normalization - Sterling's job now)
 import type { GoalTagV1 } from './llm-output-sanitizer';
 import {
   deriveEligibility,
@@ -1783,19 +1783,17 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     if (!drive) return null;
 
     // Idempotency: suppress if matching pending/active task already exists.
-    // Always suppress to prevent duplicate task accumulation. Recovery/stuck detection
-    // can be added later with createdAt/updatedAt timestamps on tasks.
-    const goalKey = canonicalGoalKey(drive.extractedGoal.action, drive.extractedGoal.target);
+    // Simple content-based dedupe (no semantic normalization - Sterling handles that).
+    // Recovery/stuck detection can be added later with createdAt/updatedAt timestamps.
     const tasks = context.currentTasks ?? [];
+    const goalAction = drive.extractedGoal.action.toLowerCase();
+    const goalTarget = drive.extractedGoal.target.toLowerCase();
+
     const matchingTask = tasks.find(t => {
       if (t.status !== 'active' && t.status !== 'pending') return false;
-      // Exact match on metadata.goalKey when available (stable across title changes)
-      const taskGoalKey = t.metadata?.goalKey;
-      if (typeof taskGoalKey === 'string') return taskGoalKey === goalKey;
-      // Fuzzy fallback for legacy tasks without goalKey
+
+      // Fuzzy match: does task title contain both action and target?
       const titleLower = (t.title || '').toLowerCase();
-      const goalAction = drive.extractedGoal.action.toLowerCase();
-      const goalTarget = drive.extractedGoal.target.toLowerCase();
       return titleLower.includes(goalAction) && titleLower.includes(goalTarget);
     });
 
@@ -1833,7 +1831,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         intensity: 0.6,
         extractedGoal: drive.extractedGoal,
         extractedGoalSource: 'drive-tick',
-        goalKey,
+        // Note: goalKey removed - Sterling provides identity via committed_goal_prop_id
         // LF-2: Include eligibility derivation provenance
         eligibilityReasoning: driveEligibility.reasoning,
         groundingResult: driveGrounding ? { pass: driveGrounding.pass, reason: driveGrounding.reason } : undefined,

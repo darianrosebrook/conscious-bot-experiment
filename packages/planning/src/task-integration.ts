@@ -330,8 +330,7 @@ function projectIncomingMetadata(
     let value = source[key];
     if (value !== undefined) {
       // Invariant: goalKey must never be empty string — coerce to undefined.
-      // canonicalGoalKey() returns '' for targetless goals; callers should
-      // convert to undefined at the callsite, but this is the last line of defense.
+      // Sterling identity fields should never be empty; this is a defensive check.
       if (key === 'goalKey' && value === '') {
         value = undefined as any;
         continue;

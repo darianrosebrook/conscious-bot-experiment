@@ -13,8 +13,7 @@ import type { Task } from '../types/task';
 import type { CognitiveStreamThought } from '../modules/cognitive-stream-client';
 import { parseRequiredQuantityFromTitle } from '../modules/requirements';
 
-// Import shared parser from cognition boundary — no local regex fork
-import { canonicalGoalKey } from '@conscious-bot/cognition';
+// Import shared types from cognition boundary — no local regex fork
 import type { GoalTagV1 } from '@conscious-bot/cognition';
 import type { TaskManagementHandler, ManagementResult } from './task-management-handler';
 
@@ -53,7 +52,9 @@ const MANAGEMENT_ACTIONS = new Set([
 ]);
 
 /**
- * Routable actions — strict subset of CANONICAL_ACTIONS that resolveRequirement + routeActionPlan can handle.
+ * Routable actions — structural routing set for actions that resolveRequirement + routeActionPlan can handle.
+ * This is NOT semantic classification (Sterling already determined executability).
+ * This is purely "can our execution layer handle this action type?"
  * Unroutable actions (check, continue) exist for cognitive observability only.
  */
 const ROUTABLE_ACTIONS = new Set([
@@ -461,29 +462,29 @@ export async function convertThoughtToTask(
       .toString(36)
       .replace('-', 'n');
 
-    // Compute canonical goalKey for exact-match idempotency in drive tick.
-    // Prefer the thought's goalKey (already canonical from drive tick).
-    // Fall back to canonicalGoalKey() from extractedGoal to normalize LLM-produced targets.
-    // Empty-string coercion: canonicalGoalKey() returns '' for targetless goals.
-    // Coerce both paths to undefined so '' never reaches task.metadata.goalKey.
-    const thoughtGoalKey = thought.metadata?.goalKey || undefined;
-    const computedGoalKey = extractedGoal
-      ? canonicalGoalKey(extractedGoal.action, extractedGoal.target) || undefined
-      : undefined;
+    // Goal identity from Sterling semantic authority.
+    // Primary: committed_goal_prop_id (Sterling-assigned stable ID)
+    // Secondary: committed_ir_digest (provenance, content-addressed)
+    // Tertiary: envelope_id (verbatim marker identity for fallback/observability)
+    // Legacy: goalKey (deprecated, from old canonicalGoalKey() - kept for backward compat)
+    //
+    // IMPORTANT: Identity comes from Sterling, not TS string manipulation.
+    // If Sterling was not used (fallback mode), we use envelope_id as provenance only.
+    const sterlingGoalId = thought.metadata?.committedGoalPropId || undefined;
+    const sterlingIrDigest = thought.metadata?.committedIrDigest || undefined;
+    const envelopeId = thought.metadata?.envelopeId || undefined;
+    const legacyGoalKey = thought.metadata?.goalKey || undefined;
 
-    // Canonical drift assertion: if a producer emitted a goalKey AND we can
-    // recompute from extractedGoal, verify they match. Log on mismatch so
-    // we catch new producers emitting non-canonical keys early.
-    if (thoughtGoalKey && computedGoalKey && thoughtGoalKey !== computedGoalKey) {
+    // Prefer Sterling-provided ID, fall back to IR digest, then envelope, then legacy
+    const goalKey = sterlingGoalId ?? sterlingIrDigest ?? envelopeId ?? legacyGoalKey;
+
+    // Warn if using legacy goalKey (indicates old code path or pre-Sterling thought)
+    if (!sterlingGoalId && !sterlingIrDigest && !envelopeId && legacyGoalKey) {
       console.warn(
-        `[Thought-to-task] goalKey drift: thought.metadata.goalKey="${thoughtGoalKey}" !== ` +
-        `canonicalGoalKey("${extractedGoal!.action}","${extractedGoal!.target}")="${computedGoalKey}". ` +
-        `Using computed key.`
+        `[Thought-to-task] Using legacy goalKey (no Sterling identity): "${legacyGoalKey}". ` +
+        `This indicates thought was not processed through Sterling. Consider updating producer.`
       );
     }
-
-    // Computed key wins on mismatch — it's the canonical source of truth
-    const goalKey = computedGoalKey ?? thoughtGoalKey;
 
     const task: Task = {
       id: `cognitive-task-${thought.id}-${extractionMethod}-${contentHash}`,
