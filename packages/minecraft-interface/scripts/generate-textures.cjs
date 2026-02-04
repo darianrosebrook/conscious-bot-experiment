@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Versions we want to generate that aren't in prismarine-viewer by default
-const VERSIONS_TO_GENERATE = ['1.21.5', '1.21.6', '1.21.7', '1.21.8'];
+const VERSIONS_TO_GENERATE = ['1.21.5', '1.21.6', '1.21.7', '1.21.8', '1.21.9'];
 
 async function main() {
   const requestedVersion = process.argv[2];

@@ -120,6 +120,13 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
 
   io.on('connection', (socket) => {
     socket.emit('version', bot.version)
+
+    // Emit bot info for name tag display
+    socket.emit('botInfo', {
+      username: bot.username || 'Bot',
+      uuid: bot.player?.uuid
+    })
+
     sockets.push(socket)
 
     const worldView = new WorldView(bot.world, viewDistance, bot.entity.position, socket)

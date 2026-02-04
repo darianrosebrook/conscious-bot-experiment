@@ -33,6 +33,7 @@ const {
 } = require('./animated-material-client')
 const { createSkyRenderer } = require('./sky-renderer')
 const { createWeatherSystem } = require('./weather-system')
+const { EntityExtrasManager } = require('./entity-extras')
 
 const io = require('socket.io-client')
 const socket = io({
@@ -55,6 +56,12 @@ let skyRenderer = null
 // Weather System State
 // ============================================================================
 let weatherSystem = null
+
+// ============================================================================
+// Bot Extras State (name tag, cape, shadow for main bot mesh)
+// ============================================================================
+let botExtrasManager = null
+let botUsername = 'Bot' // Will be updated from server
 
 // ============================================================================
 // Custom Asset Integration
@@ -200,6 +207,7 @@ let botMesh = null
 let lastPos = null
 let lastYaw = null
 let lastPitch = null
+let botVelocity = 0 // For cape animation
 
 const renderer = new THREE.WebGLRenderer()
 renderer.setPixelRatio(window.devicePixelRatio || 1)
@@ -292,6 +300,13 @@ function animate () {
     weatherSystem.update(deltaTime)
   }
 
+  // Update bot extras (name tag, cape, shadow)
+  if (botExtrasManager && botMesh) {
+    const worldPos = new THREE.Vector3()
+    botMesh.getWorldPosition(worldPos)
+    botExtrasManager.update(viewer.camera, worldPos, deltaTime, Math.min(1, botVelocity / 5))
+  }
+
   if (controls) controls.update()
   viewer.update()
   renderer.render(viewer.scene, viewer.camera)
@@ -308,6 +323,31 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'F5') {
     e.preventDefault()
     togglePOV()
+  }
+})
+
+/**
+ * Handle bot info from the server (username for name tag)
+ */
+socket.on('botInfo', (data) => {
+  if (data && data.username) {
+    botUsername = data.username
+    console.log(`[viewer] Bot username: ${botUsername}`)
+
+    // Update name tag if bot extras already exist
+    if (botExtrasManager && botMesh) {
+      // Re-setup extras with correct username
+      botExtrasManager.dispose()
+      botExtrasManager = new EntityExtrasManager()
+      botExtrasManager.setup(botMesh, {
+        name: botUsername,
+        height: 1.8,
+        width: 0.6,
+        showCape: true,
+        capeColor: 0x2244aa,
+        showShadow: true
+      })
+    }
   }
 })
 
@@ -388,7 +428,27 @@ socket.on('version', async (version) => {
       if (!botMesh) {
         botMesh = new Entity('1.16.4', 'player', viewer.scene).mesh
         viewer.scene.add(botMesh)
+
+        // Set up entity extras (name tag, cape, shadow) for bot mesh
+        botExtrasManager = new EntityExtrasManager()
+        botExtrasManager.setup(botMesh, {
+          name: botUsername,
+          height: 1.8,
+          width: 0.6,
+          showCape: true,
+          capeColor: 0x2244aa,
+          showShadow: true
+        })
+        console.log(`[viewer] Bot extras initialized for ${botUsername}`)
       }
+
+      // Calculate velocity for cape animation
+      if (lastPos) {
+        const dx = pos.x - lastPos.x
+        const dz = pos.z - lastPos.z
+        botVelocity = Math.sqrt(dx * dx + dz * dz) / 0.05 // Approximate velocity
+      }
+
       new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
       if (yaw !== undefined) {
         const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
