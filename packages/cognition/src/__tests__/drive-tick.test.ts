@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnhancedThoughtGenerator } from '../thought-generator';
-import { canonicalGoalKey } from '../llm-output-sanitizer';
+// canonicalGoalKey deleted in PR2 - Sterling provides identity via committed_goal_prop_id
 import type { ThoughtContext, CognitiveThought } from '../thought-generator';
 
 /**
@@ -267,22 +267,15 @@ describe('Drive Tick', () => {
       expect(result!.tags).toContain('autonomous');
     });
 
-    it('includes goalKey in metadata as action:target', () => {
-      const result = callEvaluateDriveTick(makeContext());
-      expect(result).not.toBeNull();
-      expect(result!.metadata.goalKey).toBe('collect:oak_log');
-    });
-
-    it('goalKey matches canonicalGoalKey(action, target)', () => {
-      const inv = [
-        { name: 'oak_log', count: 20, displayName: 'Oak Log' },
-        { name: 'crafting_table', count: 1, displayName: 'Crafting Table' },
-      ];
-      const result = callEvaluateDriveTick(makeContext({ inventory: inv }));
-      expect(result).not.toBeNull();
-      const goal = result!.metadata.extractedGoal!;
-      expect(result!.metadata.goalKey).toBe(canonicalGoalKey(goal.action, goal.target));
-    });
+    // DELETED (PR2): goalKey tests - Sterling provides identity via committed_goal_prop_id
+    // Tests removed:
+    // - 'includes goalKey in metadata as action:target'
+    // - 'goalKey matches canonicalGoalKey(action, target)'
+    //
+    // New identity hierarchy (from Sterling):
+    // 1. committed_goal_prop_id (primary)
+    // 2. committed_ir_digest (secondary)
+    // 3. envelope_id (tertiary)
   });
 
   // ==========================================
@@ -339,19 +332,9 @@ describe('Drive Tick', () => {
       expect(result).not.toBeNull();
     });
 
-    it('suppresses via exact goalKey match even when title differs', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'some renamed task title',
-        progress: 0.5,
-        status: 'active',
-        type: 'gathering',
-        metadata: { goalKey: 'collect:oak_log' },
-      }];
-      // Empty inventory → wants collect:oak_log, task has matching goalKey
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).toBeNull();
-    });
+    // DELETED (PR2): goalKey deduplication test removed
+    // Behavior changed: now uses fuzzy title matching (action + target)
+    // instead of canonical goalKey matching
 
     it('does not suppress when goalKey differs even if title has partial match', () => {
       const tasks = [{
