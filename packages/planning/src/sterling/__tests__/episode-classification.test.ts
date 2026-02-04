@@ -201,21 +201,29 @@ describe('extractSolveJoinKeys', () => {
     timestamp: Date.now(),
     input: {
       solverId: 'test.solver',
+      executionMode: 'live',
       contractVersion: 1,
       definitionHash: 'def-hash',
       initialStateHash: 'state-hash',
       goalHash: 'goal-hash',
+      nearbyBlocksHash: 'nearby-hash',
+      codeVersion: '1.0.0',
+      definitionCount: 10,
+      objectiveWeightsEffective: { costWeight: 1.0, timeWeight: 0.0, riskWeight: 0.0 },
+      objectiveWeightsSource: 'default',
     },
     output: {
       planId: 'plan-123',
       solved: true,
       stepsDigest: 'steps-digest',
-      durationMs: 100,
-      solutionPathLength: 5,
-      totalNodes: 50,
+      searchStats: {
+        durationMs: 100,
+        solutionPathLength: 5,
+        totalNodes: 50,
+      },
       sterlingIdentity: traceBundleHash ? { traceBundleHash } : undefined,
     },
-    compatReport: { valid: true, ruleCount: 10, issues: [] },
+    compatReport: { valid: true, definitionCount: 10, issues: [], checkedAt: Date.now() },
   });
 
   it('extracts bundleHash and planId from a bundle', () => {

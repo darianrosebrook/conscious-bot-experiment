@@ -1826,6 +1826,14 @@ app.post('/action', async (req, res) => {
       actionTranslator = (global as any)._cachedActionTranslator;
     }
 
+    // TypeScript can't infer the control flow above guarantees non-null
+    if (!actionTranslator) {
+      return res.status(503).json({
+        success: false,
+        message: 'Action translator not available',
+      });
+    }
+
     // For movement actions, ensure pathfinder is ready before dispatching
     const MOVEMENT_ACTIONS = new Set([
       'move_to',

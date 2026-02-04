@@ -268,7 +268,7 @@ describe('unknown-leaf terminality', () => {
       '../../modules/executable-step'
     );
 
-    const step = {
+    const step: { id: string; label: string; done: boolean; meta: { leaf: string; executable?: boolean } } = {
       id: 'step-2',
       label: 'Dig block',
       done: false,
@@ -474,7 +474,15 @@ describe('shadow mode task selection contract', () => {
 
   it('shadow-blocked task should be unblocked when mode is live', () => {
     // This verifies the auto-unblock contract (modular-server.ts lines 1643-1658)
-    const task = {
+    const task: {
+      id: string;
+      status: string;
+      metadata: {
+        blockedReason: string | undefined;
+        blockedAt: number | undefined;
+        shadowObservationCount: number;
+      };
+    } = {
       id: 't1',
       status: 'active',
       metadata: {
@@ -498,7 +506,14 @@ describe('shadow mode task selection contract', () => {
   });
 
   it('shadow-blocked task should remain blocked when mode is shadow', () => {
-    const task = {
+    const task: {
+      id: string;
+      status: string;
+      metadata: {
+        blockedReason: string | undefined;
+        blockedAt: number;
+      };
+    } = {
       id: 't1',
       status: 'active',
       metadata: {
@@ -507,12 +522,15 @@ describe('shadow mode task selection contract', () => {
       },
     };
 
-    const currentMode = 'shadow' as const;
-    // No unblock in shadow mode
-    if (currentMode === 'live' && task.metadata?.blockedReason === 'shadow_mode') {
+    // Simulate the condition check from modular-server (in shadow mode, no unblock happens)
+    const currentMode: string = 'shadow';
+    const shouldUnblock = currentMode === 'live' && task.metadata?.blockedReason === 'shadow_mode';
+    if (shouldUnblock) {
       task.metadata.blockedReason = undefined;
     }
 
+    // In shadow mode, task should remain blocked
+    expect(shouldUnblock).toBe(false);
     expect(task.metadata.blockedReason).toBe('shadow_mode');
   });
 

@@ -12,10 +12,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateLeafArgs, KNOWN_LEAVES } from '../leaf-arg-contracts';
 import { SterlingPlanner } from '../../task-integration/sterling-planner';
+import type { Task } from '../../types/task';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function makeCollectTask(item: string, quantity = 1) {
+function makeCollectTask(item: string, quantity = 1): Partial<Task> {
   return {
     id: 'test-collect-1',
     title: `Collect ${item}`,
@@ -27,16 +28,23 @@ function makeCollectTask(item: string, quantity = 1) {
       },
     },
     metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 3,
+      childTaskIds: [],
+      tags: [],
+      category: 'collect',
       currentState: {
         inventory: [{ name: 'wooden_pickaxe', count: 1 }],
         nearbyBlocks: ['oak_log', 'stone'],
         nearbyEntities: [],
       },
-    },
+    } as Task['metadata'],
   };
 }
 
-function makeMineTask(item: string, quantity = 1) {
+function makeMineTask(item: string, quantity = 1): Partial<Task> {
   return {
     id: 'test-mine-1',
     title: `Mine ${item}`,
@@ -48,12 +56,19 @@ function makeMineTask(item: string, quantity = 1) {
       },
     },
     metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 3,
+      childTaskIds: [],
+      tags: [],
+      category: 'mine',
       currentState: {
         inventory: [{ name: 'wooden_pickaxe', count: 1 }],
         nearbyBlocks: ['stone', 'iron_ore'],
         nearbyEntities: [],
       },
-    },
+    } as Task['metadata'],
   };
 }
 

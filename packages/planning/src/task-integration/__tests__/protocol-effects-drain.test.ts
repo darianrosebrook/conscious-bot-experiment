@@ -181,7 +181,8 @@ describe('Protocol effects drain: serialization', () => {
     // Spy on updateTaskStatus to record call order
     const originalUpdate = (ti as any).updateTaskStatus.bind(ti);
     vi.spyOn(ti as any, 'updateTaskStatus').mockImplementation(
-      async (taskId: string, status: string, opts: any) => {
+      async (...args: unknown[]) => {
+        const [taskId, status, opts] = args as [string, string, any];
         callOrder.push(`${taskId}:${status}`);
         return originalUpdate(taskId, status, opts);
       }
@@ -238,7 +239,8 @@ describe('Protocol effects drain: async caller ordering', () => {
 
     const originalUpdate = (ti as any).updateTaskStatus.bind(ti);
     vi.spyOn(ti as any, 'updateTaskStatus').mockImplementation(
-      async (taskId: string, status: string, opts: any) => {
+      async (...args: unknown[]) => {
+        const [taskId, status, opts] = args as [string, string, any];
         timeline.push(`start:${taskId}:${status}`);
         // Simulate async work with a small delay on the first batch
         if (status === 'paused') {

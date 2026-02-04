@@ -149,7 +149,7 @@ describe('NavigationLeaseManager', () => {
   // --- withLease happy/busy/exception paths ---
 
   it('withLease: happy path acquires, runs fn, and releases', async () => {
-    const result = await manager.withLease(
+    const result = await manager.withLease<{ success: boolean; error?: string }>(
       'executor',
       'normal',
       async () => ({ success: true }),
@@ -162,7 +162,7 @@ describe('NavigationLeaseManager', () => {
 
   it('withLease: returns busyResult when lease is held', async () => {
     manager.acquire('other-holder');
-    const result = await manager.withLease(
+    const result = await manager.withLease<{ success: boolean; error?: string }>(
       'executor',
       'normal',
       async () => ({ success: true }),

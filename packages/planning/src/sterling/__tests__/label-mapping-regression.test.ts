@@ -101,7 +101,7 @@ describe('CraftingSolver string label mapping', () => {
   beforeEach(() => {
     service = new SterlingReasoningService({
       url: 'ws://localhost:9999',
-      autoConnect: false,
+      enabled: false, // Disable to prevent auto-connect in tests
     });
     vi.spyOn(service, 'isAvailable').mockReturnValue(true);
     vi.spyOn(service, 'solve').mockResolvedValue({
@@ -373,24 +373,24 @@ describe('CraftingSolver string label mapping', () => {
     expect(taskSteps).toHaveLength(3);
 
     // mine step
-    expect(taskSteps[0].meta.leaf).toBe('acquire_material');
-    expect(taskSteps[0].meta.action).toBe('mine:oak_log');
-    expect(taskSteps[0].meta.produces).toEqual([{ name: 'oak_log', count: 1 }]);
+    expect(taskSteps[0]?.meta?.leaf).toBe('acquire_material');
+    expect(taskSteps[0]?.meta?.action).toBe('mine:oak_log');
+    expect(taskSteps[0]?.meta?.produces).toEqual([{ name: 'oak_log', count: 1 }]);
 
     // craft oak_planks step
-    expect(taskSteps[1].meta.leaf).toBe('craft_recipe');
-    expect(taskSteps[1].meta.action).toBe('craft:oak_planks');
-    expect(taskSteps[1].meta.produces).toEqual([{ name: 'oak_planks', count: 4 }]);
+    expect(taskSteps[1]?.meta?.leaf).toBe('craft_recipe');
+    expect(taskSteps[1]?.meta?.action).toBe('craft:oak_planks');
+    expect(taskSteps[1]?.meta?.produces).toEqual([{ name: 'oak_planks', count: 4 }]);
 
     // craft stick step
-    expect(taskSteps[2].meta.leaf).toBe('craft_recipe');
-    expect(taskSteps[2].meta.action).toBe('craft:stick');
-    expect(taskSteps[2].meta.produces).toEqual([{ name: 'stick', count: 4 }]);
+    expect(taskSteps[2]?.meta?.leaf).toBe('craft_recipe');
+    expect(taskSteps[2]?.meta?.action).toBe('craft:stick');
+    expect(taskSteps[2]?.meta?.produces).toEqual([{ name: 'stick', count: 4 }]);
 
     // Non-degraded steps should not have degradation markers
-    expect(taskSteps[0].meta.degraded).toBeUndefined();
-    expect(taskSteps[1].meta.degraded).toBeUndefined();
-    expect(taskSteps[2].meta.degraded).toBeUndefined();
+    expect(taskSteps[0]?.meta?.degraded).toBeUndefined();
+    expect(taskSteps[1]?.meta?.degraded).toBeUndefined();
+    expect(taskSteps[2]?.meta?.degraded).toBeUndefined();
   });
 
   // ========================================================================
@@ -622,13 +622,13 @@ describe('CraftingSolver string label mapping', () => {
     expect(taskSteps).toHaveLength(2);
 
     // First step is clean
-    expect(taskSteps[0].meta.degraded).toBeUndefined();
-    expect(taskSteps[0].meta.action).toBe('craft:stick');
+    expect(taskSteps[0]?.meta?.degraded).toBeUndefined();
+    expect(taskSteps[0]?.meta?.action).toBe('craft:stick');
 
     // Second step is degraded
-    expect(taskSteps[1].meta.degraded).toBe(true);
-    expect(taskSteps[1].meta.degradedReason).toBe('no_label');
-    expect(taskSteps[1].meta.action).toBe('unknown-1');
+    expect(taskSteps[1]?.meta?.degraded).toBe(true);
+    expect(taskSteps[1]?.meta?.degradedReason).toBe('no_label');
+    expect(taskSteps[1]?.meta?.action).toBe('unknown-1');
   });
 });
 
@@ -643,7 +643,7 @@ describe('ToolProgressionSolver strict mapping mode', () => {
   beforeEach(() => {
     service = new SterlingReasoningService({
       url: 'ws://localhost:9999',
-      autoConnect: false,
+      enabled: false, // Disable to prevent auto-connect in tests
     });
     vi.spyOn(service, 'isAvailable').mockReturnValue(true);
     vi.spyOn(service, 'solve').mockResolvedValue({

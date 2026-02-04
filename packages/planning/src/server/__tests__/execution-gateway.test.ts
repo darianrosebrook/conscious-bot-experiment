@@ -73,7 +73,7 @@ describe('ExecutionGateway', () => {
   // -----------------------------------------------------------------------
 
   it('fails when bot is not connected', async () => {
-    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
+    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'client_error' });
     const result = await executeViaGateway(makeRequest());
     expect(result.ok).toBe(false);
     expect(result.outcome).toBe('error');
@@ -285,7 +285,7 @@ describe('ExecutionGateway', () => {
   });
 
   it('outcome invariant: error implies ok===false', async () => {
-    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
+    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'client_error' });
     const result = await executeViaGateway(makeRequest());
     expect(result.outcome).toBe('error');
     expect(result.ok).toBe(false);
@@ -326,7 +326,7 @@ describe('ExecutionGateway', () => {
 
   it('outcome invariant: error implies no failureCode (infra vs action-level)', async () => {
     // Bot not connected is an infra error, not an action-level failure
-    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'refused' });
+    mockBotCheck.mockResolvedValue({ ok: false, failureKind: 'client_error' });
     const result = await executeViaGateway(makeRequest());
     expect(result.outcome).toBe('error');
     expect(result.failureCode).toBeUndefined();

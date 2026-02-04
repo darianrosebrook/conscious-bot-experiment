@@ -195,10 +195,8 @@ describe('shouldHold', () => {
     for (const level of levels) {
       for (const threshold of levels) {
         const key = `${level},${threshold}`;
-        expect(shouldHold(makeSignal(level), threshold)).toBe(
-          expected[key],
-          `shouldHold(${level}, ${threshold})`,
-        );
+        const result = shouldHold(makeSignal(level), threshold);
+        expect(result, `shouldHold(${level}, ${threshold})`).toBe(expected[key]);
       }
     }
   });

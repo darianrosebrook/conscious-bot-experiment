@@ -8,10 +8,12 @@
  */
 
 // Global type declarations
+// Note: keepAliveIntegration uses a generic type to avoid dist/src type conflicts
 declare global {
   var lastIdleEvent: number | undefined;
   var lastNoTasksLog: number | undefined;
-  var keepAliveIntegration: KeepAliveIntegration | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var keepAliveIntegration: any;
   var lastUserCommand: number | undefined;
 }
 

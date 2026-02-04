@@ -177,9 +177,9 @@ export class MemoryIntegrationService {
         }
       );
 
-      if (!response?.ok) {
+      if (!response || !response.ok) {
         throw new Error(
-          `Memory service responded with status: ${response.status}`
+          `Memory service responded with status: ${response?.status ?? 'null'}`
         );
       }
 

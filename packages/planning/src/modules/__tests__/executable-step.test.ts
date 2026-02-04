@@ -3,7 +3,7 @@ import { normalizeStepExecutability, isExecutableStep } from '../executable-step
 
 describe('normalizeStepExecutability', () => {
   it('defaults meta.executable to true when leaf is present', () => {
-    const step = { meta: { leaf: 'dig_block' } };
+    const step: { meta: { leaf: string; executable?: boolean } } = { meta: { leaf: 'dig_block' } };
     normalizeStepExecutability(step);
     expect(step.meta.executable).toBe(true);
   });

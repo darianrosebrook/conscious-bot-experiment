@@ -658,6 +658,9 @@ export class SterlingNavigateLeaf implements LeafImpl {
             scanMargin,
           }),
         });
+        if (!resp) {
+          return fail('unknown', 'Planning server returned null response', ctx.now() - t0);
+        }
         solveResult = await resp.json() as NavSolveResponse;
       } catch (e: any) {
         return fail('unknown', `Planning server error: ${e?.message ?? e}`, ctx.now() - t0);

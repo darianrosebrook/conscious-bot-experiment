@@ -32,6 +32,7 @@ function makeSignals(overrides: Partial<RigGSignals> = {}): RigGSignals {
     feasibility_rejections: {},
     linearization_digest: 'abc123',
     plan_digest: 'def456',
+    degraded_to_raw_steps: false,
     ...overrides,
   };
 }

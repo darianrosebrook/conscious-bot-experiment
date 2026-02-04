@@ -28,11 +28,11 @@ describe('RaycastEngine line-of-sight', () => {
   });
 
   it('returns false when a closer hit occludes target', () => {
-    const worldRaycast = vi.fn(() => ({
+    const worldRaycast = vi.fn().mockReturnValue({
       position: { x: 0, y: 0, z: 5 },
       intersect: { x: 0, y: 0, z: 5 },
       faceVector: { x: 0, y: 1, z: 0 },
-    }));
+    }) as unknown as typeof baseConfig extends any ? any : never;
 
     const engine = new RaycastEngine(baseConfig, {
       entity: { position: { x: 0, y: 0, z: 0 }, height: 1.62, yaw: 0, pitch: 0 },
@@ -53,11 +53,11 @@ describe('RaycastEngine line-of-sight', () => {
 
 describe('RaycastEngine sweepOccluders', () => {
   it('deduplicates hits at the same position', () => {
-    const worldRaycast = vi.fn(() => ({
+    const worldRaycast = vi.fn().mockReturnValue({
       position: { x: 1.2, y: 0, z: 3.4 },
       intersect: { x: 1.2, y: 0, z: 3.4 },
       faceVector: { x: 0, y: 1, z: 0 },
-    }));
+    }) as any;
 
     const engine = new RaycastEngine(
       validateSensingConfig({
