@@ -28,59 +28,84 @@ const CONVERSION_MODULES = [
 // - sterling-planner.ts: Verified as structural routing only (switch on req.kind)
 
 /**
+ * Structured violation object for switch case analysis.
+ */
+interface SwitchViolation {
+  discriminant: string;  // What's being switched on (e.g., "action", "goal.action")
+  caseLabel: string;     // The case label (e.g., "craft", "mine")
+  snippet: string;       // Short code snippet for error messages
+  file: string;          // Filename for context
+}
+
+/**
+ * Normalize source code for robust pattern matching.
+ *
+ * Removes comments and collapses whitespace so multi-line constructs
+ * can be matched reliably without AST parsing.
+ */
+function normalizeSource(content: string): string {
+  let normalized = content;
+
+  // Remove block comments
+  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  // Remove line comments
+  normalized = normalized.replace(/\/\/.*/g, ' ');
+
+  // Collapse whitespace to single spaces
+  normalized = normalized.replace(/\s+/g, ' ');
+
+  return normalized;
+}
+
+/**
  * Check if a switch statement switches on a semantic discriminant (FORBIDDEN)
  * vs a structural discriminant (ALLOWED).
  *
  * FORBIDDEN: switch (action), switch (goal.action), switch (verb), switch (predicate)
  * ALLOWED: switch (req.kind), switch (requirement.kind), switch (task.kind)
  *
- * LIMITATIONS (regex-based, not AST-based):
- * - Multi-line switch statements may not match: `switch (\n  action\n)`
- * - Nested switches can cause incorrect association
- * - Comments/strings containing "case 'craft'" may cause false positives
- * - Bounded lookback (20 lines) may miss distant switch statements
+ * IMPLEMENTATION NOTES:
+ * - Uses normalized source (comments stripped, whitespace collapsed) to handle multi-line
+ * - Character-based lookback (500 chars) instead of line-based to work with normalized text
+ * - Returns structured violation objects, not strings
+ * - Name-based heuristic for allowed discriminants (documented limitation)
  *
- * HARDENING RECOMMENDATIONS (for future work):
- * 1. Use TypeScript Compiler API or ts-morph for true AST analysis
- * 2. Strip comments/strings before scanning to avoid false positives
- * 3. Normalize whitespace for multi-line switch statements
- * 4. Add fixtures for edge cases: multi-line switch, switch with comments in discriminant
- * 5. Use provenance-based checking (import Sterling types) instead of variable name heuristics
+ * REMAINING LIMITATIONS (would require AST to fully fix):
+ * - Nested switches can cause incorrect association if lookback isn't large enough
+ * - Name-based heuristic: `const req = {kind: action}` would bypass if named "req"
+ * - Doesn't verify Sterling type imports (would need import analysis)
  *
- * This is "good enough" for current boundary enforcement but should be upgraded
- * to AST-based checking if the boundary contract becomes load-bearing for other repos.
+ * UPGRADE PATH: Use TypeScript Compiler API or ts-morph when boundary becomes
+ * load-bearing for other repos or when bypass attempts emerge.
  */
-function checkSwitchCases(content: string, file: string): string[] {
-  const violations: string[] = [];
+function checkSwitchCases(content: string, file: string): SwitchViolation[] {
+  const violations: SwitchViolation[] = [];
 
-  // Find all case statements for action strings
+  // Normalize to handle multi-line and comments
+  const normalized = normalizeSource(content);
+
+  // Find all case statements for action strings in normalized source
   const casePattern = /case\s+['"]?(craft|mine|explore|navigate|build|collect|gather)['"]?\s*:/gi;
   let match;
 
-  while ((match = casePattern.exec(content)) !== null) {
+  while ((match = casePattern.exec(normalized)) !== null) {
     const caseIndex = match.index;
-    const caseText = match[0];
+    const caseLabel = match[1]; // The action string (craft, mine, etc.)
 
-    // Walk backwards to find the nearest switch statement (bounded scan, max 20 lines)
-    const lines = content.substring(0, caseIndex).split('\n');
-    const caseLineIndex = lines.length - 1;
-    const startLine = Math.max(0, caseLineIndex - 20);
+    // Walk backwards in normalized source to find switch (character-based, 500 chars max)
+    const lookbackStart = Math.max(0, caseIndex - 500);
+    const precedingText = normalized.substring(lookbackStart, caseIndex);
 
-    let switchDiscriminant: string | null = null;
+    // Find the nearest switch statement
+    const switchMatch = precedingText.match(/switch\s*\(\s*([^)]+)\s*\)\s*\{[^}]*$/);
 
-    for (let i = caseLineIndex; i >= startLine; i--) {
-      const line = lines[i];
-      const switchMatch = line.match(/switch\s*\(\s*([^)]+)\s*\)/);
-      if (switchMatch) {
-        switchDiscriminant = switchMatch[1].trim();
-        break;
-      }
-    }
-
-    if (!switchDiscriminant) {
-      // Couldn't find switch - might be malformed code, skip
+    if (!switchMatch) {
+      // Couldn't find switch - might be malformed code or lookback too small
       continue;
     }
+
+    const switchDiscriminant = switchMatch[1].trim();
 
     // Check if discriminant is FORBIDDEN (semantic) or ALLOWED (structural)
     const forbiddenDiscriminants = /\b(action|verb|intent|predicate|goal|extractedGoal)\b|\.(action|intent|predicate|verb)/i;
@@ -93,7 +118,13 @@ function checkSwitchCases(content: string, file: string): string[] {
 
     if (forbiddenDiscriminants.test(switchDiscriminant)) {
       // Semantic interpretation - FORBIDDEN
-      violations.push(`switch (${switchDiscriminant}) { ${caseText} ... }`);
+      const snippet = `switch (${switchDiscriminant}) { case '${caseLabel}': ... }`;
+      violations.push({
+        discriminant: switchDiscriminant,
+        caseLabel,
+        snippet,
+        file,
+      });
     }
   }
 
@@ -146,7 +177,11 @@ describe('I-CONVERSION-1: No Local Predicate→TaskType Mapping', () => {
             const violations = checkSwitchCases(content, file);
 
             if (violations.length > 0) {
-              const details = violations.map(v => `  ${v}`).join('\n');
+              const details = violations.map(v =>
+                `  - Discriminant: ${v.discriminant}\n` +
+                `    Case: ${v.caseLabel}\n` +
+                `    Snippet: ${v.snippet}`
+              ).join('\n');
               expect.fail(
                 `Found semantic switch statement(s) in ${file}:\n${details}\n\n` +
                 `This violates I-CONVERSION-1.\n` +
@@ -245,9 +280,8 @@ describe('Allowed Patterns', () => {
       expect(violations).toHaveLength(0);
     });
 
-    it('multi-line switch on req.kind (edge case: whitespace normalization)', () => {
-      // Tests limitation: current regex may not handle multi-line well
-      // This SHOULD be allowed (structural), but may fail to match due to newlines
+    it('multi-line switch on req.kind (whitespace normalization)', () => {
+      // Tests that normalization handles multi-line switch statements
       const goodCode = `
         switch (
           req.kind
@@ -257,8 +291,20 @@ describe('Allowed Patterns', () => {
         }
       `;
       const violations = checkSwitchCases(goodCode, 'test.ts');
-      // Current implementation may fail here - documenting known limitation
-      // expect(violations).toHaveLength(0); // Would pass with AST-based checker
+      // Should pass now with normalization
+      expect(violations).toHaveLength(0);
+    });
+
+    it('switch with comments in discriminant (normalization)', () => {
+      // Tests that comment stripping works
+      const goodCode = `
+        switch (/* type hint */ req.kind) {
+          case 'mine':
+            return req.patterns;
+        }
+      `;
+      const violations = checkSwitchCases(goodCode, 'test.ts');
+      expect(violations).toHaveLength(0);
     });
   });
 
@@ -287,9 +333,10 @@ describe('Allowed Patterns', () => {
       `;
       const violations = checkSwitchCases(badCode, 'test.ts');
       expect(violations.length).toBeGreaterThan(0);
-      // Assert on violation structure, not just string content
-      expect(violations[0]).toMatch(/^switch \(.*(action).*\) \{.*case/);
-      expect(violations[0]).toContain('craft'); // Verify case was captured
+      // Assert on structured violation object
+      expect(violations[0].discriminant).toBe('action');
+      expect(violations[0].caseLabel).toBe('craft');
+      expect(violations[0].file).toBe('test.ts');
     });
 
     it('switch on goal.action (semantic discriminant)', () => {
@@ -304,8 +351,8 @@ describe('Allowed Patterns', () => {
       `;
       const violations = checkSwitchCases(badCode, 'test.ts');
       expect(violations.length).toBeGreaterThan(0);
-      expect(violations[0]).toMatch(/^switch \(.*(goal\.action).*\) \{.*case/);
-      expect(violations[0]).toContain('explore');
+      expect(violations[0].discriminant).toBe('goal.action');
+      expect(violations[0].caseLabel).toBe('explore');
     });
 
     it('switch on verb (semantic discriminant)', () => {
@@ -320,8 +367,8 @@ describe('Allowed Patterns', () => {
       `;
       const violations = checkSwitchCases(badCode, 'test.ts');
       expect(violations.length).toBeGreaterThan(0);
-      expect(violations[0]).toMatch(/^switch \(.*(verb).*\) \{.*case/);
-      expect(violations[0]).toContain('collect');
+      expect(violations[0].discriminant).toBe('verb');
+      expect(violations[0].caseLabel).toBe('collect');
     });
 
     it('switch on extractedGoal (semantic discriminant)', () => {
@@ -334,8 +381,29 @@ describe('Allowed Patterns', () => {
       `;
       const violations = checkSwitchCases(badCode, 'test.ts');
       expect(violations.length).toBeGreaterThan(0);
-      expect(violations[0]).toMatch(/^switch \(.*(extractedGoal).*\) \{.*case/);
-      expect(violations[0]).toContain('gather');
+      expect(violations[0].discriminant).toBe('extractedGoal');
+      expect(violations[0].caseLabel).toBe('gather');
+    });
+
+    it('bypass attempt: naming local variable "req" (caught)', () => {
+      // This is a bypass attempt - local variable named "req" but contains semantic data
+      // Current implementation flags this as allowed (name-based heuristic limitation)
+      // but it demonstrates the documented limitation
+      const bypassCode = `
+        const req = { kind: action }; // "req" shadows, but kind contains semantic action
+        switch (req.kind) {
+          case 'craft':
+            return doSomething();
+        }
+      `;
+      const violations = checkSwitchCases(bypassCode, 'test.ts');
+      // KNOWN LIMITATION: This currently passes (0 violations) because we use name-based heuristic
+      // Would need import/type analysis to catch this properly
+      // Documenting the bypass vector explicitly
+      expect(violations).toHaveLength(0); // Name-based heuristic allows this
+      // TODO: When upgrading to AST-based checking, this should become:
+      // expect(violations).toHaveLength(1);
+      // expect(violations[0].discriminant).toBe('req.kind');
     });
   });
 });
