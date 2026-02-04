@@ -1,0 +1,465 @@
+/**
+ * entities.js - Entity manager with skeletal animation support
+ *
+ * This file manages all entities in the Three.js scene, handling:
+ * - Entity spawning and despawning
+ * - Position/rotation interpolation via TWEEN
+ * - Skeletal animation (walk/idle cycles)
+ *
+ * @module prismarine-viewer/lib/entities
+ */
+
+const THREE = require('three')
+const TWEEN = require('@tweenjs/tween.js')
+
+const Entity = require('./entity/Entity')
+const { dispose3 } = require('./dispose')
+
+const { createCanvas } = require('canvas')
+
+// ============================================================================
+// SKELETAL ANIMATION SYSTEM
+// ============================================================================
+
+// Entity categories for animation selection
+const BIPED_ENTITIES = [
+  'player', 'zombie', 'skeleton', 'creeper', 'enderman', 'witch',
+  'villager', 'pillager', 'vindicator', 'evoker', 'illusioner',
+  'zombie_villager', 'drowned', 'husk', 'stray', 'wither_skeleton',
+  'piglin', 'piglin_brute', 'zombified_piglin'
+]
+
+const QUADRUPED_ENTITIES = [
+  'pig', 'cow', 'sheep', 'chicken', 'wolf', 'cat', 'ocelot',
+  'horse', 'donkey', 'mule', 'fox', 'rabbit', 'goat', 'llama',
+  'polar_bear', 'panda', 'bee', 'spider', 'cave_spider'
+]
+
+// Standard bone names for bipeds
+const BIPED_BONES = {
+  HEAD: 'head',
+  BODY: 'body',
+  LEFT_ARM: 'leftArm',
+  RIGHT_ARM: 'rightArm',
+  LEFT_LEG: 'leftLeg',
+  RIGHT_LEG: 'rightLeg'
+}
+
+// Standard bone names for quadrupeds
+const QUADRUPED_BONES = {
+  HEAD: 'head',
+  BODY: 'body',
+  LEG0: 'leg0', // front right
+  LEG1: 'leg1', // front left
+  LEG2: 'leg2', // back right
+  LEG3: 'leg3'  // back left
+}
+
+/**
+ * Create a QuaternionKeyframeTrack for bone rotation animation
+ */
+function createBoneRotationTrack (boneName, keyframes) {
+  const times = []
+  const values = []
+
+  for (const kf of keyframes) {
+    times.push(kf.time)
+    // Convert Euler to Quaternion for smooth interpolation
+    const euler = new THREE.Euler(kf.rotation.x, kf.rotation.y, kf.rotation.z, 'XYZ')
+    const quat = new THREE.Quaternion().setFromEuler(euler)
+    values.push(quat.x, quat.y, quat.z, quat.w)
+  }
+
+  return new THREE.QuaternionKeyframeTrack(
+    boneName + '.quaternion',
+    times,
+    values
+  )
+}
+
+/**
+ * Create walk animation clip for biped entities
+ */
+function createBipedWalkClip () {
+  const tracks = []
+  const duration = 1.0 // 1 second per full cycle
+  const amplitude = 0.6 // Radians - leg swing amount
+
+  // Left leg - swings forward then back
+  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_LEG, [
+    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
+  ]))
+
+  // Right leg - opposite phase
+  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_LEG, [
+    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
+  ]))
+
+  // Left arm - opposite to left leg (natural walking motion)
+  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
+    { time: 0.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
+    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
+    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } }
+  ]))
+
+  // Right arm - opposite to right leg
+  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
+    { time: 0.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
+    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
+    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } }
+  ]))
+
+  return new THREE.AnimationClip('walk', duration, tracks)
+}
+
+/**
+ * Create idle animation clip for biped entities (subtle breathing/swaying)
+ */
+function createBipedIdleClip () {
+  const tracks = []
+  const duration = 2.0 // Slower, more relaxed
+  const breathAmplitude = 0.02 // Very subtle
+
+  // Subtle body sway
+  tracks.push(createBoneRotationTrack(BIPED_BONES.BODY, [
+    { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: breathAmplitude, y: 0, z: 0 } },
+    { time: 2.0, rotation: { x: 0, y: 0, z: 0 } }
+  ]))
+
+  // Arms at rest with slight movement
+  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
+    { time: 0.0, rotation: { x: 0, y: 0, z: 0.05 } },
+    { time: 1.0, rotation: { x: 0, y: 0, z: 0.08 } },
+    { time: 2.0, rotation: { x: 0, y: 0, z: 0.05 } }
+  ]))
+
+  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
+    { time: 0.0, rotation: { x: 0, y: 0, z: -0.05 } },
+    { time: 1.0, rotation: { x: 0, y: 0, z: -0.08 } },
+    { time: 2.0, rotation: { x: 0, y: 0, z: -0.05 } }
+  ]))
+
+  return new THREE.AnimationClip('idle', duration, tracks)
+}
+
+/**
+ * Create walk animation clip for quadruped entities
+ */
+function createQuadrupedWalkClip () {
+  const tracks = []
+  const duration = 1.0
+  const amplitude = 0.5
+
+  // Diagonal pairs move together (like a trotting animal)
+  // Front right + back left
+  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG0, [
+    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
+  ]))
+
+  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG3, [
+    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
+  ]))
+
+  // Front left + back right (opposite phase)
+  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG1, [
+    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
+  ]))
+
+  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG2, [
+    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
+  ]))
+
+  return new THREE.AnimationClip('walk', duration, tracks)
+}
+
+/**
+ * Create idle animation for quadrupeds
+ */
+function createQuadrupedIdleClip () {
+  const tracks = []
+  const duration = 3.0
+
+  // Subtle head movement
+  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.HEAD, [
+    { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
+    { time: 1.5, rotation: { x: 0.05, y: 0.1, z: 0 } },
+    { time: 3.0, rotation: { x: 0, y: 0, z: 0 } }
+  ]))
+
+  return new THREE.AnimationClip('idle', duration, tracks)
+}
+
+/**
+ * Determine entity category for animation selection
+ */
+function getEntityCategory (entityType) {
+  if (!entityType) return 'unknown'
+  const type = entityType.toLowerCase().replace('minecraft:', '')
+  if (BIPED_ENTITIES.includes(type)) return 'biped'
+  if (QUADRUPED_ENTITIES.includes(type)) return 'quadruped'
+  return 'unknown'
+}
+
+/**
+ * Calculate animation speed based on movement velocity
+ */
+function calculateAnimationSpeed (velocity) {
+  const horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
+  // Walking speed ~4.3 blocks/sec, running ~5.6
+  if (horizontalSpeed < 0.1) return 0 // Idle
+  if (horizontalSpeed < 4.5) return horizontalSpeed / 4.3 // Normal walk speed
+  return horizontalSpeed / 4.3 // Scale with speed
+}
+
+// ============================================================================
+// Entity Mesh Creation
+// ============================================================================
+
+function getEntityMesh (entity, scene) {
+  if (entity.name) {
+    try {
+      const e = new Entity('1.16.4', entity.name, scene)
+
+      if (entity.username !== undefined) {
+        const canvas = createCanvas(500, 100)
+
+        const ctx = canvas.getContext('2d')
+        ctx.font = '50pt Arial'
+        ctx.fillStyle = '#000000'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
+
+        const txt = entity.username
+        ctx.fillText(txt, 100, 0)
+
+        const tex = new THREE.Texture(canvas)
+        tex.needsUpdate = true
+        const spriteMat = new THREE.SpriteMaterial({ map: tex })
+        const sprite = new THREE.Sprite(spriteMat)
+        sprite.position.y += entity.height + 0.6
+
+        e.mesh.add(sprite)
+      }
+      return e.mesh
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
+  const geometry = new THREE.BoxGeometry(entity.width, entity.height, entity.width)
+  geometry.translate(0, entity.height / 2, 0)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff00ff })
+  const cube = new THREE.Mesh(geometry, material)
+  return cube
+}
+
+// ============================================================================
+// Entities Manager Class
+// ============================================================================
+
+class Entities {
+  constructor (scene) {
+    this.scene = scene
+    this.entities = {}
+    // Animation system
+    this.animationMixers = new Map() // entityId -> THREE.AnimationMixer
+    this.animationActions = new Map() // entityId -> { idle, walk }
+    this.entityStates = new Map() // entityId -> { lastPos, velocity, isMoving }
+    this.lastUpdateTime = performance.now()
+  }
+
+  clear () {
+    for (const mesh of Object.values(this.entities)) {
+      this.scene.remove(mesh)
+      dispose3(mesh)
+    }
+    this.entities = {}
+    // Clear animation data
+    this.animationMixers.clear()
+    this.animationActions.clear()
+    this.entityStates.clear()
+  }
+
+  /**
+   * Set up animation system for an entity
+   */
+  setupEntityAnimation (entityId, mesh) {
+    const entityType = mesh.userData.entityType
+    const category = getEntityCategory(entityType)
+
+    if (category === 'unknown') {
+      return // No animation for unknown entities
+    }
+
+    // Find the first skinned mesh with bones
+    let skinnedMesh = null
+    mesh.traverse((child) => {
+      if (child.isSkinnedMesh && child.userData.bonesByName) {
+        skinnedMesh = child
+      }
+    })
+
+    if (!skinnedMesh || !skinnedMesh.userData.bonesByName) {
+      return // No bones to animate
+    }
+
+    // Create animation mixer for this entity
+    const mixer = new THREE.AnimationMixer(skinnedMesh)
+    this.animationMixers.set(entityId, mixer)
+
+    // Create appropriate animation clips based on category
+    let idleClip, walkClip
+    if (category === 'biped') {
+      idleClip = createBipedIdleClip()
+      walkClip = createBipedWalkClip()
+    } else if (category === 'quadruped') {
+      idleClip = createQuadrupedIdleClip()
+      walkClip = createQuadrupedWalkClip()
+    }
+
+    if (idleClip && walkClip) {
+      const idleAction = mixer.clipAction(idleClip)
+      const walkAction = mixer.clipAction(walkClip)
+
+      // Configure actions
+      idleAction.setLoop(THREE.LoopRepeat, Infinity)
+      walkAction.setLoop(THREE.LoopRepeat, Infinity)
+
+      // Start with idle
+      idleAction.play()
+
+      this.animationActions.set(entityId, {
+        idle: idleAction,
+        walk: walkAction,
+        current: 'idle'
+      })
+    }
+
+    // Initialize entity state
+    this.entityStates.set(entityId, {
+      lastPos: new THREE.Vector3(),
+      velocity: new THREE.Vector3(),
+      isMoving: false
+    })
+  }
+
+  /**
+   * Transition between animation states
+   */
+  transitionAnimation (entityId, toState, speed = 1.0) {
+    const actions = this.animationActions.get(entityId)
+    if (!actions || actions.current === toState) return
+
+    const fromAction = actions[actions.current]
+    const toAction = actions[toState]
+
+    if (!fromAction || !toAction) return
+
+    // Crossfade duration
+    const fadeDuration = 0.2
+
+    // Set the playback speed for walk animation
+    if (toState === 'walk') {
+      toAction.setEffectiveTimeScale(Math.max(0.5, speed))
+    }
+
+    // Crossfade
+    toAction.reset()
+    toAction.setEffectiveWeight(1)
+    toAction.play()
+    fromAction.crossFadeTo(toAction, fadeDuration, true)
+
+    actions.current = toState
+  }
+
+  update (entity) {
+    if (!this.entities[entity.id]) {
+      const mesh = getEntityMesh(entity, this.scene)
+      if (!mesh) return
+      this.entities[entity.id] = mesh
+      this.scene.add(mesh)
+
+      // Set up animation for new entity
+      this.setupEntityAnimation(entity.id, mesh)
+    }
+
+    const e = this.entities[entity.id]
+
+    if (entity.delete) {
+      this.scene.remove(e)
+      dispose3(e)
+      delete this.entities[entity.id]
+      // Clean up animation data
+      this.animationMixers.delete(entity.id)
+      this.animationActions.delete(entity.id)
+      this.entityStates.delete(entity.id)
+      return
+    }
+
+    if (entity.pos) {
+      const newPos = new THREE.Vector3(entity.pos.x, entity.pos.y, entity.pos.z)
+
+      // Calculate velocity for animation
+      const state = this.entityStates.get(entity.id)
+      if (state) {
+        const deltaTime = 0.05 // 50ms update interval
+        state.velocity.subVectors(newPos, state.lastPos).divideScalar(deltaTime)
+        state.lastPos.copy(newPos)
+
+        // Determine animation state based on movement
+        const speed = calculateAnimationSpeed(state.velocity)
+        const isMoving = speed > 0.1
+
+        if (isMoving !== state.isMoving) {
+          state.isMoving = isMoving
+          this.transitionAnimation(entity.id, isMoving ? 'walk' : 'idle', speed)
+        } else if (isMoving) {
+          // Update walk speed
+          const actions = this.animationActions.get(entity.id)
+          if (actions && actions.walk) {
+            actions.walk.setEffectiveTimeScale(Math.max(0.5, speed))
+          }
+        }
+      }
+
+      new TWEEN.Tween(e.position).to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 50).start()
+    }
+    if (entity.yaw) {
+      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2)
+      const dy = 2 * da % (Math.PI * 2) - da
+      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start()
+    }
+  }
+
+  /**
+   * Update all animation mixers - call this from the render loop
+   */
+  updateAnimations (deltaTime) {
+    for (const mixer of this.animationMixers.values()) {
+      mixer.update(deltaTime)
+    }
+  }
+}
+
+module.exports = { Entities }

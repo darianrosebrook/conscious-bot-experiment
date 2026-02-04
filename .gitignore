@@ -19,6 +19,9 @@ build/
 **/src/**/*.js.map
 **/src/**/*.d.ts.map
 
+# Exception: prismarine-viewer source customizations (authoritative JS, not compiled)
+!**/prismarine-viewer-src/**/*.js
+
 # Environment variables
 .env
 .env.local
