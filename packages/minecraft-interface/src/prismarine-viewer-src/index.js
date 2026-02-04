@@ -11,6 +11,7 @@
  * 3. Bot mesh rendering when in 3rd person mode
  * 4. Custom texture URLs from /mc-assets for version support beyond 1.21.4
  * 5. Animated texture shader for water/lava/fire animations
+ * 6. Procedural sky dome with sun/moon/stars
  *
  * This file is copied to node_modules/prismarine-viewer/lib/index.js
  * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
@@ -30,6 +31,7 @@ const {
   updateAnimatedMaterial,
   updateDayProgress
 } = require('./animated-material-client')
+const { createSkyRenderer } = require('./sky-renderer')
 
 const io = require('socket.io-client')
 const socket = io({
@@ -41,7 +43,12 @@ const socket = io({
 // ============================================================================
 let animatedMaterial = null
 let lastAnimationTime = performance.now()
-let currentWorldTime = 6000 // Default to morning
+let currentWorldTime = 6000 // Default to noon
+
+// ============================================================================
+// Sky Renderer State
+// ============================================================================
+let skyRenderer = null
 
 // ============================================================================
 // Custom Asset Integration
@@ -126,8 +133,15 @@ function setupAnimatedMaterial (blockStates) {
 socket.on('time', (data) => {
   if (data && typeof data.time === 'number') {
     currentWorldTime = data.time
+
+    // Update animated material day/night colors
     if (animatedMaterial) {
       updateDayProgress(animatedMaterial, currentWorldTime)
+    }
+
+    // Update sky renderer sun/moon positions
+    if (skyRenderer) {
+      skyRenderer.setTime(currentWorldTime)
     }
   }
 })
@@ -234,6 +248,11 @@ function animate () {
     updateAnimatedMaterial(animatedMaterial, deltaTime)
   }
 
+  // Update sky dome position to follow camera
+  if (skyRenderer) {
+    skyRenderer.update()
+  }
+
   if (controls) controls.update()
   viewer.update()
   renderer.render(viewer.scene, viewer.camera)
@@ -283,6 +302,13 @@ socket.on('version', async (version) => {
     }
     // Start checking after a small initial delay
     setTimeout(checkAndSetupMaterial, 200)
+  }
+
+  // Initialize sky renderer after viewer is set up
+  if (!skyRenderer) {
+    skyRenderer = createSkyRenderer(viewer.scene, viewer.camera)
+    skyRenderer.setTime(currentWorldTime)
+    console.log('[viewer] Sky renderer initialized')
   }
 
   firstPositionUpdate = true

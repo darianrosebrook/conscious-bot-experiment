@@ -13,6 +13,7 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - ✅ **Replaced**: Animated textures (water/lava/fire with frame interpolation)
 - ✅ **Replaced**: Day/night lighting cycle (Minecraft-accurate colors)
 - ✅ **Replaced**: Entity equipment rendering (armor, held items)
+- ✅ **Replaced**: Procedural sky dome (sun/moon/stars)
 - ✅ **Working**: Player skins (via Microsoft auth + ONLINE_MODE)
 - ✅ **Working**: Custom asset server for MC 1.21.5-1.21.9 textures
 - ❌ **Not Started**: Chunk meshing, physics simulation
@@ -89,9 +90,10 @@ We maintain our own source files that get injected into prismarine-viewer via pn
 
 | File | Mechanism | Purpose |
 |------|-----------|---------|
-| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom asset URLs, animated material, equipment events |
+| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom asset URLs, animated material, equipment events, sky |
 | `animated-material-client.js` | postinstall copy | Custom ShaderMaterial for water/lava/fire animations |
 | `equipment-renderer.js` | postinstall copy | Equipment mesh factory for armor/held items |
+| `sky-renderer.js` | postinstall copy | Procedural sky dome with sun/moon/stars |
 | `mineflayer.js` | postinstall copy | Enhanced server-side with equipment/time events |
 | `Entity.js` | postinstall copy | Store bone refs in `mesh.userData` for animation lookups |
 | `entities.js` | postinstall copy | Skeletal animation + equipment manager integration |
@@ -234,7 +236,44 @@ Custom equipment system that renders armor and held items on entity skeletal mes
 - Proper disposal on entity despawn
 - Change detection to minimize updates
 
-### 2.7 Viewer Patches (pnpm) ✅
+### 2.7 Procedural Sky Rendering ✅
+
+**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/sky-renderer.js`
+
+Procedural sky dome with dynamic celestial bodies:
+
+| Feature | Implementation | Notes |
+|---------|---------------|-------|
+| Sky gradient | Fragment shader | Horizon→zenith color blend |
+| Sun | Disc + glow in shader | Position from MC time |
+| Moon | Disc + glow in shader | Opposite sun position |
+| Stars | Procedural noise | Multi-layer star field |
+| Day/night | Smooth transitions | Matches material shader |
+
+**Minecraft Time Mapping**:
+```
+MC Time    Real Time     Sky State
+───────    ──────────    ─────────
+0          6:00 AM       Sunrise (sun at horizon)
+6000       12:00 PM      Noon (sun overhead)
+12000      6:00 PM       Sunset (sun at horizon)
+18000      12:00 AM      Midnight (moon overhead)
+```
+
+**Shader Uniforms**:
+- `time`: Minecraft tick (0-24000)
+- `sunDirection`: Normalized vec3 for sun disc
+- `moonDirection`: Normalized vec3 for moon disc
+- `day/twilight/nightHorizon`: Horizon colors for each phase
+- `day/twilight/nightZenith`: Zenith colors for each phase
+- `starBrightness`: 0-1 for overcast weather
+
+**Integration Points**:
+- Sky dome follows camera (always surrounds viewer)
+- `socket.on('time')` updates sun/moon positions
+- Renders first (behind everything) via `renderOrder: -1000`
+
+### 2.8 Viewer Patches (pnpm) ✅
 
 **Location**: `patches/prismarine-viewer@1.33.0.patch`
 
@@ -362,7 +401,7 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - [x] Player skins (via Microsoft auth)
 - [x] Custom asset server for MC 1.21.5-1.21.9
 - [x] Entity equipment rendering (armor, held items)
-- [ ] Custom sky rendering (sun/moon position, stars)
+- [x] Custom sky rendering (sun/moon position, stars)
 - [ ] Weather effects (rain, snow particles)
 - [ ] Block lighting (torch light, redstone)
 
@@ -485,6 +524,7 @@ pnpm install
 | Player skins | ✅ Done | Via Microsoft auth (no code needed) |
 | Day/night cycle | ✅ Done | Smooth color interpolation |
 | Entity equipment | ✅ Done | Armor, held items on skeletal meshes |
+| Procedural sky | ✅ Done | Sun/moon/stars with day/night cycle |
 | Chunk meshing | ⏳ Maybe | High effort, current solution works |
 | Physics | ❌ Keep | Pathfinding depends on it |
 | Protocol handling | ❌ Keep | mineflayer is excellent |

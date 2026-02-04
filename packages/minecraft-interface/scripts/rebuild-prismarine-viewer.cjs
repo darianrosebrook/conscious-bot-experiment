@@ -113,6 +113,20 @@ function run() {
       console.log('[rebuild-prismarine-viewer] Copied equipment-renderer.js to viewer/lib/');
     }
 
+    // Copy sky-renderer.js to lib/ for procedural sky dome
+    const skyRendererSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'sky-renderer.js'
+    );
+    const skyRendererDest = path.join(pvRoot, 'lib', 'sky-renderer.js');
+    if (fs.existsSync(skyRendererSrc)) {
+      fs.copyFileSync(skyRendererSrc, skyRendererDest);
+      console.log('[rebuild-prismarine-viewer] Copied sky-renderer.js (procedural sky)');
+    }
+
     // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
     // This runs in background and doesn't block postinstall
     const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');
