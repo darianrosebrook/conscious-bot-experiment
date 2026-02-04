@@ -1073,14 +1073,74 @@ async function mainVerbose() {
   // Step 7: Build packages
   log('\nBuilding packages...', colors.cyan);
   try {
-    const buildStdio =
-      OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production'
-        ? 'pipe'
-        : 'inherit';
-    execSync('pnpm build', { stdio: buildStdio });
-    log(' Packages built successfully', colors.green);
+    if (OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production') {
+      // Silent mode - no output
+      execSync('pnpm build', { stdio: 'pipe' });
+      log(' Packages built successfully', colors.green);
+    } else if (OUTPUT_MODE === 'debug') {
+      // Debug mode - full output
+      execSync('pnpm build', { stdio: 'inherit' });
+      log(' Packages built successfully', colors.green);
+    } else {
+      // Verbose mode - summarized output
+      const buildOutput = execSync('pnpm build', {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large builds
+      });
+
+      // Parse turbo build output for summary
+      const lines = buildOutput.split('\n');
+      const buildResults = [];
+      let totalTime = null;
+      let cached = 0;
+      let total = 0;
+
+      for (const line of lines) {
+        // Match package build lines: "@conscious-bot/core:build: cache hit" or "cache miss"
+        const buildMatch = line.match(/@conscious-bot\/([^:]+):build:\s*(cache hit|cache miss)/);
+        if (buildMatch) {
+          const pkg = buildMatch[1];
+          const cacheStatus = buildMatch[2] === 'cache hit' ? 'cached' : 'built';
+          buildResults.push({ pkg, cacheStatus });
+          if (cacheStatus === 'cached') cached++;
+          total++;
+        }
+
+        // Match total time line: "  Time:    16.012s"
+        const timeMatch = line.match(/Time:\s+([\d.]+)s/);
+        if (timeMatch) {
+          totalTime = timeMatch[1];
+        }
+      }
+
+      // Print summarized build results
+      if (buildResults.length > 0) {
+        const cachedPkgs = buildResults.filter(r => r.cacheStatus === 'cached').map(r => r.pkg);
+        const builtPkgs = buildResults.filter(r => r.cacheStatus === 'built').map(r => r.pkg);
+
+        if (cachedPkgs.length > 0) {
+          log(`  ${colors.cyan}cached${colors.reset}: ${cachedPkgs.join(', ')}`, colors.reset);
+        }
+        if (builtPkgs.length > 0) {
+          log(`  ${colors.green}built${colors.reset}:  ${builtPkgs.join(', ')}`, colors.reset);
+        }
+
+        const timeStr = totalTime ? ` in ${totalTime}s` : '';
+        log(` ${colors.green}✓${colors.reset} ${total} packages (${cached} cached)${timeStr}`, colors.green);
+      } else {
+        log(' Packages built successfully', colors.green);
+      }
+    }
   } catch (error) {
     log(' Failed to build packages', colors.red);
+    // In verbose mode, show the error output
+    if (error.stdout) {
+      console.error(error.stdout.toString());
+    }
+    if (error.stderr) {
+      console.error(error.stderr.toString());
+    }
     process.exit(1);
   }
 
@@ -1141,18 +1201,24 @@ async function mainVerbose() {
       env: baseEnv,
     });
 
-    // Handle output with service prefix
+    // Handle output with service prefix - ensure every line is prefixed
     child.stdout.on('data', (data) => {
-      const output = data.toString().trim();
-      if (output) {
-        console.log(`[${service.name}] ${output}`);
+      const lines = data.toString().split('\n');
+      for (const line of lines) {
+        const trimmed = line.trimEnd();
+        if (trimmed) {
+          console.log(`[${service.name}] ${trimmed}`);
+        }
       }
     });
 
     child.stderr.on('data', (data) => {
-      const output = data.toString().trim();
-      if (output && !output.includes('Warning')) {
-        console.error(`[${service.name}] ${output}`);
+      const lines = data.toString().split('\n');
+      for (const line of lines) {
+        const trimmed = line.trimEnd();
+        if (trimmed && !trimmed.includes('Warning')) {
+          console.error(`[${service.name}] ${trimmed}`);
+        }
       }
     });
 
@@ -1243,12 +1309,34 @@ async function mainVerbose() {
     await wait(500);
   }
 
-  // Summary of health checks
-  log('\nHealth Check Summary:', colors.blue);
-  for (const result of healthResults) {
-    if (result.status === 'healthy') {
-      log(`  ${result.service}`, colors.green);
-    } else {
+  // Summary of health checks - compact status line
+  const healthyServices = healthResults.filter((r) => r.status === 'healthy');
+  const unhealthyServices = healthResults.filter((r) => r.status !== 'healthy');
+
+  // Build a compact ready status line: "core✓ memory✓ world✓ cognition✗"
+  const statusLine = healthResults
+    .map((r) => {
+      const shortName = r.service
+        .replace(' Interface', '')
+        .replace(' API', '')
+        .replace(' Service', '')
+        .replace('MLX-LM Sidecar', 'MLX')
+        .toLowerCase();
+      return r.status === 'healthy'
+        ? `${colors.green}${shortName}✓${colors.reset}`
+        : `${colors.red}${shortName}✗${colors.reset}`;
+    })
+    .join(' ');
+
+  log('');
+  log('═══════════════════════════════════════════════════════════════', colors.blue);
+  log(`  SERVICES: ${statusLine}`, colors.reset);
+  log('═══════════════════════════════════════════════════════════════', colors.blue);
+
+  // Show detailed failures if any
+  if (unhealthyServices.length > 0) {
+    log('');
+    for (const result of unhealthyServices) {
       log(`  ${result.service}: ${result.error}`, colors.red);
     }
   }
@@ -1303,11 +1391,8 @@ async function mainVerbose() {
       logService(service, 'Failed to start (non-critical)', 'WARN')
     );
   } else {
-    logWithTimestamp(
-      '\nAll services passed health checks!',
-      'SUCCESS',
-      colors.green
-    );
+    log('');
+    log(`${colors.green}${colors.bold}✓ All ${healthyServices.length} services ready${colors.reset}`, colors.green);
   }
 
   // Step 9b: Broadcast readiness barrier to services that support it

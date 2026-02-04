@@ -68,6 +68,7 @@ import { createInitialState, CognitionMutableState } from './cognition-state';
 import { THOUGHT_CYCLE_MS } from './server-utils/constants';
 import { ObservationQueueItem } from './server-utils/observation-helpers';
 import { createThoughtStreamHelpers } from './server-utils/thought-stream-helpers';
+import { createServerLogger } from './server-utils/server-logger';
 
 // Route modules
 import { createSystemRoutes } from './routes/system-routes';
@@ -84,14 +85,46 @@ import { createSocialMemoryRoutes } from './routes/social-memory-routes';
 // ============================================================================
 
 const cognitiveLogger = CognitiveStreamLogger.getInstance();
+const serverLogger = createServerLogger({ subsystem: 'cognition-server' });
 
 const observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
 function logObservation(message: string, payload?: unknown): void {
   if (observationLogDebug && payload !== undefined) {
-    console.log(message, payload);
+    serverLogger.debug(message, {
+      event: 'observation_log',
+      tags: ['observation', 'debug'],
+      fields: { payload },
+    });
   } else {
-    console.log(message);
+    serverLogger.debug(message, {
+      event: 'observation_log',
+      tags: ['observation', 'debug'],
+    });
   }
+}
+
+async function resilientFetchLogged(
+  url: string,
+  options: Parameters<typeof resilientFetch>[1],
+  logContext: {
+    event: string;
+    tags: string[];
+    fields?: Record<string, unknown>;
+  }
+): Promise<Response | null> {
+  const response = await resilientFetch(url, { ...options, silent: true });
+  if (!response?.ok) {
+    serverLogger.warn('Resilient fetch failed', {
+      event: logContext.event,
+      tags: logContext.tags,
+      fields: {
+        label: options?.label ?? url,
+        status: response?.status ?? 'unavailable',
+        ...logContext.fields,
+      },
+    });
+  }
+  return response;
 }
 
 const llmInterface = new LLMInterface();
@@ -181,10 +214,11 @@ const state = createInitialState();
     (socialAwarenessManager as any).socialMemoryManager =
       state.socialMemoryManager;
   } catch (error) {
-    console.warn(
-      '⚠️ Social memory system could not be initialized:',
-      (error as Error)?.message
-    );
+    serverLogger.warn('Social memory system could not be initialized', {
+      event: 'social_memory_init_failed',
+      tags: ['social-memory', 'init', 'warn'],
+      fields: { error: (error as Error)?.message },
+    });
   }
 })();
 
@@ -270,7 +304,11 @@ function startThoughtGeneration() {
       }
     )
     .catch((error) => {
-      console.warn('Failed to log thought generation start:', error);
+      serverLogger.warn('Failed to log thought generation start', {
+        event: 'thought_generation_log_start_failed',
+        tags: ['thought-generation', 'log', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     });
 
   // Generate initial thought
@@ -289,8 +327,24 @@ function startThoughtGeneration() {
       const planningUrl =
         process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
       const [botRes, planningRes] = await Promise.all([
-        resilientFetch(`${mcUrl}/state`, { label: 'mc/state' }),
-        resilientFetch(`${planningUrl}/state`, { label: 'planning/state' }),
+        resilientFetchLogged(
+          `${mcUrl}/state`,
+          { label: 'mc/state' },
+          {
+            event: 'resilient_fetch_failed',
+            tags: ['resilient-fetch', 'mc'],
+            fields: { url: `${mcUrl}/state` },
+          }
+        ),
+        resilientFetchLogged(
+          `${planningUrl}/state`,
+          { label: 'planning/state' },
+          {
+            event: 'resilient_fetch_failed',
+            tags: ['resilient-fetch', 'planning'],
+            fields: { url: `${planningUrl}/state` },
+          }
+        ),
       ]);
       const botState = botRes?.ok ? await botRes.json() : null;
       const planningState = planningRes?.ok ? await planningRes.json() : null;
@@ -368,11 +422,25 @@ function startThoughtGeneration() {
       const uptimeMin = Math.round(
         (Date.now() - counters.startedAtMs) / 60_000
       );
-      console.log(
-        `[Agency ${uptimeMin}m] llm=${counters.llmCalls} goals=${counters.goalTags} drives=${counters.driveTicks} sigDedup=${counters.signatureSuppressions} contentDedup=${counters.contentSuppressions} intents=${counters.intentExtractions}`
-      );
+      serverLogger.info('Agency counters snapshot', {
+        event: 'agency_counters',
+        tags: ['thought-generation', 'metrics'],
+        fields: {
+          uptimeMin,
+          llmCalls: counters.llmCalls,
+          goalTags: counters.goalTags,
+          driveTicks: counters.driveTicks,
+          signatureSuppressions: counters.signatureSuppressions,
+          contentSuppressions: counters.contentSuppressions,
+          intentExtractions: counters.intentExtractions,
+        },
+      });
     } catch (error) {
-      console.error('Error generating periodic thought:', error);
+      serverLogger.error('Error generating periodic thought', {
+        event: 'thought_generation_error',
+        tags: ['thought-generation', 'error'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
 
       cognitiveLogger
         .logEvent(
@@ -386,12 +454,23 @@ function startThoughtGeneration() {
           }
         )
         .catch((logError) => {
-          console.warn('Failed to log thought generation error:', logError);
+          serverLogger.warn('Failed to log thought generation error', {
+            event: 'thought_generation_log_error_failed',
+            tags: ['thought-generation', 'log', 'warn'],
+            fields: {
+              error:
+                logError instanceof Error ? logError.message : String(logError),
+            },
+          });
         });
     }
   }, 60000);
 
-  console.log('Enhanced thought generator started with 60-second intervals');
+  serverLogger.info('Enhanced thought generator started', {
+    event: 'thought_generation_started',
+    tags: ['thought-generation', 'started'],
+    fields: { intervalMs: 60000 },
+  });
 }
 
 function stopThoughtGeneration() {
@@ -410,10 +489,19 @@ function stopThoughtGeneration() {
         }
       )
       .catch((error) => {
-        console.warn('Failed to log thought generation stop:', error);
+        serverLogger.warn('Failed to log thought generation stop', {
+          event: 'thought_generation_log_stop_failed',
+          tags: ['thought-generation', 'log', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
       });
 
-    console.log('Enhanced thought generator stopped');
+    serverLogger.info('Enhanced thought generator stopped', {
+      event: 'thought_generation_stopped',
+      tags: ['thought-generation', 'stopped'],
+    });
   }
 }
 
@@ -424,10 +512,11 @@ function stopThoughtGeneration() {
 enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
   state.cognitiveThoughts.push(thought);
   sendThoughtToCognitiveStream(thought).catch((err: any) => {
-    console.warn(
-      '[Cognition] Failed to send thought to stream:',
-      err?.message || err
-    );
+    serverLogger.warn('Failed to send thought to stream', {
+      event: 'thought_stream_send_failed',
+      tags: ['thought-stream', 'send', 'warn'],
+      fields: { error: err?.message || String(err) },
+    });
   });
 });
 
@@ -441,7 +530,13 @@ intrusiveThoughtProcessor.on(
         tags: ['intrusive', 'processing', 'started'],
       })
       .catch((error) => {
-        console.warn('Failed to log thought processing start:', error);
+        serverLogger.warn('Failed to log thought processing start', {
+          event: 'thought_processing_log_start_failed',
+          tags: ['intrusive', 'processing', 'log', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
       });
 
     const processingThought = {
@@ -461,10 +556,11 @@ intrusiveThoughtProcessor.on(
     };
 
     sendThoughtToCognitiveStream(processingThought).catch((err: any) => {
-      console.warn(
-        '[Cognition] Failed to send thought to stream:',
-        err?.message || err
-      );
+      serverLogger.warn('Failed to send thought to stream', {
+        event: 'thought_stream_send_failed',
+        tags: ['thought-stream', 'send', 'warn'],
+        fields: { error: err?.message || String(err) },
+      });
     });
   }
 );
@@ -483,7 +579,11 @@ intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
       }
     )
     .catch((error) => {
-      console.warn('Failed to log intrusive thought generation:', error);
+      serverLogger.warn('Failed to log intrusive thought generation', {
+        event: 'intrusive_thought_log_failed',
+        tags: ['intrusive', 'thought', 'log', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     });
 
   const generatedThought = {
@@ -496,17 +596,22 @@ intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
   };
 
   sendThoughtToCognitiveStream(generatedThought).catch((err: any) => {
-    console.warn(
-      '[Cognition] Failed to send thought to stream:',
-      err?.message || err
-    );
+    serverLogger.warn('Failed to send thought to stream', {
+      event: 'thought_stream_send_failed',
+      tags: ['thought-stream', 'send', 'warn'],
+      fields: { error: err?.message || String(err) },
+    });
   });
 });
 
 intrusiveThoughtProcessor.on(
   'thoughtRecorded',
   ({ thought, action, timestamp }) => {
-    console.log('Thought recorded (no action):', thought);
+    serverLogger.info('Thought recorded (no action)', {
+      event: 'intrusive_thought_recorded',
+      tags: ['intrusive', 'thought', 'recorded'],
+      fields: { thought },
+    });
 
     const recordedThought = {
       id: `thought-recorded-${timestamp}`,
@@ -526,16 +631,21 @@ intrusiveThoughtProcessor.on(
     };
 
     sendThoughtToCognitiveStream(recordedThought).catch((err: any) => {
-      console.warn(
-        '[Cognition] Failed to send thought to stream:',
-        err?.message || err
-      );
+      serverLogger.warn('Failed to send thought to stream', {
+        event: 'thought_stream_send_failed',
+        tags: ['thought-stream', 'send', 'warn'],
+        fields: { error: err?.message || String(err) },
+      });
     });
   }
 );
 
 intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
-  console.error('Error processing intrusive thought:', { thought, error });
+  serverLogger.error('Error processing intrusive thought', {
+    event: 'intrusive_thought_processing_error',
+    tags: ['intrusive', 'processing', 'error'],
+    fields: { thought, error: String(error) },
+  });
 
   const errorThought = {
     id: `processing-error-${Date.now()}`,
@@ -554,10 +664,11 @@ intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
   };
 
   sendThoughtToCognitiveStream(errorThought).catch((err: any) => {
-    console.warn(
-      '[Cognition] Failed to send thought to stream:',
-      err?.message || err
-    );
+    serverLogger.warn('Failed to send thought to stream', {
+      event: 'thought_stream_send_failed',
+      tags: ['thought-stream', 'send', 'warn'],
+      fields: { error: err?.message || String(err) },
+    });
   });
 });
 
@@ -576,7 +687,11 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
       }
     )
     .catch((error) => {
-      console.warn('Failed to log social consideration:', error);
+      serverLogger.warn('Failed to log social consideration', {
+        event: 'social_consideration_log_failed',
+        tags: ['social', 'consideration', 'log', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     });
 
   const considerationThought = {
@@ -601,10 +716,11 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
   };
 
   sendThoughtToCognitiveStream(considerationThought).catch((err: any) => {
-    console.warn(
-      '[Cognition] Failed to send thought to stream:',
-      err?.message || err
-    );
+    serverLogger.warn('Failed to send thought to stream', {
+      event: 'thought_stream_send_failed',
+      tags: ['thought-stream', 'send', 'warn'],
+      fields: { error: err?.message || String(err) },
+    });
   });
 });
 
@@ -624,7 +740,11 @@ socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
       }
     )
     .catch((error) => {
-      console.warn('Failed to log chat consideration:', error);
+      serverLogger.warn('Failed to log chat consideration', {
+        event: 'chat_consideration_log_failed',
+        tags: ['social', 'chat', 'log', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     });
 
   const chatConsiderationThought = {
@@ -650,10 +770,11 @@ socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
   };
 
   sendThoughtToCognitiveStream(chatConsiderationThought).catch((err: any) => {
-    console.warn(
-      '[Cognition] Failed to send thought to stream:',
-      err?.message || err
-    );
+    serverLogger.warn('Failed to send thought to stream', {
+      event: 'thought_stream_send_failed',
+      tags: ['thought-stream', 'send', 'warn'],
+      fields: { error: err?.message || String(err) },
+    });
   });
 });
 
@@ -666,12 +787,14 @@ eventDrivenThoughtGenerator.on(
     forced?: boolean;
   }) => {
     try {
-      console.log(
-        '🧠 Thought generated event received:',
-        data.thought.type,
-        '-',
-        data.thought.content.substring(0, 60)
-      );
+      serverLogger.info('Thought generated event received', {
+        event: 'event_thought_generated',
+        tags: ['event-driven', 'thought'],
+        fields: {
+          type: data.thought.type,
+          preview: data.thought.content.substring(0, 60),
+        },
+      });
 
       state.cognitiveThoughts.push({
         id: data.thought.id,
@@ -692,26 +815,35 @@ eventDrivenThoughtGenerator.on(
         );
       }
 
-      await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: data.thought.type,
-          content: data.thought.content,
-          attribution: data.thought.attribution,
-          context: data.thought.context,
-          metadata: data.thought.metadata,
-          id: data.thought.id,
-          timestamp: data.thought.timestamp,
-          processed: data.thought.processed,
-        }),
-        label: 'dashboard/cognitive-stream',
-      });
-    } catch (error) {
-      console.warn(
-        '⚠️ Failed to forward generated thought to dashboard:',
-        error
+      await resilientFetchLogged(
+        `${dashboardUrl}/api/ws/cognitive-stream`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: data.thought.type,
+            content: data.thought.content,
+            attribution: data.thought.attribution,
+            context: data.thought.context,
+            metadata: data.thought.metadata,
+            id: data.thought.id,
+            timestamp: data.thought.timestamp,
+            processed: data.thought.processed,
+          }),
+          label: 'dashboard/cognitive-stream',
+        },
+        {
+          event: 'resilient_fetch_failed',
+          tags: ['resilient-fetch', 'dashboard'],
+          fields: { url: `${dashboardUrl}/api/ws/cognitive-stream` },
+        }
       );
+    } catch (error) {
+      serverLogger.warn('Failed to forward generated thought to dashboard', {
+        event: 'dashboard_forward_failed',
+        tags: ['dashboard', 'thought', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     }
   }
 );
@@ -746,6 +878,20 @@ app.use((req, res, next) => {
             ? 'intrusion_handled'
             : 'api_request';
     cognitiveStateTracker.recordOperation(operationType, success, startTime);
+
+    const durationMs = Date.now() - startTime;
+    serverLogger.info('Request completed', {
+      event: 'middleware_request',
+      tags: ['middleware', 'request'],
+      fields: {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        durationMs,
+        operationType,
+        success,
+      },
+    });
   });
 
   next();
@@ -881,7 +1027,11 @@ app.post('/api/llm/generate', async (req, res) => {
       metadata: response.metadata,
     });
   } catch (error) {
-    console.error('[LLM Generate] Error:', error);
+    serverLogger.error('LLM generate error', {
+      event: 'llm_generate_error',
+      tags: ['llm', 'generate', 'error'],
+      fields: { error: error instanceof Error ? error.message : String(error) },
+    });
     res.status(500).json({
       error: 'LLM generation failed',
       message: (error as Error).message,
@@ -897,12 +1047,20 @@ process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
     return;
   }
-  console.error('[Cognition] Uncaught exception:', err);
+  serverLogger.error('Uncaught exception', {
+    event: 'process_uncaught_exception',
+    tags: ['process', 'error'],
+    fields: { error: err.message, code: err.code },
+  });
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason: any) => {
-  console.error('[Cognition] Unhandled rejection:', reason);
+  serverLogger.error('Unhandled rejection', {
+    event: 'process_unhandled_rejection',
+    tags: ['process', 'error'],
+    fields: { error: reason instanceof Error ? reason.message : String(reason) },
+  });
 });
 
 // ============================================================================
@@ -910,7 +1068,7 @@ process.on('unhandledRejection', (reason: any) => {
 // ============================================================================
 
 const server = app.listen(port, () => {
-  const startupMessage = `🧠 Cognition service running on port ${port}`;
+  const startupMessage = `Cognition service running on port ${port}`;
 
   cognitiveLogger
     .logStatus('cognition_service_started', startupMessage, {
@@ -920,10 +1078,18 @@ const server = app.listen(port, () => {
       tags: ['server', 'startup'],
     })
     .catch((error) => {
-      console.warn('Failed to log server startup:', error);
+      serverLogger.warn('Failed to log server startup', {
+        event: 'server_startup_log_failed',
+        tags: ['server', 'startup', 'log', 'warn'],
+        fields: { error: error instanceof Error ? error.message : String(error) },
+      });
     });
 
-  console.log(startupMessage);
+  serverLogger.info(startupMessage, {
+    event: 'server_started',
+    tags: ['server', 'startup'],
+    fields: { port },
+  });
 
   loadInteroHistory();
 
@@ -933,73 +1099,84 @@ const server = app.listen(port, () => {
     const host = cfg.host ?? 'localhost';
     const llmPort = cfg.port ?? 5002;
     const healthUrl = `http://${host}:${llmPort}/health`;
-    resilientFetch(healthUrl, { timeoutMs: 5000, label: 'llm/health' })
+    resilientFetchLogged(
+      healthUrl,
+      { timeoutMs: 5000, label: 'llm/health' },
+      {
+        event: 'resilient_fetch_failed',
+        tags: ['resilient-fetch', 'llm'],
+        fields: { url: healthUrl },
+      }
+    )
       .then((r) => {
         if (r?.ok) {
-          console.log(
-            `[Cognition] LLM backend (MLX/Ollama) reachable at ${healthUrl}`
-          );
+          serverLogger.info('LLM backend reachable', {
+            event: 'llm_health_ok',
+            tags: ['llm', 'health'],
+            fields: { healthUrl },
+          });
           llmInterface.preloadModel().catch(() => {});
         } else {
-          console.warn(
-            `[Cognition] LLM backend at ${healthUrl} returned ${r?.status ?? 'unknown'} - observation reasoning may fall back`
-          );
+          serverLogger.warn('LLM backend health check returned non-OK', {
+            event: 'llm_health_non_ok',
+            tags: ['llm', 'health', 'warn'],
+            fields: { healthUrl, status: r?.status ?? 'unknown' },
+          });
         }
       })
       .catch(() => {
-        console.warn(
-          `[Cognition] LLM backend not reachable at ${healthUrl} - start the MLX sidecar (e.g. pnpm start) or set COGNITION_LLM_HOST/PORT. Observation reasoning will use fallback until it is.`
-        );
+        serverLogger.warn('LLM backend not reachable', {
+          event: 'llm_health_unreachable',
+          tags: ['llm', 'health', 'warn'],
+          fields: { healthUrl },
+        });
       });
   }, 2000);
 
-  console.log(
-    `📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`
-  );
-  console.log(
-    `💭 Thought generation endpoint: http://localhost:${port}/generate-thoughts`
-  );
-  console.log(
-    `🎯 ReAct arbiter endpoint: http://localhost:${port}/react-arbiter`
-  );
-  console.log(
-    `🤝 Social cognition endpoint: http://localhost:${port}/social-cognition`
-  );
-  console.log(
-    `🧠 Social consideration endpoint: http://localhost:${port}/consider-social`
-  );
-  console.log(
-    `🤔 Nearby entities processing endpoint: http://localhost:${port}/process-nearby-entities`
-  );
-  console.log(
-    `💬 Chat consideration endpoint: http://localhost:${port}/consider-chat`
-  );
-  console.log(
-    `🚪 Departure communication endpoint: http://localhost:${port}/consider-departure`
-  );
-  console.log(`🧠 Cognitive stream endpoints:`);
-  console.log(
-    `  Get recent thoughts: http://localhost:${port}/api/cognitive-stream/recent`
-  );
-  console.log(
-    `  ✅ Mark thoughts processed: http://localhost:${port}/api/cognitive-stream/:id/processed`
-  );
-  console.log(`🧠 Social memory endpoints:`);
-  console.log(
-    `  Get remembered entities: http://localhost:${port}/social-memory/entities`
-  );
-  console.log(
-    `  🔍 Search entities by fact: http://localhost:${port}/social-memory/search`
-  );
-  console.log(
-    `  📊 Social memory stats: http://localhost:${port}/social-memory/stats`
-  );
+  const endpoints = [
+    { name: 'metrics', url: `http://localhost:${port}/metrics` },
+    { name: 'thought_generation', url: `http://localhost:${port}/generate-thoughts` },
+    { name: 'react_arbiter', url: `http://localhost:${port}/react-arbiter` },
+    { name: 'social_cognition', url: `http://localhost:${port}/social-cognition` },
+    { name: 'social_consideration', url: `http://localhost:${port}/consider-social` },
+    { name: 'nearby_entities', url: `http://localhost:${port}/process-nearby-entities` },
+    { name: 'chat_consideration', url: `http://localhost:${port}/consider-chat` },
+    { name: 'departure_communication', url: `http://localhost:${port}/consider-departure` },
+    { name: 'cognitive_stream_recent', url: `http://localhost:${port}/api/cognitive-stream/recent` },
+    { name: 'cognitive_stream_processed', url: `http://localhost:${port}/api/cognitive-stream/:id/processed` },
+    { name: 'social_memory_entities', url: `http://localhost:${port}/social-memory/entities` },
+    { name: 'social_memory_search', url: `http://localhost:${port}/social-memory/search` },
+    { name: 'social_memory_stats', url: `http://localhost:${port}/social-memory/stats` },
+  ];
+
+  // Log endpoints summary (collapsed) - detailed listing only in debug mode
+  const endpointNames = endpoints.map((e) => e.name).join(', ');
+  serverLogger.info(`Registered ${endpoints.length} endpoints`, {
+    event: 'server_endpoints_registered',
+    tags: ['server', 'startup'],
+    fields: { count: endpoints.length, endpoints: endpointNames },
+  });
+
+  // Detailed endpoint logging only when COGNITION_DEBUG is set
+  if (process.env.COGNITION_DEBUG === '1') {
+    for (const endpoint of endpoints) {
+      serverLogger.debug('Server endpoint', {
+        event: 'server_endpoint',
+        tags: ['server', 'endpoint'],
+        fields: { name: endpoint.name, url: endpoint.url },
+      });
+    }
+  }
 });
 
 server.on('connection', (socket) => {
   socket.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {
-      console.warn('[Cognition] Socket error:', err.message);
+      serverLogger.warn('Socket error', {
+        event: 'socket_error',
+        tags: ['socket', 'warn'],
+        fields: { error: err.message, code: err.code },
+      });
     }
   });
 });
