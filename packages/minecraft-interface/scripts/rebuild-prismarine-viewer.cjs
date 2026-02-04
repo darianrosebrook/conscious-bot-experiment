@@ -36,6 +36,20 @@ function run() {
       fs.copyFileSync(povPatchPath, pvLibIndex);
     }
 
+    // Copy animated-material-client.js to lib/ for webpack bundling
+    const animatedMaterialSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'animated-material-client.js'
+    );
+    const animatedMaterialDest = path.join(pvRoot, 'lib', 'animated-material-client.js');
+    if (fs.existsSync(animatedMaterialSrc)) {
+      fs.copyFileSync(animatedMaterialSrc, animatedMaterialDest);
+      console.log('[rebuild-prismarine-viewer] Copied animated-material-client.js');
+    }
+
     // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
     // This runs in background and doesn't block postinstall
     const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');

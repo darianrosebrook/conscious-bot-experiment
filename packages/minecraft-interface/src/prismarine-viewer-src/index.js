@@ -24,11 +24,24 @@ const TWEEN = require('@tweenjs/tween.js')
 require('three/examples/js/controls/OrbitControls')
 
 const { Viewer, Entity } = require('../viewer')
+const {
+  generateAnimationMap,
+  createAnimatedMaterial,
+  updateAnimatedMaterial,
+  updateDayProgress
+} = require('./animated-material-client')
 
 const io = require('socket.io-client')
 const socket = io({
   path: window.location.pathname + 'socket.io'
 })
+
+// ============================================================================
+// Animated Material State
+// ============================================================================
+let animatedMaterial = null
+let lastAnimationTime = performance.now()
+let currentWorldTime = 6000 // Default to morning
 
 // ============================================================================
 // Custom Asset Integration
@@ -67,6 +80,57 @@ async function loadCustomBlockStates (version) {
   }
   return null
 }
+
+/**
+ * Set up animated material to replace the viewer's default material.
+ * This enables animated water, lava, and fire textures.
+ *
+ * @param {Object} blockStates - The loaded blockstates with animation metadata
+ */
+function setupAnimatedMaterial (blockStates) {
+  if (!viewer.world || !viewer.world.material || !viewer.world.material.map) {
+    console.log('[viewer] Cannot setup animated material: viewer.world.material.map not ready')
+    return
+  }
+
+  try {
+    const texture = viewer.world.material.map
+    const atlasSize = texture.image ? texture.image.width : 1024
+
+    // Generate animation lookup map from blockstates
+    const animMap = generateAnimationMap(blockStates, atlasSize)
+
+    // Create the animated material
+    animatedMaterial = createAnimatedMaterial(texture, animMap, {
+      dayProgress: 0.5, // Start at noon
+      ambientLightIntensity: 0.6,
+      directionalLightIntensity: 0.5
+    })
+
+    // Replace the world's material
+    const originalMaterial = viewer.world.material
+    viewer.world.material = animatedMaterial
+
+    console.log('[viewer] Animated material enabled - water/lava/fire will animate')
+
+    // Store original for potential cleanup
+    viewer.world._originalMaterial = originalMaterial
+  } catch (e) {
+    console.error('[viewer] Failed to setup animated material:', e)
+  }
+}
+
+/**
+ * Handle world time updates from the server for day/night cycle.
+ */
+socket.on('time', (data) => {
+  if (data && typeof data.time === 'number') {
+    currentWorldTime = data.time
+    if (animatedMaterial) {
+      updateDayProgress(animatedMaterial, currentWorldTime)
+    }
+  }
+})
 
 let firstPositionUpdate = true
 let viewMode = 'first' // 'first' | 'third'
@@ -141,6 +205,16 @@ function createPOVButton () {
 
 function animate () {
   window.requestAnimationFrame(animate)
+
+  // Update animation time for animated textures (water, lava, fire)
+  const now = performance.now()
+  const deltaTime = (now - lastAnimationTime) / 1000
+  lastAnimationTime = now
+
+  if (animatedMaterial) {
+    updateAnimatedMaterial(animatedMaterial, deltaTime)
+  }
+
   if (controls) controls.update()
   viewer.update()
   renderer.render(viewer.scene, viewer.camera)
@@ -175,6 +249,21 @@ socket.on('version', async (version) => {
 
   if (!viewer.setVersion(version)) {
     return false
+  }
+
+  // Set up animated material after texture loads
+  // The material.map may not be ready immediately, so we wait for it
+  if (customBlockStates) {
+    const checkAndSetupMaterial = () => {
+      if (viewer.world && viewer.world.material && viewer.world.material.map) {
+        setupAnimatedMaterial(customBlockStates)
+      } else {
+        // Retry after a short delay while texture loads
+        setTimeout(checkAndSetupMaterial, 100)
+      }
+    }
+    // Start checking after a small initial delay
+    setTimeout(checkAndSetupMaterial, 200)
   }
 
   firstPositionUpdate = true
