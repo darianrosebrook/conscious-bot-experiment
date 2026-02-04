@@ -1784,8 +1784,11 @@ export class EnhancedThoughtGenerator extends EventEmitter {
 
     // Idempotency: Drive-tick thoughts lack Sterling identity (committedGoalPropId).
     // Cannot dedupe semantically without reintroducing boundary violations.
-    // Accept duplicates here; downstream thought-to-task converter will dedupe
-    // using Sterling identity (committedGoalPropId, committedIrDigest, envelopeId).
+    //
+    // Duplicates are acceptable until drive-ticks are routed through Sterling
+    // or a non-semantic ID is introduced. Drive-ticks do NOT flow through
+    // language-io/Sterling reduce, so no identity will be added downstream
+    // unless explicitly wired.
     //
     // REMOVED: Fuzzy title matching (was semantic substitution - violates I-BOUNDARY-1).
     // Drive-ticks are rare (idle-only), so duplicate risk is low in practice.

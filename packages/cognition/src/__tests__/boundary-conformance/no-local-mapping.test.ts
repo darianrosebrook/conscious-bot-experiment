@@ -21,28 +21,74 @@ const CONVERSION_MODULES = [
   path.resolve(__dirname, '../../reasoning-surface'),
 ];
 
-// Files with known patterns that match the regex but are NOT semantic violations.
-// These are FALSE POSITIVES - structural routing on Sterling types, not semantic predicates.
-//
-// CLEANED (PR3):
+// DELETED (PR3 fix): Allowlist removed - test now distinguishes semantic vs structural switches.
+// All legacy violations cleaned up:
 // - grounder.ts: Removed semantic predicate switch (case 'craft'/case 'smelt')
-//
-// FALSE POSITIVE (not a violation):
-// - sterling-planner.ts: Contains switch (req.kind) where kind is Sterling's TaskRequirement type.
-//   This is structural routing (ALLOWED), not semantic interpretation (FORBIDDEN).
-//   The test regex matches case 'craft': but can't distinguish:
-//     FORBIDDEN: switch (action) { case 'craft': ... }  // semantic
-//     ALLOWED:   switch (req.kind) { case 'craft': ... } // structural
+// - sterling-planner.ts: Verified as structural routing only (switch on req.kind)
 const LEGACY_VIOLATION_FILES = new Set<string>([
-  'sterling-planner.ts', // FALSE POSITIVE: switches on req.kind (Sterling type), not action strings
+  // Empty - all violations fixed, test refined to avoid false positives
 ]);
 
+/**
+ * Check if a switch statement switches on a semantic discriminant (FORBIDDEN)
+ * vs a structural discriminant (ALLOWED).
+ *
+ * FORBIDDEN: switch (action), switch (goal.action), switch (verb), switch (predicate)
+ * ALLOWED: switch (req.kind), switch (requirement.kind), switch (task.kind)
+ */
+function checkSwitchCases(content: string, file: string): string[] {
+  const violations: string[] = [];
+
+  // Find all case statements for action strings
+  const casePattern = /case\s+['"]?(craft|mine|explore|navigate|build|collect|gather)['"]?\s*:/gi;
+  let match;
+
+  while ((match = casePattern.exec(content)) !== null) {
+    const caseIndex = match.index;
+    const caseText = match[0];
+
+    // Walk backwards to find the nearest switch statement (bounded scan, max 20 lines)
+    const lines = content.substring(0, caseIndex).split('\n');
+    const caseLineIndex = lines.length - 1;
+    const startLine = Math.max(0, caseLineIndex - 20);
+
+    let switchDiscriminant: string | null = null;
+
+    for (let i = caseLineIndex; i >= startLine; i--) {
+      const line = lines[i];
+      const switchMatch = line.match(/switch\s*\(\s*([^)]+)\s*\)/);
+      if (switchMatch) {
+        switchDiscriminant = switchMatch[1].trim();
+        break;
+      }
+    }
+
+    if (!switchDiscriminant) {
+      // Couldn't find switch - might be malformed code, skip
+      continue;
+    }
+
+    // Check if discriminant is FORBIDDEN (semantic) or ALLOWED (structural)
+    const forbiddenDiscriminants = /\b(action|verb|intent|predicate|goal|extractedGoal)\b|\.(action|intent|predicate|verb)/i;
+    const allowedDiscriminants = /\b(req|requirement|task)\.kind\b/i;
+
+    if (allowedDiscriminants.test(switchDiscriminant)) {
+      // Structural routing - ALLOWED
+      continue;
+    }
+
+    if (forbiddenDiscriminants.test(switchDiscriminant)) {
+      // Semantic interpretation - FORBIDDEN
+      violations.push(`switch (${switchDiscriminant}) { ${caseText} ... }`);
+    }
+  }
+
+  return violations;
+}
+
 describe('I-CONVERSION-1: No Local Predicate→TaskType Mapping', () => {
-  const forbiddenPatterns = [
-    {
-      pattern: /case\s+['"]?(craft|mine|explore|navigate|build|collect|gather)['"]?\s*:/gi,
-      name: 'switch case on predicate string',
-    },
+  // Simple pattern checks (still needed for enum and direct comparison)
+  const simplePatterns = [
     {
       pattern: /TaskType\.(CRAFT|MINE|EXPLORE|NAVIGATE|BUILD|COLLECT|GATHER)/gi,
       name: 'TaskType enum with action variants',
@@ -76,40 +122,35 @@ describe('I-CONVERSION-1: No Local Predicate→TaskType Mapping', () => {
           continue;
         }
 
-        // Handle legacy files with known violations
-        if (LEGACY_VIOLATION_FILES.has(file)) {
-          describe(`${file} (LEGACY - marked for deprecation)`, () => {
-            it('is tracked as a legacy violation file', () => {
-              // This file has known violations that are marked for deprecation
-              // The test documents the violation without failing
-              const content = fs.readFileSync(filePath, 'utf-8');
-              const hasViolations = forbiddenPatterns.some((p) => {
-                p.pattern.lastIndex = 0;
-                return p.pattern.test(content);
-              });
-
-              if (hasViolations) {
-                console.log(`⚠️  ${file} contains legacy violations (deprecated, tracked for removal)`);
-              }
-
-              // Test passes but documents the violation
-              expect(LEGACY_VIOLATION_FILES.has(file)).toBe(true);
-            });
-          });
-          continue;
-        }
+        // DELETED (PR3 fix): Allowlist handling removed - no legacy violations remain
 
         describe(file, () => {
           const content = fs.readFileSync(filePath, 'utf-8');
 
-          for (const { pattern, name } of forbiddenPatterns) {
+          // Check for semantic switch statements (smarter discriminant check)
+          it('does not contain switch case on semantic discriminant', () => {
+            const violations = checkSwitchCases(content, file);
+
+            if (violations.length > 0) {
+              const details = violations.map(v => `  ${v}`).join('\n');
+              expect.fail(
+                `Found semantic switch statement(s) in ${file}:\n${details}\n\n` +
+                `This violates I-CONVERSION-1.\n` +
+                `FORBIDDEN: switch (action), switch (goal.action), switch (verb)\n` +
+                `ALLOWED: switch (req.kind), switch (requirement.kind)`,
+              );
+            }
+
+            expect(violations).toHaveLength(0);
+          });
+
+          // Check simple patterns (enum usage, direct comparison)
+          for (const { pattern, name } of simplePatterns) {
             it(`does not contain ${name}`, () => {
-              // Reset lastIndex for global patterns
               pattern.lastIndex = 0;
               const matches = content.match(pattern);
 
               if (matches) {
-                // Provide helpful error message showing what was found
                 const locations = matches.map((m) => `"${m}"`).join(', ');
                 expect.fail(
                   `Found ${name} in ${file}: ${locations}\n` +
@@ -147,6 +188,48 @@ describe('Allowed Patterns', () => {
       const code = `const taskType = await sterlingClient.resolveTaskType(propId);`;
       expect(code).toContain('resolveTaskType');
     });
+
+    it('structural routing on req.kind (Sterling type)', () => {
+      // This is allowed - switching on Sterling's structural type field, not semantic action
+      const goodCode = `
+        switch (req.kind) {
+          case 'craft':
+            return req.outputPattern;
+          case 'mine':
+            return req.patterns?.[0];
+        }
+      `;
+      const violations = checkSwitchCases(goodCode, 'test.ts');
+      expect(violations).toHaveLength(0);
+    });
+
+    it('structural routing on requirement.kind (Sterling type)', () => {
+      // This is allowed - requirement.kind is a Sterling structural field
+      const goodCode = `
+        switch (requirement.kind) {
+          case 'collect':
+            return requirement.targetItem;
+          case 'explore':
+            return requirement.targetBiome;
+        }
+      `;
+      const violations = checkSwitchCases(goodCode, 'test.ts');
+      expect(violations).toHaveLength(0);
+    });
+
+    it('structural routing on task.kind', () => {
+      // This is allowed - task.kind is a Sterling structural field
+      const goodCode = `
+        switch (task.kind) {
+          case 'navigate':
+            return task.destination;
+          case 'build':
+            return task.structure;
+        }
+      `;
+      const violations = checkSwitchCases(goodCode, 'test.ts');
+      expect(violations).toHaveLength(0);
+    });
   });
 
   describe('What is NOT allowed', () => {
@@ -160,6 +243,64 @@ describe('Allowed Patterns', () => {
       // This is NOT allowed
       const badCode = `if (predicate === 'mine') { /* ... */ }`;
       expect(badCode).toMatch(/predicate\s*===?\s*['"]?mine['"]?/i);
+    });
+
+    it('switch on action (semantic discriminant)', () => {
+      // This is NOT allowed - action is semantic
+      const badCode = `
+        switch (action) {
+          case 'craft':
+            return validateInventory();
+          case 'mine':
+            return validateTools();
+        }
+      `;
+      const violations = checkSwitchCases(badCode, 'test.ts');
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations[0]).toContain('switch (action)');
+    });
+
+    it('switch on goal.action (semantic discriminant)', () => {
+      // This is NOT allowed - goal.action is semantic
+      const badCode = `
+        switch (goal.action) {
+          case 'explore':
+            return getExplorationPath();
+          case 'navigate':
+            return getNavigationPath();
+        }
+      `;
+      const violations = checkSwitchCases(badCode, 'test.ts');
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations[0]).toContain('switch (goal.action)');
+    });
+
+    it('switch on verb (semantic discriminant)', () => {
+      // This is NOT allowed - verb is semantic
+      const badCode = `
+        switch (verb) {
+          case 'collect':
+            return GatherTask;
+          case 'build':
+            return ConstructTask;
+        }
+      `;
+      const violations = checkSwitchCases(badCode, 'test.ts');
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations[0]).toContain('switch (verb)');
+    });
+
+    it('switch on extractedGoal (semantic discriminant)', () => {
+      // This is NOT allowed - extractedGoal is semantic
+      const badCode = `
+        switch (extractedGoal) {
+          case 'gather':
+            return GatheringRequirement;
+        }
+      `;
+      const violations = checkSwitchCases(badCode, 'test.ts');
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations[0]).toContain('switch (extractedGoal)');
     });
   });
 });
