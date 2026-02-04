@@ -4,11 +4,20 @@
  * Re-exports evidence extraction from llm-output-sanitizer.
  * Semantic exports removed in PR2 - Sterling is the semantic authority.
  *
- * @deprecated Migrating to language-io module. Semantic functions deleted.
+ * @deprecated Migrating to language-io module. Use these instead:
+ * - buildLanguageIOEnvelope() for envelope construction
+ * - extractVerbatimMarkers() for marker extraction
+ * - SterlingLanguageIOClient.reduce() for semantic processing
+ *
+ * This file will be removed in the next breaking change.
+ *
  * @author @darianrosebrook
  */
 
-// Re-export types from the canonical source
+// Re-export types from the canonical source (all deprecated)
+/**
+ * @deprecated Use language-io module types instead
+ */
 export type {
   GoalTag,
   GoalTagV1,
@@ -17,7 +26,10 @@ export type {
   IntentParse,
 } from '../llm-output-sanitizer';
 
-// Re-export functions (semantic exports removed in PR2)
+// Re-export functions (all deprecated, semantic exports removed in PR2)
+/**
+ * @deprecated Use language-io/marker-extractor.extractVerbatimMarkers() instead
+ */
 export {
   extractGoalTag,
   extractIntent,

@@ -19,11 +19,20 @@
 // ============================================================================
 
 /**
- * @deprecated IntentLabel deleted (PR2) - Sterling classifies intent, not TS
- * Keeping type stub for backward compatibility during migration
+ * @deprecated IntentLabel deleted (PR2) - Sterling classifies intent, not TS.
+ * This type stub exists only for backward compatibility during migration.
+ * Use Sterling's IntentFamily from language-io/reducer-result-types instead.
+ * Will be removed in next breaking change.
  */
 export type IntentLabel = 'none';
 
+/**
+ * @deprecated Use language-io module instead. This interface exists for backward
+ * compatibility only. New code should use:
+ * - buildLanguageIOEnvelope() for envelope construction
+ * - SterlingLanguageIOClient.reduce() for semantic processing
+ * - ReducerResultView for Sterling's semantic output
+ */
 export interface SanitizedOutput {
   text: string;
   goalTag: GoalTag | null;
@@ -41,6 +50,11 @@ export interface SanitizedOutput {
   flags: SanitizationFlags;
 }
 
+/**
+ * @deprecated Use language-io/marker-extractor types instead.
+ * This type represents verbatim marker extraction, which is now handled
+ * by DeclaredMarker in the language-io module.
+ */
 export interface GoalTag {
   action: string;
   target: string;
@@ -51,6 +65,10 @@ export interface GoalTag {
  * Structured goal tag with version, canonical action, and raw text for debugging.
  * This is the single source of truth for goal extraction — downstream code reads
  * this instead of re-parsing text.
+ *
+ * @deprecated Use language-io module instead. Goal markers are now extracted as
+ * DeclaredMarker objects in LanguageIOEnvelopeV1, and Sterling performs semantic
+ * interpretation to produce goal propositions in the committed IR.
  */
 export interface GoalTagV1 {
   version: 1;
@@ -58,7 +76,7 @@ export interface GoalTagV1 {
   target: string;         // normalized lowercase
   targetId: string | null; // explicit task ID from id= token
   amount: number | null;
-  raw: string;            // original tag text for debugging
+  raw: string;            // original tag for debugging
 }
 
 /**
@@ -219,7 +237,10 @@ export function stripSystemPromptLeaks(text: string): string {
  *
  * Sterling validates and normalizes actions - TS only extracts verbatim.
  *
- * @deprecated Evidence extraction only. Sterling owns semantic validation.
+ * @deprecated Use language-io/marker-extractor.extractVerbatimMarkers() instead.
+ * This function exists for backward compatibility only. New code should use the
+ * language-io module which provides proper envelope construction for Sterling.
+ * Will be removed in next breaking change.
  */
 export function extractGoalTag(text: string): {
   text: string;
@@ -613,6 +634,14 @@ export function isUsableContent(text: string): boolean {
  * 4. Truncate degeneration
  * 5. Strip trailing garbage
  * 6. Normalize whitespace
+ *
+ * @deprecated Use language-io module instead:
+ * ```typescript
+ * import { buildLanguageIOEnvelope } from '@conscious-bot/cognition/language-io';
+ * const envelope = buildLanguageIOEnvelope(rawText, options);
+ * const result = await languageIOClient.reduce(envelope);
+ * ```
+ * This function will be removed in the next breaking change.
  */
 export function sanitizeLLMOutput(raw: string): SanitizedOutput {
   const originalLength = raw.length;
