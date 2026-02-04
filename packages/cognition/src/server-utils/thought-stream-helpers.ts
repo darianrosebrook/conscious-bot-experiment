@@ -5,12 +5,23 @@
 
 import { resilientFetch, TTSClient } from '@conscious-bot/core';
 import { LLMInterface } from '../cognitive-core/llm-interface';
-import { isUsableContent } from '../llm-output-sanitizer';
 import { GOAL_TAG_STRIP, TTS_EXCLUDED_TYPES, TTS_STATUS_LIKE } from './constants';
 import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
 import { broadcastThought } from '../routes/cognitive-stream-routes';
 import { createServerLogger } from './server-logger';
+
+/**
+ * Check if text is usable for TTS (not empty, not too short, not pure symbols).
+ * Inline minimal check - avoids legacy sanitizer dependency.
+ */
+function isUsableForTTS(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 5) return false;
+  // Reject pure symbols (e.g., "...", "---")
+  const alphanumCount = (trimmed.match(/[a-zA-Z0-9]/g) || []).length;
+  return alphanumCount / trimmed.length > 0.3;
+}
 
 export interface ThoughtStreamDeps {
   dashboardUrl: string;
@@ -85,7 +96,7 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
           deps.ttsClient.isEnabled &&
           !isExcludedType &&
           !looksLikeStatus &&
-          isUsableContent(displayText)
+          isUsableForTTS(displayText)
         ) {
           deps.ttsClient.speak(displayText);
         }
