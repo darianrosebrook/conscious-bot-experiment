@@ -287,6 +287,9 @@ function isLikelyItemName(term: string): boolean {
 
 /**
  * Check if an action is feasible given current state.
+ *
+ * DELETED (PR3): Predicate switch removed - Sterling validates action feasibility.
+ * Keeping only critical state check (health <= 0).
  */
 function checkActionFeasibility(action: string, context: GroundingContext): GroundingViolation | null {
   // Check for critical state that might make actions infeasible
@@ -298,31 +301,8 @@ function checkActionFeasibility(action: string, context: GroundingContext): Grou
     };
   }
 
-  // Specific action checks
-  switch (action) {
-    case 'craft':
-      // Crafting requires some items in inventory
-      if (context.bot.inventory.length === 0) {
-        return {
-          type: 'contradiction',
-          description: 'Cannot craft: inventory is empty',
-          trigger: action,
-        };
-      }
-      break;
-
-    case 'smelt':
-      // Smelting requires fuel and items
-      if (context.bot.inventory.length === 0) {
-        return {
-          type: 'contradiction',
-          description: 'Cannot smelt: inventory is empty',
-          trigger: action,
-        };
-      }
-      break;
-  }
-
+  // DELETED (PR3): case 'craft'/case 'smelt' predicate switch
+  // Sterling owns action validation - TS only checks critical state (health=0)
   return null;
 }
 

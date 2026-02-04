@@ -21,11 +21,20 @@ const CONVERSION_MODULES = [
   path.resolve(__dirname, '../../reasoning-surface'),
 ];
 
-// Files with known legacy violations that are marked for deprecation
-// These files will fail the boundary check but are tracked separately
-const LEGACY_VIOLATION_FILES = new Set([
-  'grounder.ts', // Contains case 'craft': switch - deprecated, use Sterling
-  'sterling-planner.ts', // Contains multiple predicate switches - deprecated
+// Files with known patterns that match the regex but are NOT semantic violations.
+// These are FALSE POSITIVES - structural routing on Sterling types, not semantic predicates.
+//
+// CLEANED (PR3):
+// - grounder.ts: Removed semantic predicate switch (case 'craft'/case 'smelt')
+//
+// FALSE POSITIVE (not a violation):
+// - sterling-planner.ts: Contains switch (req.kind) where kind is Sterling's TaskRequirement type.
+//   This is structural routing (ALLOWED), not semantic interpretation (FORBIDDEN).
+//   The test regex matches case 'craft': but can't distinguish:
+//     FORBIDDEN: switch (action) { case 'craft': ... }  // semantic
+//     ALLOWED:   switch (req.kind) { case 'craft': ... } // structural
+const LEGACY_VIOLATION_FILES = new Set<string>([
+  'sterling-planner.ts', // FALSE POSITIVE: switches on req.kind (Sterling type), not action strings
 ]);
 
 describe('I-CONVERSION-1: No Local Predicate→TaskType Mapping', () => {
