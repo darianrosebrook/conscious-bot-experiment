@@ -42,15 +42,21 @@ interface SwitchViolation {
  *
  * Removes comments and collapses whitespace so multi-line constructs
  * can be matched reliably without AST parsing.
+ *
+ * LIMITATIONS:
+ * - Line comment stripping is heuristic (checks for line-start or whitespace before //)
+ * - This trades "false positives from comments" for "false negatives from // in strings"
+ * - Still better than no normalization for multi-line switch statements
  */
 function normalizeSource(content: string): string {
   let normalized = content;
 
-  // Remove block comments
+  // Remove block comments (safe - no state needed)
   normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-  // Remove line comments
-  normalized = normalized.replace(/\/\/.*/g, ' ');
+  // Remove line comments (heuristic: only when // is at line start or after whitespace)
+  // This reduces over-stripping inside strings/regex/URLs
+  normalized = normalized.replace(/(^|\s)\/\/.*/gm, '$1 ');
 
   // Collapse whitespace to single spaces
   normalized = normalized.replace(/\s+/g, ' ');
@@ -67,14 +73,17 @@ function normalizeSource(content: string): string {
  *
  * IMPLEMENTATION NOTES:
  * - Uses normalized source (comments stripped, whitespace collapsed) to handle multi-line
- * - Character-based lookback (500 chars) instead of line-based to work with normalized text
+ * - Finds nearest 'switch' keyword before case, parses discriminant forward
+ * - Character-based lookback (500 chars) instead of line-based
+ * - No brace balancing heuristics (accepts imperfect nested construct handling)
  * - Returns structured violation objects, not strings
  * - Name-based heuristic for allowed discriminants (documented limitation)
  *
  * REMAINING LIMITATIONS (would require AST to fully fix):
- * - Nested switches can cause incorrect association if lookback isn't large enough
- * - Name-based heuristic: `const req = {kind: action}` would bypass if named "req"
+ * - Nested switches: nearest-switch heuristic may mis-associate in complex nesting
+ * - Name-based heuristic: `const req = {kind: action}` bypasses check (explicit test)
  * - Doesn't verify Sterling type imports (would need import analysis)
+ * - Comment stripping is heuristic (line comments only stripped after whitespace)
  *
  * UPGRADE PATH: Use TypeScript Compiler API or ts-morph when boundary becomes
  * load-bearing for other repos or when bypass attempts emerge.
@@ -97,11 +106,22 @@ function checkSwitchCases(content: string, file: string): SwitchViolation[] {
     const lookbackStart = Math.max(0, caseIndex - 500);
     const precedingText = normalized.substring(lookbackStart, caseIndex);
 
-    // Find the nearest switch statement
-    const switchMatch = precedingText.match(/switch\s*\(\s*([^)]+)\s*\)\s*\{[^}]*$/);
+    // Find the nearest 'switch' keyword before this case
+    // Strategy: locate last occurrence of 'switch', then parse forward for discriminant
+    // This avoids brace-balancing heuristics which are fragile in normalized text
+    const lastSwitchIndex = precedingText.lastIndexOf('switch');
+
+    if (lastSwitchIndex === -1) {
+      // No switch found in lookback window
+      continue;
+    }
+
+    // Parse forward from 'switch' to extract discriminant from 'switch (...)'
+    const fromSwitch = precedingText.substring(lastSwitchIndex);
+    const switchMatch = fromSwitch.match(/^switch\s*\(\s*([^)]+)\s*\)/);
 
     if (!switchMatch) {
-      // Couldn't find switch - might be malformed code or lookback too small
+      // Malformed switch or couldn't parse discriminant
       continue;
     }
 
@@ -385,10 +405,12 @@ describe('Allowed Patterns', () => {
       expect(violations[0].caseLabel).toBe('gather');
     });
 
-    it('bypass attempt: naming local variable "req" (caught)', () => {
-      // This is a bypass attempt - local variable named "req" but contains semantic data
-      // Current implementation flags this as allowed (name-based heuristic limitation)
-      // but it demonstrates the documented limitation
+    it('bypass attempt: local req.kind carrying semantic data (KNOWN LIMITATION)', () => {
+      // This bypass attempt exploits the name-based heuristic: naming a local variable
+      // "req" makes it appear structural, but it actually carries semantic action data.
+      //
+      // LIMITATION: Currently NOT caught (0 violations) because we check discriminant
+      // name patterns, not provenance. Would need import/type analysis or AST to fix.
       const bypassCode = `
         const req = { kind: action }; // "req" shadows, but kind contains semantic action
         switch (req.kind) {
@@ -397,13 +419,14 @@ describe('Allowed Patterns', () => {
         }
       `;
       const violations = checkSwitchCases(bypassCode, 'test.ts');
-      // KNOWN LIMITATION: This currently passes (0 violations) because we use name-based heuristic
-      // Would need import/type analysis to catch this properly
-      // Documenting the bypass vector explicitly
-      expect(violations).toHaveLength(0); // Name-based heuristic allows this
-      // TODO: When upgrading to AST-based checking, this should become:
+
+      // Current behavior: name-based heuristic allows this bypass
+      expect(violations).toHaveLength(0);
+
+      // When upgraded to AST-based checking with import analysis, this should become:
       // expect(violations).toHaveLength(1);
       // expect(violations[0].discriminant).toBe('req.kind');
+      // expect(violations[0].caseLabel).toBe('craft');
     });
   });
 });
