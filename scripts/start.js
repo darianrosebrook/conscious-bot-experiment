@@ -19,6 +19,10 @@
  *   node scripts/start.js --progress       # Progress bars (listr2)
  *   node scripts/start.js --debug          # Extra verbose
  *   node scripts/start.js --production     # Production mode (no dev logs)
+ *   node scripts/start.js --capture-logs   # Capture startup + 2min to run.log
+ *   node scripts/start.js --capture-logs=0 # Capture startup only to run.log
+ *   node scripts/start.js --capture-logs=300  # Capture startup + 5min to run.log
+ *   node scripts/start.js --proceed-temporarily="reason"  # Escape hatch for dev
  *
  * @author @darianrosebrook
  */
@@ -55,6 +59,55 @@ const PROCEED_TEMPORARILY = (() => {
   }
   return process.env.PROCEED_TEMPORARILY || null;
 })();
+
+// Log capture: save startup logs to run.log
+// Usage: --capture-logs or --capture-logs=120 (seconds to capture after startup)
+// In verbose mode, captures 2 minutes of runtime logs after "Services are running"
+const CAPTURE_LOGS = args.includes('--capture-logs') || args.some((a) => a.startsWith('--capture-logs='));
+const CAPTURE_DURATION_SEC = (() => {
+  const argMatch = args.find((a) => a.startsWith('--capture-logs='));
+  if (argMatch) {
+    const value = parseInt(argMatch.split('=')[1], 10);
+    return isNaN(value) ? 120 : value;
+  }
+  // Default: 120 seconds (2 minutes) in verbose mode, 0 otherwise
+  return OUTPUT_MODE === 'verbose' || OUTPUT_MODE === 'debug' ? 120 : 0;
+})();
+
+// Log buffer for capturing to run.log
+const logBuffer = [];
+let logCaptureActive = CAPTURE_LOGS;
+let logCaptureStartTime = Date.now();
+let startupComplete = false;
+
+/**
+ * Strip ANSI escape codes from a string
+ */
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+/**
+ * Capture a log line to the buffer (for run.log output)
+ */
+function captureLog(line) {
+  if (!logCaptureActive) return;
+  logBuffer.push(stripAnsi(line));
+}
+
+/**
+ * Write captured logs to run.log
+ */
+async function writeLogBuffer() {
+  if (logBuffer.length === 0) return;
+  const logPath = path.join(projectRoot, 'run.log');
+  try {
+    await fs.promises.writeFile(logPath, logBuffer.join('\n') + '\n');
+    console.log(`\n📝 Startup logs saved to run.log (${logBuffer.length} lines)`);
+  } catch (err) {
+    console.error(`Failed to write run.log: ${err.message}`);
+  }
+}
 
 // Dynamically import listr2 only if needed
 let Listr = null;
@@ -264,9 +317,11 @@ if (umapAvailable && umapVenvExists) {
 
 // Utility functions with output mode support
 function log(message, color = colors.reset) {
+  const line = `${color}${message}${colors.reset}`;
+  captureLog(line);
   if (OUTPUT_MODE === 'quiet') return;
   if (OUTPUT_MODE === 'progress') return; // Handled by listr2
-  console.log(`${color}${message}${colors.reset}`);
+  console.log(line);
 }
 
 function logBanner() {
@@ -279,26 +334,32 @@ function logBanner() {
 
 // Enhanced logging with structured format
 function logWithTimestamp(message, level = 'INFO', color = colors.reset) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] [${level}] ${message}`;
+  const line = `${color}${logEntry}${colors.reset}`;
+  captureLog(line);
+
   if (OUTPUT_MODE === 'quiet' && level !== 'ERROR' && level !== 'SUCCESS')
     return;
   if (OUTPUT_MODE === 'progress') return; // Handled by listr2
   if (OUTPUT_MODE === 'production' && level === 'DEBUG') return;
 
-  const timestamp = new Date().toISOString();
-  const logEntry = `[${timestamp}] [${level}] ${message}`;
-  console.log(`${color}${logEntry}${colors.reset}`);
+  console.log(line);
 }
 
 // Service-specific logging with consistent format
 function logService(serviceName, message, level = 'INFO') {
+  const timestamp = new Date().toISOString();
+  const color = getServiceColor(serviceName);
+  const logEntry = `[${timestamp}] [${serviceName}] [${level}] ${message}`;
+  const line = `${color}${logEntry}${colors.reset}`;
+  captureLog(line);
+
   if (OUTPUT_MODE === 'quiet' && level !== 'ERROR') return;
   if (OUTPUT_MODE === 'progress') return; // Handled by listr2
   if (OUTPUT_MODE === 'production' && level === 'DEBUG') return;
 
-  const timestamp = new Date().toISOString();
-  const color = getServiceColor(serviceName);
-  const logEntry = `[${timestamp}] [${serviceName}] [${level}] ${message}`;
-  console.log(`${color}${logEntry}${colors.reset}`);
+  console.log(line);
 }
 
 // Get color for service based on name
@@ -1219,7 +1280,9 @@ async function mainVerbose() {
       for (const line of lines) {
         const trimmed = line.trimEnd();
         if (trimmed) {
-          console.log(`[${service.name}] ${trimmed}`);
+          const prefixedLine = `[${service.name}] ${trimmed}`;
+          captureLog(prefixedLine);
+          console.log(prefixedLine);
         }
       }
     });
@@ -1229,7 +1292,9 @@ async function mainVerbose() {
       for (const line of lines) {
         const trimmed = line.trimEnd();
         if (trimmed && !trimmed.includes('Warning')) {
-          console.error(`[${service.name}] ${trimmed}`);
+          const prefixedLine = `[${service.name}] ${trimmed}`;
+          captureLog(prefixedLine);
+          console.error(prefixedLine);
         }
       }
     });
@@ -1718,6 +1783,13 @@ async function mainVerbose() {
 
     logWithTimestamp('All services stopped', 'SUCCESS', colors.green);
     logWithTimestamp('👋 Goodbye!', 'INFO', colors.blue);
+
+    // Write captured logs on shutdown
+    if (logCaptureActive && logBuffer.length > 0) {
+      logCaptureActive = false;
+      await writeLogBuffer();
+    }
+
     process.exit(0);
   };
 
@@ -1730,6 +1802,30 @@ async function mainVerbose() {
     'INFO',
     colors.green
   );
+
+  // Mark startup as complete for log capture
+  startupComplete = true;
+
+  // Handle log capture
+  if (CAPTURE_LOGS) {
+    if (CAPTURE_DURATION_SEC > 0) {
+      // Continue capturing for specified duration
+      logWithTimestamp(
+        `Capturing logs for ${CAPTURE_DURATION_SEC}s (use --capture-logs=0 for startup only)`,
+        'INFO',
+        colors.cyan
+      );
+
+      setTimeout(async () => {
+        logCaptureActive = false;
+        await writeLogBuffer();
+      }, CAPTURE_DURATION_SEC * 1000);
+    } else {
+      // Write immediately (startup logs only)
+      logCaptureActive = false;
+      await writeLogBuffer();
+    }
+  }
 }
 
 // Run the main function
