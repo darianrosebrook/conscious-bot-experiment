@@ -1537,14 +1537,8 @@ app.get('/enhanced/memories/:id', async (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`Memory system server running on port ${port}`);
-  console.log(`Health check: http://localhost:${port}/health`);
-  console.log(
-    `Enhanced system status: http://localhost:${port}/enhanced/status`
-  );
-  console.log(`Current seed info: http://localhost:${port}/enhanced/seed`);
-  console.log(`Database info: http://localhost:${port}/enhanced/database`);
-  console.log(`Database stats: http://localhost:${port}/enhanced/stats`);
+  console.log(`[Memory] Server running on port ${port}`);
+  console.log(`[Memory] Endpoints: /health, /enhanced/* (status, seed, database, stats)`);
 });
 
 export default app;

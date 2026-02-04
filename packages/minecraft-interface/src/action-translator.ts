@@ -231,12 +231,7 @@ export class ActionTranslator {
     // NavigationBridge.initializePathfinder() handles loadPlugin + Movements + setMovements.
     // We no longer duplicate that work here.
     if (bot.entity && bot.entity.position) {
-      console.log('🔧 ActionTranslator initialized', {
-        hasBot: !!bot,
-        botSpawned: !!bot.entity?.position,
-        hasStateMachine: !!stateMachineWrapper,
-        timestamp: Date.now(),
-      });
+      // ActionTranslator initialized (verbose logging suppressed)
 
       // Initialize D* Lite navigation bridge (owns pathfinder lifecycle)
       this.navigationBridge = new NavigationBridge(bot, {

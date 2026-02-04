@@ -399,10 +399,10 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         metadata: thoughtWithId.metadata,
       });
 
-      console.log(`🧠 Intrusive thought received and broadcast to ${sseClients.size} clients`);
+      // Intrusive thought broadcast (verbose logging suppressed)
       res.json({ success: true, thoughtId: thoughtWithId.id });
     } catch (error) {
-      console.error('❌ Error processing intrusive thought:', error);
+      console.error('[CognitiveStream] Error processing intrusive thought:', error);
       res.status(500).json({ error: 'Failed to process intrusive thought' });
     }
   });

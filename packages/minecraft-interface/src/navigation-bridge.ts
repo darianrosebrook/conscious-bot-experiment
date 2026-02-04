@@ -193,15 +193,7 @@ export class NavigationBridge extends EventEmitter {
   constructor(bot: Bot, config: Partial<NavigationBridgeConfig> = {}) {
     super();
 
-    console.log('🚀 NavigationBridge constructor called');
-    console.log('🔍 Bot state:', {
-      hasBot: !!bot,
-      hasEntity: !!bot.entity,
-      hasPosition: !!bot.entity?.position,
-      hasPathfinder: !!(bot as any).pathfinder,
-      version: bot.version,
-    });
-
+    // NavigationBridge initialization (verbose logging suppressed)
     this.bot = bot;
     this.botId = `bot_${Math.random().toString(36).substr(2, 9)}`;
     this.config = {
@@ -294,21 +286,16 @@ export class NavigationBridge extends EventEmitter {
 
   private async initializePathfinder(): Promise<void> {
     try {
-      console.log('🔧 Loading mineflayer-pathfinder...');
       // Use dynamic import for ES modules compatibility
       const pathfinderModule = await import('mineflayer-pathfinder');
       this.pf = pathfinderModule;
       // Dynamic import may put `goals` on the default export rather than top-level
       this.pfGoals = pathfinderModule.goals ?? (pathfinderModule as any).default?.goals;
-      console.log('✅ mineflayer-pathfinder loaded:', !!this.pf, 'goals:', !!this.pfGoals);
 
       if (!(this.bot as any).pathfinder) {
-        console.log('🔧 Loading pathfinder plugin...');
         this.bot.loadPlugin(this.pf.pathfinder);
-        console.log('✅ Pathfinder plugin loaded');
       }
 
-      console.log('🔧 Loading minecraft-data...');
       try {
         const mcDataModule = await import('minecraft-data');
         const mcData = mcDataModule.default || mcDataModule;
@@ -316,40 +303,25 @@ export class NavigationBridge extends EventEmitter {
         if (typeof mcData === 'function') {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const _mcDataInstance = mcData(this.bot.version);
-          console.log(
-            '✅ Minecraft data loaded for version:',
-            this.bot.version
-          );
         } else {
           throw new Error('minecraft-data is not callable');
         }
       } catch (error) {
-        console.warn(
-          '⚠️ Failed to load minecraft-data, using fallback:',
-          error
-        );
-        // Use a fallback approach without minecraft-data
-        console.log('✅ Using fallback data loading');
+        // Use a fallback approach without minecraft-data (verbose logging suppressed)
       }
 
-      console.log('🔧 Creating movements...');
       // Create movements without minecraft-data for now
       this.movements = new this.pf.Movements(this.bot);
-      console.log('✅ Movements created');
-
-      console.log('🔧 Setting pathfinder movements...');
       this.bot.pathfinder.setMovements(this.movements);
-      console.log('✅ Pathfinder movements set');
 
-      console.log('✅ Mineflayer pathfinder fully initialized');
+      console.log(`[NavigationBridge] Pathfinder initialized (version ${this.bot.version})`);
 
       // Resolve stored promise and emit event
       this._resolvePathfinderReady(true);
       this.emit('pathfinder-ready', { success: true });
     } catch (e) {
       // If pathfinder isn't available, we can still compile; navigateTo will fail fast.
-      console.error('❌ Mineflayer pathfinder initialization failed:', e);
-      console.error('Error stack:', e instanceof Error ? e.stack : 'No stack');
+      console.error('[NavigationBridge] Pathfinder initialization failed:', e instanceof Error ? e.message : e);
       this.pf = undefined;
 
       // Resolve stored promise and emit event
@@ -363,8 +335,6 @@ export class NavigationBridge extends EventEmitter {
    */
   private initializeNeuralPrediction(): void {
     try {
-      console.log('🧠 Initializing neural terrain prediction...');
-
       // Register this bot with the social learning system
       neuralTerrainPredictor.registerBot(this.botId);
 
@@ -390,10 +360,9 @@ export class NavigationBridge extends EventEmitter {
       neuralTerrainPredictor.on('social-learning-analysis', (data: any) => {
         this.emit('social-learning-analysis', data);
       });
-
-      console.log('✅ Neural terrain prediction initialized');
+      // Neural terrain prediction initialized (verbose logging suppressed)
     } catch (error) {
-      console.error('❌ Failed to initialize neural prediction:', error);
+      console.error('[NavigationBridge] Failed to initialize neural prediction:', error);
       this.neuralEnabled = false;
     }
   }
@@ -403,8 +372,6 @@ export class NavigationBridge extends EventEmitter {
    */
   private initializeEnvironmentalMonitoring(): void {
     try {
-      console.log('🌍 Initializing environmental monitoring...');
-
       // Wire bot reference into environmental detector for real data queries
       environmentalDetector.setBot(this.bot);
 
@@ -419,9 +386,9 @@ export class NavigationBridge extends EventEmitter {
         }
       );
 
-      console.log('✅ Environmental monitoring initialized');
+      // Environmental monitoring initialized (verbose logging suppressed)
     } catch (error) {
-      console.error('❌ Failed to initialize environmental monitoring:', error);
+      console.error('[NavigationBridge] Failed to initialize environmental monitoring:', error);
     }
   }
 
@@ -490,7 +457,7 @@ export class NavigationBridge extends EventEmitter {
           targetVec3
         );
       }
-      console.log('[NavigationBridge] ✅ pathfinder ready');
+      // Pathfinder ready (verbose logging suppressed)
     }
 
     if (

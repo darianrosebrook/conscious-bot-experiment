@@ -123,7 +123,7 @@ export class BotAdapter extends EventEmitter {
       // Add mcData to the bot for crafting support
       if (this.bot) {
         (this.bot as any).mcData = mcData(this.config.version);
-        console.log(`🔧 Added mcData for version ${this.config.version}`);
+        // mcData added (verbose logging suppressed)
       }
 
       this.setupBotEventHandlers();
@@ -273,7 +273,7 @@ export class BotAdapter extends EventEmitter {
 
     // Prevent duplicate initialization
     if (this.safetyMonitor) {
-      console.log('🛡️ Safety monitor already initialized, skipping');
+      // Safety monitor already initialized (verbose logging suppressed)
       return;
     }
 
@@ -292,8 +292,7 @@ export class BotAdapter extends EventEmitter {
 
       // Start automatic safety monitoring
       this.safetyMonitor.start();
-
-      console.log('🛡️ Automatic safety monitoring enabled');
+      // Safety monitoring enabled (verbose logging suppressed)
 
       // Set up safety monitor event handlers
       this.safetyMonitor.on('emergency-response', (data) => {
@@ -301,7 +300,7 @@ export class BotAdapter extends EventEmitter {
       });
 
       this.safetyMonitor.on('emergency-response-failed', (data) => {
-        console.error('❌ Safety monitor emergency response failed:', data);
+        console.error('[SafetyMonitor] Emergency response failed:', data);
         this.emitBotEvent('safety_emergency_failed', data);
       });
     } catch (error) {
@@ -865,7 +864,7 @@ export class BotAdapter extends EventEmitter {
           shouldCreateTask?: boolean;
           taskSuggestion?: string;
         };
-        console.log(`🧠 Cognition system processed chat:`, result);
+        // Cognition chat processing result (verbose logging suppressed)
 
         // If cognition system suggests a response, send it (with social cooldown)
         if (result.shouldRespond && result.response) {
@@ -939,7 +938,7 @@ export class BotAdapter extends EventEmitter {
       }, 2000)
     ); // Check every 2 seconds but only process every 10 seconds
 
-    console.log('👁️ Entity detection system activated (throttled)');
+    // Entity detection system activated (verbose logging suppressed)
   }
 
   /**
@@ -1166,7 +1165,7 @@ export class BotAdapter extends EventEmitter {
       const entityDescription = this.describeEntity(entity);
       const thought = `I notice a ${entityDescription} ${distance.toFixed(1)} blocks away`;
 
-      console.log(`🧠 Entity thought: "${thought}"`);
+      // Entity thought generated (verbose logging suppressed)
 
       // Send entity detection to cognition system
       const cognitionUrl =
@@ -1459,7 +1458,7 @@ export class BotAdapter extends EventEmitter {
       }, 5000)
     ); // Check every 5 seconds, only for significant changes
 
-    console.log('🌍 Environmental event detection activated');
+    // Environmental event detection activated (verbose logging suppressed)
   }
 
   /**
@@ -1491,7 +1490,7 @@ export class BotAdapter extends EventEmitter {
       );
       const thought = `Environmental event: ${eventDescription}`;
 
-      console.log(`🌍 ${eventType.toUpperCase()}: ${eventDescription}`);
+      // Environmental event logged (verbose logging suppressed)
 
       // Send to cognition system
       const cognitionUrl =
@@ -1525,7 +1524,7 @@ export class BotAdapter extends EventEmitter {
           shouldCreateTask?: boolean;
           taskSuggestion?: string;
         };
-        console.log(`✅ Environmental event processed:`, result);
+        // Environmental event processed (verbose JSON dump suppressed)
 
         // If cognition suggests a response, execute it (with throttling)
         if (result.shouldRespond && result.response) {

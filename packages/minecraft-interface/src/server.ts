@@ -964,12 +964,12 @@ let coreLeavesRegistered = false;
 async function registerCoreLeaves() {
   // Idempotency guard - prevent duplicate registration
   if (coreLeavesRegistered) {
-    console.log('📝 Core leaves already registered, skipping');
+    // Verbose logging suppressed - already registered
     return;
   }
 
   try {
-    console.log('📝 Registering core leaves...');
+    // Registering core leaves (verbose logging suppressed)
 
     // Import the LeafFactory from core
     const { LeafFactory } = await import('@conscious-bot/core');
@@ -1067,20 +1067,22 @@ async function registerCoreLeaves() {
       ...constructionLeaves,
     ];
 
+    const registered: string[] = [];
+    const failed: string[] = [];
     for (const leaf of allLeaves) {
       const result = leafFactory.register(leaf);
       if (result.ok) {
-        console.log(`Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`);
+        registered.push(leaf.spec.name);
       } else {
-        console.warn(
-          `⚠️ Failed to register leaf: ${leaf.spec.name}@${leaf.spec.version}: ${result.error}`
-        );
+        failed.push(`${leaf.spec.name}: ${result.error}`);
       }
     }
 
-    console.log(
-      `Registered ${allLeaves.length} core leaves with local leaf factory`
-    );
+    // Summary log instead of per-leaf logging
+    console.log(`[Minecraft Interface] Registered ${registered.length}/${allLeaves.length} core leaves`);
+    if (failed.length > 0) {
+      console.warn(`[Minecraft Interface] Failed to register leaves: ${failed.join(', ')}`);
+    }
 
     // Store the leaf factory globally so it can be used by the action executor
     (global as any).minecraftLeafFactory = leafFactory;
@@ -2534,7 +2536,7 @@ function startViewerSafely(bot: any, port: number) {
     console.warn = originalConsoleWarn;
 
     viewerActive = true;
-    console.log(`🖥️ Prismarine viewer started at http://localhost:${port}`);
+    console.log(`[Prismarine] Viewer started at http://localhost:${port}`);
 
     if (errorMessages.length > 0 || warningMessages.length > 0) {
       console.log(
@@ -2566,7 +2568,7 @@ app.post('/stop-viewer', async (req, res) => {
     // Note: prismarine-viewer doesn't provide a direct stop method
     // We can only mark it as inactive and let it be cleaned up
     viewerActive = false;
-    console.log('🖥️ Prismarine viewer stopped');
+    console.log('[Prismarine] Viewer stopped');
 
     res.json({
       success: true,

@@ -114,7 +114,7 @@ export class SkillRegistry {
     };
 
     this.skills.set(skill.id, fullSkill);
-    console.log(`✅ Skill registered: ${skill.id}`);
+    // Per-skill logging suppressed - summary logged after batch registration
     return fullSkill;
   }
 
@@ -835,6 +835,9 @@ export class SkillRegistry {
     ];
 
     defaultSkills.forEach((skill) => this.registerSkill(skill));
+    // Log summary after batch registration
+    const skillIds = defaultSkills.map(s => s.id.replace('opt.', '')).join(', ');
+    console.log(`[Memory] Registered ${defaultSkills.length} skills (${skillIds})`);
   }
 
   private initializeCurriculum(): void {

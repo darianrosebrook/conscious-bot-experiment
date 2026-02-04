@@ -101,7 +101,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     }
 
     this.isMonitoring = true;
-    console.log('🛡️ Automatic safety monitoring started');
+    // Safety monitoring started (verbose logging suppressed)
 
     // Set up health monitoring
     this.bot.on('health', () => {

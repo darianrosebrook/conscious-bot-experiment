@@ -530,7 +530,7 @@ export class EnvironmentalDetector extends EventEmitter {
       this.analyzeEnvironment(pos);
     }, updateInterval);
 
-    console.log('🌍 Environmental monitoring started');
+    // Environmental monitoring started (verbose logging suppressed)
   }
 
   stopMonitoring(): void {
