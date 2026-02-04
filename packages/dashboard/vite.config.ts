@@ -24,6 +24,12 @@ export default defineConfig({
       // =====================================================================
       // Memory service (port 3001)
       // =====================================================================
+      // Health check — must come before /api/database to avoid being rewritten to /enhanced/health
+      '/api/database/health': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: () => '/health',
+      },
       '/api/database': {
         target: 'http://localhost:3001',
         changeOrigin: true,
@@ -74,6 +80,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/planner/, '/planner'),
       },
+      '/api/valuation-updates': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: () => '/valuation-updates',
+      },
 
       // =====================================================================
       // Cognition service (port 3003)
@@ -117,11 +128,11 @@ export default defineConfig({
       // =====================================================================
       // Minecraft interface service (port 3005)
       // =====================================================================
-      // Bot state - dashboard polls this for current bot state
+      // Bot state SSE stream - used by dashboard as fallback when WebSocket is unavailable
       '/api/ws/bot-state': {
         target: 'http://localhost:3005',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ws\/bot-state/, '/state'),
+        rewrite: () => '/state-stream',
       },
       '/api/bot/state': {
         target: 'http://localhost:3005',

@@ -76,9 +76,15 @@ export class AtlasBuilder {
   /**
    * Builds a texture atlas from extracted textures.
    *
-   * For animated textures, we store all frames vertically in the atlas,
-   * and include animation metadata in the UV coordinates so the renderer
-   * can step through frames over time.
+   * For animated textures, we store all frames in a CONTIGUOUS VERTICAL STRIP
+   * in the atlas. This is critical because the shader uses a simple V offset
+   * formula (frame * frameVStep) to select frames - frames MUST be vertically
+   * stacked without wrapping to the next column.
+   *
+   * Layout strategy:
+   * 1. Calculate grid dimensions to accommodate the tallest animated texture
+   * 2. Allocate animated textures to dedicated columns (ensuring vertical continuity)
+   * 3. Fill remaining space with static textures
    *
    * @param textures - Array of extracted textures
    */
@@ -90,18 +96,30 @@ export class AtlasBuilder {
     const staticTextures = textures.filter((t) => !t.animation);
     const animatedTextures = textures.filter((t) => t.animation);
 
-    // Calculate total tile slots needed
-    // Static textures: 1 slot each
-    // Animated textures: frameCount slots each (vertical strip)
-    const staticSlots = staticTextures.length + 1; // +1 for missing texture
-    const animatedSlots = animatedTextures.reduce(
-      (sum, t) => sum + (t.animation?.frameCount ?? 1),
-      0
+    // Find max frame count among animated textures (determines min rows needed)
+    const maxFrameCount = animatedTextures.reduce(
+      (max, t) => Math.max(max, t.animation?.frameCount ?? 1),
+      1
     );
-    const totalSlots = staticSlots + animatedSlots;
 
-    // Calculate atlas dimensions (power of 2 grid)
-    const tilesPerSide = nextPowerOfTwo(Math.ceil(Math.sqrt(totalSlots)));
+    // Calculate atlas dimensions
+    // We need: animatedTextures.length columns for animated + ceil(staticTextures/rows) for static
+    const staticSlots = staticTextures.length + 1; // +1 for missing texture
+    const animatedColumns = animatedTextures.length;
+
+    // Rows must accommodate the tallest animated texture
+    const minRows = Math.max(maxFrameCount, 1);
+
+    // Static textures fill remaining slots
+    // Total columns = animated columns + columns needed for static
+    const staticColumns = Math.ceil(staticSlots / minRows);
+    const totalColumns = animatedColumns + staticColumns;
+
+    // Use power of 2 dimensions
+    const tilesPerSide = Math.max(
+      nextPowerOfTwo(totalColumns),
+      nextPowerOfTwo(minRows)
+    );
     const atlasSize = tilesPerSide * this.tileSize;
 
     if (atlasSize > this.maxSize) {
@@ -118,17 +136,15 @@ export class AtlasBuilder {
     const texturesIndex: Record<string, TextureUV> = {};
     const animatedTextureNames: string[] = [];
 
-    let currentSlot = 0;
+    // Track which columns are used for animated textures (they get the full column)
+    let nextAnimatedColumn = 0;
+    let nextStaticColumn = animatedColumns; // Static textures start after animated columns
+    let nextStaticRow = 0;
 
-    // Helper to get x,y from slot index
-    const slotToXY = (slot: number) => ({
-      x: (slot % tilesPerSide) * this.tileSize,
-      y: Math.floor(slot / tilesPerSide) * this.tileSize,
-    });
-
-    // 1. Draw missing texture first
+    // 1. Draw missing texture first (in static area)
     {
-      const { x, y } = slotToXY(currentSlot);
+      const x = nextStaticColumn * this.tileSize;
+      const y = nextStaticRow * this.tileSize;
       texturesIndex['missing_texture'] = {
         u: x / atlasSize,
         v: y / atlasSize,
@@ -137,12 +153,17 @@ export class AtlasBuilder {
       };
       const missingImg = await loadImage(missingTextureData);
       ctx.drawImage(missingImg, x, y, this.tileSize, this.tileSize);
-      currentSlot++;
+      nextStaticRow++;
+      if (nextStaticRow >= tilesPerSide) {
+        nextStaticRow = 0;
+        nextStaticColumn++;
+      }
     }
 
-    // 2. Draw static textures
+    // 2. Draw static textures (filling columns after animated area)
     for (const texture of staticTextures) {
-      const { x, y } = slotToXY(currentSlot);
+      const x = nextStaticColumn * this.tileSize;
+      const y = nextStaticRow * this.tileSize;
 
       texturesIndex[texture.name] = {
         u: x / atlasSize,
@@ -164,22 +185,29 @@ export class AtlasBuilder {
         ctx.drawImage(missingImg, x, y, this.tileSize, this.tileSize);
       }
 
-      currentSlot++;
+      nextStaticRow++;
+      if (nextStaticRow >= tilesPerSide) {
+        nextStaticRow = 0;
+        nextStaticColumn++;
+      }
     }
 
-    // 3. Draw animated textures (all frames in a vertical strip)
+    // 3. Draw animated textures - EACH IN ITS OWN COLUMN for vertical strip layout
+    // This ensures frame N is always directly below frame N-1 (no wrapping)
     for (const texture of animatedTextures) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- animatedTextures are filtered to have animation
       const animation = texture.animation!;
       const frameCount = animation.frameCount;
-      const startSlot = currentSlot;
-      const { x: startX, y: startY } = slotToXY(startSlot);
+
+      // Use dedicated column for this animated texture
+      const columnX = nextAnimatedColumn * this.tileSize;
+      const startY = 0; // Always start at top of column
 
       // Calculate frame V step (how much to add to V to get next frame)
       const frameVStep = this.tileSize / atlasSize;
 
       texturesIndex[texture.name] = {
-        u: startX / atlasSize,
+        u: columnX / atlasSize,
         v: startY / atlasSize,
         su: this.tileSize / atlasSize,
         sv: this.tileSize / atlasSize,
@@ -197,29 +225,28 @@ export class AtlasBuilder {
       try {
         const img = await loadImage(texture.data);
 
-        // Draw each frame to consecutive slots
+        // Draw each frame VERTICALLY in this column
         for (let frame = 0; frame < frameCount; frame++) {
-          const { x, y } = slotToXY(currentSlot);
+          const y = frame * this.tileSize;
 
-          // Source is the frame within the vertical sprite sheet
+          // Source is the frame within the vertical sprite sheet in the original image
           ctx.drawImage(
             img,
             0, frame * this.tileSize, this.tileSize, this.tileSize, // source
-            x, y, this.tileSize, this.tileSize // destination
+            columnX, y, this.tileSize, this.tileSize // destination - same column, next row
           );
-
-          currentSlot++;
         }
       } catch (error) {
         console.warn(`[atlas-builder] Failed to load animated texture ${texture.name}, using placeholder`);
         // Draw placeholder for each frame slot
         const missingImg = await loadImage(missingTextureData);
         for (let frame = 0; frame < frameCount; frame++) {
-          const { x, y } = slotToXY(currentSlot);
-          ctx.drawImage(missingImg, x, y, this.tileSize, this.tileSize);
-          currentSlot++;
+          const y = frame * this.tileSize;
+          ctx.drawImage(missingImg, columnX, y, this.tileSize, this.tileSize);
         }
       }
+
+      nextAnimatedColumn++;
     }
 
     return {

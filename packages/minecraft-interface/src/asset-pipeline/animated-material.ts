@@ -64,7 +64,10 @@ export const animatedVertexShader = /* glsl */ `
  * - R channel: frameCount (0 = not animated)
  * - G channel: frametime in ticks (scaled)
  * - B channel: frameVStep (scaled)
- * - A channel: flags (interpolate, etc.)
+ * - A channel: flags (bit 0 = interpolate between frames)
+ *
+ * Frame interpolation blends between adjacent frames for smooth water/lava/fire
+ * animations instead of hard frame cuts.
  */
 export const animatedFragmentShader = /* glsl */ `
   precision highp float;
@@ -115,39 +118,64 @@ export const animatedFragmentShader = /* glsl */ `
   }
 
   /**
-   * Calculates the animated UV offset for a texture.
+   * Samples the animated texture with optional frame interpolation.
+   *
+   * When interpolate flag is set (water, lava, fire), blends between
+   * adjacent frames for smooth flowing animation instead of hard cuts.
+   *
+   * @param uv - Base UV coordinate
+   * @param animData - Animation parameters (frameCount, frametimeMs, frameVStep, flags)
+   * @return Sampled and potentially interpolated texture color
    */
-  vec2 animateUV(vec2 uv, vec4 animData) {
+  vec4 sampleAnimatedTexture(vec2 uv, vec4 animData) {
     float frameCount = animData.x;
     float frametimeMs = animData.y;
     float frameVStep = animData.z;
+    float flags = animData.w;
 
     // No animation if frameCount is 0 or 1
     if (frameCount <= 1.0) {
-      return uv;
+      return texture2D(map, uv);
     }
 
-    // Calculate current frame based on time
+    // Check interpolate flag (bit 0)
+    bool shouldInterpolate = mod(flags, 2.0) >= 1.0;
+
+    // Calculate frame timing
     float timeMs = time * 1000.0;
     float cycleTime = frameCount * frametimeMs;
     float timeInCycle = mod(timeMs, cycleTime);
-    float frameIndex = floor(timeInCycle / frametimeMs);
+    float exactFrame = timeInCycle / frametimeMs;
 
-    // Apply V offset for current frame
-    float vOffset = frameIndex * frameVStep;
+    if (shouldInterpolate) {
+      // Smooth interpolation: blend between current and next frame
+      float frame1 = floor(exactFrame);
+      float frame2 = mod(frame1 + 1.0, frameCount);
+      float blendFactor = fract(exactFrame);
 
-    return vec2(uv.x, uv.y + vOffset);
+      // Calculate UV offsets for both frames
+      vec2 uv1 = vec2(uv.x, uv.y + frame1 * frameVStep);
+      vec2 uv2 = vec2(uv.x, uv.y + frame2 * frameVStep);
+
+      // Sample both frames and blend
+      vec4 color1 = texture2D(map, uv1);
+      vec4 color2 = texture2D(map, uv2);
+
+      return mix(color1, color2, blendFactor);
+    } else {
+      // Hard frame cut (original behavior)
+      float frameIndex = floor(exactFrame);
+      float vOffset = frameIndex * frameVStep;
+      return texture2D(map, vec2(uv.x, uv.y + vOffset));
+    }
   }
 
   void main() {
     // Get animation data for this UV region
     vec4 animData = getAnimationData(vUv);
 
-    // Calculate potentially animated UV
-    vec2 animatedUv = animateUV(vUv, animData);
-
-    // Sample the texture
-    vec4 texColor = texture2D(map, animatedUv);
+    // Sample texture with animation (includes interpolation if flagged)
+    vec4 texColor = sampleAnimatedTexture(vUv, animData);
 
     // Alpha test - discard transparent pixels
     if (texColor.a < alphaTest) discard;

@@ -2,12 +2,24 @@
 UMAP Dimensionality Reduction Service
 Reduces 768D embeddings → 3D for visualization
 Port: 5003
+
+Note: UMAP + numba can crash on Python 3.13 / Apple Silicon due to threading issues.
+We configure single-threaded mode and provide PCA fallback if UMAP fails.
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
-import umap
 import hashlib
+import os
+
+# Limit threading to avoid crashes on Python 3.13 + Apple Silicon
+os.environ['NUMBA_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+
+import umap
+from sklearn.decomposition import PCA
 
 app = Flask(__name__)
 CORS(app)
@@ -48,17 +60,27 @@ def reduce_embeddings():
     if content_hash in reduction_cache:
         return jsonify(reduction_cache[content_hash])
 
-    # Fit UMAP reducer with appropriate n_neighbors
+    # Try UMAP first, fall back to PCA if it crashes (common on Python 3.13 + Apple Silicon)
     n_neighbors = min(15, max(2, len(embeddings) - 1))
-    reducer = umap.UMAP(
-        n_components=3,
-        n_neighbors=n_neighbors,
-        min_dist=0.1,
-        metric='cosine',
-        random_state=42  # Deterministic for reproducibility
-    )
+    method_used = 'umap'
 
-    coords_3d = reducer.fit_transform(embeddings)
+    try:
+        reducer = umap.UMAP(
+            n_components=3,
+            n_neighbors=n_neighbors,
+            min_dist=0.1,
+            metric='cosine',
+            random_state=42,
+            n_jobs=1,  # Single-threaded to avoid crashes
+            low_memory=True  # Reduce memory pressure
+        )
+        coords_3d = reducer.fit_transform(embeddings)
+    except Exception as e:
+        # Fallback to PCA if UMAP crashes
+        print(f'UMAP failed ({e}), falling back to PCA')
+        method_used = 'pca'
+        reducer = PCA(n_components=3, random_state=42)
+        coords_3d = reducer.fit_transform(embeddings)
 
     # Normalize to [-1, 1] range for Three.js
     mins = coords_3d.min(axis=0)
@@ -78,7 +100,7 @@ def reduce_embeddings():
         for i in range(len(coords_3d))
     ]
 
-    result = {'points': points, 'hash': content_hash, 'count': len(points)}
+    result = {'points': points, 'hash': content_hash, 'count': len(points), 'method': method_used}
     reduction_cache[content_hash] = result
 
     return jsonify(result)

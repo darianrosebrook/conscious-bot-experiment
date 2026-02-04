@@ -1,3 +1,23 @@
+diff --git a/viewer/lib/entity/Entity.js b/viewer/lib/entity/Entity.js
+index 1234567890abcdef..fedcba0987654321 100644
+--- a/viewer/lib/entity/Entity.js
++++ b/viewer/lib/entity/Entity.js
+@@ -203,7 +203,14 @@ function getMesh (texture, jsonModel) {
+ class Entity {
+   constructor (version, type, scene) {
+     const e = entities[type]
+-    if (!e) throw new Error(`Unknown entity ${type}`)
++    if (!e) {
++      // Graceful fallback for unknown entities (e.g., trader_llama, glow_squid on newer MC versions)
++      // Create an empty mesh instead of crashing the viewer
++      console.warn(`Unknown entity ${type} - using placeholder`)
++      this.mesh = new THREE.Object3D()
++      this.unknownEntity = true
++      return
++    }
+
+     this.mesh = new THREE.Object3D()
+     for (const [name, jsonModel] of Object.entries(e.geometry)) {
 diff --git a/viewer/lib/version.js b/viewer/lib/version.js
 index 39e3ad8670f3d4a756c99e14ea258df0bbb4c252..6c2da77dc3f7f1173a65d66d14f3a64465e4d1e6 100644
 --- a/viewer/lib/version.js

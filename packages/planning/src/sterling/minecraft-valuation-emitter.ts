@@ -56,8 +56,29 @@ export interface EmitterStats {
 // ============================================================================
 
 /**
+ * SSE sink using internal broadcast.
+ * Pushes events to connected SSE clients via broadcastValuationUpdate.
+ * This is the preferred transport for single-node dev setups.
+ */
+export function createBroadcastValuationSink(): ValuationEventSink {
+  // Lazy import to avoid circular dependencies
+  let broadcast: ((event: any) => void) | null = null;
+  return {
+    async emit(event: ValuationUpdateEvent): Promise<void> {
+      if (!broadcast) {
+        const { broadcastValuationUpdate } = await import('../modules/planning-endpoints');
+        broadcast = broadcastValuationUpdate;
+      }
+      broadcast(event);
+    },
+  };
+}
+
+/**
  * SSE sink: POST to dashboard endpoint.
- * Single-node dev dashboard transport. Not safe for multi-instance/serverless.
+ * Legacy transport — the Vite dev server can't receive POSTs.
+ * Prefer createBroadcastValuationSink() for local dev.
+ * @deprecated Use createBroadcastValuationSink instead
  */
 export function createSSEValuationSink(dashboardEndpoint: string): ValuationEventSink {
   return {

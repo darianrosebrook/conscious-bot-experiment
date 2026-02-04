@@ -107,6 +107,27 @@ export function inferRequirementFromEndpointParams(
 // Track connected SSE clients for task updates
 const taskUpdateClients: Set<Response> = new Set();
 
+// Track connected SSE clients for valuation updates
+const valuationUpdateClients: Set<Response> = new Set();
+
+/**
+ * Broadcast a valuation update to all connected SSE clients.
+ * Called by the valuation emitter when a decision is made.
+ */
+export function broadcastValuationUpdate(eventData: any): void {
+  if (valuationUpdateClients.size === 0) return;
+
+  const message = JSON.stringify(eventData);
+
+  for (const client of valuationUpdateClients) {
+    try {
+      client.write(`data: ${message}\n\n`);
+    } catch {
+      valuationUpdateClients.delete(client);
+    }
+  }
+}
+
 /**
  * Broadcast a task update to all connected SSE clients
  */
@@ -170,6 +191,34 @@ export function createPlanningEndpoints(
       clearInterval(keepaliveInterval);
       taskUpdateClients.delete(res);
       console.log(`[SSE] Client disconnected from task-updates (${taskUpdateClients.size} remaining)`);
+    });
+  });
+
+  // GET /valuation-updates - SSE endpoint for valuation decision updates
+  router.get('/valuation-updates', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    valuationUpdateClients.add(res);
+    console.log(`[SSE] Client connected to valuation-updates (${valuationUpdateClients.size} total)`);
+
+    // Send keepalive every 30 seconds
+    const keepaliveInterval = setInterval(() => {
+      try {
+        res.write(`: keepalive\n\n`);
+      } catch {
+        clearInterval(keepaliveInterval);
+        valuationUpdateClients.delete(res);
+      }
+    }, 30000);
+
+    req.on('close', () => {
+      clearInterval(keepaliveInterval);
+      valuationUpdateClients.delete(res);
+      console.log(`[SSE] Client disconnected from valuation-updates (${valuationUpdateClients.size} remaining)`);
     });
   });
 

@@ -1093,22 +1093,36 @@ app.get('/enhanced/embeddings-3d', async (req, res) => {
     const umapHost = process.env.MLX_SIDECAR_HOST || process.env.UMAP_SERVICE_HOST || 'localhost';
     const umapPort = process.env.MLX_SIDECAR_PORT || process.env.UMAP_SERVICE_PORT || '5002';
 
-    const umapResponse = await fetch(`http://${umapHost}:${umapPort}/reduce`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeddings: data.embeddings,
-        ids: data.ids,
-        metadata: data.metadata,
-      }),
-    });
+    try {
+      const umapResponse = await fetch(`http://${umapHost}:${umapPort}/reduce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeddings: data.embeddings,
+          ids: data.ids,
+          metadata: data.metadata,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
 
-    if (!umapResponse.ok) {
-      throw new Error(`UMAP service error: ${umapResponse.statusText}`);
+      if (!umapResponse.ok) {
+        throw new Error(`UMAP service error: ${umapResponse.statusText}`);
+      }
+
+      const result = await umapResponse.json();
+      res.json(result);
+    } catch (umapError) {
+      // Graceful fallback: return empty visualization with informative message
+      // when the MLX sidecar is unavailable
+      const errorMsg = umapError instanceof Error ? umapError.message : 'Unknown error';
+      console.warn(`[embeddings-3d] UMAP service unavailable (${umapHost}:${umapPort}): ${errorMsg}`);
+      res.json({
+        points: [],
+        message: `UMAP service unavailable. Start the MLX sidecar on port ${umapPort} to enable 3D embedding visualization.`,
+        count: data.embeddings.length,
+        serviceStatus: 'unavailable',
+      });
     }
-
-    const result = await umapResponse.json();
-    res.json(result);
   } catch (error) {
     console.error('[embeddings-3d] Error:', error);
     res.status(500).json({

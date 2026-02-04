@@ -128,8 +128,11 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
 }) => {
   void _selectedSlot; // Reserved for future use
   const [expanded, setExpanded] = useState(false);
-  const mainInventoryItems = inventory.filter((item) => item.slot >= 9 && item.slot <= 44);
-  const totalItems = inventory.length;
+
+  // Defensive: inventory may be undefined during initial load or when bot disconnects
+  const safeInventory = inventory || [];
+  const mainInventoryItems = safeInventory.filter((item) => item.slot >= 9 && item.slot <= 44);
+  const totalItems = safeInventory.length;
 
   return (
     <Section
@@ -148,7 +151,7 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
         ) : null
       }
     >
-      {!expanded ? null : inventory.length === 0 ? (
+      {!expanded ? null : safeInventory.length === 0 ? (
         <EmptyState icon={Package} title="No items in inventory" description="The bot's inventory is empty." />
       ) : (
         <div className={s.spacer}>
@@ -165,7 +168,7 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
           <div>
             <h4 className={s.sectionTitle}>Item Details</h4>
             <div className={s.detailsSpacer}>
-              {inventory.slice(0, 8).map((item, index) => (
+              {safeInventory.slice(0, 8).map((item, index) => (
                 <div key={index} className={s.detailRow}>
                   <div className={s.detailThumb}>
                     <img

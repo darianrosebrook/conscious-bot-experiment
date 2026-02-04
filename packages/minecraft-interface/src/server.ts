@@ -155,6 +155,10 @@ const viewerPort = process.env.VIEWER_PORT
 const wss = new WebSocketServer({ server });
 const connectedClients = new Set<WebSocket>();
 
+// SSE clients for bot state fallback (when WebSocket is unavailable)
+import type { Response } from 'express';
+const sseClients = new Set<Response>();
+
 // Middleware
 app.use(
   cors({
@@ -317,20 +321,44 @@ function broadcastBotStateUpdate(eventType: string, data: any) {
     data,
   });
 
-  console.log(`Broadcasting ${eventType} to ${connectedClients.size} clients`);
-
-  connectedClients.forEach((client) => {
-    if (client.readyState === 1) {
-      // WebSocket.OPEN
-      try {
-        client.send(message);
-      } catch (error) {
-        console.error('Failed to send message to WebSocket client:', error);
+  // Broadcast to WebSocket clients
+  if (connectedClients.size > 0) {
+    console.log(`Broadcasting ${eventType} to ${connectedClients.size} WS clients`);
+    connectedClients.forEach((client) => {
+      if (client.readyState === 1) {
+        // WebSocket.OPEN
+        try {
+          client.send(message);
+        } catch (error) {
+          console.error('Failed to send message to WebSocket client:', error);
+        }
       }
-    } else {
-      console.log(`Client not ready, state: ${client.readyState}`);
-    }
-  });
+    });
+  }
+
+  // Also broadcast to SSE clients (for fallback when WebSocket is unavailable)
+  if (sseClients.size > 0) {
+    // Wrap in bot_state_update format expected by dashboard SSE handler
+    const sseMessage = JSON.stringify({
+      type: 'bot_state_update',
+      timestamp: Date.now(),
+      data: {
+        eventType,
+        ...data,
+        // Include standard fields the dashboard expects
+        connected: data.connected ?? true,
+        position: data.position ? [data.position.x, data.position.y, data.position.z] : null,
+        vitals: data.health !== undefined ? { health: data.health, food: data.food ?? 0 } : undefined,
+      },
+    });
+    sseClients.forEach((client) => {
+      try {
+        client.write(`data: ${sseMessage}\n\n`);
+      } catch {
+        sseClients.delete(client);
+      }
+    });
+  }
 }
 
 /**
@@ -699,6 +727,55 @@ app.get('/health', (req, res) => {
     executionStatus: executionStatus,
     connectionState: minecraftInterface?.botAdapter.getConnectionState(),
     isAlive,
+  });
+});
+
+// SSE endpoint for bot state (fallback when WebSocket is unavailable)
+// Used by dashboard when the direct WebSocket connection to port 3005 fails
+app.get('/state-stream', (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  sseClients.add(res);
+  console.log(`[SSE] Bot state client connected (${sseClients.size} total)`);
+
+  // Send initial state immediately
+  const botStatus = minecraftInterface?.botAdapter.getStatus();
+  if (botStatus) {
+    const initMessage = JSON.stringify({
+      type: 'bot_state_update',
+      timestamp: Date.now(),
+      data: {
+        connected: botStatus.connected,
+        position: botStatus.position ? [botStatus.position.x, botStatus.position.y, botStatus.position.z] : null,
+        vitals: {
+          health: botStatus.health ?? 0,
+          food: botStatus.food ?? 0,
+        },
+      },
+    });
+    res.write(`data: ${initMessage}\n\n`);
+  }
+
+  // Send keepalive every 30 seconds
+  const keepaliveInterval = setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`);
+    } catch {
+      clearInterval(keepaliveInterval);
+      sseClients.delete(res);
+    }
+  }, 30000);
+
+  // Clean up on disconnect
+  req.on('close', () => {
+    clearInterval(keepaliveInterval);
+    sseClients.delete(res);
+    console.log(`[SSE] Bot state client disconnected (${sseClients.size} remaining)`);
   });
 });
 

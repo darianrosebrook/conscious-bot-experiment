@@ -364,13 +364,23 @@ export default function Dashboard() {
   const sortByTime = (a: (typeof thoughts)[0], b: (typeof thoughts)[0]) =>
     (a.ts || '').localeCompare(b.ts || '');
 
-  const cognitiveThoughts = thoughts
-    .filter((t) => !isStatusOrEnvironmental(t))
-    .sort(sortByTime);
+  // Deduplicate by ID to prevent React key warnings (race conditions in addThought can allow duplicates)
+  const dedupeById = <T extends { id?: string }>(items: T[]): T[] => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (!item.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
 
-  const statusEnvironmentalThoughts = thoughts
-    .filter(isStatusOrEnvironmental)
-    .sort(sortByTime);
+  const cognitiveThoughts = dedupeById(
+    thoughts.filter((t) => !isStatusOrEnvironmental(t))
+  ).sort(sortByTime);
+
+  const statusEnvironmentalThoughts = dedupeById(
+    thoughts.filter(isStatusOrEnvironmental)
+  ).sort(sortByTime);
 
   const renderThoughtCard = (thought: (typeof thoughts)[0]) => {
     const isIntrusive =
