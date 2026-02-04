@@ -25,6 +25,16 @@ import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 import { resilientFetch } from '@conscious-bot/core';
 import { Vec3 } from 'vec3';
 
+// Startup barrier for gating processing until all services are ready
+import {
+  isSystemReady,
+  getSystemReadyState,
+  markSystemReady,
+  proceedTemporarily,
+  onSystemReady,
+  setExpectedServiceCount,
+} from './startup-barrier';
+
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
 
@@ -232,9 +242,6 @@ let memoryIntegration: MemoryIntegrationService | null = null;
 let isConnecting = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
-let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
-let readyAt: string | null = systemReady ? new Date().toISOString() : null;
-let readySource: string | null = systemReady ? 'env' : null;
 let pendingThoughtGeneration = false;
 
 /**
@@ -242,7 +249,7 @@ let pendingThoughtGeneration = false;
  * Replaces the retired planning loop: execution now flows through the planning server (port 3002).
  */
 function startObservationBroadcast() {
-  if (!systemReady) {
+  if (!isSystemReady()) {
     pendingThoughtGeneration = true;
     console.log('Waiting for system readiness; observation broadcast paused');
     return;
@@ -289,7 +296,7 @@ function startObservationBroadcast() {
 }
 
 function tryStartObservationBroadcast(reason: string) {
-  if (!systemReady) {
+  if (!isSystemReady()) {
     pendingThoughtGeneration = true;
     console.log(
       `Deferring observation broadcast until system readiness (${reason})`
@@ -781,17 +788,35 @@ app.get('/state-stream', (req, res) => {
 
 // Startup readiness endpoint
 app.get('/system/ready', (_req, res) => {
-  res.json({ ready: systemReady, readyAt, source: readySource });
+  res.json(getSystemReadyState());
 });
 
 app.post('/system/ready', (req, res) => {
-  if (!systemReady) {
-    systemReady = true;
-    readyAt = new Date().toISOString();
-    readySource =
-      typeof req.body?.source === 'string' ? req.body.source : 'startup';
+  const source = typeof req.body?.source === 'string' ? req.body.source : 'startup';
+  const services = Array.isArray(req.body?.services) ? req.body.services : [];
+  const expectedCount = typeof req.body?.expectedCount === 'number' ? req.body.expectedCount : 0;
+
+  // Check for escape hatch
+  if (req.body?.proceedTemporarily) {
+    const reason = typeof req.body.proceedTemporarily === 'string'
+      ? req.body.proceedTemporarily
+      : 'manual override';
+    proceedTemporarily(reason);
+  } else {
+    // Set expected count if provided
+    if (expectedCount > 0) {
+      setExpectedServiceCount(expectedCount);
+    }
+
+    // Mark system ready with payload
+    markSystemReady(source, {
+      services,
+      expectedCount,
+      timestamp: req.body?.timestamp,
+    });
   }
 
+  // Start pending operations now that we're ready
   if (pendingThoughtGeneration) {
     const bot = minecraftInterface?.botAdapter.getBot();
     if (bot?.entity) {
@@ -799,7 +824,13 @@ app.post('/system/ready', (req, res) => {
     }
   }
 
-  res.json({ ready: systemReady, readyAt, accepted: true });
+  // Notify bot adapter to start BeliefBus if it was waiting
+  if (minecraftInterface?.botAdapter) {
+    minecraftInterface.botAdapter.onSystemReady();
+  }
+
+  const state = getSystemReadyState();
+  res.json({ ...state, accepted: true });
 });
 
 // Set world seed at runtime

@@ -44,6 +44,18 @@ const OUTPUT_MODE = args.includes('--quiet')
         ? 'production'
         : 'verbose';
 
+// Escape hatch: proceed temporarily even if some services fail
+// Usage: --proceed-temporarily="debugging minecraft-interface"
+// Or: PROCEED_TEMPORARILY="debugging minecraft-interface"
+const PROCEED_TEMPORARILY = (() => {
+  const argMatch = args.find((a) => a.startsWith('--proceed-temporarily'));
+  if (argMatch) {
+    const value = argMatch.split('=')[1];
+    return value || 'cli-flag';
+  }
+  return process.env.PROCEED_TEMPORARILY || null;
+})();
+
 // Dynamically import listr2 only if needed
 let Listr = null;
 if (OUTPUT_MODE === 'progress') {
@@ -1407,7 +1419,10 @@ async function mainVerbose() {
   );
   const forceReady = process.env.FORCE_SYSTEM_READY === '1';
 
-  if (unhealthyTargets.length > 0 && !forceReady) {
+  // Check if we should use the escape hatch (proceed temporarily)
+  const shouldProceedTemporarily = PROCEED_TEMPORARILY && unhealthyTargets.length > 0;
+
+  if (unhealthyTargets.length > 0 && !forceReady && !shouldProceedTemporarily) {
     logWithTimestamp(
       `\n⚠️  Readiness broadcast skipped; unhealthy services: ${unhealthyTargets
         .map((s) => s.name)
@@ -1416,22 +1431,32 @@ async function mainVerbose() {
       colors.yellow
     );
     logWithTimestamp(
-      '   Set FORCE_SYSTEM_READY=1 to override',
+      '   Set FORCE_SYSTEM_READY=1 to override, or use --proceed-temporarily="reason"',
       'INFO',
       colors.cyan
     );
-  } else {
-    logWithTimestamp('\nBroadcasting system readiness...', 'INFO', colors.cyan);
+  } else if (shouldProceedTemporarily) {
+    // Escape hatch: proceed temporarily even with unhealthy services
+    logWithTimestamp(
+      `\n⚠️  Proceeding temporarily despite unhealthy services: ${PROCEED_TEMPORARILY}`,
+      'WARN',
+      colors.yellow
+    );
+
+    const healthyServiceNames = healthyServices.map((r) => r.service);
     const payload = {
-      ready: true,
-      services: readinessTargets.map((s) => s.name),
+      ready: false,
+      proceedTemporarily: PROCEED_TEMPORARILY,
+      services: healthyServiceNames,
+      expectedCount: healthResults.length,
       timestamp: Date.now(),
       source: 'scripts/start.js',
     };
+
     for (const service of readinessTargets) {
       try {
         await postJson(service.readyUrl, payload, 4000);
-        logService(service.name, 'Readiness acknowledged', 'HEALTH');
+        logService(service.name, `Proceeding temporarily (${healthyServiceNames.length}/${healthResults.length} services)`, 'WARN');
       } catch (error) {
         logService(
           service.name,
@@ -1441,7 +1466,34 @@ async function mainVerbose() {
       }
       await wait(200);
     }
-    logWithTimestamp('Readiness broadcast complete', 'SUCCESS', colors.green);
+    logWithTimestamp(`Temporary proceed broadcast complete (${healthyServiceNames.length}/${healthResults.length} services)`, 'WARN', colors.yellow);
+  } else {
+    logWithTimestamp('\nBroadcasting system readiness...', 'INFO', colors.cyan);
+
+    // Include all healthy services and expected count in the payload
+    const healthyServiceNames = healthyServices.map((r) => r.service);
+    const payload = {
+      ready: true,
+      services: healthyServiceNames,
+      expectedCount: healthResults.length,
+      timestamp: Date.now(),
+      source: 'scripts/start.js',
+    };
+
+    for (const service of readinessTargets) {
+      try {
+        await postJson(service.readyUrl, payload, 4000);
+        logService(service.name, `Readiness acknowledged (${healthyServiceNames.length}/${healthResults.length} services)`, 'HEALTH');
+      } catch (error) {
+        logService(
+          service.name,
+          `Readiness push failed: ${error.message}`,
+          'WARN'
+        );
+      }
+      await wait(200);
+    }
+    logWithTimestamp(`Readiness broadcast complete (${healthyServiceNames.length}/${healthResults.length} services ready)`, 'SUCCESS', colors.green);
   }
 
   // Step 10: Check optional external services (Sterling is now started by this script when available)

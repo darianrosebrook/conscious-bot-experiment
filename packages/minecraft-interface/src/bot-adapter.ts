@@ -23,6 +23,7 @@ import {
   type BeliefStreamEnvelope,
 } from './entity-belief';
 import { assessReflexThreats, ReflexArbitrator } from './reflex';
+import { isSystemReady, onSystemReady } from './startup-barrier';
 
 /** Module-level monotonic counter for ephemeral stream_id (deterministic, no Date.now()) */
 let botInstanceCounter = 0;
@@ -62,6 +63,8 @@ export class BotAdapter extends EventEmitter {
   private beliefTickId = 0;
   private emitSeq = 0;
   private reflexArbitrator: ReflexArbitrator;
+  private beliefBusStarted = false;
+  private beliefBusPending = false;
 
   // Performance benchmarking — capped ring buffer for responseTimes
   private static readonly MAX_RESPONSE_TIMES = 200;
@@ -541,11 +544,11 @@ export class BotAdapter extends EventEmitter {
     });
 
     // Entity belief system (replaces per-entity /process POSTs)
+    // Gate behind system readiness to avoid work before all services are up
     if (process.env.LEGACY_ENTITY_PROCESS === '1') {
       this.setupEntityDetection();
     } else {
-      this.setupBeliefIngestion();
-      this.setupCognitionEmission();
+      this.tryStartBeliefBus();
     }
 
     // Environmental event detection
@@ -937,6 +940,55 @@ export class BotAdapter extends EventEmitter {
     ); // Check every 2 seconds but only process every 10 seconds
 
     console.log('👁️ Entity detection system activated (throttled)');
+  }
+
+  /**
+   * Try to start BeliefBus loops. Gates behind system readiness.
+   * If not ready, marks as pending and will be started when onSystemReady() is called.
+   */
+  private tryStartBeliefBus(): void {
+    if (this.beliefBusStarted) {
+      console.log('[BeliefBus] Already started, skipping');
+      return;
+    }
+
+    if (!isSystemReady()) {
+      this.beliefBusPending = true;
+      console.log('[BeliefBus] Waiting for system readiness before starting');
+      return;
+    }
+
+    this.startBeliefBus();
+  }
+
+  /**
+   * Actually start the BeliefBus loops (called when system is ready).
+   */
+  private startBeliefBus(): void {
+    if (this.beliefBusStarted) return;
+    if (!this.bot) {
+      console.log('[BeliefBus] No bot available, cannot start');
+      return;
+    }
+
+    this.beliefBusStarted = true;
+    this.beliefBusPending = false;
+
+    this.setupBeliefIngestion();
+    this.setupCognitionEmission();
+
+    console.log('[BeliefBus] Started (system ready)');
+  }
+
+  /**
+   * Called by server.ts when system readiness is received.
+   * Starts any pending BeliefBus loops.
+   */
+  public onSystemReady(): void {
+    if (this.beliefBusPending && !this.beliefBusStarted) {
+      console.log('[BeliefBus] System ready signal received, starting BeliefBus');
+      this.startBeliefBus();
+    }
   }
 
   /**
