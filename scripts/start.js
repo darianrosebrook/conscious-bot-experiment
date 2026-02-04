@@ -103,7 +103,7 @@ async function writeLogBuffer() {
   const logPath = path.join(projectRoot, 'run.log');
   try {
     await fs.promises.writeFile(logPath, logBuffer.join('\n') + '\n');
-    console.log(`\n📝 Startup logs saved to run.log (${logBuffer.length} lines)`);
+    console.log(`\nStartup logs saved to run.log (${logBuffer.length} lines)`);
   } catch (err) {
     console.error(`Failed to write run.log: ${err.message}`);
   }
@@ -560,7 +560,7 @@ async function waitForService(url, serviceName, maxAttempts = 60) {
           if (attempts - lastLogAttempt >= 5 || attempts === 1) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             log(
-              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} not ready yet (${elapsed}s)`,
+              `   Attempt ${attempts}/${maxAttempts} - ${serviceName} not ready yet (${elapsed}s)`,
               colors.yellow
             );
             lastLogAttempt = attempts;
@@ -750,7 +750,7 @@ async function setupUMAPEnvironment() {
 
 // Docker compose management
 async function startDockerServices() {
-  log('\n🐳 Starting Docker services...', colors.cyan);
+  log('\nStarting Docker services...', colors.cyan);
 
   // Check if Docker is available
   try {
@@ -783,7 +783,7 @@ async function startDockerServices() {
   }
 
   // Wait for Postgres healthcheck
-  log(' ⏳ Waiting for Postgres...', colors.cyan);
+  log('   Waiting for Postgres...', colors.cyan);
   let pgReady = false;
   for (let i = 0; i < 30; i++) {
     try {
@@ -1080,7 +1080,7 @@ async function mainVerbose() {
   // Step 3b: Start Docker services (Postgres + Minecraft)
   const skipDocker = process.argv.includes('--skip-docker');
   if (skipDocker) {
-    log('\n🐳 Skipping Docker services (--skip-docker)', colors.yellow);
+    log('\nSkipping Docker services (--skip-docker)', colors.yellow);
   } else {
     await startDockerServices();
   }
@@ -1218,7 +1218,7 @@ async function mainVerbose() {
   }
 
   // Step 8: Start services in priority order with dependency checking
-  log('\n🚀 Starting services in dependency order...', colors.cyan);
+  log('\nStarting services in dependency order...', colors.cyan);
   if (!sterlingAvailable) {
     log(
       `  Sterling repo not found at ${sterlingDir}, skipping Sterling service`,
@@ -1237,7 +1237,7 @@ async function mainVerbose() {
     // Wait for dependencies to be ready
     if (service.dependencies.length > 0) {
       log(
-        ` ⏳ Waiting for dependencies: ${service.dependencies.join(', ')}`,
+        `   Waiting for dependencies: ${service.dependencies.join(', ')}`,
         colors.yellow
       );
 
@@ -1348,7 +1348,7 @@ async function mainVerbose() {
   }
 
   // Step 9: Wait for services to start and check health with retry logic
-  log('\n⏳ Waiting for services to start...', colors.cyan);
+  log('\nWaiting for services to start...', colors.cyan);
   await wait(8000); // Give services time to initialize
 
   log('\nChecking service health...', colors.cyan);
