@@ -16,12 +16,21 @@ function run() {
     const pvRoot = path.dirname(
       require.resolve('prismarine-viewer/package.json')
     );
-    const povPatchPath = path.join(
+    // POV switcher patch - try new source location first, fall back to legacy
+    const povPatchPathNew = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'index.js'
+    );
+    const povPatchPathLegacy = path.join(
       __dirname,
       '..',
       'patches',
       'prismarine-viewer-lib-index.patched.js'
     );
+    const povPatchPath = fs.existsSync(povPatchPathNew) ? povPatchPathNew : povPatchPathLegacy;
     const pvLibIndex = path.join(pvRoot, 'lib', 'index.js');
     if (fs.existsSync(povPatchPath) && fs.existsSync(pvLibIndex)) {
       fs.copyFileSync(povPatchPath, pvLibIndex);

@@ -1,21 +1,44 @@
 # Prismarine-Viewer Source Customizations
 
-This directory contains our customizations to prismarine-viewer that get applied via pnpm patch.
+This directory contains our customizations to prismarine-viewer that get applied via pnpm patch and postinstall scripts.
 
 ## Why This Exists
 
-The prismarine-viewer package doesn't support skeletal animations out of the box - entities just "glide" around without leg/arm movement. We inject our animation system directly into the viewer's client-side JavaScript.
+The prismarine-viewer package has several limitations we address:
+1. **No skeletal animations** - Entities "glide" without leg/arm movement
+2. **No POV switching** - Locked to first-person view
+3. **No orbit controls** - Can't orbit around the bot in 3rd person
+
+We inject our customizations directly into the viewer's client-side JavaScript.
 
 ## Architecture
 
 ```
 prismarine-viewer-src/
 ├── README.md                    # This file
+├── index.js                     # Client entry point (POV toggle, orbit controls)
 ├── Entity.js                    # Modified entity mesh creation (stores bone refs)
 ├── entities.js                  # Animation system + entity manager
 ├── viewer.js                    # Render loop integration
 └── animation-system.js          # Pure animation logic (no viewer deps)
 ```
+
+## Two Patch Mechanisms
+
+### 1. pnpm patch (automatic)
+Applied automatically during `pnpm install`. Patches:
+- `viewer/lib/entity/Entity.js`
+- `viewer/lib/entities.js`
+- `viewer/lib/viewer.js`
+
+Patch file: `/patches/prismarine-viewer@1.33.0.patch`
+
+### 2. postinstall copy (rebuild script)
+Copies `index.js` during the webpack rebuild. This replaces the entire
+client entry point to add POV switching and orbit controls.
+
+Script: `scripts/rebuild-prismarine-viewer.cjs`
+Source: `patches/prismarine-viewer-lib-index.patched.js` (symlinked from here)
 
 ## How It Works
 
