@@ -132,6 +132,25 @@ socket.on('time', (data) => {
   }
 })
 
+/**
+ * Handle entity equipment updates from the server.
+ * This is emitted when an entity's equipment changes (armor, held items).
+ */
+socket.on('entityEquipment', (data) => {
+  if (!data || !viewer.entities) return
+
+  try {
+    // Forward to the entities manager to update equipment meshes
+    viewer.entities.update({
+      id: data.id,
+      equipment: data.equipment
+    })
+    console.log(`[viewer] Updated equipment for entity ${data.id}`)
+  } catch (e) {
+    // Ignore equipment update errors
+  }
+})
+
 let firstPositionUpdate = true
 let viewMode = 'first' // 'first' | 'third'
 let controls = null

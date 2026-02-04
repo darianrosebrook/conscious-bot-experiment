@@ -50,6 +50,69 @@ function run() {
       console.log('[rebuild-prismarine-viewer] Copied animated-material-client.js');
     }
 
+    // Copy equipment-renderer.js to lib/ for webpack bundling
+    const equipmentRendererSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'equipment-renderer.js'
+    );
+    const equipmentRendererDest = path.join(pvRoot, 'lib', 'equipment-renderer.js');
+    if (fs.existsSync(equipmentRendererSrc)) {
+      fs.copyFileSync(equipmentRendererSrc, equipmentRendererDest);
+      console.log('[rebuild-prismarine-viewer] Copied equipment-renderer.js');
+    }
+
+    // Copy enhanced mineflayer.js for server-side equipment/time events
+    const mineflayerSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'mineflayer.js'
+    );
+    const mineflayerDest = path.join(pvRoot, 'lib', 'mineflayer.js');
+    if (fs.existsSync(mineflayerSrc)) {
+      fs.copyFileSync(mineflayerSrc, mineflayerDest);
+      console.log('[rebuild-prismarine-viewer] Copied mineflayer.js (equipment/time support)');
+    }
+
+    // Copy entities.js to viewer/lib/ for equipment rendering support
+    const entitiesSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'entities.js'
+    );
+    const entitiesDest = path.join(pvRoot, 'viewer', 'lib', 'entities.js');
+    if (fs.existsSync(entitiesSrc)) {
+      fs.copyFileSync(entitiesSrc, entitiesDest);
+      console.log('[rebuild-prismarine-viewer] Copied entities.js (equipment rendering)');
+    }
+
+    // Copy Entity.js to viewer/lib/entity/ for skeletal animation support
+    const entitySrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'Entity.js'
+    );
+    const entityDest = path.join(pvRoot, 'viewer', 'lib', 'entity', 'Entity.js');
+    if (fs.existsSync(entitySrc)) {
+      fs.copyFileSync(entitySrc, entityDest);
+      console.log('[rebuild-prismarine-viewer] Copied Entity.js (skeletal animation)');
+    }
+
+    // Copy equipment-renderer.js to viewer/lib/ (used by entities.js)
+    const equipmentViewerDest = path.join(pvRoot, 'viewer', 'lib', 'equipment-renderer.js');
+    if (fs.existsSync(equipmentRendererSrc)) {
+      fs.copyFileSync(equipmentRendererSrc, equipmentViewerDest);
+      console.log('[rebuild-prismarine-viewer] Copied equipment-renderer.js to viewer/lib/');
+    }
+
     // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
     // This runs in background and doesn't block postinstall
     const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');

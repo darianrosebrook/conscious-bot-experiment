@@ -14,6 +14,7 @@ const TWEEN = require('@tweenjs/tween.js')
 
 const Entity = require('./entity/Entity')
 const { dispose3 } = require('./dispose')
+const { EquipmentManager } = require('./equipment-renderer')
 
 const { createCanvas } = require('canvas')
 
@@ -287,6 +288,8 @@ class Entities {
     this.animationActions = new Map() // entityId -> { idle, walk }
     this.entityStates = new Map() // entityId -> { lastPos, velocity, isMoving }
     this.lastUpdateTime = performance.now()
+    // Equipment rendering system
+    this.equipmentManagers = new Map() // entityId -> EquipmentManager
   }
 
   clear () {
@@ -299,6 +302,11 @@ class Entities {
     this.animationMixers.clear()
     this.animationActions.clear()
     this.entityStates.clear()
+    // Clear equipment managers
+    for (const manager of this.equipmentManagers.values()) {
+      manager.dispose()
+    }
+    this.equipmentManagers.clear()
   }
 
   /**
@@ -402,6 +410,9 @@ class Entities {
 
       // Set up animation for new entity
       this.setupEntityAnimation(entity.id, mesh)
+
+      // Set up equipment manager for new entity
+      this.equipmentManagers.set(entity.id, new EquipmentManager())
     }
 
     const e = this.entities[entity.id]
@@ -414,7 +425,21 @@ class Entities {
       this.animationMixers.delete(entity.id)
       this.animationActions.delete(entity.id)
       this.entityStates.delete(entity.id)
+      // Clean up equipment manager
+      const equipmentManager = this.equipmentManagers.get(entity.id)
+      if (equipmentManager) {
+        equipmentManager.dispose()
+        this.equipmentManagers.delete(entity.id)
+      }
       return
+    }
+
+    // Update equipment if present
+    if (entity.equipment) {
+      const equipmentManager = this.equipmentManagers.get(entity.id)
+      if (equipmentManager && equipmentManager.hasChanged(entity.equipment)) {
+        equipmentManager.update(e, entity.equipment)
+      }
     }
 
     if (entity.pos) {
