@@ -375,31 +375,18 @@ export function extractGoalTag(text: string): {
 }
 
 // ============================================================================
-// Goal Key Canonicalization
+// Goal Key Canonicalization — DELETED
 // ============================================================================
-
-/**
- * Produce a canonical goal key from action + target for exact-match idempotency.
- * Single source of truth — used by both cognition (drive tick) and planning (converter).
- *
- * Rules:
- * - lowercase everything
- * - collapse whitespace to single underscore
- * - strip leading/trailing underscores
- * - collapse repeated underscores
- * - restrict to [a-z0-9_] (replace anything else with _)
- * - format: "action:target"
- */
-/**
- * @deprecated DELETED (PR2): canonicalGoalKey removed - use Sterling committed_goal_prop_id
- * Stub for backward compatibility during migration - throws error if called
- */
-export function canonicalGoalKey(action: string, target: string): string {
-  throw new Error(
-    'canonicalGoalKey() deleted (PR2): Use Sterling committed_goal_prop_id instead. ' +
-    'Identity comes from semantic authority, not TS string manipulation.'
-  );
-}
+// canonicalGoalKey() DELETED (boundary fix): Sterling provides identity.
+//
+// Identity hierarchy for task conversion/dedupe:
+//   1. committed_goal_prop_id (primary, from Sterling committed IR)
+//   2. committed_ir_digest (secondary, from Sterling IR digest)
+//   3. envelope_id (tertiary, from language-io envelope)
+//   4. Fail-open if none available (accept duplicates, no semantic substitution)
+//
+// Use Sterling IDs in thought-to-task converter and planning modules.
+// ============================================================================
 
 // ============================================================================
 // Intent Extraction (DEPRECATED - Evidence-Only Mode)

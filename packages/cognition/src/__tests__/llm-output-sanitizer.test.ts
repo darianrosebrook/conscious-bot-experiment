@@ -172,14 +172,7 @@ describe('isUsableContent', () => {
 });
 
 // ============================================================================
-// canonicalGoalKey (error stub)
+// canonicalGoalKey — DELETED (boundary fix)
 // ============================================================================
-
-describe('canonicalGoalKey (deleted)', () => {
-  it('throws error when called', async () => {
-    const { canonicalGoalKey } = await import('../llm-output-sanitizer');
-    expect(() => canonicalGoalKey('craft', 'stick')).toThrow(
-      /canonicalGoalKey\(\) deleted.*Sterling committed_goal_prop_id/
-    );
-  });
-});
+// canonicalGoalKey() deleted entirely - import will fail at compile time.
+// Identity comes from Sterling (committedGoalPropId, committedIrDigest, envelopeId).
