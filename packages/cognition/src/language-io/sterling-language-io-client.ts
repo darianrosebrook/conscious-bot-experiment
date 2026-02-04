@@ -47,6 +47,14 @@ export interface LanguageIOClientConfig {
   maxRetries?: number;
   /** Optional transport (for dependency injection). If not provided, uses default. */
   transport?: LanguageIOTransport;
+  /**
+   * Fallback policy when Sterling is unavailable.
+   * - 'permissive': Allow explicit goals without grounding (resilience mode)
+   * - 'strict': Require Sterling to be available (certification mode)
+   * - 'markers_only': Allow explicit markers but mark as ungrounded
+   * Default: 'markers_only'
+   */
+  fallbackPolicy?: 'permissive' | 'strict' | 'markers_only';
 }
 
 export interface ReduceOptions {
@@ -97,6 +105,9 @@ export interface ReduceError {
  *
  * In fallback mode, we can ONLY extract explicit [GOAL:] tags.
  * Natural language intent is NOT processed (fail-closed).
+ *
+ * SECURITY: Fallback execution is granted WITHOUT grounding validation.
+ * Downstream code should gate world-affecting actions appropriately.
  */
 export interface FallbackResult {
   /** Fallback mode indicator */
@@ -107,6 +118,10 @@ export interface FallbackResult {
   envelope: LanguageIOEnvelopeV1;
   /** Reason for fallback */
   fallbackReason: string;
+  /** Whether grounding was performed (always false in fallback) */
+  groundingPerformed: false;
+  /** Fallback policy that was applied */
+  fallbackPolicy: 'permissive' | 'strict' | 'markers_only';
 }
 
 // =============================================================================
@@ -141,7 +156,9 @@ export interface FallbackResult {
  * ```
  */
 export class SterlingLanguageIOClient extends EventEmitter {
-  private config: Required<Omit<LanguageIOClientConfig, 'transport'>>;
+  private config: Required<Omit<LanguageIOClientConfig, 'transport' | 'fallbackPolicy'>> & {
+    fallbackPolicy: 'permissive' | 'strict' | 'markers_only';
+  };
   private transport: LanguageIOTransport;
   private connected = false;
 
@@ -150,6 +167,7 @@ export class SterlingLanguageIOClient extends EventEmitter {
     this.config = {
       url: config.url || process.env.STERLING_WS_URL || 'ws://localhost:8766',
       enabled: config.enabled ?? process.env.STERLING_ENABLED !== 'false',
+      fallbackPolicy: config.fallbackPolicy ?? 'markers_only',
       reduceTimeout: config.reduceTimeout ?? 10000,
       maxRetries: config.maxRetries ?? 2,
     };
@@ -361,8 +379,13 @@ export class SterlingLanguageIOClient extends EventEmitter {
       return outcome;
     }
 
-    // Sterling unavailable - use fallback mode
+    // Sterling unavailable - check fallback policy
     if (outcome.code === 'STERLING_UNAVAILABLE' || outcome.code === 'STERLING_TIMEOUT') {
+      // Strict mode: fail closed, no fallback allowed
+      if (this.config.fallbackPolicy === 'strict') {
+        throw new Error(`Sterling unavailable and fallbackPolicy=strict: ${outcome.message}`);
+      }
+
       const envelope = outcome.envelope!;
       const hasExplicitGoal = envelope.declared_markers.length > 0;
 
@@ -371,6 +394,8 @@ export class SterlingLanguageIOClient extends EventEmitter {
         hasExplicitGoal,
         envelope,
         fallbackReason: outcome.message,
+        groundingPerformed: false,
+        fallbackPolicy: this.config.fallbackPolicy,
       };
     }
 

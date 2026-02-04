@@ -177,6 +177,8 @@ export interface SterlingPipelineResult extends ReasoningPipelineResult {
   envelopeId: string | null;
   /** Round-trip duration in ms */
   durationMs: number;
+  /** Whether grounding was performed (false in fallback mode) */
+  groundingPerformed: boolean;
 }
 
 /**
@@ -301,10 +303,19 @@ function handleFallbackResult(
   // Run legacy pipeline to get text/goal/grounding
   const legacyResult = processLLMOutput(rawOutput, context);
 
-  // In fallback mode, only explicit goals are eligible
-  // Natural language intent is NOT processed (fail-closed)
-  // When Sterling is unavailable, we trust explicit [GOAL:] tags without grounding
+  // In fallback mode, execution depends on policy:
+  // - 'permissive': Allow explicit goals even without grounding (resilience)
+  // - 'markers_only': Allow explicit goals but mark as ungrounded (default)
+  // - 'strict': Never reached (throws earlier)
   const isExecutable = fallback.hasExplicitGoal && legacyResult.goal !== null;
+
+  // Build block reason that indicates lack of grounding
+  let blockReason: string | null = null;
+  if (!isExecutable) {
+    blockReason = 'Sterling unavailable; natural language intent not processed';
+  } else if (fallback.fallbackPolicy === 'markers_only') {
+    blockReason = 'UNGROUNDED: Sterling unavailable, execution granted for explicit marker only';
+  }
 
   return {
     ...legacyResult,
@@ -312,9 +323,10 @@ function handleFallbackResult(
     reducerResult: null,
     fallbackReason: fallback.fallbackReason,
     isExecutable,
-    blockReason: isExecutable ? null : 'Sterling unavailable; natural language intent not processed',
+    blockReason,
     envelopeId: fallback.envelope.envelope_id,
     durationMs: 0, // Not tracked in fallback
+    groundingPerformed: false, // SECURITY: No grounding in fallback mode
   };
 }
 
@@ -393,6 +405,7 @@ function mapSterlingResultToPipelineResult(
     blockReason,
     envelopeId: envelope.envelope_id,
     durationMs,
+    groundingPerformed: result.grounding !== null, // True if Sterling provided grounding
   };
 }
 
