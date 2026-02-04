@@ -10,7 +10,10 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - ✅ **Replaced**: Asset extraction, texture atlases, blockstate processing
 - ✅ **Replaced**: Skeletal entity animations (walk/idle cycles)
 - ✅ **Replaced**: POV switching and orbit controls
-- ⏳ **In Progress**: Custom shader system for lighting
+- ✅ **Replaced**: Animated textures (water/lava/fire with frame interpolation)
+- ✅ **Replaced**: Day/night lighting cycle (Minecraft-accurate colors)
+- ✅ **Working**: Player skins (via Microsoft auth + ONLINE_MODE)
+- ✅ **Working**: Custom asset server for MC 1.21.5-1.21.9 textures
 - ❌ **Not Started**: Chunk meshing, physics simulation
 
 ---
@@ -85,7 +88,8 @@ We maintain our own source files that get injected into prismarine-viewer via pn
 
 | File | Mechanism | Purpose |
 |------|-----------|---------|
-| `index.js` | postinstall copy | POV toggle (F5), orbit controls, bot mesh in 3rd person |
+| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom asset URLs, animated material setup |
+| `animated-material-client.js` | postinstall copy | Custom ShaderMaterial for water/lava/fire animations |
 | `Entity.js` | pnpm patch | Store bone refs in `mesh.userData` for animation lookups |
 | `entities.js` | pnpm patch | Full skeletal animation system (walk/idle cycles) |
 | `viewer.js` | pnpm patch | Render loop with `updateAnimations(deltaTime)` call |
@@ -97,7 +101,8 @@ pnpm install
   → pnpm patch applies Entity.js, entities.js, viewer.js
   → postinstall runs rebuild-prismarine-viewer.cjs
     → copies index.js to lib/index.js
-    → webpack rebuilds client bundle
+    → copies animated-material-client.js to lib/
+    → webpack rebuilds client bundle with both files
 ```
 
 ### 2.3 Skeletal Animation System ✅
@@ -118,7 +123,68 @@ Full TypeScript implementation with additional states beyond what's in the patch
 - Biped: player, zombie, skeleton, creeper, enderman, villager, pillager, etc.
 - Quadruped: pig, cow, sheep, wolf, horse, fox, rabbit, etc.
 
-### 2.4 Viewer Patches (Legacy) ✅
+### 2.4 Animated Texture System ✅
+
+**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/animated-material-client.js`
+
+Custom ShaderMaterial that replaces prismarine-viewer's default `MeshLambertMaterial`:
+
+| Feature | Implementation | Notes |
+|---------|---------------|-------|
+| UV Animation | Fragment shader with time uniform | Offsets UV based on frame timing |
+| Frame Interpolation | `mix()` between adjacent frames | Smooth water/lava/fire |
+| Day/Night Cycle | Color interpolation uniforms | Minecraft-accurate day/twilight/night colors |
+| Animation Map | DataTexture lookup | Encodes frametime, frameCount, frameVStep, flags |
+
+**Shader Uniforms**:
+```glsl
+uniform sampler2D map;              // Texture atlas
+uniform sampler2D animationMap;     // Animation metadata lookup
+uniform float time;                 // Updated each frame
+uniform float dayProgress;          // 0=midnight, 0.5=noon
+uniform vec3 dayAmbientColor;       // White at noon
+uniform vec3 nightAmbientColor;     // Blue at midnight
+uniform vec3 twilightAmbientColor;  // Orange at dawn/dusk
+```
+
+**Integration Flow**:
+```
+socket.on('version') → loadCustomBlockStates() → setupAnimatedMaterial()
+                                                        ↓
+                                               generateAnimationMap(blockStates)
+                                                        ↓
+                                               createAnimatedMaterial(texture, animMap)
+                                                        ↓
+                                               viewer.world.material = animatedMaterial
+                                                        ↓
+animate() loop → updateAnimatedMaterial(material, deltaTime)
+```
+
+### 2.5 Player Skins ✅
+
+**Mechanism**: Microsoft Authentication + Online Mode
+
+Player skins work through Mojang's session authentication system, not custom loading:
+
+| Component | Setting | Purpose |
+|-----------|---------|---------|
+| Docker Minecraft | `ONLINE_MODE: "TRUE"` | Validates players via Mojang session servers |
+| Bot Config | `auth: 'microsoft'` | Uses Microsoft OAuth for authentication |
+| Session Server | `sessionserver.mojang.com` | Provides skin textures during auth |
+
+**How It Works**:
+1. Bot connects with `auth: 'microsoft'` → triggers Microsoft OAuth flow
+2. Mineflayer exchanges token with Mojang session server
+3. Session server validates and provides player UUID + skin URL
+4. Minecraft server receives skin data and distributes to all clients
+5. Prismarine-viewer receives skin through protocol, no custom code needed
+
+**Requirements**:
+- Microsoft account with Minecraft: Java Edition
+- Docker running with `ONLINE_MODE=TRUE`
+- First-time connection prompts for Microsoft login
+
+### 2.6 Viewer Patches (pnpm) ✅
 
 **Location**: `patches/prismarine-viewer@1.33.0.patch`
 
@@ -179,13 +245,16 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 
 **What Still Needs Work**:
 - Equipment rendering (armor, held items)
-- Player skin loading and capes
+- Cape rendering
 - Name tag rendering
 - Shadow projection
 
+**What's Now Working** ✅:
+- Player skins (via Microsoft auth + ONLINE_MODE)
+
 **Remaining Estimate**:
-- Lines of code: 500-800
-- Time: 1 week
+- Lines of code: 400-600
+- Time: 3-5 days
 - Complexity: Medium
 
 ### 3.3 World Renderer Integration (Medium Effort)
@@ -237,13 +306,15 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - [x] POV toggle (1st/3rd person)
 - [x] Orbit controls for 3rd person view
 
-### Phase 3: Enhanced Rendering (Next)
+### Phase 3: Enhanced Rendering (Partially Complete)
+- [x] Animated textures (water, lava, fire, sea lantern, etc.)
+- [x] Day/night lighting cycle with smooth transitions
+- [x] Player skins (via Microsoft auth)
+- [x] Custom asset server for MC 1.21.5-1.21.9
 - [ ] Custom sky rendering (sun/moon position, stars)
 - [ ] Weather effects (rain, snow particles)
 - [ ] Block lighting (torch light, redstone)
-- [ ] Water/lava special rendering (transparency, flow)
 - [ ] Entity equipment rendering (armor, held items)
-- [ ] Player skin loading
 
 ### Phase 4: Chunk Meshing (Future)
 - [ ] WebWorker-based mesh generation
@@ -269,7 +340,8 @@ Our migration code is organized into three tiers:
 packages/minecraft-interface/src/
 ├── prismarine-viewer-src/          # Tier 1: Direct patches (JS, injected into viewer)
 │   ├── README.md                   # Documentation + regeneration instructions
-│   ├── index.js                    # Client entry (POV, orbit controls)
+│   ├── index.js                    # Client entry (POV, orbit, custom assets, animated material)
+│   ├── animated-material-client.js # Custom ShaderMaterial for texture animations
 │   ├── Entity.js                   # Bone storage for animations
 │   ├── entities.js                 # Animation system + entity manager
 │   ├── viewer.js                   # Render loop integration
@@ -356,9 +428,12 @@ pnpm install
 |-----------|--------|--------|
 | Asset extraction | ✅ Done | Version independence achieved |
 | Texture atlases | ✅ Done | Custom animations working |
-| Animated materials | ✅ Done | Frame sequences, day/night working |
+| Animated materials | ✅ Done | Frame interpolation, day/night working |
 | Skeletal animations | ✅ Done | Walk/idle cycles for 30+ entities |
 | POV switching | ✅ Done | 1st/3rd person with orbit controls |
+| Custom asset server | ✅ Done | MC 1.21.5-1.21.9 support |
+| Player skins | ✅ Done | Via Microsoft auth (no code needed) |
+| Day/night cycle | ✅ Done | Smooth color interpolation |
 | Entity equipment | ⏳ Next | Armor, held items needed |
 | Chunk meshing | ⏳ Maybe | High effort, current solution works |
 | Physics | ❌ Keep | Pathfinding depends on it |
