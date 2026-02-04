@@ -11,7 +11,7 @@ overrides:
 
 patchedDependencies:
   prismarine-viewer@1.33.0:
-    hash: 49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413
+    hash: 511f04e9d3711b83f2a1deaf8fc3568d06bd7033556fb539e022723e051e8c5e
     path: patches/prismarine-viewer@1.33.0.patch
 
 importers:
@@ -517,7 +517,7 @@ importers:
         version: 1.2.0
       prismarine-viewer:
         specifier: ^1.33.0
-        version: 1.33.0(patch_hash=49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413)
+        version: 1.33.0(patch_hash=511f04e9d3711b83f2a1deaf8fc3568d06bd7033556fb539e022723e051e8c5e)
       three:
         specifier: ^0.179.1
         version: 0.179.1
@@ -8787,7 +8787,7 @@ snapshots:
       prismarine-block: 1.22.0
       prismarine-nbt: 2.8.0
 
-  prismarine-viewer@1.33.0(patch_hash=49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413):
+  prismarine-viewer@1.33.0(patch_hash=511f04e9d3711b83f2a1deaf8fc3568d06bd7033556fb539e022723e051e8c5e):
     dependencies:
       '@tweenjs/tween.js': 23.1.3
       compression: 1.8.1
