@@ -54,17 +54,18 @@ export type {
   AuditSummary,
 } from './audit/thought-action-audit-logger';
 
-// LLM Output Sanitizer (shared boundary — downstream code imports from here)
+// LLM Output Sanitizer (DEPRECATED - migrating to language-io)
+// Semantic exports removed in PR2 - Sterling is semantic authority
 export {
   extractGoalTag,
   extractIntent,
-  normalizeGoalAction,
-  canonicalGoalKey,
+  // DELETED (PR2): normalizeGoalAction - Sterling normalizes
+  // DELETED (PR2): canonicalGoalKey - use Sterling committed_goal_prop_id
   sanitizeLLMOutput,
   isUsableContent,
   hasCodeLikeDensity,
-  CANONICAL_ACTIONS,
-  NORMALIZE_MAP_VERSION,
+  // DELETED (PR2): CANONICAL_ACTIONS - Sterling validates
+  // DELETED (PR2): NORMALIZE_MAP_VERSION - Sterling normalizes
 } from './llm-output-sanitizer';
 export type {
   GoalTag,

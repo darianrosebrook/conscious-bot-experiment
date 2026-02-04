@@ -1,27 +1,42 @@
 /**
- * LLM Output Sanitizer
+ * LLM Output Sanitizer (DEPRECATED - Migrating to language-io)
  *
- * Standardizes and sanitizes MLX/Ollama LLM output at the generation boundary
- * so all downstream consumers receive clean text.
+ * This file is being phased out in favor of packages/cognition/src/language-io/.
+ * Semantic functions (normalization, canonicalization, intent classification)
+ * have been DELETED as part of PR2 - Sterling is the only semantic authority.
  *
- * Pipeline: stripCodeFences -> stripSystemPromptLeaks -> extractGoalTag ->
- *           truncateDegeneration -> stripTrailingGarbage -> normalizeWhitespace
+ * What remains: Evidence transforms only (sanitization, verbatim marker extraction).
+ * New code should use language-io/sanitization-pipeline.ts and language-io/marker-extractor.ts.
  *
+ * REMOVAL TARGET: After all consumers migrate to language-io, delete this file entirely.
+ *
+ * @deprecated Use language-io module instead
  * @author @darianrosebrook
  */
 
 // ============================================================================
-// Types
+// Types (Evidence Only - No Semantic Interpretation)
 // ============================================================================
 
-export type IntentLabel = 'none' | 'explore' | 'gather' | 'craft' | 'shelter' | 'food' | 'mine' | 'navigate';
+/**
+ * @deprecated IntentLabel deleted (PR2) - Sterling classifies intent, not TS
+ * Keeping type stub for backward compatibility during migration
+ */
+export type IntentLabel = 'none';
 
 export interface SanitizedOutput {
   text: string;
   goalTag: GoalTag | null;
   goalTagV1: GoalTagV1 | null;
-  intent: IntentLabel | null;
-  /** How the INTENT was parsed: 'final_line' (compliant), 'inline_noncompliant', or null (absent) */
+  /**
+   * Verbatim INTENT marker (evidence only, no validation).
+   * @deprecated Intent classification removed - use Sterling intent_family instead
+   */
+  intent: string | null;
+  /**
+   * How the INTENT marker was extracted (observability only).
+   * @deprecated Intent parsing metadata - use Sterling
+   */
   intentParse: IntentParse | null;
   flags: SanitizationFlags;
 }
@@ -101,82 +116,15 @@ const GENERIC_FILLER_PATTERNS = [
 ];
 
 // ============================================================================
-// Action normalization — maps synonyms to canonical goal actions
-// Versioned: changes to this map change meaning, not just parsing.
-// Bump NORMALIZE_MAP_VERSION when adding/removing/changing entries.
+// DELETED (PR2): Semantic Footholds Removed
 // ============================================================================
-
-export const NORMALIZE_MAP_VERSION = 3;
-
-const ACTION_NORMALIZE_MAP: Record<string, string> = {
-  dig: 'mine',
-  break: 'mine',
-  harvest: 'mine',
-  get: 'collect',
-  obtain: 'collect',
-  pickup: 'collect',
-  make: 'craft',
-  create: 'craft',
-  construct: 'build',
-  assemble: 'build',
-  reinforce: 'build',
-  fortify: 'build',
-  locate: 'find',
-  search: 'find',
-  look: 'find',
-  identify: 'find',
-  move: 'navigate',
-  go: 'navigate',
-  reach: 'navigate',
-  walk: 'navigate',
-  travel: 'navigate',
-  run: 'navigate',
-  observe: 'check',
-  assess: 'check',
-  inspect: 'check',
-  acknowledge: 'check',
-  acquire: 'gather',
-  increase: 'gather',
-  farm: 'gather',
-  fix: 'repair',
-  mend: 'repair',
-  restore: 'repair',
-  cook: 'smelt',
-  hear: 'check',
-  listen: 'check',
-  // Management action synonyms (v2)
-  remove: 'cancel',
-  drop: 'cancel',
-  abort: 'cancel',
-  stop: 'cancel',
-  boost: 'prioritize',
-  promote: 'prioritize',
-  hold: 'pause',
-  defer: 'pause',
-  suspend: 'pause',
-  unpause: 'resume',
-  restart: 'resume',
-};
-
-/**
- * Normalize a raw goal action to its canonical form.
- * Unknown actions pass through unchanged.
- */
-export function normalizeGoalAction(raw: string): string {
-  const lower = raw.toLowerCase().replace(/^_+|_+$/g, '');
-  return ACTION_NORMALIZE_MAP[lower] ?? lower;
-}
-
+// ACTION_NORMALIZE_MAP - DELETED: Sterling normalizes, not TS
+// normalizeGoalAction() - DELETED: Sterling normalizes, not TS
+// CANONICAL_ACTIONS - DELETED: Sterling validates, not TS
+// NORMALIZE_MAP_VERSION - DELETED: No longer versioning TS semantics
+//
+// Migration: Use Sterling reducer result for normalized/validated actions
 // ============================================================================
-// Canonical actions allowlist (strict, versioned)
-// ============================================================================
-
-export const CANONICAL_ACTIONS = new Set([
-  'collect', 'mine', 'craft', 'build', 'find', 'explore',
-  'navigate', 'gather', 'check', 'smelt', 'repair', 'continue',
-  // Management actions (v2)
-  'cancel', 'prioritize', 'pause', 'resume',
-]);
 
 // ============================================================================
 // Pipeline Steps
@@ -261,15 +209,17 @@ export function stripSystemPromptLeaks(text: string): string {
 }
 
 /**
- * Step 3: Extract [GOAL: action target amount?] tag from text.
+ * Step 3: Extract [GOAL: action target amount?] tag from text (verbatim, no validation).
  *
  * Bounded-scan parser (no regex backtracking):
  * 1. Locate `[GOAL:` via indexOf
  * 2. Find matching `]` via bounded scan (max 100 chars)
- * 3. Tokenize inner text, validate against CANONICAL_ACTIONS allowlist
+ * 3. Tokenize inner text and extract verbatim (NO validation)
  * 4. Also handle trailing amount after `]` (e.g. `[GOAL: craft wood] 20`)
  *
- * Fail-closed: unknown actions → goal: null (raw tag preserved in flags for debugging).
+ * Sterling validates and normalizes actions - TS only extracts verbatim.
+ *
+ * @deprecated Evidence extraction only. Sterling owns semantic validation.
  */
 export function extractGoalTag(text: string): {
   text: string;
@@ -358,13 +308,9 @@ export function extractGoalTag(text: string): {
     return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'empty_inner', tagCount };
   }
 
-  // Token 1: action — normalize then check allowlist
+  // Token 1: action — extract verbatim (Sterling validates, not TS)
   const rawAction = tokens[0].toLowerCase().replace(/[^a-z_]/g, '');
-  const action = normalizeGoalAction(rawAction);
-  if (!CANONICAL_ACTIONS.has(action)) {
-    // Fail-closed: unknown action → no goal, but preserve raw tag for debugging
-    return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'unknown_action', tagCount };
-  }
+  const action = rawAction; // No normalization - Sterling handles this
 
   // Remaining tokens: target words, optional id=, amount=, and trailing bare amount
   let innerAmount: number | null = null;
@@ -444,85 +390,71 @@ export function extractGoalTag(text: string): {
  * - restrict to [a-z0-9_] (replace anything else with _)
  * - format: "action:target"
  */
+/**
+ * @deprecated DELETED (PR2): canonicalGoalKey removed - use Sterling committed_goal_prop_id
+ * Stub for backward compatibility during migration - throws error if called
+ */
 export function canonicalGoalKey(action: string, target: string): string {
-  const normalize = (s: string) =>
-    s.toLowerCase()
-      .replace(/\s+/g, '_')
-      .replace(/[^a-z0-9_]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
-  const normAction = normalize(action);
-  const normTarget = normalize(target);
-  // Reject targetless goals — an empty target after normalization means
-  // the goal is too vague for idempotency matching.
-  if (!normAction || !normTarget) return '';
-  return `${normAction}:${normTarget}`;
+  throw new Error(
+    'canonicalGoalKey() deleted (PR2): Use Sterling committed_goal_prop_id instead. ' +
+    'Identity comes from semantic authority, not TS string manipulation.'
+  );
 }
 
 // ============================================================================
-// Intent Extraction
+// Intent Extraction (DEPRECATED - Evidence-Only Mode)
 // ============================================================================
-
-const VALID_INTENTS = new Set<IntentLabel>([
-  'none', 'explore', 'gather', 'craft', 'shelter', 'food', 'mine', 'navigate',
-]);
+// INTENT: markers are stripped verbatim but NOT semantically validated.
+// Sterling performs intent classification; TS only captures the raw marker.
+// ============================================================================
 
 export type IntentParse = 'final_line' | 'inline_noncompliant' | null;
 
 /**
- * Extract INTENT label from the final line of text.
- * Strips the INTENT line from the output whenever the syntax matches,
- * even if the label is unknown (returns intent: null in that case).
+ * Extract INTENT marker verbatim from text (evidence-only, no validation).
  *
- * Also strips inline `INTENT: <word>` occurrences that appear mid-sentence
- * (LLM format non-compliance). These are removed from text but tagged as
- * `intentParse: 'inline_noncompliant'` so the caller can measure compliance.
+ * Strips the INTENT line from the output and returns the verbatim label
+ * WITHOUT semantic validation. Sterling classifies intent, not TS.
+ *
+ * Also strips inline `INTENT: <word>` occurrences (format violations).
+ *
+ * @deprecated This is evidence extraction only. Do not use intent field for
+ * semantic decisions - use Sterling's intent_family classification instead.
  */
-export function extractIntent(text: string): { text: string; intent: IntentLabel | null; intentParse: IntentParse } {
+export function extractIntent(text: string): { text: string; intent: string | null; intentParse: IntentParse } {
   // Pass 1: Match INTENT: <label> only as the final non-empty line.
-  // Walk backward past trailing blank lines (small models often emit trailing newlines).
   const lines = text.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
     if (trimmed.length === 0) continue;
     const match = trimmed.match(/^INTENT:\s*(\w+)\s*$/i);
     if (match) {
-      // Always strip the INTENT line from output — it's a control line, not content
+      // Always strip the INTENT line — it's a control marker, not content
       let cleanedText = lines.slice(0, i).join('\n').trimEnd();
-      const candidate = match[1].toLowerCase() as IntentLabel;
+      const verbatimLabel = match[1].toLowerCase(); // Verbatim only, no validation
       // Also strip any inline occurrences in the remaining text
       cleanedText = stripInlineIntent(cleanedText);
-      if (VALID_INTENTS.has(candidate)) {
-        return { text: cleanedText, intent: candidate, intentParse: 'final_line' };
-      }
-      // Syntax matched but label invalid → strip line anyway, intent null
-      return { text: cleanedText, intent: null, intentParse: 'final_line' };
+      return { text: cleanedText, intent: verbatimLabel, intentParse: 'final_line' };
     }
     // First non-empty line from the end wasn't an INTENT line — stop looking
     break;
   }
 
   // Pass 2: No final-line INTENT found. Check for inline occurrences.
-  // Strip them from text to prevent leakage into titles/goalKeys.
   const stripped = stripInlineIntent(text);
   if (stripped !== text) {
-    // Inline INTENT was found and removed — extract label for observability
+    // Inline INTENT was found and removed — extract label for observability (verbatim)
     const inlineMatch = text.match(/INTENT:\s*(\w+)/i);
-    const candidate = inlineMatch?.[1]?.toLowerCase() as IntentLabel | undefined;
-    const intent = candidate && VALID_INTENTS.has(candidate) ? candidate : null;
-    return { text: stripped, intent, intentParse: 'inline_noncompliant' };
+    const verbatimLabel = inlineMatch?.[1]?.toLowerCase() ?? null;
+    return { text: stripped, intent: verbatimLabel, intentParse: 'inline_noncompliant' };
   }
 
   return { text, intent: null, intentParse: null };
 }
 
 /**
- * Strip inline `INTENT: <word>` substrings from text.
+ * Strip inline `INTENT: <word>` substrings from text (verbatim cleaning).
  * Handles mid-sentence occurrences like "I will explore. INTENT: explore I notice a tree."
- *
- * Contract: newlines in the original text are preserved. Only horizontal
- * whitespace immediately surrounding the INTENT token is consumed. The
- * cleanup pass collapses horizontal whitespace runs but never touches `\n`.
  */
 function stripInlineIntent(text: string): string {
   return text

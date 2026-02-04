@@ -1,15 +1,10 @@
 /**
- * Goal Extractor — Production Reasoning Surface
+ * Goal Extractor — Production Reasoning Surface (DEPRECATED)
  *
- * Re-exports the canonical goal extraction from llm-output-sanitizer.
- * This module exists to provide a stable API boundary for the reasoning surface,
- * allowing internal implementation changes without affecting consumers.
+ * Re-exports evidence extraction from llm-output-sanitizer.
+ * Semantic exports removed in PR2 - Sterling is the semantic authority.
  *
- * The actual extraction logic lives in llm-output-sanitizer.ts, which implements:
- * - Bounded-scan parser (no regex backtracking)
- * - Action normalization via CANONICAL_ACTIONS allowlist
- * - Fail-closed behavior for unknown actions
- *
+ * @deprecated Migrating to language-io module. Semantic functions deleted.
  * @author @darianrosebrook
  */
 
@@ -22,15 +17,15 @@ export type {
   IntentParse,
 } from '../llm-output-sanitizer';
 
-// Re-export functions from the canonical source
+// Re-export functions (semantic exports removed in PR2)
 export {
   extractGoalTag,
   extractIntent,
-  normalizeGoalAction,
-  canonicalGoalKey,
+  // DELETED (PR2): normalizeGoalAction - Sterling normalizes
+  // DELETED (PR2): canonicalGoalKey - use Sterling committed_goal_prop_id
   sanitizeLLMOutput,
-  CANONICAL_ACTIONS,
-  NORMALIZE_MAP_VERSION,
+  // DELETED (PR2): CANONICAL_ACTIONS - Sterling validates
+  // DELETED (PR2): NORMALIZE_MAP_VERSION - Sterling normalizes
 } from '../llm-output-sanitizer';
 
 // ============================================================================

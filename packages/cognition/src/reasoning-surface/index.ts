@@ -63,7 +63,7 @@ export type {
 } from './frame-renderer';
 
 // ============================================================================
-// Goal Extraction
+// Goal Extraction (DEPRECATED - semantic exports removed in PR2)
 // ============================================================================
 
 export {
@@ -71,11 +71,11 @@ export {
   extractGoalFromSanitized,
   extractGoalTag,
   extractIntent,
-  normalizeGoalAction,
-  canonicalGoalKey,
+  // DELETED (PR2): normalizeGoalAction - Sterling normalizes
+  // DELETED (PR2): canonicalGoalKey - use Sterling committed_goal_prop_id
   sanitizeLLMOutput,
-  CANONICAL_ACTIONS,
-  NORMALIZE_MAP_VERSION,
+  // DELETED (PR2): CANONICAL_ACTIONS - Sterling validates
+  // DELETED (PR2): NORMALIZE_MAP_VERSION - Sterling normalizes
 } from './goal-extractor';
 
 export type {
