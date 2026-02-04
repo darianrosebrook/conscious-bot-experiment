@@ -283,7 +283,25 @@ describe('Drive Tick', () => {
   // ==========================================
 
   describe('idempotency', () => {
-    it('skips when matching active task exists with progress', () => {
+    // DELETED (boundary fix): Fuzzy dedupe tests removed
+    // Fuzzy title matching was semantic substitution (violated I-BOUNDARY-1).
+    //
+    // Drive-tick thoughts lack Sterling identity (committedGoalPropId) because
+    // they're generated from internal drives, not LLM output processed by Sterling.
+    //
+    // Dedupe now happens downstream in thought-to-task converter using Sterling IDs.
+    // Drive-ticks are rare (idle-only), so duplicate risk is low.
+    //
+    // Tests removed:
+    // - 'skips when matching active task exists with progress'
+    // - 'skips when matching pending task exists at 0% progress'
+    // - 'falls back to fuzzy title match for legacy tasks without goalKey'
+    //
+    // Retained behavior: Drive-ticks always fire when idle conditions met.
+    // Downstream converter dedupes using identity hierarchy:
+    //   committedGoalPropId > committedIrDigest > envelopeId > fail-open
+
+    it('fires when idle conditions met (no drive-tick dedupe)', () => {
       const tasks = [{
         id: 'task-1',
         title: 'collect oak_log',
@@ -291,76 +309,10 @@ describe('Drive Tick', () => {
         status: 'active',
         type: 'gathering',
       }];
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).toBeNull();
-    });
-
-    it('skips when matching pending task exists at 0% progress', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'collect oak_log',
-        progress: 0,
-        status: 'pending',
-        type: 'gathering',
-      }];
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).toBeNull();
-    });
-
-    it('fires when no matching task exists', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'craft stone_pickaxe',
-        progress: 0.5,
-        status: 'active',
-        type: 'crafting',
-      }];
-      // Empty inventory → wants to collect oak_log, but task is for stone_pickaxe
+      // Drive-ticks no longer dedupe against existing tasks
       const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
       expect(result).not.toBeNull();
-    });
-
-    it('ignores completed/paused tasks for suppression check', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'collect oak_log',
-        progress: 1.0,
-        status: 'completed',
-        type: 'gathering',
-      }];
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).not.toBeNull();
-    });
-
-    // DELETED (PR2): goalKey deduplication test removed
-    // Behavior changed: now uses fuzzy title matching (action + target)
-    // instead of canonical goalKey matching
-
-    it('does not suppress when goalKey differs even if title has partial match', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'collect birch_log near oak trees',
-        progress: 0.5,
-        status: 'active',
-        type: 'gathering',
-        metadata: { goalKey: 'collect:birch_log' },
-      }];
-      // Empty inventory → wants collect:oak_log, task goalKey is collect:birch_log
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).not.toBeNull();
-    });
-
-    it('falls back to fuzzy title match for legacy tasks without goalKey', () => {
-      const tasks = [{
-        id: 'task-1',
-        title: 'collect oak_log',
-        progress: 0.3,
-        status: 'active',
-        type: 'gathering',
-        // no metadata.goalKey — legacy task
-      }];
-      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
-      expect(result).toBeNull();
+      expect(result?.metadata.thoughtType).toBe('drive-tick');
     });
   });
 

@@ -1782,22 +1782,13 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const drive = this.selectDrive(inventory, timeOfDay, context);
     if (!drive) return null;
 
-    // Idempotency: suppress if matching pending/active task already exists.
-    // Simple content-based dedupe (no semantic normalization - Sterling handles that).
-    // Recovery/stuck detection can be added later with createdAt/updatedAt timestamps.
-    const tasks = context.currentTasks ?? [];
-    const goalAction = drive.extractedGoal.action.toLowerCase();
-    const goalTarget = drive.extractedGoal.target.toLowerCase();
-
-    const matchingTask = tasks.find(t => {
-      if (t.status !== 'active' && t.status !== 'pending') return false;
-
-      // Fuzzy match: does task title contain both action and target?
-      const titleLower = (t.title || '').toLowerCase();
-      return titleLower.includes(goalAction) && titleLower.includes(goalTarget);
-    });
-
-    if (matchingTask) return null;
+    // Idempotency: Drive-tick thoughts lack Sterling identity (committedGoalPropId).
+    // Cannot dedupe semantically without reintroducing boundary violations.
+    // Accept duplicates here; downstream thought-to-task converter will dedupe
+    // using Sterling identity (committedGoalPropId, committedIrDigest, envelopeId).
+    //
+    // REMOVED: Fuzzy title matching (was semantic substitution - violates I-BOUNDARY-1).
+    // Drive-ticks are rare (idle-only), so duplicate risk is low in practice.
 
     // Fire drive tick
     this._lastDriveTickMs = now;
