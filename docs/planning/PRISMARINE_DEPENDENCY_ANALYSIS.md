@@ -8,8 +8,10 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 
 **Current Status**: Hybrid approach
 - ✅ **Replaced**: Asset extraction, texture atlases, blockstate processing
-- ⏳ **In Progress**: Custom shader system for animations and lighting
-- ❌ **Not Started**: Chunk meshing, entity rendering, physics simulation
+- ✅ **Replaced**: Skeletal entity animations (walk/idle cycles)
+- ✅ **Replaced**: POV switching and orbit controls
+- ⏳ **In Progress**: Custom shader system for lighting
+- ❌ **Not Started**: Chunk meshing, physics simulation
 
 ---
 
@@ -75,15 +77,55 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - Smooth day/night lighting interpolation
 - Direct JAR extraction eliminates NPM package version lag
 
-### 2.2 Viewer Patches ✅
+### 2.2 Viewer Source Customizations ✅
+
+**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/`
+
+We maintain our own source files that get injected into prismarine-viewer via pnpm patch and postinstall scripts. This gives us version control, debugging capability, and a clear migration path.
+
+| File | Mechanism | Purpose |
+|------|-----------|---------|
+| `index.js` | postinstall copy | POV toggle (F5), orbit controls, bot mesh in 3rd person |
+| `Entity.js` | pnpm patch | Store bone refs in `mesh.userData` for animation lookups |
+| `entities.js` | pnpm patch | Full skeletal animation system (walk/idle cycles) |
+| `viewer.js` | pnpm patch | Render loop with `updateAnimations(deltaTime)` call |
+| `animation-system.js` | reference | Standalone animation logic (importable) |
+
+**Patch Application**:
+```
+pnpm install
+  → pnpm patch applies Entity.js, entities.js, viewer.js
+  → postinstall runs rebuild-prismarine-viewer.cjs
+    → copies index.js to lib/index.js
+    → webpack rebuilds client bundle
+```
+
+### 2.3 Skeletal Animation System ✅
+
+**Location**: `packages/minecraft-interface/src/asset-pipeline/entity-animations.ts`
+
+Full TypeScript implementation with additional states beyond what's in the patch:
+
+| Animation | Biped | Quadruped | Notes |
+|-----------|-------|-----------|-------|
+| Idle | ✅ | ✅ | Subtle breathing/sway |
+| Walk | ✅ | ✅ | Leg swing, arm counterswing |
+| Run | ✅ | ❌ | Faster cycle, forward lean |
+| Jump | ✅ | ❌ | Crouch → extend → tuck |
+| Fall | ✅ | ❌ | Arms out for balance |
+
+**Supported Entities** (30+):
+- Biped: player, zombie, skeleton, creeper, enderman, villager, pillager, etc.
+- Quadruped: pig, cow, sheep, wolf, horse, fox, rabbit, etc.
+
+### 2.4 Viewer Patches (Legacy) ✅
 
 **Location**: `patches/prismarine-viewer@1.33.0.patch`
 
-| Patch | Purpose |
-|-------|---------|
-| Entity.js | Graceful handling of unknown entities (trader_llama, glow_squid) |
-| version.js | Extended version support (1.21.5 - 1.21.9) |
-| webpack.config.js | Browser compatibility fixes |
+The pnpm patch file is auto-generated from our source files. Contains diffs for:
+- `viewer/lib/entity/Entity.js` - Bone storage for animation
+- `viewer/lib/entities.js` - Animation system injection
+- `viewer/lib/viewer.js` - Render loop integration
 
 ---
 
@@ -124,26 +166,27 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - Face culling optimization (only render visible faces)
 - Biome color interpolation (smooth transitions)
 
-### 3.2 Entity Rendering (Medium Effort)
+### 3.2 Entity Rendering (Partially Complete)
 
-**Current**: prismarine-viewer's entity system
+**Current**: Hybrid - prismarine-viewer base + our animation system
 
-**Functionality**:
-- Load entity models (JSON format)
-- Apply textures and animations
-- Handle equipment rendering (armor, held items)
+**What We've Built** ✅:
+- Skeletal animation system with AnimationMixer per entity
+- Walk/idle cycles for bipeds and quadrupeds
+- Velocity-based animation state machine
+- Smooth crossfade transitions (0.2s)
+- Run/jump/fall animations (TypeScript, not yet in patch)
+
+**What Still Needs Work**:
+- Equipment rendering (armor, held items)
 - Player skin loading and capes
-
-**Replacement Estimate**:
-- Lines of code: 1000-1500
-- Time: 1-2 weeks
-- Complexity: Medium
-
-**Key Challenges**:
-- Skeletal animation system
-- Equipment layering
 - Name tag rendering
 - Shadow projection
+
+**Remaining Estimate**:
+- Lines of code: 500-800
+- Time: 1 week
+- Complexity: Medium
 
 ### 3.3 World Renderer Integration (Medium Effort)
 
@@ -177,42 +220,84 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 
 ## 4. Replacement Roadmap
 
-### Phase 1: Foundation (Current) ✅
+### Phase 1: Foundation ✅ Complete
 - [x] Custom asset extraction from Minecraft JARs
 - [x] Texture atlas generation with UV mapping
 - [x] BlockState and model resolution
 - [x] Animated texture shader (interpolation + sequences)
 - [x] Day/night lighting interpolation
+- [x] Frame sequence lookup for non-sequential animations
 
-### Phase 2: Enhanced Rendering (Next)
+### Phase 2: Entity Animation ✅ Complete
+- [x] Skeletal animation system architecture
+- [x] Biped walk/idle cycles (legs, arms, body)
+- [x] Quadruped walk/idle cycles (trot gait)
+- [x] Velocity-based animation state machine
+- [x] Smooth crossfade transitions
+- [x] POV toggle (1st/3rd person)
+- [x] Orbit controls for 3rd person view
+
+### Phase 3: Enhanced Rendering (Next)
 - [ ] Custom sky rendering (sun/moon position, stars)
 - [ ] Weather effects (rain, snow particles)
 - [ ] Block lighting (torch light, redstone)
 - [ ] Water/lava special rendering (transparency, flow)
+- [ ] Entity equipment rendering (armor, held items)
+- [ ] Player skin loading
 
-### Phase 3: Chunk Meshing (Future)
+### Phase 4: Chunk Meshing (Future)
 - [ ] WebWorker-based mesh generation
 - [ ] Face culling algorithm
 - [ ] Ambient occlusion calculation
 - [ ] Multipart model resolver
 - [ ] Biome tinting system
 
-### Phase 4: Entity System (Future)
-- [ ] Entity model loader
-- [ ] Skeletal animation system
-- [ ] Equipment rendering
-- [ ] Player skins and capes
-
 ### Phase 5: Full Independence (Long-term)
 - [ ] Remove prismarine-viewer dependency entirely
 - [ ] Custom WebSocket protocol for viewer communication
-- [ ] Standalone viewer package
+- [ ] Standalone viewer package (`@conscious-bot/viewer`)
 
 ---
 
-## 5. Code Locations Reference
+## 5. Code Organization Strategy
 
-### Current Prismarine Usage
+### 5.1 Directory Structure
+
+Our migration code is organized into three tiers:
+
+```
+packages/minecraft-interface/src/
+├── prismarine-viewer-src/          # Tier 1: Direct patches (JS, injected into viewer)
+│   ├── README.md                   # Documentation + regeneration instructions
+│   ├── index.js                    # Client entry (POV, orbit controls)
+│   ├── Entity.js                   # Bone storage for animations
+│   ├── entities.js                 # Animation system + entity manager
+│   ├── viewer.js                   # Render loop integration
+│   └── animation-system.js         # Standalone animation logic
+│
+├── asset-pipeline/                 # Tier 2: TypeScript enhancements (server-side)
+│   ├── entity-animations.ts        # Full animation system (authoritative)
+│   ├── animated-material.ts        # Custom shaders
+│   ├── viewer-integration.ts       # Hooks into prismarine-viewer
+│   └── ...                         # Asset extraction, atlas, etc.
+│
+└── custom-viewer/                  # Tier 3: Future full replacement (not started)
+    ├── index.ts                    # Entry point
+    ├── renderer/                   # Three.js scene management
+    ├── meshing/                    # Chunk mesh generation
+    ├── entities/                   # Entity rendering
+    └── shaders/                    # GLSL shaders
+```
+
+### 5.2 Three-Tier Migration Strategy
+
+| Tier | Purpose | When to Use |
+|------|---------|-------------|
+| **Tier 1: Patches** | Minimal changes to prismarine-viewer | Small fixes, feature injection |
+| **Tier 2: Enhancements** | TypeScript code that integrates with viewer | Complex logic, server-side processing |
+| **Tier 3: Replacement** | Full custom implementation | When prismarine-viewer is deprecated |
+
+### 5.3 Current Prismarine Usage
 
 ```
 packages/minecraft-interface/
@@ -221,11 +306,12 @@ packages/minecraft-interface/
 └── src/viewer-enhancements.ts          # Wraps prismarine-viewer with custom features
 ```
 
-### Custom Replacements
+### 5.4 Custom Replacements (Asset Pipeline)
 
 ```
 packages/minecraft-interface/src/asset-pipeline/
 ├── animated-material.ts                # Custom Three.js shader (replaces basic animation)
+├── entity-animations.ts                # Skeletal animation system
 ├── atlas-builder.ts                    # Texture atlas (replaces minecraft-assets)
 ├── blockstates-builder.ts              # Model resolution (replaces viewer's loader)
 ├── asset-extractor.ts                  # JAR extraction (replaces minecraft-assets)
@@ -236,20 +322,48 @@ packages/minecraft-interface/src/asset-pipeline/
 └── pipeline.ts                         # Orchestrates generation
 ```
 
+### 5.5 Patch Regeneration Workflow
+
+When modifying viewer customizations:
+
+```bash
+# 1. Edit source files in prismarine-viewer-src/
+vim src/prismarine-viewer-src/entities.js
+
+# 2. Start a fresh patch session
+pnpm patch prismarine-viewer@1.33.0
+
+# 3. Copy source files to patch directory
+cp src/prismarine-viewer-src/Entity.js \
+   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/entity/
+cp src/prismarine-viewer-src/entities.js \
+   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
+cp src/prismarine-viewer-src/viewer.js \
+   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
+
+# 4. Commit the patch
+pnpm patch-commit 'node_modules/.pnpm_patches/prismarine-viewer@1.33.0'
+
+# 5. Verify
+pnpm install
+```
+
 ---
 
 ## 6. Decision Matrix
 
-| Component | Replace? | Reason |
-|-----------|----------|--------|
-| Asset extraction | ✅ Yes | Version independence, done |
-| Texture atlases | ✅ Yes | Custom animations, done |
-| Animated materials | ✅ Yes | Frame sequences, day/night, done |
-| Chunk meshing | ⏳ Maybe | High effort, prismarine-viewer works |
-| Entity rendering | ⏳ Maybe | Medium effort, nice-to-have |
-| Physics | ❌ No | Works well, pathfinding depends on it |
-| Protocol handling | ❌ No | mineflayer is excellent, no benefit |
-| World storage | ❌ No | prismarine-world is solid |
+| Component | Status | Reason |
+|-----------|--------|--------|
+| Asset extraction | ✅ Done | Version independence achieved |
+| Texture atlases | ✅ Done | Custom animations working |
+| Animated materials | ✅ Done | Frame sequences, day/night working |
+| Skeletal animations | ✅ Done | Walk/idle cycles for 30+ entities |
+| POV switching | ✅ Done | 1st/3rd person with orbit controls |
+| Entity equipment | ⏳ Next | Armor, held items needed |
+| Chunk meshing | ⏳ Maybe | High effort, current solution works |
+| Physics | ❌ Keep | Pathfinding depends on it |
+| Protocol handling | ❌ Keep | mineflayer is excellent |
+| World storage | ❌ Keep | prismarine-world is solid |
 
 ---
 
