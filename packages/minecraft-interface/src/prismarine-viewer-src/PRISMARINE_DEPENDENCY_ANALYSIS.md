@@ -90,11 +90,12 @@ We maintain our own source files that get injected into prismarine-viewer via pn
 
 | File | Mechanism | Purpose |
 |------|-----------|---------|
-| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom asset URLs, animated material, equipment events, sky |
+| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom assets, animated material, equipment, sky, weather |
 | `animated-material-client.js` | postinstall copy | Custom ShaderMaterial for water/lava/fire animations |
 | `equipment-renderer.js` | postinstall copy | Equipment mesh factory for armor/held items |
 | `sky-renderer.js` | postinstall copy | Procedural sky dome with sun/moon/stars |
-| `mineflayer.js` | postinstall copy | Enhanced server-side with equipment/time events |
+| `weather-system.js` | postinstall copy | GPU-accelerated rain/snow/lightning particles |
+| `mineflayer.js` | postinstall copy | Enhanced server-side with equipment/time/weather events |
 | `Entity.js` | postinstall copy | Store bone refs in `mesh.userData` for animation lookups |
 | `entities.js` | postinstall copy | Skeletal animation + equipment manager integration |
 | `viewer.js` | pnpm patch | Render loop with `updateAnimations(deltaTime)` call |
@@ -108,6 +109,8 @@ pnpm install
     → copies index.js to lib/index.js
     → copies animated-material-client.js to lib/
     → copies equipment-renderer.js to lib/ and viewer/lib/
+    → copies sky-renderer.js to lib/
+    → copies weather-system.js to lib/
     → copies mineflayer.js to lib/
     → copies Entity.js to viewer/lib/entity/
     → copies entities.js to viewer/lib/
@@ -273,7 +276,54 @@ MC Time    Real Time     Sky State
 - `socket.on('time')` updates sun/moon positions
 - Renders first (behind everything) via `renderOrder: -1000`
 
-### 2.8 Viewer Patches (pnpm) ✅
+### 2.8 Weather Particle System ✅
+
+**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/weather-system.js`
+
+GPU-accelerated particle system for rain and snow effects:
+
+| Feature | Implementation | Notes |
+|---------|---------------|-------|
+| Rain | 15000 particles, vertical streaks | Fast vertical fall with wind drift |
+| Snow | 8000 particles, soft circles | Slow fall with swaying motion |
+| Lightning | Intensity system | Random flashes during thunderstorms |
+| Transitions | Smooth fade | 0.5 seconds between weather states |
+
+**Particle Shader Approach**:
+```glsl
+// Rain: Time-based vertical fall with wrapping
+float fallDistance = mod(time * speed + offset * height, height);
+pos.y = cameraPos.y + height * 0.5 - fallDistance;
+
+// Keep particles in area around camera (no pop-in)
+pos.x = cameraPos.x + mod(pos.x - cameraPos.x + areaSize * 0.5, areaSize) - areaSize * 0.5;
+```
+
+**Weather States from Minecraft**:
+- `clear`: No precipitation, full star brightness
+- `rain`: Rain or snow particles (biome-dependent), dimmed stars
+- `thunder`: Rain + random lightning flashes
+
+**Integration Flow**:
+```
+Server (mineflayer.js)                 Client (index.js)
+─────────────────────                  ─────────────────────
+bot.on('weatherUpdate')           →    socket.on('weather')
+       ↓                                      ↓
+emitWeather(state)                      weatherSystem.setWeather()
+       ↓                                      ↓
+socket.emit('weather', {...})           skyRenderer.setStarBrightness()
+                                              ↓
+                                        animate() → weatherSystem.update(dt)
+```
+
+**Performance Optimizations**:
+- Single draw call per particle system (THREE.Points)
+- GPU-based particle movement via uniforms
+- Distance-based fade for depth perception
+- Particles recycle when falling below ground
+
+### 2.9 Viewer Patches (pnpm) ✅
 
 **Location**: `patches/prismarine-viewer@1.33.0.patch`
 
@@ -402,7 +452,7 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - [x] Custom asset server for MC 1.21.5-1.21.9
 - [x] Entity equipment rendering (armor, held items)
 - [x] Custom sky rendering (sun/moon position, stars)
-- [ ] Weather effects (rain, snow particles)
+- [x] Weather effects (rain, snow, lightning particles)
 - [ ] Block lighting (torch light, redstone)
 
 ### Phase 4: Chunk Meshing (Future)

@@ -127,6 +127,20 @@ function run() {
       console.log('[rebuild-prismarine-viewer] Copied sky-renderer.js (procedural sky)');
     }
 
+    // Copy weather-system.js to lib/ for rain/snow particles
+    const weatherSystemSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'weather-system.js'
+    );
+    const weatherSystemDest = path.join(pvRoot, 'lib', 'weather-system.js');
+    if (fs.existsSync(weatherSystemSrc)) {
+      fs.copyFileSync(weatherSystemSrc, weatherSystemDest);
+      console.log('[rebuild-prismarine-viewer] Copied weather-system.js (rain/snow)');
+    }
+
     // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
     // This runs in background and doesn't block postinstall
     const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');

@@ -197,6 +197,53 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
     }
 
     // ========================================================================
+    // ENHANCED: Weather state tracking
+    // ========================================================================
+
+    let currentWeatherState = 'clear'
+
+    function emitWeather (state) {
+      if (state === currentWeatherState) return
+      currentWeatherState = state
+
+      // Determine if current biome is cold (for snow vs rain)
+      // Default to rain; biome detection can be added later
+      const isSnowBiome = false // TODO: Check bot.world biome temperature
+
+      socket.emit('weather', {
+        state: state,
+        isSnowBiome: isSnowBiome
+      })
+
+      console.log(`[mineflayer] Weather changed to: ${state}`)
+    }
+
+    // Listen for rain state changes
+    bot.on('rain', () => {
+      emitWeather('rain')
+    })
+
+    // Note: mineflayer emits 'rain' for both start and state; we check isRaining
+    bot.on('weatherUpdate', () => {
+      if (bot.isRaining) {
+        if (bot.thunderState > 0) {
+          emitWeather('thunder')
+        } else {
+          emitWeather('rain')
+        }
+      } else {
+        emitWeather('clear')
+      }
+    })
+
+    // Send initial weather state
+    setTimeout(() => {
+      if (bot.isRaining) {
+        emitWeather(bot.thunderState > 0 ? 'thunder' : 'rain')
+      }
+    }, 1000)
+
+    // ========================================================================
     // Bot Position & Movement
     // ========================================================================
 

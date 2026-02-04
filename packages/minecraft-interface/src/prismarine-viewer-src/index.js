@@ -32,6 +32,7 @@ const {
   updateDayProgress
 } = require('./animated-material-client')
 const { createSkyRenderer } = require('./sky-renderer')
+const { createWeatherSystem } = require('./weather-system')
 
 const io = require('socket.io-client')
 const socket = io({
@@ -49,6 +50,11 @@ let currentWorldTime = 6000 // Default to noon
 // Sky Renderer State
 // ============================================================================
 let skyRenderer = null
+
+// ============================================================================
+// Weather System State
+// ============================================================================
+let weatherSystem = null
 
 // ============================================================================
 // Custom Asset Integration
@@ -165,6 +171,28 @@ socket.on('entityEquipment', (data) => {
   }
 })
 
+/**
+ * Handle weather updates from the server.
+ * This is emitted when weather changes (clear/rain/thunder).
+ */
+socket.on('weather', (data) => {
+  if (!data || !weatherSystem) return
+
+  try {
+    weatherSystem.setWeather(data.state, data.isSnowBiome || false)
+
+    // Dim stars during rain/thunder
+    if (skyRenderer) {
+      const starBrightness = data.state === 'clear' ? 1.0 : 0.2
+      skyRenderer.setStarBrightness(starBrightness)
+    }
+
+    console.log(`[viewer] Weather changed to: ${data.state}${data.isSnowBiome ? ' (snow)' : ''}`)
+  } catch (e) {
+    console.warn('[viewer] Failed to update weather:', e)
+  }
+})
+
 let firstPositionUpdate = true
 let viewMode = 'first' // 'first' | 'third'
 let controls = null
@@ -251,6 +279,17 @@ function animate () {
   // Update sky dome position to follow camera
   if (skyRenderer) {
     skyRenderer.update()
+
+    // Apply lightning flash to sky if active
+    if (weatherSystem && weatherSystem.getLightningIntensity() > 0) {
+      // Could flash the sky brighter during lightning
+      // For now, just track the intensity
+    }
+  }
+
+  // Update weather particles
+  if (weatherSystem) {
+    weatherSystem.update(deltaTime)
   }
 
   if (controls) controls.update()
@@ -309,6 +348,12 @@ socket.on('version', async (version) => {
     skyRenderer = createSkyRenderer(viewer.scene, viewer.camera)
     skyRenderer.setTime(currentWorldTime)
     console.log('[viewer] Sky renderer initialized')
+  }
+
+  // Initialize weather system
+  if (!weatherSystem) {
+    weatherSystem = createWeatherSystem(viewer.scene, viewer.camera)
+    console.log('[viewer] Weather system initialized')
   }
 
   firstPositionUpdate = true
