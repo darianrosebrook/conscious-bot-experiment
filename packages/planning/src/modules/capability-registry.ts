@@ -70,11 +70,24 @@ export class CapabilityRegistry implements ICapabilityRegistry {
  * Minimal implementation for modular-server (register, registerLeaf only).
  */
 export class MCPLeafRegistry implements ICapabilityRegistry {
+  private leafCount = 0;
+  private capabilityCount = 0;
+
   register(name: string, _handler: any): void {
-    console.log(`Registered: ${name}`);
+    this.capabilityCount++;
+    // Verbose logging removed - summary logged by caller
   }
 
   registerLeaf(name: string, _leaf: any): void {
-    console.log(`Registered leaf: ${name}`);
+    this.leafCount++;
+    // Verbose logging removed - summary logged by caller
+  }
+
+  getLeafCount(): number {
+    return this.leafCount;
+  }
+
+  getCapabilityCount(): number {
+    return this.capabilityCount;
   }
 }

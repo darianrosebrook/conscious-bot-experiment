@@ -115,7 +115,7 @@ export class ServerConfiguration {
    */
   mountRouter(path: string, router: Router): void {
     this.app.use(path, router);
-    console.log(`[Server] Router mounted at ${path}`);
+    // Verbose logging suppressed - routers mounted at /, /mcp
   }
 
   /**
@@ -174,7 +174,7 @@ export class ServerConfiguration {
         if (this._mcpIntegration) {
           const status = this._mcpIntegration.getStatus();
           console.log(
-            `[Server] MCP Integration: ${status.initialized ? '✅ Active' : '❌ Inactive'}`
+            `[Server] MCP Integration: ${status.initialized ? 'active' : 'inactive'}`
           );
         }
 

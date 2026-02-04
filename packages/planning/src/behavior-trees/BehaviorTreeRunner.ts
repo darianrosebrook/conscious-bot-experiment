@@ -366,7 +366,7 @@ export class BehaviorTreeRunner extends EventEmitter {
    */
   storeInlineDefinition(optionId: string, definition: any): void {
     this.inlineDefinitions.set(optionId, definition);
-    console.log(`📝 Stored inline BT definition for ${optionId}`);
+    // Verbose logging suppressed - see MCP options summary
   }
 }
 

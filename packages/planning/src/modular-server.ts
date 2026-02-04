@@ -3721,7 +3721,7 @@ async function startServer() {
       const { eventDrivenThoughtGenerator: generator } =
         await import('@conscious-bot/cognition');
       eventDrivenThoughtGenerator = generator;
-      console.log('✅ Event-driven thought generator initialized in server');
+      console.log('[Planning] Event-driven thought generator initialized');
     } catch (error) {
       console.warn(
         '⚠️ Failed to initialize event-driven thought generator:',
@@ -3736,7 +3736,7 @@ async function startServer() {
         baseIntervalMs: parseInt(process.env.KEEPALIVE_INTERVAL_MS || '120000', 10),
         cognitionServiceUrl: process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
       });
-      console.log('✅ Keep-alive integration initialized');
+      console.log('[Planning] Keep-alive integration initialized');
     } catch (error) {
       console.warn(
         '⚠️ Failed to initialize keep-alive integration:',
@@ -3761,7 +3761,7 @@ async function startServer() {
       // invalidate leaf cache
       (getAvailableLeaves as any).__cache = undefined;
       (getAvailableLeaves as any).__ts = 0;
-      console.log('✅ MCP integration initialized successfully');
+      console.log('[Planning] MCP integration initialized');
     } catch (error) {
       console.warn(
         '⚠️ MCP integration failed to initialize, continuing without it:',
@@ -3773,7 +3773,7 @@ async function startServer() {
     try {
       const mcpIntegration = serverConfig.getMCPIntegration();
       if (mcpIntegration) {
-        console.log('🔗 Connecting MCP integration to behavior tree runner...');
+        // MCP integration connected to behavior tree runner (verbose logging removed)
 
         // Add the behavior tree runner to the MCP integration so it can execute options
         (mcpIntegration as any).btRunner = btRunner;
@@ -3792,7 +3792,7 @@ async function startServer() {
     try {
       const mcpIntegration = serverConfig.getMCPIntegration();
       if (mcpIntegration) {
-        console.log('Registering core Minecraft leaves in planning...');
+        // Registering core Minecraft leaves (verbose logging suppressed)
 
         // Create minimal placeholder LeafImpls so BT options can register and validate
 
@@ -4016,7 +4016,7 @@ async function startServer() {
 
       // Seed MCP options (permissions inferred by MCP server when possible)
       try {
-        console.log('📝 Seeding default MCP options...');
+        // Seed default MCP options (verbose logging suppressed)
 
         // Now seed MCP options that use the expected leaves
         const defaultOptions = [
@@ -4115,21 +4115,22 @@ async function startServer() {
           },
         ];
 
+        let registered = 0;
+        let promoted = 0;
+        const failed: string[] = [];
+
         for (const opt of defaultOptions) {
           try {
             const reg = await mcpIntegration.registerOption(opt);
             if (reg.success) {
-              console.log(`✅ Registered MCP option: ${opt.name}`);
+              registered++;
 
               // Also register the option with the behavior tree runner
               try {
-                console.log(
-                  `🔗 Adding MCP option ${opt.name} to behavior tree runner`
-                );
                 btRunner.storeInlineDefinition(opt.id, opt.btDefinition);
               } catch (btError) {
                 console.warn(
-                  `⚠️ Failed to connect option ${opt.name} to behavior tree runner:`,
+                  `[Planning] Failed to connect option ${opt.name} to BT runner:`,
                   btError
                 );
               }
@@ -4138,37 +4139,31 @@ async function startServer() {
                 const id = (reg.data as string) || opt.id;
                 const promo = await mcpIntegration.promoteOption(id);
                 if (promo.success) {
-                  console.log(`🚀 Promoted MCP option to active: ${id}`);
-                } else {
-                  console.warn(
-                    `⚠️ MCP option promotion failed for ${id}: ${promo.error}`
-                  );
+                  promoted++;
                 }
-              } catch (e) {
-                console.warn(
-                  `⚠️ MCP option promotion error for ${opt.name}:`,
-                  e
-                );
+              } catch {
+                // Promotion failure is not critical
               }
             } else {
-              console.warn(
-                `⚠️ MCP option registration failed for ${opt.name}: ${reg.error}`
-              );
-              // Log more details about the failure
-              console.warn(`  - Option ID: ${opt.id}`);
-              console.warn(
-                `  - Action: ${opt.btDefinition?.root?.children?.[0]?.action || 'unknown'}`
-              );
+              failed.push(opt.name);
             }
           } catch (error) {
+            failed.push(opt.name);
             console.error(
-              `[Executor] Error during MCP option registration for ${opt.name}:`,
+              `[Planning] Error during MCP option registration for ${opt.name}:`,
               error
             );
           }
         }
+
+        // Summary log
+        const optionNames = defaultOptions.map(o => o.name).join(', ');
+        console.log(`[Planning] MCP options seeded: ${registered}/${defaultOptions.length} registered, ${promoted} promoted (${optionNames})`);
+        if (failed.length > 0) {
+          console.warn(`[Planning] MCP options failed: ${failed.join(', ')}`);
+        }
       } catch (e) {
-        console.warn('⚠️ Seeding default MCP options failed:', e);
+        console.warn('[Planning] Seeding default MCP options failed:', e);
       }
     }
 
@@ -4177,7 +4172,7 @@ async function startServer() {
 
     // Start the server
     await serverConfig.start();
-    console.log('✅ Server started successfully');
+    console.log('[Planning] Server started successfully');
 
     // --- Service readiness gate (never blocks boot) ---
     const readiness = new ReadinessMonitor({
@@ -4281,7 +4276,7 @@ async function startServer() {
       '[Planning] Using event-driven thought generation (cognition) instead of legacy cognitive processor.'
     );
 
-    console.log('✅ Modular planning server started successfully');
+    console.log('[Planning] Modular planning server started successfully');
   } catch (error) {
     console.error('[Planning] Failed to start modular planning server:', error);
     process.exit(1);
