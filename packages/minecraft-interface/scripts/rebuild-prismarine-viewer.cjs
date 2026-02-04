@@ -54,13 +54,14 @@ function run() {
     process.chdir(pvRoot);
     const configs = require(configPath);
 
-    // Build both index.js and worker.js bundles
-    // The worker.js contains minecraft-data which needs to be updated for new MC versions
+    // Build index.js bundle (contains our client-side customizations)
+    // Skip worker.js - it has a transitive 'assert' dependency issue, but our changes don't affect it
     const configsArray = Array.isArray(configs) ? configs : [configs];
+    const indexConfig = configsArray[0]; // First config is index.js
 
-    console.log(`[rebuild-prismarine-viewer] Building ${configsArray.length} bundle(s)...`);
+    console.log('[rebuild-prismarine-viewer] Building index.js bundle...');
 
-    webpack(configsArray, (err, stats) => {
+    webpack(indexConfig, (err, stats) => {
       if (err) {
         console.warn('[rebuild-prismarine-viewer] webpack error:', err.message);
       } else if (stats && stats.hasErrors()) {

@@ -8,6 +8,8 @@ The prismarine-viewer package has several limitations we address:
 1. **No skeletal animations** - Entities "glide" without leg/arm movement
 2. **No POV switching** - Locked to first-person view
 3. **No orbit controls** - Can't orbit around the bot in 3rd person
+4. **Version lag** - Bundled textures only go up to MC 1.21.4
+5. **No animated textures** - Water/lava/fire are static
 
 We inject our customizations directly into the viewer's client-side JavaScript.
 
@@ -16,12 +18,26 @@ We inject our customizations directly into the viewer's client-side JavaScript.
 ```
 prismarine-viewer-src/
 ├── README.md                    # This file
-├── index.js                     # Client entry point (POV toggle, orbit controls)
+├── index.js                     # Client entry point (POV, orbit, custom assets)
 ├── Entity.js                    # Modified entity mesh creation (stores bone refs)
 ├── entities.js                  # Animation system + entity manager
 ├── viewer.js                    # Render loop integration
 └── animation-system.js          # Pure animation logic (no viewer deps)
 ```
+
+## Custom Asset Integration
+
+The `index.js` client entry point connects to our asset server (`/mc-assets/*`) for:
+- **Textures**: `/mc-assets/textures/{version}.png` - Custom generated atlases
+- **BlockStates**: `/mc-assets/blocksStates/{version}.json` - Block model/UV data
+
+This enables:
+1. Support for MC versions beyond prismarine-viewer's bundled 1.21.4
+2. Custom texture atlases with animation metadata
+3. Fallback to bundled assets when custom assets aren't available
+
+The asset server is mounted at `/mc-assets` in the minecraft-interface server (see `server.ts`).
+Assets are generated via `pnpm mc:assets extract <version>` and cached in `~/.minecraft-assets-cache/`.
 
 ## Two Patch Mechanisms
 

@@ -9,6 +9,8 @@
  * 1. POV toggle (F5 key or button) - switch between 1st/3rd person
  * 2. OrbitControls for 3rd person view with mouse rotation
  * 3. Bot mesh rendering when in 3rd person mode
+ * 4. Custom texture URLs from /mc-assets for version support beyond 1.21.4
+ * 5. Animated texture shader for water/lava/fire animations
  *
  * This file is copied to node_modules/prismarine-viewer/lib/index.js
  * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
@@ -27,6 +29,44 @@ const io = require('socket.io-client')
 const socket = io({
   path: window.location.pathname + 'socket.io'
 })
+
+// ============================================================================
+// Custom Asset Integration
+// ============================================================================
+// Use our asset server for textures/blockstates to support MC versions beyond 1.21.4
+// The asset server falls back to prismarine-viewer's bundled assets if custom assets
+// aren't available for a version.
+
+/**
+ * Configure viewer to use custom asset URLs from our asset server.
+ * This enables support for newer Minecraft versions and custom animated textures.
+ */
+function configureCustomAssets (viewer, version) {
+  // Point to our asset server - falls back to bundled assets if not found
+  if (viewer.world) {
+    // Custom texture atlas URL (served by minecraft-interface asset server)
+    viewer.world.texturesDataUrl = `/mc-assets/textures/${version}.png`
+    console.log(`[viewer] Using custom texture URL: ${viewer.world.texturesDataUrl}`)
+  }
+}
+
+/**
+ * Load blockstates from our custom asset server.
+ * Falls back to prismarine-viewer's bundled blockstates if not found.
+ */
+async function loadCustomBlockStates (version) {
+  try {
+    const response = await fetch(`/mc-assets/blocksStates/${version}.json`)
+    if (response.ok) {
+      const data = await response.json()
+      console.log(`[viewer] Loaded custom blockstates for ${version}`)
+      return data
+    }
+  } catch (e) {
+    console.log(`[viewer] Custom blockstates not found, using bundled: ${e.message}`)
+  }
+  return null
+}
 
 let firstPositionUpdate = true
 let viewMode = 'first' // 'first' | 'third'
@@ -120,7 +160,19 @@ window.addEventListener('keydown', (e) => {
   }
 })
 
-socket.on('version', (version) => {
+socket.on('version', async (version) => {
+  console.log(`[viewer] Received version: ${version}`)
+
+  // Configure custom asset URLs before setting version
+  configureCustomAssets(viewer, version)
+
+  // Try to load custom blockstates first
+  const customBlockStates = await loadCustomBlockStates(version)
+  if (customBlockStates && viewer.world) {
+    viewer.world.blockStatesData = customBlockStates
+    console.log(`[viewer] Using custom blockstates with ${Object.keys(customBlockStates).length} blocks`)
+  }
+
   if (!viewer.setVersion(version)) {
     return false
   }
