@@ -1,0 +1,123 @@
+[
+  {
+    "name": "explicit_goal_tag",
+    "description": "Single explicit goal tag with observation text",
+    "input": "I see trees nearby. [GOAL: craft wood]",
+    "expected": {
+      "envelope_id": "3051772209c11dc7",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: craft wood]",
+          "span": [20, 38]
+        }
+      ],
+      "sanitized_text": "I see trees nearby."
+    }
+  },
+  {
+    "name": "no_goal_tag",
+    "description": "Natural language without explicit goal markers",
+    "input": "I want to explore the area.",
+    "expected": {
+      "envelope_id": "0152e19fa0e683d3",
+      "declared_markers": [],
+      "sanitized_text": "I want to explore the area."
+    }
+  },
+  {
+    "name": "multiple_markers",
+    "description": "Multiple goal tags in sequence",
+    "input": "[GOAL: mine stone] then [GOAL: craft pickaxe]",
+    "expected": {
+      "envelope_id": "9002439e5ba7dca6",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: mine stone]",
+          "span": [0, 18]
+        },
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: craft pickaxe]",
+          "span": [24, 45]
+        }
+      ],
+      "sanitized_text": "then"
+    }
+  },
+  {
+    "name": "goal_with_code_fences",
+    "description": "Goal tag wrapped in code fences (common LLM artifact)",
+    "input": "```\nI will gather resources. [GOAL: collect wood]\n```",
+    "expected": {
+      "envelope_id": "1f526e61b41873bb",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: collect wood]",
+          "span": [29, 49]
+        }
+      ],
+      "sanitized_text": "I will gather resources."
+    }
+  },
+  {
+    "name": "lowercase_goal",
+    "description": "Goal tag with lowercase 'goal' (should still be extracted)",
+    "input": "I notice caves. [goal: explore caves]",
+    "expected": {
+      "envelope_id": "794e33802c9fe839",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[goal: explore caves]",
+          "span": [16, 37]
+        }
+      ],
+      "sanitized_text": "I notice caves."
+    }
+  },
+  {
+    "name": "unnormalized_action",
+    "description": "Action verb that would be normalized by Sterling (dig->mine), but TS must NOT normalize",
+    "input": "[GOAL: dig stone]",
+    "expected": {
+      "envelope_id": "75f4824f4ae892ba",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: dig stone]",
+          "span": [0, 17]
+        }
+      ],
+      "sanitized_text": ""
+    }
+  },
+  {
+    "name": "natural_language_intent",
+    "description": "Natural language expressing intent without explicit tag - TS must NOT create markers",
+    "input": "I intend to explore the nearby mountains.",
+    "expected": {
+      "envelope_id": "7202414e03c7a06a",
+      "declared_markers": [],
+      "sanitized_text": "I intend to explore the nearby mountains."
+    }
+  },
+  {
+    "name": "thinking_block",
+    "description": "Text with thinking block that should be stripped",
+    "input": "<think>I should gather wood first.</think>I will start gathering resources. [GOAL: gather wood]",
+    "expected": {
+      "envelope_id": "14e90d6791c5e854",
+      "declared_markers": [
+        {
+          "marker_type": "GOAL_TAG",
+          "verbatim_text": "[GOAL: gather wood]",
+          "span": [76, 95]
+        }
+      ],
+      "sanitized_text": "I will start gathering resources."
+    }
+  }
+]

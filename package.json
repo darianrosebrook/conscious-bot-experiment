@@ -99,6 +99,16 @@
     },
     "patchedDependencies": {
       "prismarine-viewer@1.33.0": "patches/prismarine-viewer@1.33.0.patch"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "canvas",
+      "cpu-features",
+      "esbuild",
+      "node",
+      "protobufjs",
+      "ssh2"
+    ]
   }
 }

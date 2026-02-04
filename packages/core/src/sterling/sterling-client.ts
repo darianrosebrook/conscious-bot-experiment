@@ -22,6 +22,7 @@ import type {
   SterlingDiscoveredNode,
   SterlingSearchEdge,
   SterlingSolutionEdge,
+  SterlingLanguageReducerResult,
 } from './types';
 
 // ============================================================================
@@ -668,6 +669,70 @@ export class SterlingClient extends EventEmitter {
         this.recordFailure();
         resolve({
           found: false,
+          error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    });
+  }
+
+  /**
+   * Send a language_io.reduce command to Sterling.
+   *
+   * This is the canonical entry point for language processing through Sterling.
+   * Sends an envelope and waits for a language_io.result response.
+   *
+   * @param envelope - The LanguageIOEnvelope to reduce
+   * @param timeoutMs - Optional timeout (default: 10000ms)
+   * @returns The reducer result or an error
+   */
+  async sendLanguageIOReduce(
+    envelope: Record<string, unknown>,
+    timeoutMs: number = 10000,
+  ): Promise<{ success: true; result: SterlingLanguageReducerResult } | { success: false; error: string }> {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Client not available' };
+    }
+
+    const requestId = this.nextRequestId();
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        this.recordFailure();
+        resolve({ success: false, error: `Language IO reduce timeout after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      const handler = (msg: SterlingMessage) => {
+        // Filter on requestId and type
+        if (msg.type === 'language_io.result' && msg.requestId === requestId) {
+          cleanup();
+          this.recordSuccess();
+          resolve({ success: true, result: msg.result });
+        } else if (msg.type === 'error' && (msg as { requestId?: string }).requestId === requestId) {
+          cleanup();
+          this.recordFailure();
+          resolve({ success: false, error: (msg as { message: string }).message });
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'language_io.reduce',
+          envelope,
+          requestId,
+        });
+      } catch (err) {
+        cleanup();
+        this.recordFailure();
+        resolve({
+          success: false,
           error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
         });
       }

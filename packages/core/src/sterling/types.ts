@@ -57,9 +57,49 @@ export interface SterlingRequest {
     | 'switch_domain'
     | 'update_config'
     | 'register_domain_declaration_v1'
-    | 'get_domain_declaration_v1';
+    | 'get_domain_declaration_v1'
+    | 'language_io.reduce';
   domain?: SterlingDomain;
   [key: string]: unknown;
+}
+
+// ============================================================================
+// Language IO Types (for language_io.reduce command)
+// ============================================================================
+
+/** Response from language_io.reduce command */
+export interface SterlingLanguageIOResultMessage {
+  type: 'language_io.result';
+  requestId: string;
+  result: SterlingLanguageReducerResult;
+}
+
+/** Sterling's language reducer result (matches Python schema) */
+export interface SterlingLanguageReducerResult {
+  schema_id: string;
+  schema_version: string;
+  source_envelope_id: string;
+  committed_ir_digest: string;
+  committed_goal_prop_id: string | null;
+  has_committed_propositions: boolean;
+  advisory: SterlingAdvisory | null;
+  grounding: SterlingGrounding | null;
+  reducer_version: string;
+}
+
+/** Advisory from Sterling (routing hints, NOT authority) */
+export interface SterlingAdvisory {
+  intent_family: string;
+  intent_type: string;
+  confidence: number;
+  suggested_domain: string;
+}
+
+/** Grounding result from Sterling */
+export interface SterlingGrounding {
+  passed: boolean;
+  reason: string;
+  world_snapshot_digest: string | null;
 }
 
 // ============================================================================
@@ -207,7 +247,8 @@ export type SterlingMessage =
   | SterlingInitializationResultMessage
   | SterlingDeclarationRegisteredMessage
   | SterlingDeclarationRetrievedMessage
-  | SterlingDeclarationNotFoundMessage;
+  | SterlingDeclarationNotFoundMessage
+  | SterlingLanguageIOResultMessage;
 
 // ============================================================================
 // Aggregated Results

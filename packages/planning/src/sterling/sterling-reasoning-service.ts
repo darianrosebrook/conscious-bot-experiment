@@ -145,6 +145,16 @@ export class SterlingReasoningService {
     return this._connectionNonce;
   }
 
+  /**
+   * Get the underlying SterlingClient instance.
+   *
+   * This is used to wire the SterlingTransportAdapter for language IO processing.
+   * The same WebSocket connection serves both planning (solvers) and language IO.
+   */
+  getClient(): SterlingClient {
+    return this.client;
+  }
+
   // --------------------------------------------------------------------------
   // Reasoning Methods
   // --------------------------------------------------------------------------

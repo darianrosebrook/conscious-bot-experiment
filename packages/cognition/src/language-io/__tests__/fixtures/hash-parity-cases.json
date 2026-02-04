@@ -1,0 +1,56 @@
+[
+  {
+    "name": "ascii_simple",
+    "description": "Simple ASCII text",
+    "input": "hello world",
+    "python_computed_hash": "b94d27b9934d3e08"
+  },
+  {
+    "name": "unicode_emoji",
+    "description": "Text with Unicode emoji (multi-byte UTF-8)",
+    "input": "hello 🌍",
+    "python_computed_hash": "92de6bbfa52e6cfa"
+  },
+  {
+    "name": "leading_trailing_space",
+    "description": "Text with leading and trailing whitespace",
+    "input": "  spaced  ",
+    "python_computed_hash": "1dcc24a14a6bf8cb"
+  },
+  {
+    "name": "empty_string",
+    "description": "Empty string edge case",
+    "input": "",
+    "python_computed_hash": "e3b0c44298fc1c14"
+  },
+  {
+    "name": "newlines",
+    "description": "Text with newlines",
+    "input": "line1\nline2\nline3",
+    "python_computed_hash": "6bb6a5ad9b9c43a7"
+  },
+  {
+    "name": "unicode_japanese",
+    "description": "Japanese characters (multi-byte UTF-8)",
+    "input": "こんにちは",
+    "python_computed_hash": "125aeadf27b0459b"
+  },
+  {
+    "name": "mixed_unicode",
+    "description": "Mixed ASCII and Unicode",
+    "input": "hello こんにちは 🌍 world",
+    "python_computed_hash": "54d6b3532c16b27a"
+  },
+  {
+    "name": "goal_tag_simple",
+    "description": "Simple goal tag (the common case)",
+    "input": "I see trees nearby. [GOAL: craft wood]",
+    "python_computed_hash": "3051772209c11dc7"
+  },
+  {
+    "name": "multiple_goals",
+    "description": "Multiple goal tags",
+    "input": "[GOAL: mine stone] then [GOAL: craft pickaxe]",
+    "python_computed_hash": "9002439e5ba7dca6"
+  }
+]

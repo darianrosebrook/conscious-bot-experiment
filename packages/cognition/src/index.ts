@@ -112,6 +112,34 @@ export type {
   GroundingResult,
 } from './reasoning-surface';
 
+// Sterling Language IO (semantic authority boundary)
+export {
+  SterlingLanguageIOClient,
+  getDefaultLanguageIOClient,
+  setDefaultLanguageIOClient,
+  SterlingTransportAdapter,
+  MockLanguageIOTransport,
+  getDefaultTransport,
+  setDefaultTransport,
+  canConvertToTask,
+  requireExecutable,
+  ExecutionGateError,
+  buildLanguageIOEnvelope,
+  parseReducerResult,
+} from './language-io';
+export type {
+  LanguageIOClientConfig,
+  ReduceOptions,
+  ReduceResult,
+  ReduceError,
+  FallbackResult,
+  LanguageIOTransport,
+  LanguageIOReduceResponse,
+  SterlingClientLike,
+  ReducerResultView,
+  LanguageIOEnvelopeV1,
+} from './language-io';
+
 // Core Types (specific exports to avoid conflicts)
 export type {
   LLMConfig,

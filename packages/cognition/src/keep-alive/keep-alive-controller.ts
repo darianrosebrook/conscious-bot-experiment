@@ -25,6 +25,7 @@ import { EventEmitter } from 'events';
 import {
   renderSituationFrame,
   processLLMOutput,
+  processLLMOutputAsync,
   thoughtContextToFrameContext,
   FRAME_PROFILES,
   type FrameProfile,
@@ -33,6 +34,7 @@ import {
   type GoalTagV1,
   type EligibilityOutput,
   type GroundingResult,
+  type SterlingPipelineResult,
 } from '../reasoning-surface';
 
 // Import keep-alive modules
@@ -147,6 +149,17 @@ export interface KeepAliveThought {
   timestamp: number;
   /** Frame profile used */
   frameProfile: string;
+  // Sterling metadata (for observability)
+  /** Whether Sterling was used for semantic processing */
+  sterlingUsed?: boolean;
+  /** Whether the result is executable (from Sterling) */
+  isExecutable?: boolean;
+  /** Block reason if not executable */
+  blockReason?: string | null;
+  /** Envelope ID for provenance */
+  envelopeId?: string | null;
+  /** Processing duration in ms */
+  processingDurationMs?: number;
 }
 
 /**
@@ -358,6 +371,13 @@ export class KeepAliveController extends EventEmitter {
 
   /**
    * Generate a thought from the current context.
+   *
+   * This method now uses the Sterling-based async pipeline (processLLMOutputAsync)
+   * which routes through Sterling for semantic authority. If Sterling is unavailable,
+   * it falls back to the legacy sync pipeline.
+   *
+   * Key invariant: Advisory-only outputs (natural language intent without explicit
+   * [GOAL:] tags) will have isExecutable=false and will NOT be converted to tasks.
    */
   private async generateThought(context: KeepAliveContext): Promise<KeepAliveThought> {
     // Convert context to frame context
@@ -382,10 +402,11 @@ export class KeepAliveController extends EventEmitter {
     // Build grounding context
     const groundingContext = this.buildGroundingContext(context);
 
-    // Process output using production reasoning surface
-    const result = processLLMOutput(rawOutput, groundingContext);
+    // Process output using Sterling-based async pipeline
+    // This is the CANONICAL path that routes through Sterling for semantic authority
+    const result = await processLLMOutputAsync(rawOutput, groundingContext);
 
-    // Create thought object
+    // Create thought object with Sterling metadata
     const thought: KeepAliveThought = {
       id: `keepalive-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       content: result.text,
@@ -396,6 +417,12 @@ export class KeepAliveController extends EventEmitter {
       source: 'keepalive',
       timestamp: Date.now(),
       frameProfile: this.frameProfile.name,
+      // Sterling metadata for observability
+      sterlingUsed: result.sterlingUsed,
+      isExecutable: result.isExecutable,
+      blockReason: result.blockReason,
+      envelopeId: result.envelopeId,
+      processingDurationMs: result.durationMs,
     };
 
     // Validate invariants
