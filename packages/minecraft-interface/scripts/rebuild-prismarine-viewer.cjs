@@ -141,6 +141,27 @@ function run() {
       console.log('[rebuild-prismarine-viewer] Copied weather-system.js (rain/snow)');
     }
 
+    // Copy entity-extras.js to lib/ for name tags, capes, shadows
+    const entityExtrasSrc = path.join(
+      __dirname,
+      '..',
+      'src',
+      'prismarine-viewer-src',
+      'entity-extras.js'
+    );
+    const entityExtrasDest = path.join(pvRoot, 'lib', 'entity-extras.js');
+    if (fs.existsSync(entityExtrasSrc)) {
+      fs.copyFileSync(entityExtrasSrc, entityExtrasDest);
+      console.log('[rebuild-prismarine-viewer] Copied entity-extras.js (name tags/capes/shadows)');
+    }
+
+    // Also copy entity-extras.js to viewer/lib/ for entities.js imports
+    const entityExtrasViewerDest = path.join(pvRoot, 'viewer', 'lib', 'entity-extras.js');
+    if (fs.existsSync(entityExtrasSrc)) {
+      fs.copyFileSync(entityExtrasSrc, entityExtrasViewerDest);
+      console.log('[rebuild-prismarine-viewer] Copied entity-extras.js to viewer/lib/');
+    }
+
     // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
     // This runs in background and doesn't block postinstall
     const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');

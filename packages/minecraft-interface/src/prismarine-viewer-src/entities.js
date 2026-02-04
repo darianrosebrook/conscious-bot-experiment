@@ -15,6 +15,7 @@ const TWEEN = require('@tweenjs/tween.js')
 const Entity = require('./entity/Entity')
 const { dispose3 } = require('./dispose')
 const { EquipmentManager } = require('./equipment-renderer')
+const { EntityExtrasManager } = require('./entity-extras')
 
 const { createCanvas } = require('canvas')
 
@@ -241,27 +242,11 @@ function getEntityMesh (entity, scene) {
   if (entity.name) {
     try {
       const e = new Entity('1.16.4', entity.name, scene)
-
-      if (entity.username !== undefined) {
-        const canvas = createCanvas(500, 100)
-
-        const ctx = canvas.getContext('2d')
-        ctx.font = '50pt Arial'
-        ctx.fillStyle = '#000000'
-        ctx.textAlign = 'left'
-        ctx.textBaseline = 'top'
-
-        const txt = entity.username
-        ctx.fillText(txt, 100, 0)
-
-        const tex = new THREE.Texture(canvas)
-        tex.needsUpdate = true
-        const spriteMat = new THREE.SpriteMaterial({ map: tex })
-        const sprite = new THREE.Sprite(spriteMat)
-        sprite.position.y += entity.height + 0.6
-
-        e.mesh.add(sprite)
-      }
+      // Store entity info in userData for extras setup
+      e.mesh.userData.entityName = entity.name
+      e.mesh.userData.entityUsername = entity.username
+      e.mesh.userData.entityHeight = entity.height || 1.8
+      e.mesh.userData.entityWidth = entity.width || 0.6
       return e.mesh
     } catch (err) {
       console.log(err)
@@ -272,6 +257,10 @@ function getEntityMesh (entity, scene) {
   geometry.translate(0, entity.height / 2, 0)
   const material = new THREE.MeshBasicMaterial({ color: 0xff00ff })
   const cube = new THREE.Mesh(geometry, material)
+  // Store entity info for fallback entities too
+  cube.userData.entityHeight = entity.height
+  cube.userData.entityWidth = entity.width
+  cube.userData.entityUsername = entity.username
   return cube
 }
 
@@ -280,8 +269,9 @@ function getEntityMesh (entity, scene) {
 // ============================================================================
 
 class Entities {
-  constructor (scene) {
+  constructor (scene, camera) {
     this.scene = scene
+    this.camera = camera // Store camera reference for name tag updates
     this.entities = {}
     // Animation system
     this.animationMixers = new Map() // entityId -> THREE.AnimationMixer
@@ -290,6 +280,15 @@ class Entities {
     this.lastUpdateTime = performance.now()
     // Equipment rendering system
     this.equipmentManagers = new Map() // entityId -> EquipmentManager
+    // Entity extras (name tags, capes, shadows)
+    this.extrasManagers = new Map() // entityId -> EntityExtrasManager
+  }
+
+  /**
+   * Set camera reference (called from viewer after construction)
+   */
+  setCamera (camera) {
+    this.camera = camera
   }
 
   clear () {
@@ -307,6 +306,11 @@ class Entities {
       manager.dispose()
     }
     this.equipmentManagers.clear()
+    // Clear extras managers
+    for (const manager of this.extrasManagers.values()) {
+      manager.dispose()
+    }
+    this.extrasManagers.clear()
   }
 
   /**
@@ -413,6 +417,19 @@ class Entities {
 
       // Set up equipment manager for new entity
       this.equipmentManagers.set(entity.id, new EquipmentManager())
+
+      // Set up entity extras (name tags, shadows, capes)
+      const extrasManager = new EntityExtrasManager()
+      const isPlayer = entity.name === 'player' || mesh.userData.entityName === 'player'
+      extrasManager.setup(mesh, {
+        name: entity.username || mesh.userData.entityUsername,
+        height: entity.height || mesh.userData.entityHeight || 1.8,
+        width: entity.width || mesh.userData.entityWidth || 0.6,
+        showCape: isPlayer, // Only players get capes for now
+        capeColor: 0x2244aa,
+        showShadow: true
+      })
+      this.extrasManagers.set(entity.id, extrasManager)
     }
 
     const e = this.entities[entity.id]
@@ -430,6 +447,12 @@ class Entities {
       if (equipmentManager) {
         equipmentManager.dispose()
         this.equipmentManagers.delete(entity.id)
+      }
+      // Clean up extras manager
+      const extrasManager = this.extrasManagers.get(entity.id)
+      if (extrasManager) {
+        extrasManager.dispose()
+        this.extrasManagers.delete(entity.id)
       }
       return
     }
@@ -483,6 +506,24 @@ class Entities {
   updateAnimations (deltaTime) {
     for (const mixer of this.animationMixers.values()) {
       mixer.update(deltaTime)
+    }
+
+    // Update entity extras (name tags, capes, shadows)
+    if (this.camera) {
+      for (const [entityId, extrasManager] of this.extrasManagers) {
+        const mesh = this.entities[entityId]
+        if (!mesh) continue
+
+        // Get entity state for velocity
+        const state = this.entityStates.get(entityId)
+        const velocity = state ? calculateAnimationSpeed(state.velocity) / 5.0 : 0
+
+        // Get world position
+        const worldPos = new THREE.Vector3()
+        mesh.getWorldPosition(worldPos)
+
+        extrasManager.update(this.camera, worldPos, deltaTime, velocity)
+      }
     }
   }
 }

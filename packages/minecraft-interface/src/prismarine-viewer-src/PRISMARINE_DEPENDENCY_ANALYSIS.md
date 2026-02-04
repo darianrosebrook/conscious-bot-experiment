@@ -95,9 +95,10 @@ We maintain our own source files that get injected into prismarine-viewer via pn
 | `equipment-renderer.js` | postinstall copy | Equipment mesh factory for armor/held items |
 | `sky-renderer.js` | postinstall copy | Procedural sky dome with sun/moon/stars |
 | `weather-system.js` | postinstall copy | GPU-accelerated rain/snow/lightning particles |
+| `entity-extras.js` | postinstall copy | Name tags, capes, and blob shadows for entities |
 | `mineflayer.js` | postinstall copy | Enhanced server-side with equipment/time/weather events |
 | `Entity.js` | postinstall copy | Store bone refs in `mesh.userData` for animation lookups |
-| `entities.js` | postinstall copy | Skeletal animation + equipment manager integration |
+| `entities.js` | postinstall copy | Skeletal animation + equipment + extras integration |
 | `viewer.js` | pnpm patch | Render loop with `updateAnimations(deltaTime)` call |
 | `animation-system.js` | reference | Standalone animation logic (importable) |
 
@@ -111,6 +112,7 @@ pnpm install
     → copies equipment-renderer.js to lib/ and viewer/lib/
     → copies sky-renderer.js to lib/
     → copies weather-system.js to lib/
+    → copies entity-extras.js to lib/ and viewer/lib/
     → copies mineflayer.js to lib/
     → copies Entity.js to viewer/lib/entity/
     → copies entities.js to viewer/lib/
@@ -323,7 +325,57 @@ socket.emit('weather', {...})           skyRenderer.setStarBrightness()
 - Distance-based fade for depth perception
 - Particles recycle when falling below ground
 
-### 2.9 Viewer Patches (pnpm) ✅
+### 2.9 Entity Extras System ✅
+
+**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/entity-extras.js`
+
+Comprehensive entity visual enhancement system with three components:
+
+| Component | Implementation | Notes |
+|-----------|---------------|-------|
+| Name Tags | Canvas-based billboard sprites | Distance fade, camera-facing |
+| Capes | Animated plane with cloth shader | Wave simulation, velocity-aware |
+| Shadows | Blob shadow with gradient texture | Height-based fade and scale |
+
+**Name Tag Features**:
+- Canvas rendering with rounded background
+- Distance-based opacity fade (32-64 blocks)
+- Distance-based scaling for consistent screen size
+- `depthTest: false` ensures visibility through geometry
+
+**Cape Animation Shader**:
+```glsl
+// Multi-frequency wave for realistic cloth
+float wave1 = sin(time * 3.0 + uv.y * 6.0) * 0.5;
+float wave2 = sin(time * 5.0 + uv.y * 10.0 + uv.x * 2.0) * 0.25;
+float totalWave = (wave1 + wave2) * waveStrength * (0.5 + velocity * 0.5);
+pos.z += totalWave;
+```
+
+**Shadow System**:
+- Radial gradient texture for soft edges
+- Opacity and scale tied to entity height above ground
+- Maximum shadow height: 10 blocks (fully transparent above)
+- `depthWrite: false` prevents z-fighting
+
+**Integration with Entities Manager**:
+```javascript
+// In entities.js constructor
+this.extrasManagers = new Map() // entityId -> EntityExtrasManager
+
+// On entity spawn
+extrasManager.setup(mesh, {
+  name: entity.username,
+  height: entity.height,
+  showCape: isPlayer,
+  showShadow: true
+})
+
+// In updateAnimations() each frame
+extrasManager.update(camera, worldPos, deltaTime, velocity)
+```
+
+### 2.10 Viewer Patches (pnpm) ✅
 
 **Location**: `patches/prismarine-viewer@1.33.0.patch`
 
@@ -382,19 +434,20 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - Smooth crossfade transitions (0.2s)
 - Run/jump/fall animations (TypeScript, not yet in patch)
 
-**What Still Needs Work**:
-- Equipment rendering (armor, held items)
-- Cape rendering
-- Name tag rendering
-- Shadow projection
-
 **What's Now Working** ✅:
 - Player skins (via Microsoft auth + ONLINE_MODE)
+- Equipment rendering (armor, held items)
+- Cape rendering (animated cloth simulation)
+- Name tag rendering (billboard sprites with distance fade)
+- Shadow projection (blob shadows with height-based fade)
+
+**What Still Needs Work**:
+- Run/jump/fall animations (TypeScript code exists, needs wiring to patch)
 
 **Remaining Estimate**:
-- Lines of code: 400-600
-- Time: 3-5 days
-- Complexity: Medium
+- Lines of code: 100-200 (animation wiring only)
+- Time: 1-2 days
+- Complexity: Low
 
 ### 3.3 World Renderer Integration (Medium Effort)
 

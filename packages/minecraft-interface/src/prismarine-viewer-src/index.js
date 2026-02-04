@@ -358,6 +358,12 @@ socket.on('version', async (version) => {
 
   firstPositionUpdate = true
   viewer.listen(socket)
+
+  // Set camera reference on entities manager for name tag updates
+  if (viewer.entities && viewer.entities.setCamera) {
+    viewer.entities.setCamera(viewer.camera)
+  }
+
   createPOVButton()
 
   socket.on('position', ({ pos, addMesh, yaw, pitch }) => {
