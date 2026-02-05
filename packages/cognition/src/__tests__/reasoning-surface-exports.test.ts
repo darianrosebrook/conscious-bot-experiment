@@ -7,10 +7,24 @@
  * It verifies that internal consumers can import the symbols they rely on,
  * without testing the full behavior (that's covered elsewhere).
  *
+ * IMPORTANT: Type imports are compile-time checked. If any of these types
+ * are removed or renamed, `pnpm type-check` will fail on this file.
+ *
  * @author @darianrosebrook
  */
 
 import { describe, it, expect } from 'vitest';
+
+// Compile-time type contract (erased at runtime, checked by tsc)
+import type {
+  EligibilityOutput,
+  GroundingResult,
+  FrameContext,
+  ReasoningPipelineResult,
+  SterlingPipelineResult,
+  ReducerResultView,
+  ProcessLLMOutputAsyncOptions,
+} from '../reasoning-surface';
 
 describe('reasoning-surface exports contract', () => {
   it('exports all symbols used by internal consumers', async () => {
@@ -32,19 +46,18 @@ describe('reasoning-surface exports contract', () => {
     expect(reasoningSurface.SterlingLanguageIOClient).toBeTypeOf('function');
   });
 
-  it('exports type symbols (compile-time check)', async () => {
-    // This is a compile-time assertion - if these types don't exist, tsc fails
-    const reasoningSurface = await import('../reasoning-surface');
+  it('exports type symbols (compile-time check via tsc)', () => {
+    // This test is a compile-time assertion.
+    // If these imports fail, tsc will error during type-check phase.
+    // The test itself is a runtime no-op, but the import statements are checked.
 
-    // Type existence checks (runtime no-op, but ensures they're exported)
-    type EligibilityOutput = (typeof reasoningSurface)['EligibilityOutput'];
-    type GroundingResult = (typeof reasoningSurface)['GroundingResult'];
-    type FrameContext = (typeof reasoningSurface)['FrameContext'];
-    type ReasoningPipelineResult = (typeof reasoningSurface)['ReasoningPipelineResult'];
-    type SterlingPipelineResult = (typeof reasoningSurface)['SterlingPipelineResult'];
+    // We don't use dynamic import here because types are erased at runtime.
+    // Instead, this file must successfully compile for the test suite to run.
 
-    // If we got here without compile error, types are exported
-    expect(true).toBe(true);
+    // If you remove or rename any of these types from reasoning-surface,
+    // this file will fail to compile (pnpm type-check will catch it).
+
+    expect(true).toBe(true); // Test passes if file compiles
   });
 
   it('does NOT export deprecated goal-extractor functions after migration', async () => {

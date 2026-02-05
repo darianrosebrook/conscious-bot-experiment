@@ -262,16 +262,16 @@ let services = [
   },
   {
     name: 'MLX-LM Sidecar',
-    command: 'bash',
-    args: [
-      '-c',
-      'cd mlx-lm-sidecar && ./venv-mlx/bin/python mlx_server.py --port 5002',
-    ],
+    command: './venv-mlx/bin/python',
+    args: ['mlx_server.py', '--port', '5002'],
     port: 5002,
     healthUrl: 'http://localhost:5002/health',
     description: 'MLX-LM inference and embedding server for Apple Silicon',
     priority: 2, // Before Cognition and Memory need it
     dependencies: [],
+    cwd: path.join(projectRoot, 'mlx-lm-sidecar'),
+    // MLX takes ~60s to load models on first run; health endpoint returns 503 until ready
+    maxAttempts: 45, // 45 attempts * 2s = 90s timeout
   },
   // Dashboard should start last for monitoring all services
   {
@@ -979,20 +979,31 @@ async function mainWithProgress() {
                   env: baseEnv,
                 });
 
-                processes.push({ child, service });
+                // Track health status for summary banner
+                processes.push({ child, service, healthy: false });
 
                 subtask.output = 'Waiting for health check...';
                 await wait(service.priority <= 3 ? 5000 : 3000);
 
-                if (service.healthUrl) {
-                  await waitForService(service.healthUrl, service.name, 30);
-                } else if (service.wsUrl) {
-                  await waitForWebSocket(service.wsUrl, service.name, 30);
-                } else if (service.port) {
-                  await waitForPort(service.port, service.name, 30);
-                }
+                // Use service-specific maxAttempts or default to 30
+                const maxAttempts = service.maxAttempts || 30;
 
-                subtask.title = `${service.name} (Port ${service.port})`;
+                try {
+                  if (service.healthUrl) {
+                    await waitForService(service.healthUrl, service.name, maxAttempts);
+                  } else if (service.wsUrl) {
+                    await waitForWebSocket(service.wsUrl, service.name, maxAttempts);
+                  } else if (service.port) {
+                    await waitForPort(service.port, service.name, maxAttempts);
+                  }
+                  // Mark as healthy on success
+                  const proc = processes.find(p => p.service.name === service.name);
+                  if (proc) proc.healthy = true;
+                  subtask.title = `${service.name} (Port ${service.port})`;
+                } catch (error) {
+                  // Let listr2 show the failure, but don't mark as healthy
+                  throw error;
+                }
               },
             })),
             { concurrent: false, exitOnError: false }
@@ -1013,26 +1024,56 @@ async function mainWithProgress() {
   try {
     await tasks.run();
 
-    // Build compact status line for summary banner
+    // Build compact status line for summary banner using actual health results
+    const healthyCount = processes.filter(p => p.healthy).length;
+    const failedCount = processes.filter(p => !p.healthy).length;
+
     const statusLine = processes
-      .map(({ service }) => {
+      .map(({ service, healthy }) => {
         const shortName = service.name
           .replace(' Interface', '')
           .replace(' API', '')
           .replace(' Service', '')
           .replace('MLX-LM Sidecar', 'MLX')
           .toLowerCase();
-        return `${colors.green}${shortName}✓${colors.reset}`;
+        if (healthy) {
+          return `${colors.green}${shortName}✓${colors.reset}`;
+        } else {
+          return `${colors.red}${shortName}✗${colors.reset}`;
+        }
       })
       .join(' ');
+
+    // Build banner lines for both console and log capture
+    const bannerLines = [
+      '',
+      '═══════════════════════════════════════════════════════════════',
+      `  SERVICES: ${stripAnsi(statusLine.replace(/\x1b\[[0-9;]*m/g, (m) => m.includes('31m') ? '✗' : '✓').replace(/✓|✗/g, ''))}`,
+    ];
 
     // Print summary banner (matching verbose mode format)
     console.log('');
     console.log(`${colors.blue}═══════════════════════════════════════════════════════════════${colors.reset}`);
     console.log(`  SERVICES: ${statusLine}`);
     console.log(`${colors.blue}═══════════════════════════════════════════════════════════════${colors.reset}`);
-    console.log(`${colors.green}${colors.bold}✓ All ${processes.length} services ready${colors.reset}`);
+
+    if (failedCount > 0) {
+      console.log(`${colors.yellow}${colors.bold}⚠ ${healthyCount}/${processes.length} services ready (${failedCount} failed)${colors.reset}`);
+      const failedServices = processes.filter(p => !p.healthy).map(p => p.service.name);
+      console.log(`${colors.red}  Failed: ${failedServices.join(', ')}${colors.reset}`);
+      bannerLines.push(`⚠ ${healthyCount}/${processes.length} services ready (${failedCount} failed)`);
+      bannerLines.push(`  Failed: ${failedServices.join(', ')}`);
+    } else {
+      console.log(`${colors.green}${colors.bold}✓ All ${processes.length} services ready${colors.reset}`);
+      bannerLines.push(`✓ All ${processes.length} services ready`);
+    }
     console.log('');
+    bannerLines.push('');
+
+    // Capture banner to log buffer (for run.log)
+    for (const line of bannerLines) {
+      captureLog(line);
+    }
 
     // Enable streaming mode: attach stdout/stderr handlers to all processes
     // This is the "Phase 2" transition - boot phase is complete, now stream runtime logs
@@ -1365,11 +1406,7 @@ async function mainVerbose() {
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
       shell: service.cwd ? false : true,
-      cwd: service.cwd
-        ? service.cwd
-        : service.name === 'MLX-LM Sidecar'
-          ? `${process.cwd()}/mlx-lm-sidecar`
-          : process.cwd(),
+      cwd: service.cwd || process.cwd(),
       env: baseEnv,
     });
 
@@ -1419,13 +1456,16 @@ async function mainVerbose() {
       const startupDelay = service.priority <= 3 ? 5000 : 3000;
       await wait(startupDelay);
 
+      // Use service-specific maxAttempts or default to 30
+      const maxAttempts = service.maxAttempts || 30;
+
       // Check if service is healthy (HTTP healthUrl, WebSocket wsUrl, or TCP port)
       if (service.healthUrl) {
-        await waitForService(service.healthUrl, service.name, 30);
+        await waitForService(service.healthUrl, service.name, maxAttempts);
       } else if (service.wsUrl) {
-        await waitForWebSocket(service.wsUrl, service.name, 30);
+        await waitForWebSocket(service.wsUrl, service.name, maxAttempts);
       } else if (service.port) {
-        await waitForPort(service.port, service.name, 30);
+        await waitForPort(service.port, service.name, maxAttempts);
       }
 
       // Only mark as started if health check passes
@@ -1457,13 +1497,15 @@ async function mainVerbose() {
 
   // Check services with improved error handling
   for (const { service } of processes) {
+    // Use service-specific maxAttempts or default to 60
+    const maxAttempts = service.maxAttempts || 60;
     try {
       if (service.healthUrl) {
-        await waitForService(service.healthUrl, service.name);
+        await waitForService(service.healthUrl, service.name, maxAttempts);
       } else if (service.wsUrl) {
-        await waitForWebSocket(service.wsUrl, service.name);
+        await waitForWebSocket(service.wsUrl, service.name, maxAttempts);
       } else if (service.port) {
-        await waitForPort(service.port, service.name);
+        await waitForPort(service.port, service.name, maxAttempts);
       }
       healthResults.push({ service: service.name, status: 'healthy' });
       logService(service.name, 'Health check passed', 'HEALTH');
