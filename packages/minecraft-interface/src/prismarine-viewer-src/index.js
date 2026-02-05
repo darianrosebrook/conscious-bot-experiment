@@ -70,6 +70,11 @@ let botUsername = 'Bot' // Will be updated from server
 // The asset server falls back to prismarine-viewer's bundled assets if custom assets
 // aren't available for a version.
 
+// Asset server runs on minecraft-interface (port 3005), not the viewer (port 3006)
+// We need to use the correct port for asset requests
+const ASSET_SERVER_PORT = 3005
+const ASSET_SERVER_URL = `http://${window.location.hostname}:${ASSET_SERVER_PORT}`
+
 /**
  * Configure viewer to use custom asset URLs from our asset server.
  * This enables support for newer Minecraft versions and custom animated textures.
@@ -77,8 +82,8 @@ let botUsername = 'Bot' // Will be updated from server
 function configureCustomAssets (viewer, version) {
   // Point to our asset server - falls back to bundled assets if not found
   if (viewer.world) {
-    // Custom texture atlas URL (served by minecraft-interface asset server)
-    viewer.world.texturesDataUrl = `/mc-assets/textures/${version}.png`
+    // Custom texture atlas URL (served by minecraft-interface asset server on port 3005)
+    viewer.world.texturesDataUrl = `${ASSET_SERVER_URL}/mc-assets/textures/${version}.png`
     console.log(`[viewer] Using custom texture URL: ${viewer.world.texturesDataUrl}`)
   }
 }
@@ -89,7 +94,7 @@ function configureCustomAssets (viewer, version) {
  */
 async function loadCustomBlockStates (version) {
   try {
-    const response = await fetch(`/mc-assets/blocksStates/${version}.json`)
+    const response = await fetch(`${ASSET_SERVER_URL}/mc-assets/blocksStates/${version}.json`)
     if (response.ok) {
       const data = await response.json()
       console.log(`[viewer] Loaded custom blockstates for ${version}`)

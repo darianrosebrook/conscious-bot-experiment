@@ -172,7 +172,10 @@ const sseClients = new Set<Response>();
 // Middleware
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: [
+      'http://localhost:3000', 'http://127.0.0.1:3000',  // Dashboard
+      'http://localhost:3006', 'http://127.0.0.1:3006',  // Prismarine Viewer
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

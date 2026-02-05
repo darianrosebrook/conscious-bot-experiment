@@ -35,6 +35,20 @@ const ENFORCED_MODULES = [
  * - Migration target (what to use from language-io instead)
  * - Priority (order of migration)
  */
+
+/**
+ * MECHANICAL RATCHET: Maximum allowed grandfathered files.
+ *
+ * This constant enforces monotonic decrease. When you migrate a file:
+ * 1. Remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS
+ * 2. Update BASELINE_GRANDFATHERED_COUNT to new value (6, 5, 4, ...)
+ * 3. Do NOT increase this value - the list can only shrink
+ *
+ * If a test fails because a new file needs legacy imports, migrate it to
+ * language-io instead. Adding entries is not allowed.
+ */
+const BASELINE_GRANDFATHERED_COUNT = 7;
+
 const GRANDFATHERED_LEGACY_SANITIZER_IMPORTS = new Map<string, {
   currentUsage: string;
   migrationTarget: string;
@@ -111,12 +125,16 @@ describe('I-MIGRATION-1: No Legacy Sanitizer Imports', () => {
           // - export { x } from '../llm-output-sanitizer'
           // - export type { x } from '../llm-output-sanitizer'
           // - import '../llm-output-sanitizer' (side-effect import)
+          // - import('../llm-output-sanitizer') (dynamic import)
+          // - require('../llm-output-sanitizer') (CommonJS)
           const legacyImportPatterns = [
             /\bimport\s+(?:type\s+)?{[^}]+}\s+from\s+['"][^'"]*llm-output-sanitizer['"]/,
             /\bimport\s+(?:type\s+)?\*\s+as\s+\w+\s+from\s+['"][^'"]*llm-output-sanitizer['"]/,
             /\bimport\s+['"][^'"]*llm-output-sanitizer['"]/,
             /\bexport\s+(?:type\s+)?{[^}]+}\s+from\s+['"][^'"]*llm-output-sanitizer['"]/,
             /\bexport\s+\*\s+from\s+['"][^'"]*llm-output-sanitizer['"]/,
+            /\bimport\s*\(\s*['"][^'"]*llm-output-sanitizer['"]\s*\)/,  // Dynamic import
+            /\brequire\s*\(\s*['"][^'"]*llm-output-sanitizer['"]\s*\)/,  // CommonJS require
           ];
 
           const violations = legacyImportPatterns.filter(pattern => pattern.test(content));
@@ -174,15 +192,51 @@ describe('Grandfathered Legacy Imports (Strict Ratchet)', () => {
   it('enforces monotonic decrease (baseline = 7, must only shrink)', () => {
     const currentCount = GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.size;
 
-    // STRICT: Exact count, not ≤
+    // MECHANICAL RATCHET: Must match BASELINE_GRANDFATHERED_COUNT exactly
+    expect(currentCount).toBe(BASELINE_GRANDFATHERED_COUNT);
+
+    // MONOTONIC CONSTRAINT: Count must not exceed baseline (only shrink)
+    // This catches if someone adds a new entry without updating BASELINE_GRANDFATHERED_COUNT
+    expect(currentCount).toBeLessThanOrEqual(BASELINE_GRANDFATHERED_COUNT);
+
     // When you migrate a file:
     // 1. Remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS
-    // 2. Update this assertion to the new count (6, 5, 4, ...)
-    // 3. Document the migration in commit message
-    expect(currentCount).toBe(7);
+    // 2. Update BASELINE_GRANDFATHERED_COUNT to new value (6, 5, 4, ...)
+    // 3. Do NOT increase BASELINE_GRANDFATHERED_COUNT - only shrink
+  });
 
-    // Do NOT change this to allow growth.
-    // If a file needs legacy imports, migrate it to language-io instead.
+  it('enforces no new keys (strict subset check)', () => {
+    // The actual files must be an exact subset of (or equal to) the expected baseline.
+    // Any NEW file that isn't in expectedBaseline violates the "only shrink" rule.
+
+    const expectedBaseline = new Set([
+      'reasoning-surface/goal-extractor.ts',
+      'reasoning-surface/grounder.ts',
+      'reasoning-surface/eligibility.ts',
+      'thought-generator.ts',
+      'types.ts',
+      'index.ts',
+      'cognitive-core/llm-interface.ts',
+    ]);
+
+    const actualFiles = new Set(GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.keys());
+
+    // Check for unauthorized additions: any file in actualFiles that's NOT in expectedBaseline
+    const unauthorizedAdditions = [...actualFiles].filter(f => !expectedBaseline.has(f));
+
+    if (unauthorizedAdditions.length > 0) {
+      expect.fail(
+        `RATCHET VIOLATION: New files added to GRANDFATHERED_LEGACY_SANITIZER_IMPORTS:\n` +
+        `  ${unauthorizedAdditions.join('\n  ')}\n\n` +
+        `The grandfather list can ONLY shrink. Do NOT add new entries.\n` +
+        `If a file needs legacy imports, migrate it to language-io instead.`
+      );
+    }
+
+    expect(unauthorizedAdditions).toHaveLength(0);
+
+    // Also verify the count constraint
+    expect(actualFiles.size).toBeLessThanOrEqual(expectedBaseline.size);
   });
 
   it('documents migration order by priority', () => {

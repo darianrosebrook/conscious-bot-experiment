@@ -1,0 +1,381 @@
+# Prismarine-Viewer Replacement Analysis
+
+**Date**: 2026-02-03
+**Purpose**: Document what it would take to replace prismarine-viewer entirely and analyze the upstream dependency chain.
+
+---
+
+## Executive Summary
+
+**Current State**: We've built a custom asset pipeline that extracts textures/blockstates directly from Minecraft JARs, eliminating dependency on the `minecraft-assets` package. However, we still depend on `prismarine-viewer` for:
+- Three.js rendering scaffolding
+- WebWorker-based chunk mesh building
+- WebSocket bot↔browser communication
+- Browser client UI
+
+**Recommendation**: Keep prismarine-viewer as a rendering backend, but continue building independence in the asset/data layer. Full replacement has diminishing returns.
+
+---
+
+## 1. Current Dependency Chain
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CONSCIOUS-BOT                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌────────────────────────┐  │
+│  │  Custom Asset   │    │  prismarine-     │    │     mineflayer         │  │
+│  │    Pipeline     │───▶│    viewer        │◀───│   (bot interface)      │  │
+│  │                 │    │                  │    │                        │  │
+│  │ • JAR extraction│    │ • Three.js scene │    │ • MC protocol impl     │  │
+│  │ • Atlas builder │    │ • Worker.js mesh │    │ • World state          │  │
+│  │ • Blockstates   │    │ • WebSocket comm │    │ • Entity tracking      │  │
+│  │ • Animations    │    │ • Camera/controls│    │ • Events/actions       │  │
+│  └─────────────────┘    └──────────────────┘    └────────────────────────┘  │
+│           │                      │                         │                 │
+│           │                      │                         │                 │
+│           ▼                      ▼                         ▼                 │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌────────────────────────┐  │
+│  │  Mojang APIs    │    │     three.js     │    │  node-minecraft-       │  │
+│  │ (version manifest)   │  (WebGL render)  │    │    protocol            │  │
+│  └─────────────────┘    └──────────────────┘    └────────────────────────┘  │
+│                                  │                         │                 │
+│                                  │                         │                 │
+│                                  ▼                         ▼                 │
+│                         ┌──────────────────┐    ┌────────────────────────┐  │
+│                         │    minecraft-    │    │   prismarine-world     │  │
+│                         │      data        │    │   prismarine-chunk     │  │
+│                         │                  │    │   prismarine-block     │  │
+│                         │ (block registry, │    │   prismarine-biome     │  │
+│                         │  protocol defs)  │    │   prismarine-entity    │  │
+│                         └──────────────────┘    └────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. What We've Already Replaced
+
+| Component | Status | Our Implementation |
+|-----------|--------|-------------------|
+| Version management | ✅ Replaced | `version-resolver.ts` fetches Mojang manifest |
+| Asset source | ✅ Replaced | `jar-downloader.ts` + `asset-extractor.ts` |
+| Texture atlas | ✅ Replaced | `atlas-builder.ts` (canvas-based) |
+| Blockstate resolution | ✅ Replaced | `blockstates-builder.ts` |
+| Animated textures | ✅ Replaced | `animated-material.ts` (custom shader) |
+| Asset serving | ✅ Replaced | `asset-server.ts` (Express middleware) |
+
+**Result**: We no longer depend on `minecraft-assets` npm package for new Minecraft versions.
+
+---
+
+## 3. What Prismarine-Viewer Still Provides
+
+### 3.1 Worker.js (Chunk Mesh Building)
+
+**What it does**: Converts block data → Three.js BufferGeometry
+
+```
+Chunk Data (from mineflayer)
+       ↓
+  Parse palette
+       ↓
+  For each block:
+    • Resolve blockstate variant
+    • Fetch model definition
+    • Build face geometry (6 faces per cube, culled)
+    • Map UV coordinates to atlas
+    • Add vertex colors (AO, biome tint)
+       ↓
+  BufferGeometry (positions, normals, uvs, colors)
+       ↓
+  Transfer to main thread
+       ↓
+  THREE.Mesh
+```
+
+**Complexity to replace**: ~2000 lines of geometry logic, multipart conditions, model inheritance
+
+### 3.2 WebSocket Communication
+
+**What it does**: Relays bot state to browser in real-time
+
+```typescript
+// Server side (lib/mineflayer.js)
+bot.on('move', () => socket.emit('position', bot.entity.position))
+bot.world.on('blockUpdate', (block) => socket.emit('blockUpdate', block))
+
+// Client side
+socket.on('position', (pos) => viewer.camera.position.set(pos.x, pos.y, pos.z))
+socket.on('blockUpdate', (block) => viewer.world.setBlock(block))
+```
+
+**Complexity to replace**: ~500 lines, well-defined protocol
+
+### 3.3 Browser Client
+
+**What it does**: HTML/JS viewer application
+
+- Canvas setup and resize handling
+- Input handling (mouse, keyboard)
+- POV toggle (first/third person)
+- Orbit controls
+- Entity rendering
+
+**Complexity to replace**: ~1500 lines, mostly Three.js boilerplate
+
+### 3.4 Three.js Scene Management
+
+**What it does**: Organizes 3D objects, handles rendering
+
+```typescript
+scene.add(chunkMeshGroup)
+scene.add(entityGroup)
+scene.add(ambientLight)
+scene.add(directionalLight)
+renderer.render(scene, camera)
+```
+
+**Complexity to replace**: Would just be writing a new Three.js app
+
+---
+
+## 4. Full Replacement Architecture
+
+If we wanted to eliminate prismarine-viewer entirely:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      CUSTOM MINECRAFT VIEWER                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                        packages/viewer (NEW)                           │ │
+│  ├────────────────────────────────────────────────────────────────────────┤ │
+│  │                                                                        │ │
+│  │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐ │ │
+│  │  │  chunk-mesher/   │  │   renderer/      │  │    client/           │ │ │
+│  │  │                  │  │                  │  │                      │ │ │
+│  │  │  • worker.ts     │  │  • scene.ts      │  │  • index.html        │ │ │
+│  │  │  • geometry.ts   │  │  • materials.ts  │  │  • app.ts            │ │ │
+│  │  │  • culling.ts    │  │  • lighting.ts   │  │  • controls.ts       │ │ │
+│  │  │  • ao.ts         │  │  • camera.ts     │  │  • input.ts          │ │ │
+│  │  │  • tinting.ts    │  │  • entities.ts   │  │  • ui.ts             │ │ │
+│  │  └──────────────────┘  └──────────────────┘  └──────────────────────┘ │ │
+│  │           │                     │                      │              │ │
+│  │           └─────────────────────┼──────────────────────┘              │ │
+│  │                                 │                                     │ │
+│  │  ┌──────────────────────────────▼─────────────────────────────────┐  │ │
+│  │  │                      comms/                                     │  │ │
+│  │  │                                                                 │  │ │
+│  │  │  • websocket-server.ts (Node.js, receives mineflayer events)   │  │ │
+│  │  │  • websocket-client.ts (Browser, renders updates)              │  │ │
+│  │  │  • protocol.ts (message types, serialization)                  │  │ │
+│  │  └─────────────────────────────────────────────────────────────────┘  │ │
+│  │                                                                        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │              packages/minecraft-interface (EXISTING)                   │ │
+│  │                                                                        │ │
+│  │  • asset-pipeline/ (already built)                                    │ │
+│  │  • mineflayer integration (already built)                             │ │
+│  │  • viewer-enhancements.ts (port to new viewer)                        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Effort Estimation
+
+### 5.1 Components to Build
+
+| Component | Effort | Lines (est.) | Dependencies |
+|-----------|--------|--------------|--------------|
+| **Chunk mesher worker** | High | 1500-2000 | three.js, our blockstates |
+| **Geometry builder** | High | 800-1200 | - |
+| **AO calculation** | Medium | 200-300 | - |
+| **Biome tinting** | Low | 100-150 | minecraft-data biomes |
+| **Face culling** | Medium | 300-400 | - |
+| **Scene manager** | Low | 300-500 | three.js |
+| **Material system** | Done | - | our animated-material.ts |
+| **Camera controls** | Low | 200-300 | three.js OrbitControls |
+| **Entity renderer** | Medium | 500-800 | Entity model JSONs |
+| **WebSocket protocol** | Low | 300-400 | ws |
+| **Browser client** | Medium | 800-1200 | - |
+| **Build system** | Low | 100-200 | vite/esbuild |
+
+**Total estimated effort**: 5000-7500 lines of code, 2-4 weeks full-time
+
+### 5.2 Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Geometry bugs (holes, z-fighting) | High | High | Port existing worker.js logic |
+| Performance regression | Medium | High | Profile early, use SharedArrayBuffer |
+| Animation timing issues | Low | Medium | Already solved in our shader |
+| Entity model gaps | High | Low | Fallback to cubes (like now) |
+| Browser compatibility | Low | Medium | Stick to WebGL1 baseline |
+
+---
+
+## 6. Upstream Chain: What Else Could Be Replaced?
+
+### 6.1 mineflayer → Custom Protocol Client
+
+**What mineflayer provides**:
+- Minecraft protocol implementation (login, encryption, compression)
+- World state management (chunks, entities, players)
+- Bot actions (movement, block interaction, inventory)
+- Plugin system (pathfinder, collectblock, etc.)
+
+**Effort to replace**: 6+ months, 50k+ lines
+**Recommendation**: ❌ Keep mineflayer - mature, well-maintained, essential
+
+### 6.2 minecraft-data → Direct Mojang Data
+
+**What minecraft-data provides**:
+- Block registry (IDs, names, properties)
+- Item registry
+- Entity registry
+- Protocol definitions
+- Biome data
+
+**What we already do**:
+- Extract blockstates from JARs
+- Build our own atlas
+
+**Could additionally do**:
+- Parse `blocks.json` from JAR
+- Parse `registries.json` from JAR
+- Parse protocol from decompiled code
+
+**Effort**: Medium (1-2 weeks per data type)
+**Recommendation**: ⚠️ Partial - keep minecraft-data for protocol, use JARs for rendering data
+
+### 6.3 prismarine-* Libraries
+
+| Library | Purpose | Replace? |
+|---------|---------|----------|
+| prismarine-world | Chunk storage/access | No - tightly coupled to mineflayer |
+| prismarine-chunk | Chunk data structures | No - protocol-dependent |
+| prismarine-block | Block definitions | Maybe - could use JAR data |
+| prismarine-entity | Entity metadata | No - needed for spawning |
+| prismarine-nbt | NBT parsing | No - essential format |
+| prismarine-biome | Biome definitions | Maybe - in JAR |
+
+---
+
+## 7. Recommended Path Forward
+
+### Phase 1: Maintain Current Architecture (Now)
+- ✅ Custom asset pipeline (done)
+- ✅ Animated textures (done)
+- ✅ Patch for new versions (done)
+- Keep prismarine-viewer as rendering backend
+
+### Phase 2: Reduce Patch Surface (Optional)
+- Extract worker.js mesh logic into TypeScript module
+- Build meshes server-side, send pre-built geometry
+- Reduces browser-side complexity
+- **Effort**: 2-3 weeks
+
+### Phase 3: Custom Viewer (Only If Needed)
+Triggers for this phase:
+- prismarine-viewer becomes unmaintained
+- Need features PV can't support (VR, mobile, etc.)
+- Performance requirements exceed PV capabilities
+
+**If triggered**:
+1. Port chunk mesher to TypeScript worker
+2. Build minimal Three.js renderer
+3. Implement WebSocket protocol
+4. Create browser client
+5. Migrate viewer-enhancements.ts
+
+### Phase 4: Protocol Independence (Far Future)
+Only if mineflayer becomes unmaintained:
+- Implement Minecraft protocol directly
+- Likely never needed given PrismarineJS community
+
+---
+
+## 8. Key Insights
+
+`★ Insight ─────────────────────────────────────`
+**Why Full Replacement Has Diminishing Returns**:
+
+1. **Worker.js is the hard part** - The chunk mesher handles 100+ block variants, multipart rendering (redstone, fences), model inheritance, and AO calculation. This is 2000+ lines of battle-tested geometry code.
+
+2. **Three.js is unavoidable** - Any WebGL renderer will use Three.js or a similar library. Replacing prismarine-viewer doesn't eliminate this dependency.
+
+3. **The asset layer was the real bottleneck** - We solved the actual problem (new MC version support) with our custom pipeline. The rendering layer works fine.
+
+4. **Maintenance burden** - A custom viewer means maintaining geometry code when Minecraft changes block rendering (1.13 flattening, 1.14 lighting changes, etc.).
+`─────────────────────────────────────────────────`
+
+---
+
+## 9. Files Reference
+
+### Our Custom Pipeline (Already Built)
+```
+packages/minecraft-interface/src/asset-pipeline/
+├── index.ts                 # Exports
+├── types.ts                 # Type definitions (457 lines)
+├── version-resolver.ts      # Mojang manifest client
+├── jar-downloader.ts        # JAR download + cache
+├── asset-extractor.ts       # ZIP extraction (yauzl)
+├── atlas-builder.ts         # Texture atlas (canvas)
+├── blockstates-builder.ts   # Model resolution
+├── animated-material.ts     # Three.js shader
+├── viewer-integration.ts    # PV integration hooks
+├── asset-server.ts          # Express middleware
+└── pipeline.ts              # Orchestrator
+```
+
+### Prismarine-Viewer (Would Need Replacement)
+```
+node_modules/prismarine-viewer/
+├── lib/
+│   ├── mineflayer.js        # Bot integration
+│   └── index.js             # Entry point
+├── viewer/lib/
+│   ├── viewer.js            # Main viewer class
+│   ├── worldrenderer.js     # Chunk management
+│   ├── worker.js            # Mesh builder (WebWorker)
+│   ├── entities.js          # Entity rendering
+│   └── utils.web.js         # Browser utilities
+└── public/
+    ├── index.html           # Browser client
+    ├── index.js             # Bundled client JS
+    └── worker.js            # Bundled worker
+```
+
+---
+
+## 10. Decision Matrix
+
+| Scenario | Recommended Action |
+|----------|-------------------|
+| New MC version not in PV | Use our asset pipeline (current approach) |
+| PV has rendering bug | Patch or work around |
+| Need animated textures | Use our ShaderMaterial (done) |
+| PV unmaintained for 1+ year | Begin Phase 3 (custom viewer) |
+| Need VR/AR support | Custom viewer with WebXR |
+| Need mobile support | Custom viewer with touch controls |
+| Performance issues | Profile first, consider Phase 2 |
+
+---
+
+## Conclusion
+
+**The asset pipeline was the right investment.** It solved the actual problem (new version support) without the maintenance burden of a full viewer replacement.
+
+**Keep prismarine-viewer** as the rendering backend. It's stable, functional, and the community maintains it. Our patches are minimal (2 files, 36 lines).
+
+**Full replacement is possible** but offers diminishing returns. The 5000-7500 lines of code would need ongoing maintenance as Minecraft evolves. Only pursue if prismarine-viewer becomes unmaintained or requirements change significantly.

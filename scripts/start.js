@@ -14,10 +14,10 @@
  * Sterling: set STERLING_DIR or clone Sterling to ../sterling to enable.
  *
  * Usage:
- *   node scripts/start.js                  # Default (verbose)
+ *   node scripts/start.js                  # Default (progress bars during boot, streaming after)
+ *   node scripts/start.js --verbose        # Full verbose logging (no progress bars)
  *   node scripts/start.js --quiet          # Minimal output
- *   node scripts/start.js --progress       # Progress bars (listr2)
- *   node scripts/start.js --debug          # Extra verbose
+ *   node scripts/start.js --debug          # Extra verbose (like --verbose but with more detail)
  *   node scripts/start.js --production     # Production mode (no dev logs)
  *   node scripts/start.js --capture-logs   # Capture startup + 2min to run.log
  *   node scripts/start.js --capture-logs=0 # Capture startup only to run.log
@@ -38,15 +38,17 @@ const projectRoot = path.dirname(__dirname);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const OUTPUT_MODE = args.includes('--quiet')
-  ? 'quiet'
-  : args.includes('--progress')
-    ? 'progress'
+// Default is progress mode (progress bars during boot, streaming logs after)
+// Use --verbose for traditional full logging output
+let OUTPUT_MODE = args.includes('--verbose')
+  ? 'verbose'
+  : args.includes('--quiet')
+    ? 'quiet'
     : args.includes('--debug')
       ? 'debug'
       : args.includes('--production')
         ? 'production'
-        : 'verbose';
+        : 'progress';
 
 // Escape hatch: proceed temporarily even if some services fail
 // Usage: --proceed-temporarily="debugging minecraft-interface"
@@ -62,7 +64,9 @@ const PROCEED_TEMPORARILY = (() => {
 
 // Log capture: save startup logs to run.log
 // Usage: --capture-logs or --capture-logs=120 (seconds to capture after startup)
-// In verbose mode, captures 2 minutes of runtime logs after "Services are running"
+// Log capture: save startup logs to run.log
+// In verbose/debug mode, captures 2 minutes of runtime logs after "Services are running"
+// In progress mode (default), captures startup only
 const CAPTURE_LOGS = args.includes('--capture-logs') || args.some((a) => a.startsWith('--capture-logs='));
 const CAPTURE_DURATION_SEC = (() => {
   const argMatch = args.find((a) => a.startsWith('--capture-logs='));
@@ -70,7 +74,7 @@ const CAPTURE_DURATION_SEC = (() => {
     const value = parseInt(argMatch.split('=')[1], 10);
     return isNaN(value) ? 120 : value;
   }
-  // Default: 120 seconds (2 minutes) in verbose mode, 0 otherwise
+  // Default: 120 seconds (2 minutes) in verbose/debug mode, 0 (startup only) otherwise
   return OUTPUT_MODE === 'verbose' || OUTPUT_MODE === 'debug' ? 120 : 0;
 })();
 
@@ -1009,24 +1013,119 @@ async function mainWithProgress() {
   try {
     await tasks.run();
 
-    console.log('\n\nConscious Bot System Ready');
-    console.log('==========================\n');
-    services.forEach((s) => {
-      console.log(`  ${s.name.padEnd(20)} http://localhost:${s.port}`);
-    });
-    console.log('\nPress Ctrl+C to stop all services\n');
+    // Build compact status line for summary banner
+    const statusLine = processes
+      .map(({ service }) => {
+        const shortName = service.name
+          .replace(' Interface', '')
+          .replace(' API', '')
+          .replace(' Service', '')
+          .replace('MLX-LM Sidecar', 'MLX')
+          .toLowerCase();
+        return `${colors.green}${shortName}✓${colors.reset}`;
+      })
+      .join(' ');
 
-    // Graceful shutdown
+    // Print summary banner (matching verbose mode format)
+    console.log('');
+    console.log(`${colors.blue}═══════════════════════════════════════════════════════════════${colors.reset}`);
+    console.log(`  SERVICES: ${statusLine}`);
+    console.log(`${colors.blue}═══════════════════════════════════════════════════════════════${colors.reset}`);
+    console.log(`${colors.green}${colors.bold}✓ All ${processes.length} services ready${colors.reset}`);
+    console.log('');
+
+    // Enable streaming mode: attach stdout/stderr handlers to all processes
+    // This is the "Phase 2" transition - boot phase is complete, now stream runtime logs
+    for (const { child, service } of processes) {
+      child.stdout.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+          const trimmed = line.trimEnd();
+          if (trimmed) {
+            const prefixedLine = `[${service.name}] ${trimmed}`;
+            captureLog(prefixedLine);
+            console.log(prefixedLine);
+          }
+        }
+      });
+
+      child.stderr.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+          const trimmed = line.trimEnd();
+          if (trimmed && !trimmed.includes('Warning')) {
+            const prefixedLine = `[${service.name}] ${trimmed}`;
+            captureLog(prefixedLine);
+            console.error(prefixedLine);
+          }
+        }
+      });
+
+      child.on('error', (error) => {
+        console.error(`[${service.name}] Failed to start: ${error.message}`);
+      });
+
+      child.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`[${service.name}] Exited with code ${code}`);
+        }
+      });
+    }
+
+    console.log(`${colors.green}Services are running. Press Ctrl+C to stop.${colors.reset}`);
+    console.log('');
+
+    // Mark startup as complete for log capture
+    startupComplete = true;
+
+    // Handle log capture (matching verbose mode behavior)
+    if (CAPTURE_LOGS) {
+      if (CAPTURE_DURATION_SEC > 0) {
+        console.log(`${colors.cyan}Capturing logs for ${CAPTURE_DURATION_SEC}s (use --capture-logs=0 for startup only)${colors.reset}`);
+        setTimeout(async () => {
+          logCaptureActive = false;
+          await writeLogBuffer();
+        }, CAPTURE_DURATION_SEC * 1000);
+      } else {
+        logCaptureActive = false;
+        await writeLogBuffer();
+      }
+    }
+
+    // Graceful shutdown (matching verbose mode behavior)
     const cleanup = async () => {
-      console.log('\n\nShutting down services...');
+      console.log(`\n${colors.yellow}Shutting down Conscious Bot System...${colors.reset}`);
+
+      // Kill all child processes
       for (const { child, service } of processes) {
         console.log(`  Stopping ${service.name}...`);
         child.kill('SIGTERM');
       }
+
+      // Wait for graceful shutdown
       await wait(2000);
-      for (const { child } of processes) {
-        if (!child.killed) child.kill('SIGKILL');
+
+      // Force kill any remaining processes
+      for (const { child, service } of processes) {
+        if (!child.killed) {
+          console.log(`  Force killing ${service.name}...`);
+          child.kill('SIGKILL');
+        }
       }
+
+      // Kill processes by port (belt and suspenders)
+      for (const service of services) {
+        killProcessesByPort(service.port);
+      }
+
+      console.log(`${colors.green}All services stopped${colors.reset}`);
+
+      // Write captured logs on shutdown
+      if (logCaptureActive && logBuffer.length > 0) {
+        logCaptureActive = false;
+        await writeLogBuffer();
+      }
+
       process.exit(0);
     };
 

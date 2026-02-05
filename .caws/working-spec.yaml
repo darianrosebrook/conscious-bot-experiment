@@ -1,50 +1,48 @@
-id: FEAT-3071
-title: "Executor dispatch by executable metadata + fallback planning hardening"
-risk_tier: 2
+id: COG-LOG-1001
+title: "Unify cognition server logging with structured server logger"
+risk_tier: 3
 scope:
   in:
-    - "Executor dispatch uses meta.executable (authority no longer blocks)"
-    - "Fallback planner emits multi-step dig_block plan for collect/mine"
-    - "Non-blocking cognition posts in minecraft-interface event handlers"
-    - "Timeout/backoff tuning for planning↔minecraft calls"
-    - "Tests for executable dispatch + fallback plans"
+    - "Replace ad-hoc console logs in cognition server with structured server logger"
+    - "Remove emoji prefixes; use tags/subsystem fields or colorized logger output"
+    - "Add coherent middleware request logging (consistent fields)"
   out:
-    - "Full planner rewrite or legacy GOAP removal"
-    - "Schema migrations"
+    - "Changes to logging in other packages outside cognition server"
+    - "Behavioral changes to business logic"
+    - "New external logging dependencies"
 invariants:
-  - "Only steps with meta.executable === true are dispatched"
-  - "Fallback steps use canonical leaf arg schema"
-  - "Hot loops do not await telemetry/ack posts"
+  - "No change to API responses, status codes, or routes"
+  - "No change to thought generation behavior or timing"
+  - "Logging remains non-blocking and does not throw"
 acceptance:
   - id: A1
-    given: "task steps with meta.executable true but non-sterling authority"
-    when: "executor runs"
-    then: "steps dispatch successfully without authority gating"
+    given: "server is running"
+    when: "startup, shutdown, and recurring tasks occur"
+    then: "logs are emitted with consistent fields and no emoji prefixes"
   - id: A2
-    given: "collect/mine requirement and Sterling returns []"
-    when: "fallback planner runs"
-    then: "produces multi-step dig_block plan with valid args"
+    given: "middleware receives requests"
+    when: "response finishes"
+    then: "a structured log entry is emitted with operation type and success flag"
   - id: A3
-    given: "chat/environmental events"
-    when: "cognition post fails or stalls"
-    then: "bot loop remains responsive; errors logged"
+    given: "an error occurs in thought generation or external health check"
+    when: "error is caught"
+    then: "error is logged with subsystem and reason fields"
 non_functional:
   a11y: []
   perf:
     api_p95_ms: 250
   security:
-    - "No new external inputs without validation"
+    - "No sensitive data logged (PII redaction preserved)"
 contracts:
   - type: openapi
-    path: "contracts/planning-executor.yaml#/components/schemas/ExecutableStep"
+    path: "contracts/none"
 observability:
   logs:
-    - "executor dispatch source/leaf"
-    - "fallback plan chosen"
-  metrics:
-    - "executor_dispatch_count"
-    - "fallback_plan_count"
+    - "startup/shutdown events (subsystem: cognition-server)"
+    - "thought_generation cycle logs (subsystem: thought-gen)"
+    - "request lifecycle logs (subsystem: middleware)"
+  metrics: []
   traces: []
 migrations: []
 rollback:
-  - "Feature flag to restore authority gate"
+  - "Revert logging changes in cognition server"
