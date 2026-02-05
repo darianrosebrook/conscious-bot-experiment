@@ -78,13 +78,15 @@ function isDigestDuplicate(digestKey: string): boolean {
 
 export function calculateTaskPriority(thought: CognitiveStreamThought): number {
   let priority = 0.5;
-  priority += thought.context.confidence * 0.3;
+  const confidence = thought.context?.confidence ?? 0;
+  const emotionalState = thought.context?.emotionalState;
+  priority += confidence * 0.3;
   if (thought.metadata.llmConfidence) {
     priority += thought.metadata.llmConfidence * 0.2;
   }
-  if (thought.context.emotionalState === 'urgent') {
+  if (emotionalState === 'urgent') {
     priority += 0.2;
-  } else if (thought.context.emotionalState === 'excited') {
+  } else if (emotionalState === 'excited') {
     priority += 0.1;
   }
   return Math.min(1.0, priority);
@@ -92,14 +94,16 @@ export function calculateTaskPriority(thought: CognitiveStreamThought): number {
 
 export function calculateTaskUrgency(thought: CognitiveStreamThought): number {
   let urgency = 0.3;
-  if (thought.context.emotionalState === 'urgent') {
+  const confidence = thought.context?.confidence ?? 0;
+  const emotionalState = thought.context?.emotionalState;
+  if (emotionalState === 'urgent') {
     urgency = 0.8;
-  } else if (thought.context.emotionalState === 'excited') {
+  } else if (emotionalState === 'excited') {
     urgency = 0.6;
-  } else if (thought.context.emotionalState === 'focused') {
+  } else if (emotionalState === 'focused') {
     urgency = 0.5;
   }
-  urgency += thought.context.confidence * 0.2;
+  urgency += confidence * 0.2;
   return Math.min(1.0, urgency);
 }
 
@@ -224,8 +228,8 @@ export async function convertThoughtToTask(
       thoughtContent: thought.content,
       thoughtId: thought.id,
       thoughtType: thought.metadata.thoughtType,
-      confidence: thought.context.confidence,
-      cognitiveSystem: thought.context.cognitiveSystem,
+      confidence: thought.context?.confidence ?? null,
+      cognitiveSystem: thought.context?.cognitiveSystem ?? null,
       llmConfidence: thought.metadata.llmConfidence,
       model: thought.metadata.model,
     };

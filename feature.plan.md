@@ -1,23 +1,41 @@
-# Feature Plan: MCVIEW-103 — Three.js Dedupe + Entity Textures
+# Feature Plan: PR4-PLANNING-OBS-400
+
+## Risk Tier
+2
 
 ## Design Sketch
-- Webpack resolves all `three` imports to a single path to avoid duplicate globals.
-- Normalize entity names (strip `minecraft:`) before entity lookup.
-- Rebuild viewer bundle and verify warnings/textures.
+- Planning `/task` endpoint
+  - Extract/assign request id (`x-request-id`), echo back in response header.
+  - On 400 in debug mode (`PLANNING_INGEST_DEBUG_400=1`):
+    - Log structured request shape (keys, key presence booleans, content-type, body size).
+    - Return 400 with debug details (missing fields, reason code).
+- Cognition planning bridge
+  - On non-2xx: read response body (truncated), hash, log URL + status + hash.
+- Task integration
+  - Debug-only ACK gating for thoughts that fail closed (bounded retries per thought id).
 
 ## Test Matrix
-- Unit:
-  - webpack alias for `three` is set
-  - entity name normalization applied
-- Integration:
-  - no multiple-Three.js warning
-  - entity textures render
-- E2E Smoke:
-  - observe textured entities in viewer
+- Unit
+  - Debug flag off: 400 response does not include validation details.
+  - Debug flag on: 400 response includes missing fields and request id.
+  - Logs contain no free-text content.
+  - Request id propagated via header.
+- Integration
+  - Malformed planning request → 400 + debug logs (flag on).
+  - Valid planning request → 2xx.
+- E2E smoke
+  - Cognition non-2xx → log includes URL, status, response hash.
 
 ## Data Plan
-- Use existing prismarine-viewer public textures.
+- No new persisted data.
+- Request id generated per request if missing.
+- Debug state: in-memory retry counter for ACK deferral.
 
 ## Observability Plan
-- Console warning check for duplicate Three.js.
-- Log missing entity texture names if encountered.
+- Logs (debug only)
+  - `planning.thought_ingest.request` with key presence.
+  - `planning.thought_ingest.reject` with missing fields.
+  - `cognition.planning_bridge.error` with response hash.
+- Metrics (if available)
+  - `planning_thought_ingest_400_total{reason_code}`
+  - `planning_thought_ingest_missing_field_total{field}`

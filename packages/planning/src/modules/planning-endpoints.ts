@@ -8,6 +8,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { MinecraftExecutor } from '../reactive-executor/minecraft-executor';
 import { PlanStatus, PlanStepStatus, ActionType } from '../types';
 import { getSystemReadyState, markSystemReady } from '../startup-barrier';
@@ -53,6 +54,76 @@ const NON_GOAL_TASK_TYPES = new Set([
   'inventory',
   'survival',
 ]);
+
+const PLANNING_INGEST_DEBUG_400 =
+  process.env.PLANNING_INGEST_DEBUG_400 === '1';
+
+type IngestShapeReport = {
+  topLevelKeys: string[];
+  bodySizeBytes: number | null;
+  contentType: string | null;
+  keyPresence: Record<string, boolean>;
+  missingFields: string[];
+};
+
+function getRequestId(req: Request): string {
+  const fromHeader = req.header('x-request-id');
+  return fromHeader && fromHeader.trim().length > 0 ? fromHeader : crypto.randomUUID();
+}
+
+function inspectTaskPayload(taskData: any, contentType: string | null): IngestShapeReport {
+  const topLevelKeys = Object.keys(taskData || {});
+  const metadata = taskData?.metadata;
+  const reduction = metadata?.reduction;
+  const reducerResult = reduction?.reducerResult;
+
+  const keyPresence: Record<string, boolean> = {
+    'task.id': typeof taskData?.id === 'string',
+    'task.title': typeof taskData?.title === 'string' && taskData.title.length > 0,
+    'task.description': typeof taskData?.description === 'string' && taskData.description.length > 0,
+    'task.type': typeof taskData?.type === 'string' && taskData.type.length > 0,
+    'task.priority': typeof taskData?.priority === 'number',
+    'task.source': typeof taskData?.source === 'string' && taskData.source.length > 0,
+    'task.steps': Array.isArray(taskData?.steps),
+    'task.metadata': typeof metadata === 'object' && metadata !== null,
+    'metadata.thoughtId': typeof metadata?.thoughtId === 'string',
+    'metadata.origin.thoughtId': typeof metadata?.origin?.thoughtId === 'string',
+    'metadata.reduction': typeof reduction === 'object' && reduction !== null,
+    'reduction.sterlingProcessed': typeof reduction?.sterlingProcessed === 'boolean',
+    'reduction.isExecutable': typeof reduction?.isExecutable === 'boolean',
+    'reduction.reducerResult.committed_ir_digest':
+      typeof reducerResult?.committed_ir_digest === 'string' ||
+      typeof reducerResult?.committedIrDigest === 'string',
+  };
+
+  const missingFields = Object.entries(keyPresence)
+    .filter(([key, present]) => {
+      // Only treat these as required for reporting purposes.
+      return [
+        'task.title',
+        'task.description',
+        'task.type',
+        'task.metadata',
+        'metadata.reduction',
+        'reduction.sterlingProcessed',
+        'reduction.isExecutable',
+        'reduction.reducerResult.committed_ir_digest',
+      ].includes(key) && !present;
+    })
+    .map(([key]) => key);
+
+  const bodySizeBytes = taskData
+    ? Buffer.byteLength(JSON.stringify(taskData), 'utf8')
+    : 0;
+
+  return {
+    topLevelKeys,
+    bodySizeBytes,
+    contentType,
+    keyPresence,
+    missingFields,
+  };
+}
 
 /**
  * Deterministic inference of `requirementCandidate` from legacy endpoint parameters.
@@ -583,6 +654,12 @@ export function createPlanningEndpoints(
 
   // POST /task - Add a new task
   router.post('/task', async (req: Request, res: Response) => {
+    const requestId = getRequestId(req);
+    res.setHeader('x-request-id', requestId);
+    const contentType = req.header('content-type') ?? null;
+    const debugReport = PLANNING_INGEST_DEBUG_400
+      ? inspectTaskPayload(req.body, contentType)
+      : null;
     try {
       const taskData = req.body;
 
@@ -595,10 +672,35 @@ export function createPlanningEndpoints(
         } else {
           const typeKey = (taskData.type || 'general').toLowerCase();
           if (!NON_GOAL_TASK_TYPES.has(typeKey)) {
+            if (PLANNING_INGEST_DEBUG_400 && debugReport) {
+              console.warn('[Planning][IngestDebug] 400 rejection', {
+                requestId,
+                method: req.method,
+                path: req.path,
+                contentType,
+                bodySizeBytes: debugReport.bodySizeBytes,
+                topLevelKeys: debugReport.topLevelKeys,
+                keyPresence: debugReport.keyPresence,
+                missingFields: debugReport.missingFields,
+                reasonCode: 'missing_requirement_candidate',
+              });
+            }
             return res.status(400).json({
               success: false,
               error: 'strict mode: requirementCandidate required; could not infer from provided parameters',
               hint: 'Provide parameters.requirementCandidate with { kind, outputPattern, quantity }',
+              requestId,
+              ...(PLANNING_INGEST_DEBUG_400 && debugReport
+                ? {
+                    debug: {
+                      reasonCode: 'missing_requirement_candidate',
+                      missingFields: debugReport.missingFields,
+                      topLevelKeys: debugReport.topLevelKeys,
+                      contentType: debugReport.contentType,
+                      bodySizeBytes: debugReport.bodySizeBytes,
+                    },
+                  }
+                : {}),
             });
           }
         }
@@ -617,6 +719,7 @@ export function createPlanningEndpoints(
         success: false,
         error: 'Failed to add task',
         details: error instanceof Error ? error.message : 'Unknown error',
+        requestId,
       });
     }
   });

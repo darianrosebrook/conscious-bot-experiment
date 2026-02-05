@@ -72,7 +72,6 @@ export interface DashboardConfig {
     memories: () => string;
     events: () => string;
     notes: () => string;
-    intrusive: () => string;
     screenshots: () => string;
     viewerStatus: () => string;
     startViewer: () => string;
@@ -545,7 +544,6 @@ const legacyRoutes = {
   memories: () => '/api/memories',
   events: () => '/api/events',
   notes: () => '/api/notes',
-  intrusive: () => '/api/intrusive',
   screenshots: () => '/api/screenshots',
   viewerStatus: () => '/api/viewer/status',
   startViewer: () => '/api/viewer/start',

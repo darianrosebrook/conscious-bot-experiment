@@ -297,29 +297,25 @@ export function useCognitiveStream() {
       addThought(optimisticThought);
 
       try {
+        const metadata = {
+          messageType: 'intrusion',
+          intent: 'external_suggestion',
+          ...(options.tags ? { tags: options.tags } : {}),
+          ...(typeof options.strength === 'number'
+            ? { strength: options.strength }
+            : {}),
+        };
+
         // Send to cognitive stream
         await api.post(config.routes.cognitiveStreamPOST(), {
           type: 'intrusive',
           content: trimmedText,
           attribution: 'intrusive',
           context: { emotionalState: 'curious', confidence: 0.8 },
-          metadata: { messageType: 'intrusion', intent: 'external_suggestion' },
+          metadata,
         });
 
-        // Also send to intrusive API (fire-and-forget; thought already in stream)
-        api
-          .post(config.routes.intrusive(), {
-            text: trimmedText,
-            tags: ['external', 'intrusion'],
-            strength: 0.8,
-            ...options,
-          })
-          .catch((err) => {
-            debugLog(
-              '[Dashboard] Intrusive API (cognition/planning) failed:',
-              err?.message ?? err
-            );
-          });
+        // Legacy intrusive endpoint removed; rely on cognitive stream post only.
 
         return true;
       } catch (error) {

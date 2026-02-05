@@ -11,6 +11,7 @@ import { useEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { debugLog } from '@/lib/utils';
+import { normalizeTasksResponse } from '@/lib/task-normalize';
 import type { BotState, BotConnection } from '@/hooks/use-ws-bot-state';
 
 interface UseInitialDataFetchOptions {
@@ -48,8 +49,20 @@ export function useInitialDataFetch({
       });
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json();
-        setTasks(tasksData.tasks || []);
+        const normalizedTasks = normalizeTasksResponse(tasksData);
+        if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
+          console.debug('[Dashboard] initial /api/tasks', {
+            status: tasksRes.status,
+            taskCount: normalizedTasks.length,
+            fallback: tasksData.fallback,
+          });
+        }
+        setTasks(normalizedTasks);
         setTasksFallback(!!tasksData.fallback);
+      } else if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
+        console.debug('[Dashboard] initial /api/tasks non-OK', {
+          status: tasksRes.status,
+        });
       }
 
       // Fetch planner data

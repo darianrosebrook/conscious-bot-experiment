@@ -11,6 +11,7 @@ import { useEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useSSE } from '@/hooks/use-sse';
 import { mapPlanningTaskToDashboard } from '@/lib/task-utils';
+import { normalizeTasksResponse } from '@/lib/task-normalize';
 import type { Task } from '@/types';
 
 const TASK_POLL_MS = 60_000;
@@ -28,11 +29,26 @@ export function useTaskStream() {
         });
         if (res.ok) {
           const data = await res.json();
-          setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+          const normalized = normalizeTasksResponse(data);
+          if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
+            console.debug('[Dashboard] /api/tasks', {
+              status: res.status,
+              taskCount: normalized.length,
+              fallback: data.fallback,
+            });
+          }
+          setTasks(normalized);
           setTasksFallback(!!data.fallback);
+        } else if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
+          console.debug('[Dashboard] /api/tasks non-OK', {
+            status: res.status,
+          });
         }
       } catch {
         // Non-fatal; next poll will retry
+        if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
+          console.debug('[Dashboard] /api/tasks fetch failed');
+        }
       }
     };
     const interval = setInterval(pollTasks, TASK_POLL_MS);

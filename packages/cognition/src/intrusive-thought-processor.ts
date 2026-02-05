@@ -8,6 +8,20 @@
  */
 
 import { EventEmitter } from 'events';
+import crypto from 'crypto';
+
+const PLANNING_INGEST_DEBUG_400 =
+  process.env.PLANNING_INGEST_DEBUG_400 === '1';
+
+function buildResponseDebug(bodyText: string): { truncated: string; sha256: string } {
+  const truncated = bodyText.length > 2048 ? bodyText.slice(0, 2048) : bodyText;
+  const sha256 = crypto.createHash('sha256').update(bodyText).digest('hex');
+  return { truncated, sha256 };
+}
+
+function makeRequestId(): string {
+  return crypto.randomUUID();
+}
 
 export interface Action {
   type: string;
@@ -1291,9 +1305,13 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
    */
   private async updatePlanningSystem(task: Task): Promise<void> {
     try {
+      const requestId = makeRequestId();
       const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': requestId,
+        },
         body: JSON.stringify({
           title: task.title,
           description: task.description,
@@ -1307,6 +1325,17 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       });
 
       if (!response.ok) {
+        if (PLANNING_INGEST_DEBUG_400) {
+          const bodyText = await response.text();
+          const debug = buildResponseDebug(bodyText);
+          console.error('[PlanningBridge] non-2xx response', {
+            url: `${this.config.planningEndpoint}/task`,
+            status: response.status,
+            requestId,
+            responseBodyTruncated: debug.truncated,
+            responseBodySha256: debug.sha256,
+          });
+        }
         throw new Error(`Planning system responded with ${response.status}`);
       }
 
@@ -1330,9 +1359,13 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
    */
   async executeDirectAction(action: Action): Promise<BotResponse> {
     try {
+      const requestId = makeRequestId();
       const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': requestId,
+        },
         body: JSON.stringify({
           title: `${action.type}: ${action.target}`,
           description: `Cognition-triggered action (origin: intrusive-thought)`,
@@ -1344,6 +1377,17 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       });
 
       if (!response.ok) {
+        if (PLANNING_INGEST_DEBUG_400) {
+          const bodyText = await response.text();
+          const debug = buildResponseDebug(bodyText);
+          console.error('[PlanningBridge] non-2xx response', {
+            url: `${this.config.planningEndpoint}/task`,
+            status: response.status,
+            requestId,
+            responseBodyTruncated: debug.truncated,
+            responseBodySha256: debug.sha256,
+          });
+        }
         throw new Error(`Planning service responded with ${response.status}`);
       }
 

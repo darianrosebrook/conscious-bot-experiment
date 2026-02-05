@@ -24,6 +24,7 @@ import { SparklineChart, type SparklinePoint } from './sparkline-chart';
 import { InteroCurrentSnapshot } from './intero-current-snapshot';
 import { ValuationPanel } from './valuation-panel';
 import { cn } from '@/lib/utils';
+import { normalizeTasksResponse } from '@/lib/task-normalize';
 import s from './evaluation-tab.module.scss';
 import type { InteroSnapshot, ServiceHealthStatus, Task } from '@/types';
 
@@ -47,7 +48,7 @@ interface BoundaryStatsResponse {
 }
 
 interface TasksResponse {
-  tasks: Task[];
+  tasks: Task[] | { current?: Task[]; completed?: Task[]; total?: number };
   fallback?: boolean;
   timestamp: string;
 }
@@ -109,7 +110,7 @@ export function EvaluationTab() {
     // Tasks
     if (results[1].status === 'fulfilled') {
       const data = results[1].value;
-      setTasks(data.tasks || []);
+      setTasks(normalizeTasksResponse(data));
       setTasksFallback(!!data.fallback);
     }
 

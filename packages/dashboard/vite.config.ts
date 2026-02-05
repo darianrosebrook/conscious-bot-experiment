@@ -100,11 +100,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/stream/, '/stream'),
       },
-      '/api/intrusive': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/intrusive/, '/intrusive'),
-      },
       '/api/events': {
         target: 'http://localhost:3003',
         changeOrigin: true,

@@ -78,6 +78,10 @@ import {
   partitionSelfHoldEffects,
   applySelfHoldEffects,
 } from './goals/effect-partitioning';
+
+const PLANNING_INGEST_DEBUG_400 =
+  process.env.PLANNING_INGEST_DEBUG_400 === '1';
+const DEBUG_ACK_DEFERRAL_LIMIT = 3;
 import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
@@ -547,6 +551,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   private thoughtPollInFlight = false;
   private seenThoughtIds = new Set<string>();
+  private deferredAckCounts = new Map<string, number>();
 
   /**
    * Serial promise chain for protocol effects. All protocol-induced status
@@ -667,6 +672,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         await this.cognitiveStreamClient.getActionableThoughts();
 
       for (const thought of actionableThoughts) {
+        let conversionResult:
+          | {
+              decision: string;
+              reason?: string;
+              task: Task | null;
+              managementResult?: ManagementResult;
+            }
+          | null = null;
         try {
           const result = await convertThoughtToTask(thought, {
             addTask: this.addTask.bind(this),
@@ -683,6 +696,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
               strictConvertEligibility: this.config.strictConvertEligibility,
             },
           });
+          conversionResult = result;
 
           // Track conversion stats
           if (result.task || result.managementResult) {
@@ -723,9 +737,31 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           console.error('Error converting thought to task:', error);
           skippedCount++;
         } finally {
-          // CRITICAL: Always ack, even if conversion failed or was skipped
-          // This prevents thoughts from re-appearing in /actionable indefinitely
-          thoughtsToAck.push(thought.id);
+          const decision = conversionResult?.decision;
+          const allowAck =
+            !PLANNING_INGEST_DEBUG_400 ||
+            decision === 'created' ||
+            conversionResult?.managementResult != null ||
+            decision === 'dropped_not_executable';
+
+          if (allowAck) {
+            thoughtsToAck.push(thought.id);
+            this.deferredAckCounts.delete(thought.id);
+          } else {
+            const count = (this.deferredAckCounts.get(thought.id) ?? 0) + 1;
+            this.deferredAckCounts.set(thought.id, count);
+            if (count >= DEBUG_ACK_DEFERRAL_LIMIT) {
+              console.warn(
+                `[Thought-to-task][Debug] Forcing ACK after ${count} deferrals for thought ${thought.id} (decision=${decision ?? 'unknown'})`
+              );
+              thoughtsToAck.push(thought.id);
+              this.deferredAckCounts.delete(thought.id);
+            } else {
+              console.warn(
+                `[Thought-to-task][Debug] Deferring ACK for thought ${thought.id} (decision=${decision ?? 'unknown'})`
+              );
+            }
+          }
         }
       }
 
