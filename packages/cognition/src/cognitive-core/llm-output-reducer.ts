@@ -155,13 +155,23 @@ export async function reduceRawLLMOutput(
   const startTime = performance.now();
 
   // Step 1: Build envelope (TS assembles, no semantic interpretation)
+  // Build envelope BEFORE connect so we have provenance even on connect failure
   const envelope = buildLanguageIOEnvelope(rawOutput, {
     modelId: context.modelId,
     promptDigest: context.promptDigest,
   });
 
   // Step 2: Ensure client is connected
-  await client.connect();
+  // Wrap connect failures in ReductionError to preserve envelope provenance
+  try {
+    await client.connect();
+  } catch (err) {
+    throw new ReductionError(
+      `Sterling connect failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      envelope,
+      err instanceof Error ? err : undefined
+    );
+  }
 
   // Step 3: Reduce through Sterling (semantic authority)
   let degradedMode = false;

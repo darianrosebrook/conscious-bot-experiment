@@ -129,7 +129,27 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
 
     sockets.push(socket)
 
+    // Debug: Check how many chunks the bot has loaded
+    const syncWorld = bot.world?.sync || bot.world
+    const loadedColumns = syncWorld?.columns ? Object.keys(syncWorld.columns).length : 0
+    console.log(`[prismarine-viewer] Bot world has ${loadedColumns} columns loaded at position ${JSON.stringify(bot.entity.position)}`)
+    console.log(`[prismarine-viewer] viewDistance=${viewDistance}, bot.version=${bot.version}`)
+
     const worldView = new WorldView(bot.world, viewDistance, bot.entity.position, socket)
+
+    // Debug: Track chunk loading
+    const originalSocketEmit = socket.emit.bind(socket)
+    let chunkCount = 0
+    socket.emit = function(event, ...args) {
+      if (event === 'loadChunk') {
+        chunkCount++
+        if (chunkCount <= 5 || chunkCount % 50 === 0) {
+          console.log(`[prismarine-viewer] Emitting loadChunk #${chunkCount}`)
+        }
+      }
+      return originalSocketEmit(event, ...args)
+    }
+
     worldView.init(bot.entity.position)
 
     worldView.on('blockClicked', (block, face, button) => {

@@ -12,85 +12,21 @@ import { LLMInterface } from './cognitive-core/llm-interface';
 import { auditLogger } from './audit/thought-action-audit-logger';
 import { getInteroState } from './interoception-store';
 import { buildStressContext } from './stress-axis-computer';
-// Removed: canonicalGoalKey (semantic normalization - Sterling's job now)
-import type { GoalTagV1 } from './llm-output-sanitizer';
+import type { ReductionProvenance } from './types';
 import {
-  deriveEligibility,
+  computeEligibility,
   createGroundingContext,
-  groundGoal,
 } from './reasoning-surface';
 import type { EligibilityOutput, GroundingResult } from './reasoning-surface';
 
-/**
- * Build a canonical GoalTagV1 structure.
- * Shared by drive tick and any future deterministic goal emitter
- * to prevent schema drift with LLM-extracted goals.
- */
-function buildGoalTagV1(action: string, target: string, amount: number | null): GoalTagV1 {
-  return {
-    version: 1,
-    action,
-    target,
-    targetId: null,
-    amount,
-    raw: `[GOAL: ${action} ${target}${amount != null ? ` ${amount}` : ''}]`,
-  };
-}
+// DELETED (PR4/Migration C): buildGoalTagV1
+// Local GoalTagV1 construction violates I-BOUNDARY-1 (Sterling owns semantics).
+// Drive-ticks and deterministic goal emitters should route through Sterling
+// or emit non-semantic signals that Sterling interprets.
 
-/**
- * LF-2: Single choke point for eligibility derivation.
- *
- * This helper wraps the reasoning-surface deriveEligibility() to ensure
- * ALL convertEligible decisions in this file flow through the canonical path.
- *
- * Contract: convertEligible is whatever deriveEligibility() returns.
- * This helper ensures all callers use that path; the actual rule is owned
- * by the reasoning-surface module and may evolve independently.
- *
- * @param extractedGoal - The goal extracted from LLM output, or null
- * @param context - The thought context for grounding validation
- * @returns Eligibility output with derived=true marker
- */
-function computeEligibility(
-  extractedGoal: GoalTagV1 | null,
-  context: ThoughtContext
-): { eligibility: EligibilityOutput; grounding: GroundingResult | null } {
-  // If no goal, fast path to ineligible
-  if (!extractedGoal) {
-    return {
-      grounding: null,
-      eligibility: deriveEligibility({
-        extractedGoal: null,
-        groundingResult: null,
-      }),
-    };
-  }
-
-  // Ground the goal against the situation frame
-  // Wrapped in try-catch to fail closed if grounding throws
-  const groundingContext = createGroundingContext(context);
-  let grounding: GroundingResult | null;
-  try {
-    grounding = groundGoal(extractedGoal, groundingContext);
-  } catch (error) {
-    // Fail closed: grounding exception means ineligible
-    console.error('[computeEligibility] Grounding threw, failing closed:', error);
-    grounding = {
-      pass: false,
-      reason: `grounding_exception: ${error instanceof Error ? error.message : 'unknown'}`,
-      referencedFacts: [],
-      violations: [{ type: 'unknown_reference', description: 'Grounding threw an exception', trigger: extractedGoal.target }],
-    };
-  }
-
-  // Derive eligibility through the single choke point
-  const eligibility = deriveEligibility({
-    extractedGoal,
-    groundingResult: grounding,
-  });
-
-  return { eligibility, grounding };
-}
+// MIGRATED (PR4): computeEligibility now imported from reasoning-surface.
+// It accepts ReductionProvenance instead of GoalTagV1.
+// See reasoning-surface/index.ts for implementation.
 
 /**
  * Thought Deduplicator - Prevents repetitive thoughts to improve performance
@@ -673,20 +609,23 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       const tags = ['monitoring', 'environmental', 'survival'];
       if (isDuplicate) tags.push('heartbeat-stagnation');
 
-      const hasGoal = !!response.metadata.extractedGoal;
+      // PR4: Use Sterling's reduction as the primary semantic signal
+      // TS does NOT infer semantics — Sterling's is_executable is authoritative
+      const reduction = response.metadata.reduction ?? null;
+      const hasCommittedGoal = !!reduction?.reducerResult?.committed_goal_prop_id;
       const extractedIntent = response.metadata.extractedIntent ?? null;
       const intentParse = response.metadata.intentParse ?? null;
       const hasIntent = extractedIntent != null && extractedIntent !== 'none';
-      if (hasGoal) this._counters.goalTags++;
+      if (hasCommittedGoal) this._counters.goalTags++;
       if (hasIntent) this._counters.intentExtractions++;
 
       // IDLE-4: Check goal emission budget
       // Get idle reason from context if available (passed through from planning service)
       const idleReason = (context as any).idleReason as string | undefined;
-      let goalAllowed = hasGoal || hasIntent;
+      let goalAllowed = hasCommittedGoal || hasIntent;
       let budgetSuppressed = false;
 
-      if (goalAllowed && hasGoal) {
+      if (goalAllowed && hasCommittedGoal) {
         // Check if goal emission is allowed under budget
         const canEmit = this.canEmitGoal(idleReason, false);
         if (!canEmit) {
@@ -700,29 +639,31 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         }
       }
 
-      // LF-2: Derive eligibility through single choke point
-      // If budget suppressed the goal, we derive with null goal (no exposure = no eligibility)
-      // Otherwise, derive with the actual extracted goal
-      const goalForEligibility = goalAllowed ? response.metadata.extractedGoal : null;
+      // PR4: Derive eligibility from Sterling reduction (no local goal parsing)
+      // Pass reduction directly — no synthetic GoalTagV1 construction
+      const reductionForEligibility = goalAllowed ? reduction : null;
+
       const { eligibility, grounding } = computeEligibility(
-        goalForEligibility as GoalTagV1 | null,
+        reductionForEligibility,
         context
       );
 
       // IDLE-5: Log provenance for the idle cycle
       const decisionOutcome = budgetSuppressed
         ? 'budget_suppressed' as const
-        : (hasGoal || hasIntent)
+        : (hasCommittedGoal || hasIntent)
           ? 'intent_emitted' as const
           : 'thought_only' as const;
 
-      // Build intentEmitted string from extractedGoal (may or may not have .raw)
-      const extractedGoalForLog = response.metadata.extractedGoal;
-      const intentEmittedStr = goalAllowed && extractedGoalForLog
-        ? ('raw' in extractedGoalForLog && extractedGoalForLog.raw)
-          ? extractedGoalForLog.raw
-          : `[GOAL: ${extractedGoalForLog.action} ${extractedGoalForLog.target}${extractedGoalForLog.amount != null ? ` ${extractedGoalForLog.amount}` : ''}]`
-        : undefined;
+      // Build intentEmitted string from Sterling reduction
+      // PR4: Sterling's committed_goal_prop_id is the only semantic identity
+      let intentEmittedStr: string | undefined = undefined;
+
+      if (goalAllowed && reduction?.reducerResult?.committed_goal_prop_id) {
+        // Sterling's committed goal proposition ID (opaque, don't interpret)
+        intentEmittedStr = `[prop: ${reduction.reducerResult.committed_goal_prop_id}]`;
+      }
+      // DELETED: Legacy extractedGoal fallback (TS must not construct goal strings)
 
       this.logIdleCycleProvenance({
         idleReason,
@@ -752,13 +693,14 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           intensity: 0.4,
           llmConfidence: response.confidence,
           model: response.model,
-          // IDLE-4: Only include extractedGoal if budget allows (for downstream conversion)
-          extractedGoal: goalAllowed ? response.metadata.extractedGoal : undefined,
+          // PR4: extractedGoal is deprecated — use reduction.reducerResult
+          // Keeping for backwards compatibility during downstream migration
+          extractedGoal: goalAllowed && response.metadata.extractedGoal ? response.metadata.extractedGoal : undefined,
           // Always capture raw goal for audit trail (even when budget-suppressed)
-          extractedGoalRaw: hasGoal ? response.metadata.extractedGoal : undefined,
+          extractedGoalRaw: hasCommittedGoal && response.metadata.extractedGoal ? response.metadata.extractedGoal : undefined,
           extractedIntent: goalAllowed ? extractedIntent : undefined,
           intentParse,
-          extractedGoalSource: goalAllowed && hasGoal ? 'llm' as const : undefined,
+          extractedGoalSource: goalAllowed && hasCommittedGoal ? 'llm' as const : undefined,
           budgetSuppressed,
           // LF-2: Include eligibility derivation provenance
           eligibilityReasoning: eligibility.reasoning,
@@ -1670,15 +1612,19 @@ export class EnhancedThoughtGenerator extends EventEmitter {
    * Select a drive-tick micro-goal based on inventory, time, and environment.
    * Returns null if no drive is appropriate.
    *
-   * DEPRECATED: This method directly injects goals, violating IDLE-3.
+   * DEPRECATED (PR4): This method directly injects goals, violating IDLE-3 and I-BOUNDARY-1.
    * Use buildInteroceptiveSummary() instead for salience annotation.
    * This method is kept for ablation testing (DISABLE_DRIVE_TICKS=false).
+   *
+   * NOTE: Returns thought content only. Does NOT produce GoalTagV1 or ReductionProvenance.
+   * Drive-tick thoughts are NOT eligible for task conversion (convertEligible: false)
+   * because they bypass Sterling semantic authority.
    */
   private selectDrive(
     inventory: Array<{ name: string; count: number; displayName: string }>,
     timeOfDay: number,
     context: ThoughtContext
-  ): { thought: string; goalTag: string; category: string; extractedGoal: GoalTagV1 } | null {
+  ): { thought: string; category: string } | null {
     // Build inventory map
     const invMap = new Map<string, number>();
     for (const item of inventory) {
@@ -1690,79 +1636,65 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const itemCount = (name: string) => invMap.get(name) || 0;
     const logCount = itemCount('oak_log') + itemCount('birch_log') + itemCount('spruce_log') + itemCount('dark_oak_log') + itemCount('acacia_log') + itemCount('jungle_log');
     const hasShelterNearby = context.currentState?.hasShelterNearby;
-    const isNight = timeOfDay >= 13000;
 
     // Priority 1: Empty inventory / no logs → collect wood
     if (inventory.length === 0 || logCount === 0) {
-      const goal = buildGoalTagV1('collect', 'oak_log', 8);
       return {
-        thought: `My inventory is bare — I should gather some wood to get started. ${goal.raw}`,
-        goalTag: goal.raw,
+        thought: 'My inventory is bare — I should gather some wood to get started.',
         category: 'gathering',
-        extractedGoal: goal,
       };
     }
 
     // Priority 2: Night approaching + no shelter → build shelter
     // Fail-closed: hasShelterNearby must be explicitly false (not undefined) to trigger shelter drive.
-    // When undefined (signal unavailable), skip this drive to avoid confidently wrong behavior.
     if (timeOfDay >= 11000 && hasShelterNearby === false) {
-      const goal = buildGoalTagV1('build', 'basic_shelter', 1);
       return {
-        thought: `Night is coming and I have no shelter nearby. I should build something. ${goal.raw}`,
-        goalTag: goal.raw,
+        thought: 'Night is coming and I have no shelter nearby. I should build something.',
         category: 'survival',
-        extractedGoal: goal,
       };
     }
 
     // Priority 3: Has logs, no crafting table → craft one
     if (logCount > 0 && !hasItem('crafting_table')) {
-      const goal = buildGoalTagV1('craft', 'crafting_table', 1);
       return {
-        thought: `I have logs but no crafting table. Time to make one. ${goal.raw}`,
-        goalTag: goal.raw,
+        thought: 'I have logs but no crafting table. Time to make one.',
         category: 'crafting',
-        extractedGoal: goal,
       };
     }
 
     // Priority 4: Has crafting table, no pickaxe → craft one
     if (hasItem('crafting_table') && !hasItem('wooden_pickaxe') && !hasItem('stone_pickaxe') && !hasItem('iron_pickaxe') && !hasItem('diamond_pickaxe')) {
-      const goal = buildGoalTagV1('craft', 'wooden_pickaxe', 1);
       return {
-        thought: `I have a crafting table but no pickaxe. I should craft one. ${goal.raw}`,
-        goalTag: goal.raw,
+        thought: 'I have a crafting table but no pickaxe. I should craft one.',
         category: 'crafting',
-        extractedGoal: goal,
       };
     }
 
     // Priority 5: Low log stock → gather more
     if (logCount < 16) {
-      const goal = buildGoalTagV1('collect', 'oak_log', 8);
       return {
-        thought: `Running low on wood (${logCount} logs). I should gather more. ${goal.raw}`,
-        goalTag: goal.raw,
+        thought: `Running low on wood (${logCount} logs). I should gather more.`,
         category: 'gathering',
-        extractedGoal: goal,
       };
     }
 
     // Priority 6: Default curiosity → explore
-    const goal = buildGoalTagV1('explore', 'nearby', 1);
     return {
-      thought: `Everything seems in order. I should explore and see what's around. ${goal.raw}`,
-      goalTag: goal.raw,
+      thought: 'Everything seems in order. I should explore and see what\'s around.',
       category: 'exploration',
-      extractedGoal: goal,
     };
   }
 
   /**
    * Evaluate whether a drive tick should fire.
    * Safety-gated: only fires when comfortable (high health/food, no hostiles, survival mode).
-   * Idempotent: checks for existing matching pending/active tasks.
+   *
+   * MIGRATION (PR4): Drive-tick thoughts are NO LONGER eligible for task conversion.
+   * They bypass Sterling semantic authority (no ReductionProvenance), so they cannot
+   * be converted to tasks. This is fail-closed behavior per I-BOUNDARY-1.
+   *
+   * Drive-ticks now serve as observational thoughts only. To emit actionable goals,
+   * the LLM should route through Sterling via normal idle thought generation.
    */
   private evaluateDriveTick(context: ThoughtContext): CognitiveThought | null {
     const health = context.currentState?.health ?? 20;
@@ -1782,26 +1714,16 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const drive = this.selectDrive(inventory, timeOfDay, context);
     if (!drive) return null;
 
-    // Idempotency: Drive-tick thoughts lack Sterling identity (committedGoalPropId).
-    // Cannot dedupe semantically without reintroducing boundary violations.
-    //
-    // Duplicates are acceptable until drive-ticks are routed through Sterling
-    // or a non-semantic ID is introduced. Drive-ticks do NOT flow through
-    // language-io/Sterling reduce, so no identity will be added downstream
-    // unless explicitly wired.
-    //
-    // REMOVED: Fuzzy title matching (was semantic substitution - violates I-BOUNDARY-1).
-    // Drive-ticks are rare (idle-only), so duplicate risk is low in practice.
-
     // Fire drive tick
     this._lastDriveTickMs = now;
     this._driveTickCount++;
     this._counters.driveTicks++;
 
-    // LF-2: Derive eligibility through single choke point
-    // Drive-ticks always have extractedGoal, so eligibility depends on grounding
+    // PR4: Drive-ticks have NO Sterling reduction, so they are NOT eligible
+    // for task conversion. This is fail-closed behavior per I-BOUNDARY-1.
+    // Pass null reduction to derive ineligible status.
     const { eligibility: driveEligibility, grounding: driveGrounding } = computeEligibility(
-      drive.extractedGoal,
+      null, // No reduction — not eligible
       context
     );
 
@@ -1823,16 +1745,15 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         trigger: 'idle-drive',
         context: drive.category,
         intensity: 0.6,
-        extractedGoal: drive.extractedGoal,
+        // DELETED: extractedGoal (violates I-BOUNDARY-1 — TS can't construct goals)
         extractedGoalSource: 'drive-tick',
-        // Note: goalKey removed - Sterling provides identity via committed_goal_prop_id
         // LF-2: Include eligibility derivation provenance
         eligibilityReasoning: driveEligibility.reasoning,
         groundingResult: driveGrounding ? { pass: driveGrounding.pass, reason: driveGrounding.reason } : undefined,
       },
       novelty: 'high',
-      // LF-2: Use derived eligibility (single choke point)
-      convertEligible: driveEligibility.convertEligible,
+      // PR4: Drive-ticks are NOT eligible (no Sterling reduction)
+      convertEligible: false, // Explicit false — bypass Sterling = no task conversion
       category: 'idle',
       tags: ['drive-tick', 'autonomous', drive.category],
       priority: 'medium',

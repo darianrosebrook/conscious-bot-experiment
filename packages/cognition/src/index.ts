@@ -54,19 +54,34 @@ export type {
   AuditSummary,
 } from './audit/thought-action-audit-logger';
 
-// LLM Output Sanitizer (DEPRECATED - migrating to language-io)
-// Semantic exports removed in PR2 - Sterling is semantic authority
+// =============================================================================
+// LEGACY EXPORTS (DEPRECATED - PR4)
+// =============================================================================
+//
+// These exports are DEPRECATED and will be removed in a future release.
+// Sterling is the semantic authority. Use language-io exports instead.
+//
+// Migration guide:
+// - GoalTagV1 → Use reduction.reducerResult.committed_goal_prop_id
+// - sanitizeLLMOutput → Use reduceRawLLMOutput from cognitive-core
+// - extractGoalTag → Sterling extracts goals via reduce()
+// - extractIntent → Sterling classifies intent via reduce()
+// - IntentLabel → Sterling owns intent taxonomy
+// - SanitizationFlags → Use language-io SanitizationFlags
+//
+// @deprecated Use language-io module instead
 export {
   extractGoalTag,
   extractIntent,
-  // DELETED (PR2): normalizeGoalAction - Sterling normalizes
-  // DELETED (PR2): canonicalGoalKey - use Sterling committed_goal_prop_id
   sanitizeLLMOutput,
   isUsableContent,
   hasCodeLikeDensity,
-  // DELETED (PR2): CANONICAL_ACTIONS - Sterling validates
-  // DELETED (PR2): NORMALIZE_MAP_VERSION - Sterling normalizes
 } from './llm-output-sanitizer';
+
+/**
+ * @deprecated Use language-io ReducerResultView instead.
+ * Sterling owns semantic goal extraction.
+ */
 export type {
   GoalTag,
   GoalTagV1,
@@ -151,4 +166,6 @@ export type {
   ConversationState as CognitiveConversationState,
   CommunicationStyle as CognitiveCommunicationStyle,
   Relationship as CognitiveRelationship,
+  // PR4: Sterling reduction provenance (opaque semantic artifacts)
+  ReductionProvenance,
 } from './types';

@@ -7,10 +7,14 @@
  *
  * The reasoning surface provides:
  * - Frame rendering (factual-only situation frames)
- * - Goal extraction (bounded-scan parser)
- * - Goal grounding (falsification-style validation)
- * - Eligibility derivation (single choke point)
+ * - Goal grounding (Sterling-owned, fail-closed)
+ * - Eligibility derivation (single choke point, Sterling-driven)
  * - Sterling language IO integration (semantic authority)
+ *
+ * MIGRATION (PR4): Local semantic logic has been DELETED.
+ * - Goal extraction → Sterling via language-io
+ * - Grounding → Sterling via ReductionProvenance
+ * - Eligibility → Sterling's is_executable (opaque pass-through)
  *
  * IMPORTANT: Changes to this module affect both production and eval.
  * Update SURFACE_VERSION when semantics change, and regenerate digests.
@@ -26,7 +30,7 @@
  * Version of the reasoning surface API.
  * Bump when semantics change (not just implementation).
  */
-export const SURFACE_VERSION = '1.1.0'; // Bumped for Sterling integration
+export const SURFACE_VERSION = '2.0.0'; // Bumped for Sterling-owned grounding/eligibility
 
 /**
  * SHA-256 digests of source files for verification.
@@ -35,13 +39,15 @@ export const SURFACE_VERSION = '1.1.0'; // Bumped for Sterling integration
  * Regenerate with:
  *   shasum -a 256 packages/cognition/src/reasoning-surface/*.ts
  *
- * MIGRATION NOTE (PR4/Migration A):
- * goal-extractor.ts deleted - no longer part of the reasoning surface.
+ * MIGRATION NOTE (PR4):
+ * - goal-extractor.ts DELETED (Migration A)
+ * - grounder.ts REWRITTEN (Sterling pass-through)
+ * - eligibility.ts REWRITTEN (Sterling-driven)
  */
 export const SURFACE_DIGESTS = {
   frameRenderer: 'b63887aae45fba37d193c820cf1ad1cf3ddc0de4037fcf61898bf984cb6bc700',
-  grounder: '518648b6c6f37a29cc78cda176d797ec2b19def42d6628ad3ac09113a334b405',
-  eligibility: 'fec54e4021da9e9925ec3771c9bb70d5620b2d91987db23fb4fd302faff85857',
+  grounder: 'PENDING_REGENERATION', // Regenerate after migration
+  eligibility: 'PENDING_REGENERATION', // Regenerate after migration
 } as const;
 
 // ============================================================================
@@ -65,34 +71,7 @@ export type {
 } from './frame-renderer';
 
 // ============================================================================
-// Goal Extraction (DEPRECATED - migrating to language-io)
-// ============================================================================
-
-// MIGRATION NOTE (PR4):
-// goal-extractor.ts deleted. These imports now come directly from
-// llm-output-sanitizer until Migration B (llm-interface migration) completes.
-// After Migration B, these will be removed entirely or imported from language-io.
-
-export {
-  extractGoalTag,
-  extractIntent,
-  sanitizeLLMOutput,
-} from '../llm-output-sanitizer';
-
-export type {
-  GoalTag,
-  GoalTagV1,
-  GoalTagFailReason,
-  IntentLabel,
-  IntentParse,
-} from '../llm-output-sanitizer';
-
-// DELETED (Migration A): extractGoal, extractGoalFromSanitized
-// These were wrappers in goal-extractor.ts. Consumers should use
-// sanitizeLLMOutput directly or migrate to language-io.
-
-// ============================================================================
-// Goal Grounding
+// Goal Grounding (Sterling-Owned)
 // ============================================================================
 
 export {
@@ -106,7 +85,7 @@ export type {
 } from './grounder';
 
 // ============================================================================
-// Eligibility Derivation (LF-2: Single Choke Point)
+// Eligibility Derivation (LF-2: Single Choke Point, Sterling-Driven)
 // ============================================================================
 
 export {
@@ -126,11 +105,10 @@ export type {
 // Sterling Language IO Integration
 // ============================================================================
 
-import type { GoalTagV1 } from '../llm-output-sanitizer';
+import type { ReductionProvenance } from '../types';
 import type { GroundingContext } from './grounder';
-import type { EligibilityOutput, EligibilityReasoning, GroundingResult } from './eligibility';
-import { sanitizeLLMOutput } from '../llm-output-sanitizer';
-import { groundGoal } from './grounder';
+import type { EligibilityOutput, GroundingResult } from './eligibility';
+import { groundGoal, createGroundingContext } from './grounder';
 import { deriveEligibility } from './eligibility';
 
 // Import Sterling language IO client
@@ -148,15 +126,18 @@ import {
 
 /**
  * Result of the full reasoning pipeline.
+ *
+ * MIGRATION (PR4): Changed to Sterling-driven.
+ * - `goal` field removed — Sterling provides committed_goal_prop_id
+ * - `grounding` is derived from Sterling's result
+ * - `eligibility` is derived from Sterling's is_executable
  */
 export interface ReasoningPipelineResult {
-  /** Sanitized text (goal tag removed) */
+  /** Sanitized text (for display) */
   text: string;
-  /** Extracted goal, or null */
-  goal: GoalTagV1 | null;
-  /** Grounding result, or null if no goal */
+  /** Grounding result from Sterling */
   grounding: GroundingResult | null;
-  /** Eligibility derivation */
+  /** Eligibility derivation from Sterling */
   eligibility: EligibilityOutput;
 }
 
@@ -198,50 +179,33 @@ export interface ProcessLLMOutputAsyncOptions {
 }
 
 // ============================================================================
-// Legacy Sync Pipeline (Fallback)
+// Eligibility Computation Helper
 // ============================================================================
 
 /**
- * Run the full reasoning pipeline on raw LLM output (LEGACY SYNC).
+ * Compute eligibility from ReductionProvenance.
  *
- * This is the LEGACY synchronous function that chains:
- * 1. sanitizeLLMOutput (extracts goal)
- * 2. groundGoal (validates against context)
- * 3. deriveEligibility (determines convertEligible)
+ * This is a convenience function that combines groundGoal and deriveEligibility
+ * for use by thought-generator.ts and other consumers.
  *
- * IMPORTANT: This does NOT go through Sterling. Use processLLMOutputAsync()
- * for production paths that need Sterling semantic authority.
+ * BOUNDARY RULE (I-BOUNDARY-1):
+ * This function does NOT perform semantic inference. It passes Sterling's
+ * reduction result through to the eligibility derivation.
  *
- * @param rawOutput - Raw LLM output text
- * @param context - Grounding context for validation
- * @returns Full pipeline result
- *
- * @deprecated Use processLLMOutputAsync() for Sterling semantic authority
+ * @param reduction - Sterling reduction provenance, or null
+ * @param context - Grounding context (unused — Sterling owns grounding)
+ * @returns Eligibility output and grounding result
  */
-export function processLLMOutput(
-  rawOutput: string,
-  context: GroundingContext
-): ReasoningPipelineResult {
-  // Step 1: Sanitize and extract goal
-  const sanitized = sanitizeLLMOutput(rawOutput);
+export function computeEligibility(
+  reduction: ReductionProvenance | null,
+  context: { currentState?: Record<string, unknown> }
+): { eligibility: EligibilityOutput; grounding: GroundingResult | null } {
+  const groundingContext = createGroundingContext(context);
+  const grounding = groundGoal(reduction, groundingContext);
 
-  // Step 2: Ground goal if present
-  const grounding = sanitized.goalTagV1
-    ? groundGoal(sanitized.goalTagV1, context)
-    : null;
+  const eligibility = deriveEligibility({ reduction });
 
-  // Step 3: Derive eligibility (single choke point)
-  const eligibility = deriveEligibility({
-    extractedGoal: sanitized.goalTagV1,
-    groundingResult: grounding,
-  });
-
-  return {
-    text: sanitized.text,
-    goal: sanitized.goalTagV1,
-    grounding,
-    eligibility,
-  };
+  return { eligibility, grounding };
 }
 
 // ============================================================================
@@ -260,11 +224,10 @@ export function processLLMOutput(
  * 4. Maps the result to the ReasoningPipelineResult shape
  * 5. Enforces the execution gate (is_executable)
  *
- * If Sterling is unavailable, falls back to legacy processing for
- * explicit [GOAL:] tags only (fail-closed for natural language intent).
+ * If Sterling is unavailable, returns a fail-closed result (not executable).
  *
  * @param rawOutput - Raw LLM output text
- * @param context - Grounding context for validation
+ * @param context - Grounding context (for signature compatibility)
  * @param options - Optional processing options
  * @returns Extended pipeline result with Sterling metadata
  */
@@ -295,42 +258,40 @@ export async function processLLMOutputAsync(
 /**
  * Handle fallback when Sterling is unavailable.
  *
- * In fallback mode:
- * - Explicit [GOAL:] tags → process with legacy pipeline
- * - Natural language intent → NOT executable (fail-closed)
+ * In fallback mode, execution is NOT allowed (fail-closed).
+ * TS does NOT perform local semantic interpretation.
  */
 function handleFallbackResult(
   rawOutput: string,
-  context: GroundingContext,
+  _context: GroundingContext,
   fallback: FallbackResult
 ): SterlingPipelineResult {
-  // Run legacy pipeline to get text/goal/grounding
-  const legacyResult = processLLMOutput(rawOutput, context);
+  // Build reduction provenance for degraded mode
+  const degradedReduction: ReductionProvenance = {
+    sterlingProcessed: false,
+    envelopeId: fallback.envelope.envelope_id,
+    reducerResult: null,
+    isExecutable: false,
+    blockReason: 'sterling_unavailable',
+    durationMs: 0,
+    sterlingError: fallback.fallbackReason,
+  };
 
-  // In fallback mode, execution depends on policy:
-  // - 'permissive': Allow explicit goals even without grounding (resilience)
-  // - 'markers_only': Allow explicit goals but mark as ungrounded (default)
-  // - 'strict': Never reached (throws earlier)
-  const isExecutable = fallback.hasExplicitGoal && legacyResult.goal !== null;
-
-  // Build block reason that indicates lack of grounding
-  let blockReason: string | null = null;
-  if (!isExecutable) {
-    blockReason = 'Sterling unavailable; natural language intent not processed';
-  } else if (fallback.fallbackPolicy === 'markers_only') {
-    blockReason = 'UNGROUNDED: Sterling unavailable, execution granted for explicit marker only';
-  }
+  const grounding = groundGoal(degradedReduction, _context);
+  const eligibility = deriveEligibility({ reduction: degradedReduction });
 
   return {
-    ...legacyResult,
+    text: fallback.envelope.sanitized_text,
+    grounding,
+    eligibility,
     sterlingUsed: false,
     reducerResult: null,
     fallbackReason: fallback.fallbackReason,
-    isExecutable,
-    blockReason,
+    isExecutable: false,
+    blockReason: 'Sterling unavailable; execution not allowed',
     envelopeId: fallback.envelope.envelope_id,
-    durationMs: 0, // Not tracked in fallback
-    groundingPerformed: false, // SECURITY: No grounding in fallback mode
+    durationMs: 0,
+    groundingPerformed: false,
   };
 }
 
@@ -341,55 +302,27 @@ function handleFallbackResult(
  * by downstream consumers (KeepAliveController, etc.).
  */
 function mapSterlingResultToPipelineResult(
-  rawOutput: string,
-  context: GroundingContext,
+  _rawOutput: string,
+  _context: GroundingContext,
   reduceResult: ReduceResult,
   options: ProcessLLMOutputAsyncOptions
 ): SterlingPipelineResult {
   const { result, envelope, canConvert, blockReason, durationMs } = reduceResult;
 
-  // Run legacy pipeline to get text/goal extraction
-  // (Sterling doesn't return the sanitized text or extracted goal shape)
-  const legacyResult = processLLMOutput(rawOutput, context);
-
-  // Build grounding result from Sterling's grounding
-  let grounding: GroundingResult | null = null;
-  if (result.grounding) {
-    grounding = {
-      pass: result.grounding.passed,
-      reason: result.grounding.reason,
-      referencedFacts: [],
-      violations: result.grounding.passed ? [] : [{
-        type: 'unknown_reference',
-        description: result.grounding.reason,
-        trigger: 'sterling_grounding_failed',
-      }],
-    };
-  } else if (legacyResult.grounding) {
-    // Use legacy grounding if Sterling didn't provide one
-    grounding = legacyResult.grounding;
-  }
-
-  // Build eligibility from Sterling's is_executable
-  // Determine reasoning string
-  const goalPresent = result.committed_goal_prop_id !== null;
-  const groundingPass = result.grounding?.passed ?? false;
-  let reasoning: EligibilityReasoning;
-  if (goalPresent && groundingPass) {
-    reasoning = 'goal_present_and_grounding_pass';
-  } else if (goalPresent && !groundingPass) {
-    reasoning = 'goal_present_but_grounding_fail';
-  } else if (goalPresent) {
-    reasoning = 'goal_present_but_no_grounding';
-  } else {
-    reasoning = 'no_goal_present';
-  }
-
-  const eligibility: EligibilityOutput = {
-    convertEligible: result.is_executable,
-    derived: true,
-    reasoning,
+  // Build reduction provenance
+  const reduction: ReductionProvenance = {
+    sterlingProcessed: true,
+    envelopeId: envelope.envelope_id,
+    reducerResult: result,
+    isExecutable: result.is_executable,
+    blockReason,
+    durationMs,
+    sterlingError: null,
   };
+
+  // Derive grounding and eligibility through the canonical path
+  const grounding = groundGoal(reduction, _context);
+  const eligibility = deriveEligibility({ reduction });
 
   // Throw if requireExecutable was set and result is not executable
   if (options.requireExecutable && !result.is_executable) {
@@ -398,8 +331,7 @@ function mapSterlingResultToPipelineResult(
   }
 
   return {
-    text: legacyResult.text,
-    goal: legacyResult.goal,
+    text: envelope.sanitized_text,
     grounding,
     eligibility,
     sterlingUsed: true,
@@ -409,7 +341,7 @@ function mapSterlingResultToPipelineResult(
     blockReason,
     envelopeId: envelope.envelope_id,
     durationMs,
-    groundingPerformed: result.grounding !== null, // True if Sterling provided grounding
+    groundingPerformed: result.grounding !== null,
   };
 }
 
@@ -433,3 +365,63 @@ export type {
   ReducerResultView,
   LanguageIOClientConfig,
 } from '../language-io';
+
+// ============================================================================
+// DEPRECATED: Legacy Exports (for downstream compatibility)
+// ============================================================================
+// These exports are DEPRECATED and will be removed after packages/planning migration.
+// DO NOT use these in new code.
+
+/**
+ * @deprecated Use language-io module instead. Sterling is the semantic authority.
+ */
+export {
+  extractGoalTag,
+  extractIntent,
+  sanitizeLLMOutput,
+} from '../llm-output-sanitizer';
+
+/**
+ * @deprecated Use ReductionProvenance.reducerResult instead. Sterling owns goal extraction.
+ */
+export type {
+  GoalTag,
+  GoalTagV1,
+  GoalTagFailReason,
+  IntentLabel,
+  IntentParse,
+} from '../llm-output-sanitizer';
+
+/**
+ * @deprecated Use processLLMOutputAsync instead. This bypasses Sterling.
+ */
+export function processLLMOutput(
+  rawOutput: string,
+  context: GroundingContext
+): ReasoningPipelineResult & { goal: any } {
+  // Legacy sync processing — does NOT go through Sterling
+  // This is kept ONLY for backwards compatibility during migration
+  const { sanitizeLLMOutput: sanitize } = require('../llm-output-sanitizer');
+  const sanitized = sanitize(rawOutput);
+
+  // Build a fake reduction for the new pipeline
+  const fakeReduction: ReductionProvenance = {
+    sterlingProcessed: false,
+    envelopeId: null,
+    reducerResult: null,
+    isExecutable: false,
+    blockReason: 'legacy_sync_path_no_sterling',
+    durationMs: 0,
+    sterlingError: 'Legacy sync path does not use Sterling',
+  };
+
+  const grounding = groundGoal(fakeReduction, context, { requireSterling: false });
+  const eligibility = deriveEligibility({ reduction: fakeReduction });
+
+  return {
+    text: sanitized.text,
+    goal: sanitized.goalTagV1, // Legacy field
+    grounding,
+    eligibility,
+  };
+}

@@ -29,6 +29,12 @@ import { reduceRawLLMOutput, ReductionError } from '../llm-output-reducer';
 import type { SterlingLanguageIOClient } from '../../language-io';
 import type { ReduceResult, ReducerResultView } from '../../language-io';
 
+// Stub isUsableForTTS to always return true in these tests
+// This prevents retry logic from interfering with Sterling call assertions
+vi.mock('../../server-utils/tts-usable-content', () => ({
+  isUsableForTTS: () => true,
+}));
+
 /**
  * Create a mock SterlingLanguageIOClient for testing.
  * The mock tracks calls to reduce() without requiring Sterling server.
@@ -205,18 +211,16 @@ describe('LLM Interface Sterling Handshake (Migration B)', () => {
 
   describe('LLMInterface routes through stable seam (Step 2)', () => {
     /**
-     * BYPASS DETECTION TEST
+     * HANDSHAKE VERIFICATION TEST
      *
-     * Pre-migration: This test FAILS because current llm-interface.ts
-     * does NOT call Sterling reduce(). We mark it as `it.fails()` so
-     * CI stays green while proving the test can detect bypass.
+     * This test proves that LLMInterface calls Sterling reduce() for
+     * semantic interpretation. It uses DI to inject a mock client and
+     * verifies the mock is called with the raw LLM output.
      *
-     * Post-migration: Flip to `it()` - test will PASS because Sterling
-     * is now called, proving the handshake is live.
-     *
-     * This is the core "tripwire" that makes "green" mean something.
+     * MIGRATION B COMPLETE: This test now passes because llm-interface.ts
+     * uses reduceRawLLMOutput() which calls the injected Sterling client.
      */
-    it.fails('should call Sterling reduce() when processing LLM output (PRE-MIGRATION: expected to fail)', async () => {
+    it('should call Sterling reduce() when processing LLM output (POST-MIGRATION: Sterling is live)', async () => {
       const { mockClient, mockReduce } = createMockLanguageIOClient();
 
       const llm = new LLMInterface(
@@ -239,22 +243,126 @@ describe('LLM Interface Sterling Handshake (Migration B)', () => {
       // Call generateResponse - post-migration this should call Sterling reduce()
       await llm.generateResponse('What do you see?');
 
-      // ASSERTION: Sterling reduce() must be called
-      // Pre-migration: This fails (mockReduce not called)
-      // Post-migration: This passes (mockReduce called once)
-      expect(mockReduce).toHaveBeenCalledTimes(1);
+      // ASSERTION: Sterling reduce() must be called at least once
+      // Note: May be called multiple times due to quality retries — that's OK.
+      // The handshake is proven as long as reduce() is called at all.
+      expect(mockReduce).toHaveBeenCalled();
+
+      // Verify reduce was called with the raw LLM output
+      expect(mockReduce.mock.calls[0][0]).toBe('I see trees nearby. [GOAL: dig stone]');
     });
 
-    it.todo('should use Sterling result for is_executable decision', async () => {
-      // TODO: After primary handshake test is proven, implement this
-      // Mock reduce() returns result with is_executable: false
-      // Assert downstream logic respects this (doesn't override)
+    it('should use Sterling result for is_executable decision (no salvage)', async () => {
+      const { mockClient, mockReduce } = createMockLanguageIOClient();
+
+      // Force Sterling to say "not executable"
+      mockReduce.mockResolvedValueOnce({
+        result: {
+          is_executable: false,
+          is_semantically_empty: false,
+          committed_goal_prop_id: 'prop_should_not_matter',
+          committed_ir_digest: 'digest_blocked',
+          source_envelope_id: 'env_blocked',
+          advisory: null,
+          grounding: { passed: false, reason: 'blocked' } as any,
+          schema_version: '1.0.0',
+          reducer_version: '1.0.0',
+        },
+        envelope: {
+          schema_id: 'language_io_envelope',
+          schema_version: '1.0.0',
+          envelope_id: 'env_blocked',
+          raw_text_verbatim: 'I see trees. [GOAL: dig stone]',
+          sanitized_text: 'I see trees.',
+          sanitization_version: '1.0.0',
+          sanitization_flags: {},
+          declared_markers: [],
+          model_id: null,
+          prompt_digest: null,
+          world_snapshot_ref: null,
+          timestamp_ms: Date.now(),
+        } as any,
+        canConvert: false,
+        blockReason: 'blocked_by_sterling',
+        durationMs: 5,
+      });
+
+      const llm = new LLMInterface(
+        { host: 'localhost', port: 11434 },
+        { languageIOClient: mockClient }
+      );
+
+      vi.spyOn(llm as any, 'callOllama').mockResolvedValue({
+        response: 'I see trees. [GOAL: dig stone]',
+        done: true,
+        prompt_eval_count: 10,
+        eval_count: 20,
+      });
+
+      const response = await llm.generateResponse('What do you see?');
+
+      // CRITICAL: TS must NOT flip is_executable to true ("salvage")
+      // Sterling said false, so it stays false
+      expect(response.metadata?.reduction?.sterlingProcessed).toBe(true);
+      expect(response.metadata?.reduction?.isExecutable).toBe(false);
+      expect(response.metadata?.reduction?.blockReason).toBe('blocked_by_sterling');
     });
 
-    it.todo('should not perform local semantic normalization after Sterling reduce', async () => {
-      // TODO: After primary handshake test is proven, implement this
-      // Mock reduce() returns result with specific committed_goal_prop_id
-      // Assert no TS code "fixes up" the action/target/amount
+    it('should not perform local semantic normalization after Sterling reduce', async () => {
+      const { mockClient, mockReduce } = createMockLanguageIOClient();
+
+      // Use a "weird" committed_goal_prop_id to prove it's not normalized
+      const weirdId = 'PROP::Weird/Case  Value\t#1';
+
+      mockReduce.mockResolvedValueOnce({
+        result: {
+          is_executable: true,
+          is_semantically_empty: false,
+          committed_goal_prop_id: weirdId,
+          committed_ir_digest: 'digest_weird',
+          source_envelope_id: 'env_weird',
+          advisory: null,
+          grounding: null,
+          schema_version: '1.0.0',
+          reducer_version: '1.0.0',
+        },
+        envelope: {
+          schema_id: 'language_io_envelope',
+          schema_version: '1.0.0',
+          envelope_id: 'env_weird',
+          raw_text_verbatim: 'Say something',
+          sanitized_text: 'Say something',
+          sanitization_version: '1.0.0',
+          sanitization_flags: {},
+          declared_markers: [],
+          model_id: null,
+          prompt_digest: null,
+          world_snapshot_ref: null,
+          timestamp_ms: Date.now(),
+        } as any,
+        canConvert: true,
+        blockReason: null,
+        durationMs: 5,
+      });
+
+      const llm = new LLMInterface(
+        { host: 'localhost', port: 11434 },
+        { languageIOClient: mockClient }
+      );
+
+      vi.spyOn(llm as any, 'callOllama').mockResolvedValue({
+        response: 'Say something',
+        done: true,
+        prompt_eval_count: 5,
+        eval_count: 10,
+      });
+
+      const response = await llm.generateResponse('Say something');
+
+      // CRITICAL: The weird ID must be stored EXACTLY as Sterling returned it
+      // No normalization, no mapping, no "fixing up"
+      const storedId = response.metadata?.reduction?.reducerResult?.committed_goal_prop_id;
+      expect(storedId).toBe(weirdId);
     });
   });
 

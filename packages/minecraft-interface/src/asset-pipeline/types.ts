@@ -123,7 +123,19 @@ export interface AssetExtractorOptions {
   /** Directory to extract assets to */
   outputDir?: string;
   /** Only extract specific asset types */
-  assetTypes?: Array<'textures' | 'blockstates' | 'models'>;
+  assetTypes?: Array<'textures' | 'blockstates' | 'models' | 'entities'>;
+}
+
+/** A single extracted entity texture */
+export interface ExtractedEntityTexture {
+  /** Relative path within entity folder (e.g., "player/wide/steve") */
+  relativePath: string;
+  /** Full path within JAR (e.g., "assets/minecraft/textures/entity/player/wide/steve.png") */
+  jarPath: string;
+  /** Path to extracted file */
+  extractedPath: string;
+  /** Raw PNG buffer */
+  data: Buffer;
 }
 
 // ============================================================================
@@ -180,6 +192,8 @@ export interface AssetExtractionResult {
   textures: ExtractedTexture[];
   blockStates: ExtractedBlockState[];
   models: ExtractedModel[];
+  /** Entity textures extracted from JAR */
+  entityTextures: ExtractedEntityTexture[];
   /** Directory where raw assets were extracted */
   rawAssetsDir: string;
 }

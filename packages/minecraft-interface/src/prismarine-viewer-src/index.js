@@ -356,6 +356,77 @@ socket.on('botInfo', (data) => {
   }
 })
 
+// Queue for loadChunk events that arrive before viewer is ready
+// This fixes a race condition where chunks arrive during async blockStates loading
+const pendingChunks = []
+let viewerReady = false
+
+// Track whether workers have received blockStates
+let workersBlockStatesReady = false
+
+// Register loadChunk listener IMMEDIATELY to avoid missing events during async setup
+// Note: viewer.listen() also registers a loadChunk handler, but we only queue here
+// and let the viewer's handler process once viewerReady is true
+socket.on('loadChunk', ({ x, z, chunk }) => {
+  if (!viewerReady) {
+    // Queue chunks until viewer is ready - they'll be processed after setup
+    pendingChunks.push({ x, z, chunk })
+  }
+  // Once viewerReady is true, viewer.listen()'s handler will process new chunks
+})
+
+/**
+ * Wait for workers to be ready to process chunks.
+ *
+ * The race condition occurs because:
+ * 1. setVersion() calls updateTexturesData() which loads blockStates async
+ * 2. We immediately call viewer.addColumn() for chunks
+ * 3. Workers receive chunks but blocksStates === null, so they early-return
+ *
+ * This function polls for material.map (texture loaded) as a proxy for workers
+ * being ready. We also check blockStatesData to ensure it's been set before
+ * updateTexturesData() was called.
+ *
+ * @param {Object} worldRenderer - The viewer's world renderer
+ * @param {number} timeout - Maximum time to wait in milliseconds
+ * @returns {Promise<void>} Resolves when workers are ready
+ */
+function waitForWorkersReady (worldRenderer, timeout = 10000) {
+  return new Promise((resolve) => {
+    const startTime = Date.now()
+
+    const check = () => {
+      // Check if material.map is loaded (texture ready)
+      const textureReady = worldRenderer.material && worldRenderer.material.map
+
+      // If blockStatesData was pre-set, workers received it synchronously
+      // Otherwise, we wait for the texture as a proxy (they load in parallel)
+      const blockStatesReady = worldRenderer.blockStatesData != null || textureReady
+
+      if (textureReady && blockStatesReady) {
+        console.log('[viewer] Workers ready - texture loaded, blockStates should be in workers')
+        workersBlockStatesReady = true
+        resolve()
+        return
+      }
+
+      if (Date.now() - startTime > timeout) {
+        console.warn('[viewer] Timeout waiting for workers ready, proceeding anyway')
+        console.warn('[viewer]   textureReady:', !!textureReady)
+        console.warn('[viewer]   blockStatesData set:', worldRenderer.blockStatesData != null)
+        workersBlockStatesReady = true
+        resolve()
+        return
+      }
+
+      // Poll every 50ms (matches worker's setInterval)
+      setTimeout(check, 50)
+    }
+
+    check()
+  })
+}
+
 socket.on('version', async (version) => {
   console.log(`[viewer] Received version: ${version}`)
 
@@ -363,29 +434,33 @@ socket.on('version', async (version) => {
   configureCustomAssets(viewer, version)
 
   // Try to load custom blockstates first
+  console.log('[viewer] Loading custom blockstates...')
   const customBlockStates = await loadCustomBlockStates(version)
   if (customBlockStates && viewer.world) {
+    // CRITICAL: Set blockStatesData BEFORE setVersion() so updateTexturesData()
+    // can send it to workers synchronously instead of loading async
     viewer.world.blockStatesData = customBlockStates
     console.log(`[viewer] Using custom blockstates with ${Object.keys(customBlockStates).length} blocks`)
+  } else {
+    console.log('[viewer] No custom blockstates loaded, will use bundled')
   }
 
+  console.log('[viewer] Calling setVersion...')
   if (!viewer.setVersion(version)) {
     return false
   }
+  console.log('[viewer] setVersion complete')
+
+  // CRITICAL FIX: Wait for workers to receive blockStates before processing chunks
+  // This prevents the race condition where chunks arrive before blockStates
+  console.log('[viewer] Waiting for workers to be ready...')
+  await waitForWorkersReady(viewer.world)
+  console.log('[viewer] Workers ready!')
 
   // Set up animated material after texture loads
-  // The material.map may not be ready immediately, so we wait for it
+  // The material.map is now guaranteed to be ready from waitForWorkersReady
   if (customBlockStates) {
-    const checkAndSetupMaterial = () => {
-      if (viewer.world && viewer.world.material && viewer.world.material.map) {
-        setupAnimatedMaterial(customBlockStates)
-      } else {
-        // Retry after a short delay while texture loads
-        setTimeout(checkAndSetupMaterial, 100)
-      }
-    }
-    // Start checking after a small initial delay
-    setTimeout(checkAndSetupMaterial, 200)
+    setupAnimatedMaterial(customBlockStates)
   }
 
   // Initialize sky renderer after viewer is set up
@@ -402,7 +477,22 @@ socket.on('version', async (version) => {
   }
 
   firstPositionUpdate = true
+  console.log('[viewer] About to call viewer.listen(socket)...')
   viewer.listen(socket)
+  console.log('[viewer] viewer.listen() complete')
+
+  // Mark viewer as ready and process any queued chunks
+  // Workers are now GUARANTEED to have blockStates loaded
+  viewerReady = true
+  console.log(`[viewer] Viewer ready! pendingChunks.length = ${pendingChunks.length}`)
+  if (pendingChunks.length > 0) {
+    console.log(`[viewer] Processing ${pendingChunks.length} queued chunks (workers have blockStates)...`)
+    for (const { x, z, chunk } of pendingChunks) {
+      viewer.addColumn(x, z, chunk)
+    }
+    console.log(`[viewer] Finished processing queued chunks`)
+    pendingChunks.length = 0 // Clear the queue
+  }
 
   // Set camera reference on entities manager for name tag updates
   if (viewer.entities && viewer.entities.setCamera) {

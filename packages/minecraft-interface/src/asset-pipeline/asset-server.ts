@@ -173,22 +173,85 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   });
 
   /**
-   * Server status endpoint.
+   * Server status endpoint with version validation.
+   *
+   * Returns detailed status including:
+   * - Cached asset versions
+   * - Viewer version support status
+   * - Warnings for unsupported versions
    */
   router.get('/status', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const cached = await pipeline.listCached();
+
+      // Try to load version support info from patched prismarine-viewer
+      let versionSupport: Record<string, unknown> | null = null;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { getVersionStatus, getAllVersions } = require('prismarine-viewer/viewer/lib/version');
+        versionSupport = {
+          supportedVersions: getAllVersions(),
+        };
+      } catch {
+        // Version module not available (prismarine-viewer not rebuilt yet)
+        versionSupport = null;
+      }
+
+      // Build version status for each cached version
+      const versionStatuses = cached.map((c) => {
+        const paths = pipeline.getOutputPaths(c.version);
+        const hasTextures = fs.existsSync(paths.texturePath);
+        const hasBlockStates = fs.existsSync(paths.blockStatesPath);
+
+        // Check viewer support if available
+        let viewerSupported = true;
+        let viewerFallback: string | null = null;
+        if (versionSupport) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { getVersionStatus } = require('prismarine-viewer/viewer/lib/version');
+            const status = getVersionStatus(c.version);
+            viewerSupported = status.supported;
+            viewerFallback = status.fallback;
+          } catch {
+            // Ignore
+          }
+        }
+
+        return {
+          version: c.version,
+          generatedAt: c.generatedAt.toISOString(),
+          size: c.size,
+          hasTextures,
+          hasBlockStates,
+          viewerSupported,
+          viewerFallback,
+        };
+      });
+
+      // Generate warnings for versions that may have issues
+      const warnings: string[] = [];
+      for (const status of versionStatuses) {
+        if (!status.viewerSupported && !status.viewerFallback) {
+          warnings.push(`Version ${status.version} is not supported by the viewer and has no fallback`);
+        }
+        if (!status.hasTextures) {
+          warnings.push(`Version ${status.version} is missing texture atlas`);
+        }
+        if (!status.hasBlockStates) {
+          warnings.push(`Version ${status.version} is missing blockStates JSON`);
+        }
+      }
+
       res.json({
         status: 'ok',
         autoGenerate,
         fallbackToBundled,
         hasBundledFallback: !!pvPublicDir,
-        cachedVersions: cached.map((c) => ({
-          version: c.version,
-          generatedAt: c.generatedAt.toISOString(),
-          size: c.size,
-        })),
+        cachedVersions: versionStatuses,
         generatingVersions: Array.from(generatingVersions),
+        versionSupport,
+        warnings,
       });
     } catch (error) {
       next(error);

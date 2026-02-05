@@ -1,0 +1,46 @@
+id: MCVIEW-103
+title: "Deduplicate Three.js and restore entity textures"
+risk_tier: 2
+scope:
+  in:
+    - "Force prismarine-viewer webpack bundle to use a single Three.js instance"
+    - "Normalize entity names to resolve textures/models"
+    - "Verify entity textures render for common mobs"
+  out:
+    - "Upgrading Three.js versions"
+    - "Replacing prismarine-viewer renderer"
+    - "Changing asset pipeline formats"
+invariants:
+  - "Viewer bundle loads with a single Three.js instance."
+  - "Known entities render with their textures instead of magenta fallback."
+  - "No regressions to terrain rendering or animated textures."
+acceptance:
+  - id: A1
+    given: "viewer bundle is rebuilt"
+    when: "page loads"
+    then: "console does not warn about multiple Three.js instances"
+  - id: A2
+    given: "entity name includes 'minecraft:' prefix"
+    when: "entity mesh is created"
+    then: "texture loads from prismarine-viewer public textures"
+  - id: A3
+    given: "world is rendering with 1.21.9"
+    when: "entities are visible"
+    then: "entities are textured (no magenta fallback for common mobs)"
+non_functional:
+  a11y: []
+  perf:
+    lcp_ms: 2500
+  security:
+    - "No new remote code loading"
+contracts:
+  - type: openapi
+    path: "contracts/minecraft-interface-health.yaml"
+observability:
+  logs:
+    - "Entity texture load failures include entity name"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "Revert webpack alias and entity name normalization"

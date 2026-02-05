@@ -2541,6 +2541,29 @@ function startViewerSafely(bot: any, port: number) {
     viewerActive = true;
     console.log(`[Prismarine] Viewer started at http://localhost:${port}`);
 
+    // Check version support and warn if using fallback
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getVersionStatus } = require('prismarine-viewer/viewer/lib/version');
+      const mcVersion = bot.version;
+      const status = getVersionStatus(mcVersion);
+
+      if (!status.supported && !status.dynamic) {
+        console.warn(`[Prismarine] ⚠️  MC ${mcVersion} not in viewer version list`);
+        if (status.fallback) {
+          console.warn(`[Prismarine] Using fallback: ${status.fallback}`);
+        } else {
+          console.warn(`[Prismarine] No fallback available - terrain may not render correctly`);
+          console.warn(`[Prismarine] Run: pnpm mc:assets extract ${mcVersion}`);
+        }
+      } else {
+        console.log(`[Prismarine] MC ${mcVersion} supported (${status.static ? 'static' : 'dynamic'})`);
+      }
+    } catch {
+      // Version check not available (patched version.js not loaded)
+      console.log(`[Prismarine] Version check unavailable - using MC ${bot.version}`);
+    }
+
     if (errorMessages.length > 0 || warningMessages.length > 0) {
       console.log(
         `⚠️ Suppressed ${errorMessages.length} unknown entity errors and ${warningMessages.length} warnings during viewer startup`

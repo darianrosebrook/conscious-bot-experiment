@@ -259,8 +259,12 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
 
   /**
    * Test: Fallback mode when Sterling unavailable
+   *
+   * PR4 MIGRATION: Fail-closed design (I-FAILCLOSED-1)
+   * When Sterling is unavailable, NOTHING is executable, even explicit [GOAL:] tags.
+   * Sterling is the semantic authority. TS does NOT interpret goal tags locally.
    */
-  it('falls back gracefully when Sterling unavailable', async () => {
+  it('falls back gracefully when Sterling unavailable (fail-closed)', async () => {
     // Make transport unavailable
     mockTransport.setAvailable(false);
 
@@ -289,8 +293,12 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
     // Fallback mode was used
     expect(thought.sterlingUsed).toBe(false);
 
-    // Explicit goal in fallback mode IS executable
-    expect(thought.isExecutable).toBe(true);
+    // PR4: FAIL-CLOSED — even explicit goal tags are NOT executable without Sterling
+    // This is I-FAILCLOSED-1: Sterling is the semantic authority
+    expect(thought.isExecutable).toBe(false);
+
+    // Block reason should indicate Sterling unavailability
+    expect(thought.blockReason).toContain('Sterling unavailable');
   });
 
   /**

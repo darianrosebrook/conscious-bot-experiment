@@ -239,11 +239,14 @@ function calculateAnimationSpeed (velocity) {
 // ============================================================================
 
 function getEntityMesh (entity, scene) {
-  if (entity.name) {
+  const rawName = entity.name
+  const normalizedName = rawName ? rawName.replace(/^minecraft:/, '') : null
+  if (normalizedName) {
     try {
-      const e = new Entity('1.16.4', entity.name, scene)
+      const e = new Entity('1.16.4', normalizedName, scene)
       // Store entity info in userData for extras setup
-      e.mesh.userData.entityName = entity.name
+      e.mesh.userData.entityName = normalizedName
+      e.mesh.userData.entityNameRaw = rawName
       e.mesh.userData.entityUsername = entity.username
       e.mesh.userData.entityHeight = entity.height || 1.8
       e.mesh.userData.entityWidth = entity.width || 0.6
@@ -253,13 +256,16 @@ function getEntityMesh (entity, scene) {
     }
   }
 
-  const geometry = new THREE.BoxGeometry(entity.width, entity.height, entity.width)
-  geometry.translate(0, entity.height / 2, 0)
+  // Use defaults if entity dimensions are missing to prevent NaN geometry
+  const width = entity.width || 0.6
+  const height = entity.height || 1.8
+  const geometry = new THREE.BoxGeometry(width, height, width)
+  geometry.translate(0, height / 2, 0)
   const material = new THREE.MeshBasicMaterial({ color: 0xff00ff })
   const cube = new THREE.Mesh(geometry, material)
   // Store entity info for fallback entities too
-  cube.userData.entityHeight = entity.height
-  cube.userData.entityWidth = entity.width
+  cube.userData.entityHeight = height
+  cube.userData.entityWidth = width
   cube.userData.entityUsername = entity.username
   return cube
 }

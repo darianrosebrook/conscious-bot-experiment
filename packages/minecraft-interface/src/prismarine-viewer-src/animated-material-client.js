@@ -28,7 +28,6 @@ const TWILIGHT_DIRECTIONAL_COLOR = new THREE.Color(0xff8844)
 // ============================================================================
 
 const animatedVertexShader = `
-  attribute vec3 color;
   varying vec2 vUv;
   varying vec3 vColor;
   varying vec3 vNormal;

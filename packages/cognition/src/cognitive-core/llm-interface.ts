@@ -7,13 +7,16 @@
  * @author @darianrosebrook
  */
 
-import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse } from '../types';
-import { sanitizeLLMOutput, sanitizeForChat, isUsableContent } from '../llm-output-sanitizer';
+import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse, ReductionProvenance } from '../types';
 import type { BotStateCacheEnvelope } from '../bot-state-cache';
 import {
   getDefaultLanguageIOClient,
   type SterlingLanguageIOClient,
+  type SanitizationFlags,
 } from '../language-io';
+import { isUsableForTTS } from '../server-utils/tts-usable-content';
+import { formatForChat, formatForDisplay } from './chat-formatting';
+import { reduceRawLLMOutput, ReductionError, type ReductionResult } from './llm-output-reducer';
 
 /**
  * Dependencies that can be injected for testing.
@@ -52,8 +55,11 @@ export class LLMInterface {
   /** Whether the sidecar supports keep_alive. True until first rejection. */
   private keepAliveSupported: boolean = true;
   /**
-   * Sterling language IO client (DI seam for Migration B).
-   * Currently unused - will be wired during Migration B implementation.
+   * Sterling language IO client for semantic reduction.
+   *
+   * DI SEAM: Tests can inject a mock client to verify Sterling is called
+   * without requiring an actual Sterling server.
+   *
    * @internal
    */
   private readonly languageIOClient: SterlingLanguageIOClient;
@@ -87,7 +93,6 @@ export class LLMInterface {
     this.available = true;
 
     // DI seam: use injected client or default
-    // Currently unused - will be wired during Migration B implementation
     this.languageIOClient = deps?.languageIOClient ?? getDefaultLanguageIOClient();
   }
 
@@ -145,33 +150,39 @@ export class LLMInterface {
         );
       }
 
-      const sanitized = sanitizeLLMOutput(response.response);
+      // Attempt Sterling reduction — this is the semantic authority
+      const rawText = response.response;
+      const reduction = await this.attemptSterlingReduction(rawText);
 
-      const metadata = {
+      // Build metadata with reduction provenance (opaque Sterling artifacts)
+      const metadata: LLMResponse['metadata'] = {
         finishReason: response.done ? 'stop' : 'length',
         usage: {
           promptTokens,
           completionTokens,
           totalTokens: promptTokens + completionTokens,
         },
-        extractedGoal: sanitized.goalTagV1 ?? sanitized.goalTag ?? undefined,
-        extractedIntent: sanitized.intent ?? null,
-        intentParse: sanitized.intentParse ?? null,
-        sanitizationFlags: sanitized.flags,
-      } as LLMResponse['metadata'];
+        reduction: reduction.provenance,
+        sanitizationFlags: reduction.sanitizationFlags,
+      };
 
-      if (!isUsableContent(sanitized.text)) {
+      // Use text from reduction (sanitized) or fall back to raw text in degraded mode
+      const displayText = reduction.displayText;
+
+      // Quality gate: check if content is usable for TTS (non-semantic check)
+      if (!isUsableForTTS(displayText)) {
         // Single quality retry — slightly bumped temperature, no recursive check
         const retryResponse = await this.callOllama(model, fullPrompt, {
           temperature: Math.min(temperature + 0.1, 1.0),
           maxTokens,
           signal: options?.signal,
         });
-        const retrySanitized = sanitizeLLMOutput(retryResponse.response);
+        const retryRawText = retryResponse.response;
+        const retryReduction = await this.attemptSterlingReduction(retryRawText);
         const retryEndTime = performance.now();
         return {
           id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          text: retrySanitized.text,
+          text: retryReduction.displayText,
           model,
           tokensUsed: retryResponse.eval_count || 0,
           latency: retryEndTime - startTime,
@@ -180,9 +191,8 @@ export class LLMInterface {
             ...metadata,
             retryAttempt: 1,
             retryReason: 'quality_gate',
-            extractedGoal:
-              retrySanitized.goalTagV1 ?? retrySanitized.goalTag ?? undefined,
-            sanitizationFlags: retrySanitized.flags,
+            reduction: retryReduction.provenance,
+            sanitizationFlags: retryReduction.sanitizationFlags,
           },
           timestamp: Date.now(),
         };
@@ -190,7 +200,7 @@ export class LLMInterface {
 
       return {
         id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        text: sanitized.text,
+        text: displayText,
         model,
         tokensUsed: completionTokens,
         latency: latencyMs,
@@ -218,35 +228,34 @@ export class LLMInterface {
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
 
-          const response = await this.callOllama(model, fullPrompt, {
+          const retryResp = await this.callOllama(model, fullPrompt, {
             temperature,
             maxTokens,
             signal: options?.signal,
           });
 
           const endTime = performance.now();
-          const retrySanitized = sanitizeLLMOutput(response.response);
+          const retryReduction = await this.attemptSterlingReduction(retryResp.response);
 
           return {
             id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            text: retrySanitized.text,
+            text: retryReduction.displayText,
             model,
-            tokensUsed: response.eval_count || 0,
+            tokensUsed: retryResp.eval_count || 0,
             latency: endTime - startTime,
-            confidence: this.calculateConfidence(response),
+            confidence: this.calculateConfidence(retryResp),
             metadata: {
-              finishReason: response.done ? 'stop' : 'length',
+              finishReason: retryResp.done ? 'stop' : 'length',
               usage: {
-                promptTokens: response.prompt_eval_count || 0,
-                completionTokens: response.eval_count || 0,
+                promptTokens: retryResp.prompt_eval_count || 0,
+                completionTokens: retryResp.eval_count || 0,
                 totalTokens:
-                  (response.prompt_eval_count || 0) +
-                  (response.eval_count || 0),
+                  (retryResp.prompt_eval_count || 0) +
+                  (retryResp.eval_count || 0),
               },
               retryAttempt: attempt,
-              extractedGoal:
-                retrySanitized.goalTagV1 ?? retrySanitized.goalTag ?? undefined,
-              sanitizationFlags: retrySanitized.flags,
+              reduction: retryReduction.provenance,
+              sanitizationFlags: retryReduction.sanitizationFlags,
             },
             timestamp: Date.now(),
           };
@@ -434,8 +443,8 @@ Please analyze this situation and provide ethical guidance, including:
     });
 
     // Hard character cap — enforced in code, not just the prompt.
-    // sanitizeForChat runs the full pipeline + 256 char cap.
-    result.text = sanitizeForChat(result.text || '');
+    // formatForChat strips markers and enforces 256 char cap (non-semantic cleanup).
+    result.text = formatForChat(result.text || '');
 
     return result;
   }
@@ -616,6 +625,84 @@ Please analyze this situation and provide ethical guidance, including:
     if (length > 100) return 0.7;
     if (length > 50) return 0.6;
     return 0.5;
+  }
+
+  /**
+   * Attempt Sterling reduction with graceful degradation.
+   *
+   * BOUNDARY RULE (I-REDUCTION-1):
+   * Sterling is the semantic authority. If Sterling succeeds, we pass through
+   * its results OPAQUELY. If Sterling fails, we degrade gracefully to text-only
+   * mode with is_executable: false.
+   *
+   * IMPORTANT: In degraded mode, the response is explicitly "no semantics" —
+   * TS must NOT attempt local semantic parsing as a fallback.
+   *
+   * @param rawText - Raw text from LLM (verbatim, no preprocessing)
+   * @returns Reduction result with provenance and display text
+   */
+  private async attemptSterlingReduction(rawText: string): Promise<{
+    provenance: ReductionProvenance;
+    displayText: string;
+    sanitizationFlags: SanitizationFlags | undefined;
+  }> {
+    const startTime = performance.now();
+
+    try {
+      const result: ReductionResult = await reduceRawLLMOutput(rawText, this.languageIOClient);
+
+      // Success: Sterling processed the output
+      // Pass through results OPAQUELY — no fix-up, no interpretation
+      return {
+        provenance: {
+          sterlingProcessed: true,
+          envelopeId: result.envelope.envelope_id,
+          reducerResult: result.reducerResult,
+          isExecutable: result.isExecutable, // Opaque pass-through
+          blockReason: result.blockReason,   // Opaque pass-through
+          durationMs: result.durationMs,
+          sterlingError: null,
+        },
+        // Use sanitized text from envelope for display
+        displayText: result.envelope.sanitized_text,
+        sanitizationFlags: result.envelope.sanitization_flags,
+      };
+    } catch (error) {
+      const durationMs = performance.now() - startTime;
+
+      // Degraded mode: Sterling failed
+      // Return text-only, explicitly NOT executable, no semantics
+      const errorMessage = error instanceof ReductionError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'Unknown Sterling error';
+
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('[LLM] Sterling reduction failed, degrading to text-only:', errorMessage);
+      }
+
+      // If we *have* an envelope (ReductionError), keep its identifiers for debugging,
+      // but do NOT do any semantic inference locally.
+      const envelopeId = error instanceof ReductionError ? error.envelope.envelope_id : null;
+      const flags = error instanceof ReductionError ? error.envelope.sanitization_flags : undefined;
+
+      return {
+        provenance: {
+          sterlingProcessed: false,
+          envelopeId,
+          reducerResult: null,
+          isExecutable: false, // Explicitly not executable — no semantics available
+          blockReason: 'sterling_unavailable',
+          durationMs,
+          sterlingError: errorMessage,
+        },
+        // In degraded mode, use raw text (with basic visual cleanup)
+        // formatForDisplay strips markers without semantic interpretation
+        displayText: formatForDisplay(rawText),
+        sanitizationFlags: flags,
+      };
+    }
   }
 
   /**

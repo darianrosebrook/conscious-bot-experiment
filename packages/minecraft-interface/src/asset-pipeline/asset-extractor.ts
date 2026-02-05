@@ -17,6 +17,7 @@ import type {
   ExtractedTexture,
   ExtractedBlockState,
   ExtractedModel,
+  ExtractedEntityTexture,
   BlockStateDefinition,
   BlockModelDefinition,
   AnimationMeta,
@@ -36,6 +37,7 @@ const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.minecraft-assets-cache', 'ex
 // Paths within the Minecraft JAR
 const JAR_PATHS = {
   blockTextures: 'assets/minecraft/textures/block/',
+  entityTextures: 'assets/minecraft/textures/entity/',
   blockStates: 'assets/minecraft/blockstates/',
   blockModels: 'assets/minecraft/models/block/',
   itemModels: 'assets/minecraft/models/item/',
@@ -48,12 +50,12 @@ const JAR_PATHS = {
  */
 export class AssetExtractor {
   private readonly outputBaseDir: string;
-  private readonly assetTypes: Set<'textures' | 'blockstates' | 'models'>;
+  private readonly assetTypes: Set<'textures' | 'blockstates' | 'models' | 'entities'>;
 
   constructor(options: AssetExtractorOptions = {}) {
     this.outputBaseDir = options.outputDir ?? DEFAULT_CACHE_DIR;
-    const types = options.assetTypes ?? (['textures', 'blockstates', 'models'] as const);
-    this.assetTypes = new Set<'textures' | 'blockstates' | 'models'>(types);
+    const types = options.assetTypes ?? (['textures', 'blockstates', 'models', 'entities'] as const);
+    this.assetTypes = new Set<'textures' | 'blockstates' | 'models' | 'entities'>(types);
   }
 
   /**
@@ -76,6 +78,7 @@ export class AssetExtractor {
     const textures: ExtractedTexture[] = [];
     const blockStates: ExtractedBlockState[] = [];
     const models: ExtractedModel[] = [];
+    const entityTextures: ExtractedEntityTexture[] = [];
 
     // Store mcmeta files separately for post-processing
     const mcmetaFiles = new Map<string, McmetaFile>();
@@ -182,6 +185,22 @@ export class AssetExtractor {
                 } catch {
                   // Skip malformed JSON
                 }
+              } else if (
+                this.assetTypes.has('entities') &&
+                entryPath.startsWith(JAR_PATHS.entityTextures) &&
+                entryPath.endsWith('.png')
+              ) {
+                // Extract entity textures preserving directory structure
+                const relativePath = entryPath.substring(JAR_PATHS.entityTextures.length);
+                const extractedPath = path.join(outputDir, 'entity', relativePath);
+                await this.ensureDir(path.dirname(extractedPath));
+                await fs.promises.writeFile(extractedPath, data);
+                entityTextures.push({
+                  relativePath: relativePath.replace('.png', ''),
+                  jarPath: entryPath,
+                  extractedPath,
+                  data,
+                });
               }
             } catch (error) {
               // Log but don't fail on individual entry errors
@@ -202,11 +221,14 @@ export class AssetExtractor {
     // Post-process: attach animation metadata to textures
     await this.attachAnimationMetadata(textures, mcmetaFiles);
 
+    console.log(`[asset-extractor] Extracted ${textures.length} block textures, ${entityTextures.length} entity textures, ${blockStates.length} blockstates, ${models.length} models`);
+
     return {
       version,
       textures,
       blockStates,
       models,
+      entityTextures,
       rawAssetsDir: outputDir,
     };
   }
@@ -285,6 +307,11 @@ export class AssetExtractor {
         }
       }
     }
+    if (this.assetTypes.has('entities')) {
+      if (entryPath.startsWith(JAR_PATHS.entityTextures) && entryPath.endsWith('.png')) {
+        return true;
+      }
+    }
     if (this.assetTypes.has('blockstates')) {
       if (entryPath.startsWith(JAR_PATHS.blockStates) && entryPath.endsWith('.json')) {
         return true;
@@ -313,6 +340,7 @@ export class AssetExtractor {
     const texturesDir = path.join(outputDir, 'textures');
     const blockstatesDir = path.join(outputDir, 'blockstates');
     const modelsDir = path.join(outputDir, 'models');
+    const entityDir = path.join(outputDir, 'entity');
 
     // Check if all required directories exist and have content
     const checks: boolean[] = [];
@@ -321,6 +349,12 @@ export class AssetExtractor {
       checks.push(
         fs.existsSync(texturesDir) &&
           (await fs.promises.readdir(texturesDir)).some((f) => f.endsWith('.png'))
+      );
+    }
+    if (this.assetTypes.has('entities')) {
+      checks.push(
+        fs.existsSync(entityDir) &&
+          (await fs.promises.readdir(entityDir)).length > 0
       );
     }
     if (this.assetTypes.has('blockstates')) {
@@ -347,6 +381,7 @@ export class AssetExtractor {
     const textures: ExtractedTexture[] = [];
     const blockStates: ExtractedBlockState[] = [];
     const models: ExtractedModel[] = [];
+    const entityTextures: ExtractedEntityTexture[] = [];
 
     // Collect mcmeta files for post-processing
     const mcmetaFiles = new Map<string, McmetaFile>();
@@ -389,6 +424,12 @@ export class AssetExtractor {
       await this.attachAnimationMetadata(textures, mcmetaFiles);
     }
 
+    // Load entity textures (recursively)
+    const entityDir = path.join(outputDir, 'entity');
+    if (fs.existsSync(entityDir)) {
+      await this.loadEntityTexturesRecursive(entityDir, '', entityTextures);
+    }
+
     // Load blockstates
     const blockstatesDir = path.join(outputDir, 'blockstates');
     if (fs.existsSync(blockstatesDir)) {
@@ -417,6 +458,7 @@ export class AssetExtractor {
       textures,
       blockStates,
       models,
+      entityTextures,
       rawAssetsDir: outputDir,
     };
   }
@@ -445,6 +487,35 @@ export class AssetExtractor {
         } catch {
           // Skip malformed JSON
         }
+      }
+    }
+  }
+
+  /**
+   * Recursively loads entity textures from a directory.
+   */
+  private async loadEntityTexturesRecursive(
+    baseDir: string,
+    relativePath: string,
+    entityTextures: ExtractedEntityTexture[]
+  ): Promise<void> {
+    const currentDir = path.join(baseDir, relativePath);
+    const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        await this.loadEntityTexturesRecursive(baseDir, entryRelativePath, entityTextures);
+      } else if (entry.isFile() && entry.name.endsWith('.png')) {
+        const extractedPath = path.join(currentDir, entry.name);
+        const data = await fs.promises.readFile(extractedPath);
+        entityTextures.push({
+          relativePath: entryRelativePath.replace('.png', ''),
+          jarPath: `assets/minecraft/textures/entity/${entryRelativePath}`,
+          extractedPath,
+          data,
+        });
       }
     }
   }

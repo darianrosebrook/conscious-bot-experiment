@@ -36,13 +36,13 @@ const ENFORCED_MODULES = [
  * Do NOT edit this baseline set unless the policy itself changes.
  */
 const BASELINE_GRANDFATHERED_FILES = new Set([
-  'reasoning-surface/goal-extractor.ts',
+  'reasoning-surface/goal-extractor.ts',  // DELETED (Migration A)
   'reasoning-surface/grounder.ts',
   'reasoning-surface/eligibility.ts',
   'thought-generator.ts',
-  'types.ts',
+  'types.ts',                              // MIGRATED (Migration C partial)
   'index.ts',
-  'cognitive-core/llm-interface.ts',
+  'cognitive-core/llm-interface.ts',       // MIGRATED (Migration B)
 ]);
 
 /**
@@ -62,36 +62,16 @@ const GRANDFATHERED_LEGACY_SANITIZER_IMPORTS = new Map<string, {
   priority: 'high' | 'medium' | 'low';
 }>([
   // DELETED (Migration A): reasoning-surface/goal-extractor.ts - file deleted
-  ['reasoning-surface/grounder.ts', {
-    currentUsage: 'import type { GoalTagV1 }',
-    migrationTarget: 'Use DeclaredMarker from language-io/envelope-types',
-    priority: 'medium',
-  }],
-  ['reasoning-surface/eligibility.ts', {
-    currentUsage: 'import type { GoalTagV1 }',
-    migrationTarget: 'Use ReducerResultView from language-io/reducer-result-types',
-    priority: 'medium',
-  }],
-  ['thought-generator.ts', {
-    currentUsage: 'import type { GoalTagV1 }',
-    migrationTarget: 'Use DeclaredMarker from language-io/envelope-types',
-    priority: 'medium',
-  }],
-  ['types.ts', {
-    currentUsage: 'export type { SanitizationFlags, GoalTagV1 }',
-    migrationTarget: 'Re-export from language-io/envelope-types instead',
-    priority: 'low',
-  }],
+  // MIGRATED (Migration C): reasoning-surface/grounder.ts - now uses ReductionProvenance
+  // MIGRATED (Migration C): reasoning-surface/eligibility.ts - now uses ReductionProvenance
+  // MIGRATED (Migration C): thought-generator.ts - now uses ReductionProvenance
+  // MIGRATED (Migration C partial): types.ts - now imports from language-io
   ['index.ts', {
     currentUsage: 'Re-exports for package API',
     migrationTarget: 'Export language-io module, deprecate legacy exports',
     priority: 'low',
   }],
-  ['cognitive-core/llm-interface.ts', {
-    currentUsage: 'import { sanitizeLLMOutput, sanitizeForChat, isUsableContent }',
-    migrationTarget: 'Use buildLanguageIOEnvelope + SterlingLanguageIOClient.reduce',
-    priority: 'high',
-  }],
+  // MIGRATED (Migration B): cognitive-core/llm-interface.ts - now uses language-io
 ]);
 
 describe('I-MIGRATION-1: No Legacy Sanitizer Imports', () => {
@@ -212,20 +192,19 @@ describe('Grandfathered Legacy Imports (Strict Ratchet)', () => {
     }
 
     // Document migration order for visibility
-    // UPDATED (Migration A): goal-extractor.ts deleted, 6 files remain
+    // UPDATED (Migration C): grounder, eligibility, thought-generator migrated
+    // Only index.ts remains (blocked on packages/planning consumers)
     expect(highPriority).toEqual([
-      'cognitive-core/llm-interface.ts',      // Heavy user of sanitizer (Migration B)
+      // All high-priority migrations complete!
     ]);
 
     expect(mediumPriority).toEqual([
-      'reasoning-surface/grounder.ts',
-      'reasoning-surface/eligibility.ts',
-      'thought-generator.ts',
+      // All medium-priority migrations complete!
+      // grounder.ts, eligibility.ts, thought-generator.ts now use ReductionProvenance
     ]);
 
     expect(lowPriority).toEqual([
-      'types.ts',                             // Re-export layer
-      'index.ts',                             // Package API
+      'index.ts',                             // Package API (re-exports deprecated)
     ]);
   });
 });

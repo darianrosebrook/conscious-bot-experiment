@@ -6,7 +6,35 @@
 
 import { z } from 'zod';
 
-import type { SanitizationFlags, GoalTagV1 } from './llm-output-sanitizer';
+import type { ReducerResultView, SanitizationFlags as LanguageIOSanitizationFlags } from './language-io';
+
+/**
+ * Sterling reduction provenance — opaque semantic artifacts from Sterling.
+ *
+ * BOUNDARY RULE (I-REDUCTION-1):
+ * These fields are OPAQUE pass-throughs from Sterling. TS code must NOT
+ * interpret, normalize, or "fix up" these values. Sterling is the semantic
+ * authority.
+ *
+ * If Sterling returns is_executable: false, TS must NOT override it.
+ * If Sterling returns committed_goal_prop_id: null, TS must NOT infer one.
+ */
+export interface ReductionProvenance {
+  /** Whether Sterling successfully processed the output */
+  sterlingProcessed: boolean;
+  /** The envelope ID that was sent to Sterling */
+  envelopeId: string | null;
+  /** Sterling's reducer result (opaque — do not interpret semantically) */
+  reducerResult: ReducerResultView | null;
+  /** Whether the result is executable according to Sterling */
+  isExecutable: boolean;
+  /** Block reason if not executable (opaque from Sterling) */
+  blockReason: string | null;
+  /** Round-trip duration in milliseconds */
+  durationMs: number;
+  /** Error message if Sterling failed */
+  sterlingError: string | null;
+}
 
 // ============================================================================
 // LLM Interface Types
@@ -44,7 +72,18 @@ export interface LLMContext {
 }
 
 /**
- * LLM response with metadata
+ * LLM response with metadata.
+ *
+ * MIGRATION NOTE (PR4):
+ * The semantic fields (extractedGoal, extractedIntent, intentParse) have been
+ * replaced with `reduction` — an opaque provenance object from Sterling.
+ *
+ * TS code should NOT attempt to extract or normalize semantic content from
+ * the `text` field. All semantic interpretation happens in Sterling via the
+ * `reduction.reducerResult` artifact.
+ *
+ * For backwards compatibility during migration, the legacy fields are marked
+ * as deprecated but may still be present in some code paths.
  */
 export interface LLMResponse {
   id: string;
@@ -64,11 +103,42 @@ export interface LLMResponse {
     citations?: string[];
     retryAttempt?: number;
     retryReason?: string;
-    extractedGoal?: GoalTagV1 | { action: string; target: string; amount: number | null };
+
+    /**
+     * Sterling reduction provenance (PR4+).
+     *
+     * Contains opaque semantic artifacts from Sterling. TS code must NOT
+     * interpret these values — they are pass-throughs from the semantic authority.
+     */
+    reduction?: ReductionProvenance;
+
+    /**
+     * Sanitization flags from envelope construction (non-semantic).
+     * These describe what cleanup was applied to the text, not semantic content.
+     */
+    sanitizationFlags?: LanguageIOSanitizationFlags;
+
+    // =========================================================================
+    // DEPRECATED FIELDS (PR4 migration)
+    // These are kept for backwards compatibility but should not be used.
+    // =========================================================================
+
+    /**
+     * @deprecated Use `reduction.reducerResult.committed_goal_prop_id` instead.
+     * Sterling is the semantic authority for goal extraction.
+     */
+    extractedGoal?: { action: string; target: string; amount: number | null };
+
+    /**
+     * @deprecated Use `reduction.reducerResult` instead.
+     * Sterling is the semantic authority for intent classification.
+     */
     extractedIntent?: string | null;
-    /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
+
+    /**
+     * @deprecated No longer used. Intent parsing is Sterling's responsibility.
+     */
     intentParse?: string | null;
-    sanitizationFlags?: SanitizationFlags;
   };
   timestamp: number;
 }

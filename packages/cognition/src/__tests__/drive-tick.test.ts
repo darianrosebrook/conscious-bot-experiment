@@ -5,7 +5,14 @@ import type { ThoughtContext, CognitiveThought } from '../thought-generator';
 
 /**
  * Tests for drive-tick engine: safety gates, drive selection,
- * timer enforcement, idempotency, and goal shape.
+ * timer enforcement, idempotency, and thought shape.
+ *
+ * MIGRATION NOTE (PR4):
+ * Drive-ticks are now OBSERVATIONAL ONLY. They bypass Sterling semantic authority,
+ * so they are NOT eligible for task conversion (convertEligible: false).
+ *
+ * The selectDrive() method now returns { thought, category } instead of extractedGoal.
+ * Tests have been updated to check the thought content and category instead of goal shape.
  *
  * @author @darianrosebrook
  */
@@ -75,7 +82,7 @@ describe('Drive Tick', () => {
     return (generator as any).evaluateDriveTick(ctx);
   }
 
-  function callSelectDrive(inventory: any[], timeOfDay: number, ctx: ThoughtContext) {
+  function callSelectDrive(inventory: any[], timeOfDay: number, ctx: ThoughtContext): { thought: string; category: string } | null {
     return (generator as any).selectDrive(inventory, timeOfDay, ctx);
   }
 
@@ -136,20 +143,20 @@ describe('Drive Tick', () => {
   // ==========================================
 
   describe('selectDrive priorities', () => {
-    it('selects collect oak_log when inventory empty', () => {
+    it('selects gathering when inventory empty', () => {
       const result = callSelectDrive([], 6000, makeContext());
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('collect');
-      expect(result!.extractedGoal.target).toBe('oak_log');
-      expect(result!.extractedGoal.amount).toBe(8);
+      // PR4: selectDrive returns { thought, category }, not extractedGoal
+      expect(result!.category).toBe('gathering');
+      expect(result!.thought).toContain('wood');
     });
 
-    it('selects build shelter when night approaching and hasShelterNearby=false', () => {
+    it('selects survival when night approaching and hasShelterNearby=false', () => {
       const inv = [{ name: 'oak_log', count: 20, displayName: 'Oak Log' }];
       const result = callSelectDrive(inv, 11500, makeContext({ hasShelterNearby: false }));
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('build');
-      expect(result!.extractedGoal.target).toBe('basic_shelter');
+      expect(result!.category).toBe('survival');
+      expect(result!.thought).toContain('shelter');
     });
 
     it('skips shelter drive when hasShelterNearby is undefined (fail-closed)', () => {
@@ -161,29 +168,29 @@ describe('Drive Tick', () => {
       const result = callSelectDrive(inv, 11500, ctx);
       expect(result).not.toBeNull();
       // Should skip shelter and pick the next priority (craft crafting_table)
-      expect(result!.extractedGoal.action).not.toBe('build');
+      expect(result!.category).not.toBe('survival');
     });
 
-    it('selects craft crafting_table when has logs but no table', () => {
+    it('selects crafting when has logs but no table', () => {
       const inv = [{ name: 'oak_log', count: 20, displayName: 'Oak Log' }];
       const result = callSelectDrive(inv, 6000, makeContext());
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('craft');
-      expect(result!.extractedGoal.target).toBe('crafting_table');
+      expect(result!.category).toBe('crafting');
+      expect(result!.thought).toContain('crafting table');
     });
 
-    it('selects craft wooden_pickaxe when has table but no pickaxe', () => {
+    it('selects crafting for pickaxe when has table but no pickaxe', () => {
       const inv = [
         { name: 'oak_log', count: 20, displayName: 'Oak Log' },
         { name: 'crafting_table', count: 1, displayName: 'Crafting Table' },
       ];
       const result = callSelectDrive(inv, 6000, makeContext());
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('craft');
-      expect(result!.extractedGoal.target).toBe('wooden_pickaxe');
+      expect(result!.category).toBe('crafting');
+      expect(result!.thought).toContain('pickaxe');
     });
 
-    it('selects collect oak_log when log stock low', () => {
+    it('selects gathering when log stock low', () => {
       const inv = [
         { name: 'oak_log', count: 5, displayName: 'Oak Log' },
         { name: 'crafting_table', count: 1, displayName: 'Crafting Table' },
@@ -191,11 +198,11 @@ describe('Drive Tick', () => {
       ];
       const result = callSelectDrive(inv, 6000, makeContext());
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('collect');
-      expect(result!.extractedGoal.target).toBe('oak_log');
+      expect(result!.category).toBe('gathering');
+      expect(result!.thought).toContain('wood');
     });
 
-    it('selects explore when well-stocked', () => {
+    it('selects exploration when well-stocked', () => {
       const inv = [
         { name: 'oak_log', count: 32, displayName: 'Oak Log' },
         { name: 'crafting_table', count: 1, displayName: 'Crafting Table' },
@@ -203,24 +210,24 @@ describe('Drive Tick', () => {
       ];
       const result = callSelectDrive(inv, 6000, makeContext());
       expect(result).not.toBeNull();
-      expect(result!.extractedGoal.action).toBe('explore');
-      expect(result!.extractedGoal.target).toBe('nearby');
+      expect(result!.category).toBe('exploration');
+      expect(result!.thought).toContain('explore');
     });
   });
 
   // ==========================================
-  // Goal shape via buildGoalTagV1
+  // Thought shape (PR4: Sterling-aware)
   // ==========================================
 
-  describe('goal shape', () => {
-    it('produces valid GoalTagV1 structure', () => {
+  describe('thought shape', () => {
+    it('produces thought with content and category from drive', () => {
       const result = callEvaluateDriveTick(makeContext());
       expect(result).not.toBeNull();
-      const goal = result!.metadata.extractedGoal;
-      expect(goal).toBeDefined();
-      expect(goal!.action).toBeTruthy();
-      expect(goal!.target).toBeTruthy();
-      expect(typeof goal!.amount).toBe('number');
+      // Content comes from selectDrive().thought
+      expect(result!.content).toBeTruthy();
+      expect(result!.content.length).toBeGreaterThan(10);
+      // Category is in tags
+      expect(result!.tags).toBeDefined();
     });
 
     it('sets extractedGoalSource to drive-tick', () => {
@@ -229,29 +236,35 @@ describe('Drive Tick', () => {
       expect(result!.metadata.extractedGoalSource).toBe('drive-tick');
     });
 
-    it('derives convertEligible through single choke point (LF-2)', () => {
-      // LF-2: convertEligible is now derived, not hard-coded
-      // With empty inventory, drive-tick generates "collect oak_log" but grounding may fail
+    it('sets convertEligible to false (PR4: no Sterling reduction)', () => {
+      // PR4: Drive-ticks bypass Sterling, so they are NOT eligible for task conversion
+      // This is the fail-closed behavior per I-BOUNDARY-1
       const result = callEvaluateDriveTick(makeContext());
       expect(result).not.toBeNull();
-      // Eligibility depends on grounding; with sparse context, it may be false
-      expect(typeof result!.convertEligible).toBe('boolean');
+
+      // CRITICAL: Drive-ticks are always NOT eligible
+      expect(result!.convertEligible).toBe(false);
+
       // Must include eligibility reasoning for audit trail
-      expect(result!.metadata.eligibilityReasoning).toBeDefined();
+      expect(result!.metadata.eligibilityReasoning).toBe('no_reduction');
     });
 
-    it('sets convertEligible to true when grounding passes', () => {
-      // Provide context that will make grounding pass (inventory contains wood)
-      const result = callEvaluateDriveTick(makeContext({
-        inventory: [
-          { name: 'oak_log', count: 1, displayName: 'Oak Log' },
-        ],
-      }));
+    it('does NOT have extractedGoal (PR4: TS cannot construct goals)', () => {
+      // PR4: extractedGoal was deleted because TS cannot construct semantic goals
+      // This violates I-BOUNDARY-1 — only Sterling can produce goals
+      const result = callEvaluateDriveTick(makeContext());
       expect(result).not.toBeNull();
-      // With wood in inventory, "collect oak_log" should ground successfully
-      // Note: the drive-tick with wood triggers low-stock path (< 16 logs)
-      expect(result!.convertEligible).toBe(true);
-      expect(result!.metadata.groundingResult?.pass).toBe(true);
+
+      // extractedGoal MUST NOT exist
+      expect(result!.metadata.extractedGoal).toBeUndefined();
+    });
+
+    it('has grounding result from eligibility computation', () => {
+      const result = callEvaluateDriveTick(makeContext());
+      expect(result).not.toBeNull();
+
+      // Grounding result should exist (from computeEligibility)
+      expect(result!.metadata.groundingResult).toBeDefined();
     });
 
     it('sets novelty to high', () => {

@@ -1357,6 +1357,65 @@ async function mainVerbose() {
     process.exit(1);
   }
 
+  // Step 7b: Ensure entity textures are available (extract from JAR if missing)
+  try {
+    const mcVersion = process.env.MINECRAFT_VERSION || '1.21.9';
+    const pvTexturesDir = path.join(
+      projectRoot,
+      'node_modules',
+      'prismarine-viewer',
+      'public',
+      'textures',
+      mcVersion,
+      'entity'
+    );
+    const needsEntityTextures =
+      !fs.existsSync(pvTexturesDir) ||
+      fs.readdirSync(pvTexturesDir).filter((name) => name.endsWith('.png'))
+        .length === 0;
+
+    if (needsEntityTextures) {
+      log(
+        `\nEntity textures missing for ${mcVersion} — extracting from JAR...`,
+        colors.cyan
+      );
+      const injectScript = path.join(
+        projectRoot,
+        'packages',
+        'minecraft-interface',
+        'scripts',
+        'inject-entity-textures.cjs'
+      );
+      if (fs.existsSync(injectScript)) {
+        const customSkinPath = path.join(
+          process.env.HOME || '',
+          'Downloads',
+          'createdSkin.png'
+        );
+        const args = ['node', injectScript, mcVersion];
+        if (fs.existsSync(customSkinPath)) {
+          args.push('--custom-skin', customSkinPath);
+        }
+        execSync(args.join(' '), {
+          stdio:
+            OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production'
+              ? 'pipe'
+              : 'inherit',
+        });
+        log(' Entity textures injected', colors.green);
+      } else {
+        log(' inject-entity-textures.cjs not found, skipping', colors.yellow);
+      }
+    } else {
+      log(` Entity textures present for ${mcVersion}`, colors.green);
+    }
+  } catch (error) {
+    log(
+      ` Failed to ensure entity textures: ${error?.message || error}`,
+      colors.yellow
+    );
+  }
+
   // Step 8: Start services in priority order with dependency checking
   log('\nStarting services in dependency order...', colors.cyan);
   if (!sterlingAvailable) {

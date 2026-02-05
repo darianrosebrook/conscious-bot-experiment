@@ -1,0 +1,46 @@
+id: MCVIEW-102
+title: "Fix prismarine-viewer shader color attribute redefinition"
+risk_tier: 2
+scope:
+  in:
+    - "Remove duplicate color attribute declaration in animated ShaderMaterial"
+    - "Ensure vertex colors continue to render correctly"
+    - "Eliminate WebGL shader compile errors for viewer materials"
+  out:
+    - "Changing texture atlas generation"
+    - "Replacing renderer or Three.js version"
+    - "Altering worker/world meshing logic"
+invariants:
+  - "No shader compile errors in the viewer console on load."
+  - "Terrain geometry renders with vertex colors intact."
+  - "Animated textures still animate and light correctly."
+acceptance:
+  - id: A1
+    given: "viewer loads with vertexColors enabled"
+    when: "animated ShaderMaterial compiles"
+    then: "no 'color' redefinition or WebGL program invalid errors occur"
+  - id: A2
+    given: "bot world has loaded chunks"
+    when: "viewer renders terrain"
+    then: "terrain is visible (not blank) and shaded"
+  - id: A3
+    given: "animated textures (water/lava/fire)"
+    when: "time advances"
+    then: "animation remains functional and lighting updates" 
+non_functional:
+  a11y: []
+  perf:
+    lcp_ms: 2500
+  security:
+    - "No new external resources or remote code loading"
+contracts:
+  - type: openapi
+    path: "contracts/minecraft-interface-health.yaml"
+observability:
+  logs:
+    - "shader material compile status (if available via Three.js)"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "Revert animated material shader changes and rebuild viewer bundle"

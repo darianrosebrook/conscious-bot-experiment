@@ -1,29 +1,74 @@
-# Prismarine-Viewer Source Customizations
+# Prismarine-Viewer Custom Source
 
-This directory contains our customizations to prismarine-viewer that get applied via pnpm patch and postinstall scripts.
+This directory contains all customizations to prismarine-viewer.
+Files here are copied to `node_modules/prismarine-viewer/` during postinstall.
 
 ## Why This Exists
 
 The prismarine-viewer package has several limitations we address:
-1. **No skeletal animations** - Entities "glide" without leg/arm movement
-2. **No POV switching** - Locked to first-person view
-3. **No orbit controls** - Can't orbit around the bot in 3rd person
-4. **Version lag** - Bundled textures only go up to MC 1.21.4
-5. **No animated textures** - Water/lava/fire are static
-
-We inject our customizations directly into the viewer's client-side JavaScript.
+1. **BlockStates race condition** - Terrain doesn't render because chunks arrive before blockStates
+2. **No skeletal animations** - Entities "glide" without leg/arm movement
+3. **No POV switching** - Locked to first-person view
+4. **No orbit controls** - Can't orbit around the bot in 3rd person
+5. **Version lag** - Bundled textures only go up to MC 1.21.4
+6. **No animated textures** - Water/lava/fire are static
+7. **No sky/weather** - Missing procedural sky dome and weather particles
 
 ## Architecture
 
 ```
 prismarine-viewer-src/
 ├── README.md                    # This file
-├── index.js                     # Client entry point (POV, orbit, custom assets)
-├── Entity.js                    # Modified entity mesh creation (stores bone refs)
-├── entities.js                  # Animation system + entity manager
-├── viewer.js                    # Render loop integration
-└── animation-system.js          # Pure animation logic (no viewer deps)
+│
+├── Core Fixes
+│   ├── index.js                 # Client entry (POV, orbit, custom assets, waitForWorkersReady)
+│   ├── worldrenderer.js         # Sync blockStates to prevent race condition
+│   └── version.js               # Dynamic version support with fallback
+│
+├── Entity System
+│   ├── Entity.js                # Modified mesh creation (stores bone refs)
+│   ├── entities.js              # Animation system + entity manager
+│   ├── equipment-renderer.js    # Armor/held item meshes
+│   └── entity-extras.js         # Name tags, capes, shadows
+│
+├── Visual Enhancements
+│   ├── animated-material-client.js  # Water/lava/fire animation shader
+│   ├── sky-renderer.js              # Procedural sky dome (sun/moon/stars)
+│   └── weather-system.js            # Rain/snow/lightning particles
+│
+├── Server-Side
+│   └── mineflayer.js            # Bot integration, equipment/time events
+│
+└── Reference (not copied)
+    └── animation-system.js      # Pure animation logic (TypeScript reference)
 ```
+
+## The BlockStates Race Condition Fix
+
+### The Problem
+
+The original prismarine-viewer has a race condition where terrain doesn't render:
+
+1. `socket.on('version')` fires
+2. `viewer.setVersion()` → calls `updateTexturesData()` which loads blockStates async
+3. `viewer.listen(socket)` registers loadChunk handler
+4. We process queued chunks via `viewer.addColumn()`
+5. **Worker receives chunks but `blocksStates === null`** → returns early in 50ms interval
+6. By the time blockStates arrive, dirty sections may be gone
+
+### The Fix
+
+Two changes work together:
+
+1. **index.js** - `waitForWorkersReady()`:
+   - Polls until `material.map` is loaded (texture ready)
+   - If blockStatesData was pre-set, workers received it synchronously
+   - Only processes queued chunks after workers are confirmed ready
+
+2. **worldrenderer.js** - Sync blockStates:
+   - If `blockStatesData` is pre-set, sends to workers immediately (sync)
+   - Skips the async `loadJSON` promise chain that causes the race
+   - Workers have blockStates before any chunks arrive
 
 ## Custom Asset Integration
 
@@ -39,66 +84,64 @@ This enables:
 The asset server is mounted at `/mc-assets` in the minecraft-interface server (see `server.ts`).
 Assets are generated via `pnpm mc:assets extract <version>` and cached in `~/.minecraft-assets-cache/`.
 
-## Two Patch Mechanisms
+## How Files Are Applied
 
-### 1. pnpm patch (automatic)
-Applied automatically during `pnpm install`. Patches:
-- `viewer/lib/entity/Entity.js`
-- `viewer/lib/entities.js`
-- `viewer/lib/viewer.js`
+All files are copied by `scripts/rebuild-prismarine-viewer.cjs` during postinstall:
 
-Patch file: `/patches/prismarine-viewer@1.33.0.patch`
+| Source File | Destination(s) | Purpose |
+|-------------|----------------|---------|
+| index.js | lib/index.js | Main entry with POV toggle |
+| mineflayer.js | lib/mineflayer.js | Server-side events |
+| worldrenderer.js | viewer/lib/worldrenderer.js | Sync blockStates fix |
+| version.js | viewer/lib/version.js | Dynamic version support |
+| entities.js | viewer/lib/entities.js | Animation manager |
+| Entity.js | viewer/lib/entity/Entity.js | Bone storage |
+| equipment-renderer.js | lib/ + viewer/lib/ | Armor rendering |
+| entity-extras.js | lib/ + viewer/lib/ | Name tags, capes |
+| animated-material-client.js | lib/ | Animation shader |
+| sky-renderer.js | lib/ | Procedural sky |
+| weather-system.js | lib/ | Weather particles |
 
-### 2. postinstall copy (rebuild script)
-Copies `index.js` during the webpack rebuild. This replaces the entire
-client entry point to add POV switching and orbit controls.
+## Adding a New MC Version
 
-Script: `scripts/rebuild-prismarine-viewer.cjs`
-Source: `patches/prismarine-viewer-lib-index.patched.js` (symlinked from here)
+1. Update `version.js` supportedVersions array
+2. Run `pnpm mc:assets extract <version>` to generate assets
+3. Verify with `curl http://localhost:3005/mc-assets/status`
 
-## How It Works
+For versions beyond the list, the viewer will:
+1. Try to find a fallback in the same major version family
+2. Warn in console if using fallback
+3. Error if no fallback available
 
-1. **Entity.js** - When creating entity meshes:
-   - Stores bone names in `mesh.userData.bonesByName` for animation lookups
-   - Stores skeleton reference in `mesh.userData.skeleton`
-   - Passes entity type through to track which animation category to use
+## Verification
 
-2. **entities.js** - The Entities manager:
-   - Creates `AnimationMixer` per entity when spawned
-   - Calculates velocity from position updates
-   - Transitions between idle/walk based on movement speed
-   - Provides `updateAnimations(deltaTime)` for the render loop
+Run the verification script to check all patches are applied:
 
-3. **viewer.js** - The main viewer:
-   - Calls `entities.updateAnimations(deltaTime)` every frame
-   - Tracks delta time for smooth animation timing
-
-4. **animation-system.js** - Standalone animation logic:
-   - Entity category detection (biped vs quadruped)
-   - Animation clip creation with QuaternionKeyframeTrack
-   - Walk cycle definitions (legs, arms, body bob)
-   - Idle animations (breathing, subtle sway)
-
-## Applying Changes
-
-The patch is automatically applied when running `pnpm install`. The patch file lives at:
-```
-/patches/prismarine-viewer@1.33.0.patch
-```
-
-To regenerate the patch after modifying these source files:
 ```bash
-# 1. Start a fresh patch session
-pnpm patch prismarine-viewer@1.33.0
-
-# 2. Copy our source files over the patch directory
-cp src/prismarine-viewer-src/Entity.js node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/entity/
-cp src/prismarine-viewer-src/entities.js node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
-cp src/prismarine-viewer-src/viewer.js node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
-
-# 3. Commit the patch
-pnpm patch-commit 'node_modules/.pnpm_patches/prismarine-viewer@1.33.0'
+node scripts/verify-viewer-setup.cjs
 ```
+
+This checks:
+- All source files are copied to correct destinations
+- Patched files contain our signatures
+- Webpack bundle includes our customizations
+- Version support is properly configured
+
+## Common Issues
+
+### Terrain not rendering
+- Check browser console for "Workers ready" message
+- Verify blockStates loaded before chunks
+- Check `/mc-assets/status` for asset availability
+
+### Entity animations not playing
+- Ensure `viewer.update()` is called each frame
+- Check `entities.updateAnimations(deltaTime)` is wired
+
+### New version shows pink terrain
+- Version not in supportedVersions list
+- Assets not generated for version
+- Run asset extraction pipeline: `pnpm mc:assets extract <version>`
 
 ## Supported Entities
 
@@ -127,7 +170,7 @@ rabbit, goat, llama, polar_bear, panda, bee, spider, cave_spider
 - Biped: 2s cycle, subtle body sway and arm movement
 - Quadruped: 3s cycle, subtle head movement
 
-## TypeScript Source
+## TypeScript Reference
 
 The authoritative TypeScript implementation lives in:
 ```

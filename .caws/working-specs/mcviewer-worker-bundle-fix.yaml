@@ -1,0 +1,56 @@
+id: MCVIEW-101
+title: "Fix prismarine-viewer worker bundle to support MC 1.21.9"
+risk_tier: 2
+scope:
+  in:
+    - "Rebuild prismarine-viewer worker.js bundle so minecraft-data includes 1.21.9"
+    - "Remove/mitigate worker build skip due to assert dependency"
+    - "Ensure worker initialization succeeds for 1.21.9"
+    - "Add guardrails or checks to prevent silent worker version failures"
+  out:
+    - "Replacing prismarine-viewer renderer"
+    - "Changing asset pipeline output formats"
+    - "Altering blockStates content or atlas generation"
+invariants:
+  - "Worker must initialize World for the negotiated version (no 'Do not have data' error)."
+  - "Chunk meshing emits geometry messages for loaded chunks."
+  - "No regression to blockStates pre-load race fix."
+  - "Textures remain loaded and mapped consistently (no pink blocks for terrain)."
+acceptance:
+  - id: A1
+    given: "viewer receives version 1.21.9"
+    when: "worker initializes"
+    then: "worker does not throw 'Do not have data for 1.21.9'"
+  - id: A2
+    given: "chunks are queued after version set"
+    when: "worker processes dirty sections"
+    then: "geometry messages are posted and terrain renders"
+  - id: A3
+    given: "worker bundle rebuild runs"
+    when: "postinstall rebuild completes"
+    then: "public/worker.js is regenerated and includes 1.21.9 minecraft-data"
+  - id: A4
+    given: "1.21.4 is used"
+    when: "worker initializes"
+    then: "behavior remains unchanged (no regressions)"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 300
+  security:
+    - "No remote code loading added to worker build"
+    - "Dependencies pinned to existing versions"
+contracts:
+  - type: openapi
+    path: "contracts/minecraft-interface-health.yaml"
+observability:
+  logs:
+    - "worker init success/failure with version"
+    - "worker bundle rebuild summary"
+  metrics:
+    - "viewer_worker_init_success_total"
+    - "viewer_worker_init_failure_total"
+  traces: []
+migrations: []
+rollback:
+  - "Revert worker bundle changes and pin viewer to 1.21.4 (temporary)"
