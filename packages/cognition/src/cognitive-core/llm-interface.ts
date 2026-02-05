@@ -10,6 +10,25 @@
 import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse } from '../types';
 import { sanitizeLLMOutput, sanitizeForChat, isUsableContent } from '../llm-output-sanitizer';
 import type { BotStateCacheEnvelope } from '../bot-state-cache';
+import {
+  getDefaultLanguageIOClient,
+  type SterlingLanguageIOClient,
+} from '../language-io';
+
+/**
+ * Dependencies that can be injected for testing.
+ * Production code uses defaults; tests can inject mocks.
+ */
+export interface LLMInterfaceDeps {
+  /**
+   * Sterling language IO client for semantic reduction.
+   * If not provided, uses getDefaultLanguageIOClient().
+   *
+   * DI SEAM (Migration B): This allows handshake tests to inject a mock
+   * and verify Sterling reduce() is called without requiring Sterling server.
+   */
+  languageIOClient?: SterlingLanguageIOClient;
+}
 
 // Export LLMContext for use by other modules
 export type { LLMContext, LLMResponse } from '../types';
@@ -32,8 +51,14 @@ export class LLMInterface {
   private available: boolean;
   /** Whether the sidecar supports keep_alive. True until first rejection. */
   private keepAliveSupported: boolean = true;
+  /**
+   * Sterling language IO client (DI seam for Migration B).
+   * Currently unused - will be wired during Migration B implementation.
+   * @internal
+   */
+  private readonly languageIOClient: SterlingLanguageIOClient;
 
-  constructor(config: Partial<LLMConfig> = {}) {
+  constructor(config: Partial<LLMConfig> = {}, deps?: LLMInterfaceDeps) {
     const defaultConfig: LLMConfig = {
       provider: 'mlx',
       model: 'gemma3n:e2b',
@@ -60,6 +85,10 @@ export class LLMInterface {
 
     this.baseUrl = `http://${this.config.host}:${this.config.port}`;
     this.available = true;
+
+    // DI seam: use injected client or default
+    // Currently unused - will be wired during Migration B implementation
+    this.languageIOClient = deps?.languageIOClient ?? getDefaultLanguageIOClient();
   }
 
   isAvailable(): boolean {
