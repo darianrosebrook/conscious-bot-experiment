@@ -3,11 +3,16 @@
 ## Touched Modules
 - packages/minecraft-interface/src/prismarine-viewer-src/webpack.config.js
 - packages/minecraft-interface/src/prismarine-viewer-src/entities.js
+- packages/minecraft-interface/src/prismarine-viewer-src/Entity.js
+- packages/minecraft-interface/src/prismarine-viewer-src/index.js
+- packages/minecraft-interface/src/asset-pipeline/asset-server.ts
+- packages/minecraft-interface/src/server.ts
 - packages/minecraft-interface/scripts/rebuild-prismarine-viewer.cjs (bundle rebuild)
 
 ## Runtime/Build Impact
 - Viewer bundle rebuilt to dedupe Three.js.
-- Entity mesh creation uses normalized names.
+- Entity mesh creation uses normalized names and fallback mappings.
+- Entity textures served via asset server with on-demand extraction.
 
 ## Data/Migrations
 - None.

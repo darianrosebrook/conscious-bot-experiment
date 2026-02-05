@@ -94,27 +94,40 @@ export class AssetPipeline {
     version: string,
     options: {
       force?: boolean;
+      ensureRawAssets?: string[];
       // eslint-disable-next-line no-unused-vars -- callback parameter used by callers
       onProgress?: (progress: PipelineProgress) => void;
       onDownloadProgress?: DownloadProgressCallback;
     } = {}
   ): Promise<GeneratedAssets> {
-    const { force = false, onProgress, onDownloadProgress } = options;
+    const { force = false, ensureRawAssets = [], onProgress, onDownloadProgress } = options;
 
     // Stage 1: Resolve version
     onProgress?.({ stage: 'resolving', message: `Resolving version ${version}...` });
     const resolved = await this.versionResolver.resolve(version);
     const versionId = resolved.id;
 
+    const paths = this.getOutputPaths(versionId);
+    const missingRawAssets = ensureRawAssets.some((subdir) => {
+      const targetDir = path.join(paths.rawAssetsPath, subdir);
+      if (!fs.existsSync(targetDir)) return true;
+      try {
+        return fs.readdirSync(targetDir).length === 0;
+      } catch {
+        return true;
+      }
+    });
+    const shouldForce = force || missingRawAssets;
+
     // Check if already generated
-    if (!force && (await this.isGenerated(versionId))) {
-      const paths = this.getOutputPaths(versionId);
-      const stats = await fs.promises.stat(paths.texturePath);
+    if (!shouldForce && (await this.isGenerated(versionId))) {
+      const cachedPaths = this.getOutputPaths(versionId);
+      const stats = await fs.promises.stat(cachedPaths.texturePath);
       return {
         version: versionId,
-        texturePath: paths.texturePath,
-        blockStatesPath: paths.blockStatesPath,
-        rawAssetsPath: paths.rawAssetsPath,
+        texturePath: cachedPaths.texturePath,
+        blockStatesPath: cachedPaths.blockStatesPath,
+        rawAssetsPath: cachedPaths.rawAssetsPath,
         fromCache: true,
         generatedAt: stats.mtime,
         atlasInfo: await this.getAtlasInfo(versionId),
@@ -148,7 +161,6 @@ export class AssetPipeline {
 
     // Stage 6: Save results
     onProgress?.({ stage: 'saving', message: 'Saving generated assets...' });
-    const paths = this.getOutputPaths(versionId);
     await fs.promises.mkdir(path.dirname(paths.texturePath), { recursive: true });
     await fs.promises.writeFile(paths.texturePath, atlas.image);
     await fs.promises.writeFile(paths.blockStatesPath, JSON.stringify(blockStates));

@@ -237,6 +237,16 @@ function getMesh (texture, jsonModel, entityType) {
   return mesh
 }
 
+function resolveEntityTexturePath (version, texturePath) {
+  const normalized = texturePath
+    .replace(/^textures\//, '')
+    .replace(/^entity\//, '')
+  if (globalThis.__ASSET_SERVER_URL) {
+    return `${globalThis.__ASSET_SERVER_URL}/mc-assets/entity/${version}/${normalized}.png`
+  }
+  return texturePath.replace('textures', 'textures/' + version) + '.png'
+}
+
 /**
  * Entity class - creates a mesh from entity model definitions.
  *
@@ -255,7 +265,7 @@ class Entity {
       const texture = e.textures[name]
       if (!texture) continue
       // console.log(JSON.stringify(jsonModel, null, 2))
-      const mesh = getMesh(texture.replace('textures', 'textures/' + version) + '.png', jsonModel, type)
+      const mesh = getMesh(resolveEntityTexturePath(version, texture), jsonModel, type)
       /* const skeletonHelper = new THREE.SkeletonHelper( mesh )
       skeletonHelper.material.linewidth = 2
       scene.add( skeletonHelper ) */

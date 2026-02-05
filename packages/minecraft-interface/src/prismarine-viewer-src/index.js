@@ -74,6 +74,7 @@ let botUsername = 'Bot' // Will be updated from server
 // We need to use the correct port for asset requests
 const ASSET_SERVER_PORT = 3005
 const ASSET_SERVER_URL = `http://${window.location.hostname}:${ASSET_SERVER_PORT}`
+globalThis.__ASSET_SERVER_URL = ASSET_SERVER_URL
 
 /**
  * Configure viewer to use custom asset URLs from our asset server.
@@ -429,6 +430,7 @@ function waitForWorkersReady (worldRenderer, timeout = 10000) {
 
 socket.on('version', async (version) => {
   console.log(`[viewer] Received version: ${version}`)
+  globalThis.__MC_VERSION = version
 
   // Configure custom asset URLs before setting version
   configureCustomAssets(viewer, version)
@@ -521,7 +523,8 @@ socket.on('version', async (version) => {
 
     if (addMesh) {
       if (!botMesh) {
-        botMesh = new Entity('1.16.4', 'player', viewer.scene).mesh
+        const textureVersion = globalThis.__MC_VERSION || '1.21.9'
+        botMesh = new Entity(textureVersion, 'player', viewer.scene).mesh
         viewer.scene.add(botMesh)
 
         // Set up entity extras (name tag, cape, shadow) for bot mesh

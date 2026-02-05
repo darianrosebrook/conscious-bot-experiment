@@ -5,6 +5,8 @@ scope:
   in:
     - "Force prismarine-viewer webpack bundle to use a single Three.js instance"
     - "Normalize entity names to resolve textures/models"
+    - "Serve entity textures via asset server with on-demand extraction"
+    - "Fallback unknown entity types to known models"
     - "Verify entity textures render for common mobs"
   out:
     - "Upgrading Three.js versions"
@@ -22,7 +24,7 @@ acceptance:
   - id: A2
     given: "entity name includes 'minecraft:' prefix"
     when: "entity mesh is created"
-    then: "texture loads from prismarine-viewer public textures"
+    then: "texture loads from the asset server path"
   - id: A3
     given: "world is rendering with 1.21.9"
     when: "entities are visible"
@@ -43,4 +45,4 @@ observability:
   traces: []
 migrations: []
 rollback:
-  - "Revert webpack alias and entity name normalization"
+  - "Revert webpack alias, entity name normalization, and asset server entity routing"

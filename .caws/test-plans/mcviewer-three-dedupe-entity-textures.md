@@ -3,10 +3,12 @@
 ## Unit
 - Webpack config resolves `three` to a single alias path.
 - Entity name normalization strips `minecraft:` prefix.
+- Entity texture URL resolves through `/mc-assets/entity/:version/...`.
+- Unknown entity types map to fallback models.
 
 ## Integration
 - Load viewer, confirm console has no "Multiple instances of Three.js" warning.
-- Spawn/observe entities: verify texture requests return 200 and models render textured.
+- Spawn/observe entities: verify `/mc-assets/entity/:version/...` requests return 200 and models render textured.
 
 ## E2E Smoke
 - Open viewer, verify common mobs (e.g., bee, bat, cod) render with textures.

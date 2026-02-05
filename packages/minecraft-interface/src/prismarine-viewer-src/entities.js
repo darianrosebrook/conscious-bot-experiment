@@ -241,9 +241,24 @@ function calculateAnimationSpeed (velocity) {
 function getEntityMesh (entity, scene) {
   const rawName = entity.name
   const normalizedName = rawName ? rawName.replace(/^minecraft:/, '') : null
+  const textureVersion = globalThis.__MC_VERSION || '1.21.9'
+  const loggedFallbacks = (globalThis.__ENTITY_FALLBACK_LOGGED ||= new Set())
+  const fallbackMap = {
+    glow_squid: 'squid',
+    breeze: 'player',
+    camel: 'horse',
+    sniffer: 'cow',
+    armadillo: 'pig',
+    bogged: 'zombie',
+    allay: 'vex',
+    warden: 'iron_golem',
+    frog: 'slime',
+    tadpole: 'fish/cod'
+  }
+  const fallbackName = normalizedName ? fallbackMap[normalizedName] : null
   if (normalizedName) {
     try {
-      const e = new Entity('1.16.4', normalizedName, scene)
+      const e = new Entity(textureVersion, normalizedName, scene)
       // Store entity info in userData for extras setup
       e.mesh.userData.entityName = normalizedName
       e.mesh.userData.entityNameRaw = rawName
@@ -252,6 +267,26 @@ function getEntityMesh (entity, scene) {
       e.mesh.userData.entityWidth = entity.width || 0.6
       return e.mesh
     } catch (err) {
+      if (fallbackName) {
+        try {
+          const e = new Entity(textureVersion, fallbackName, scene)
+          e.mesh.userData.entityName = fallbackName
+          e.mesh.userData.entityNameRaw = rawName
+          e.mesh.userData.entityNameFallback = normalizedName
+          e.mesh.userData.entityUsername = entity.username
+          e.mesh.userData.entityHeight = entity.height || 1.8
+          e.mesh.userData.entityWidth = entity.width || 0.6
+          if (!loggedFallbacks.has(normalizedName)) {
+            loggedFallbacks.add(normalizedName)
+            console.warn(
+              `[viewer] Entity fallback: ${normalizedName} -> ${fallbackName}`
+            )
+          }
+          return e.mesh
+        } catch (fallbackErr) {
+          console.log(fallbackErr)
+        }
+      }
       console.log(err)
     }
   }

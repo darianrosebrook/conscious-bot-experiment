@@ -82,7 +82,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         console.log(`[asset-server] Auto-generating assets for ${version}...`);
 
         try {
-          await pipeline.generate(version);
+          await pipeline.generate(version, { ensureRawAssets: ['entity'] });
           generatingVersions.delete(version);
 
           // Now serve the generated asset
@@ -111,9 +111,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
     }
   });
 
-  /**
-   * Serves a blockStates JSON file.
-   */
+ /**
+  * Serves a blockStates JSON file.
+  */
   router.get('/blocksStates/:version.json', async (req: Request, res: Response, next: NextFunction) => {
     const version = req.params.version;
 
@@ -163,6 +163,114 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
       res.status(404).json({
         error: 'BlockStates not found',
         version,
+        hint: autoGenerate
+          ? 'Asset generation may have failed'
+          : 'Run `pnpm mc:assets extract ' + version + '` to generate',
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Serves entity textures (PNG), preserving directory structure.
+   *
+   * Example:
+   *   GET /entity/1.21.9/player/wide/steve.png
+   */
+  router.get('/entity/:version/*', async (req: Request, res: Response, next: NextFunction) => {
+    const version = req.params.version;
+    let relativePath = (req.params[0] || '').replace(/^\/+/, '');
+    if (relativePath.startsWith('entity/')) {
+      relativePath = relativePath.slice('entity/'.length);
+    }
+
+    try {
+      const paths = pipeline.getOutputPaths(version);
+      const generatedPath = path.join(paths.rawAssetsPath, 'entity', relativePath);
+      const simpleName = relativePath.includes('/') ? null : path.basename(relativePath, '.png');
+      const altRelativePath = simpleName ? path.join(simpleName, `${simpleName}.png`) : null;
+      const altGeneratedPath = altRelativePath ? path.join(paths.rawAssetsPath, 'entity', altRelativePath) : null;
+      const playerSkinCandidates = simpleName
+        ? [
+            path.join('player', 'wide', `${simpleName}.png`),
+            path.join('player', 'slim', `${simpleName}.png`),
+          ]
+        : [];
+      if (fs.existsSync(generatedPath)) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Asset-Source', 'generated');
+        return fs.createReadStream(generatedPath).pipe(res);
+      }
+      if (altGeneratedPath && fs.existsSync(altGeneratedPath)) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Asset-Source', 'generated');
+        return fs.createReadStream(altGeneratedPath).pipe(res);
+      }
+      for (const candidate of playerSkinCandidates) {
+        const candidatePath = path.join(paths.rawAssetsPath, 'entity', candidate);
+        if (fs.existsSync(candidatePath)) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Asset-Source', 'generated');
+          return fs.createReadStream(candidatePath).pipe(res);
+        }
+      }
+
+      if (fallbackToBundled && pvPublicDir) {
+        const bundledPath = path.join(pvPublicDir, 'textures', version, 'entity', relativePath);
+        if (fs.existsSync(bundledPath)) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Asset-Source', 'bundled');
+          return fs.createReadStream(bundledPath).pipe(res);
+        }
+        if (altRelativePath) {
+          const altBundledPath = path.join(pvPublicDir, 'textures', version, 'entity', altRelativePath);
+          if (fs.existsSync(altBundledPath)) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('X-Asset-Source', 'bundled');
+            return fs.createReadStream(altBundledPath).pipe(res);
+          }
+        }
+        for (const candidate of playerSkinCandidates) {
+          const candidateBundled = path.join(pvPublicDir, 'textures', version, 'entity', candidate);
+          if (fs.existsSync(candidateBundled)) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('X-Asset-Source', 'bundled');
+            return fs.createReadStream(candidateBundled).pipe(res);
+          }
+        }
+      }
+
+      if (autoGenerate && !generatingVersions.has(version)) {
+        generatingVersions.add(version);
+        console.log(`[asset-server] Auto-generating assets for ${version} (entity textures)...`);
+
+        try {
+          await pipeline.generate(version);
+          generatingVersions.delete(version);
+
+          if (fs.existsSync(generatedPath)) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('X-Asset-Source', 'generated');
+            return fs.createReadStream(generatedPath).pipe(res);
+          }
+        } catch (error) {
+          generatingVersions.delete(version);
+          console.error(`[asset-server] Failed to generate assets for ${version}:`, error);
+        }
+      }
+
+      res.status(404).json({
+        error: 'Entity texture not found',
+        version,
+        path: relativePath,
         hint: autoGenerate
           ? 'Asset generation may have failed'
           : 'Run `pnpm mc:assets extract ' + version + '` to generate',

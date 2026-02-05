@@ -136,7 +136,8 @@ socket.on('version', (version) => {
 
     if (addMesh) {
       if (!botMesh) {
-        botMesh = new Entity('1.16.4', 'player', viewer.scene).mesh
+        const textureVersion = globalThis.__MC_VERSION || '1.21.9'
+        botMesh = new Entity(textureVersion, 'player', viewer.scene).mesh
         viewer.scene.add(botMesh)
       }
       new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()

@@ -186,7 +186,7 @@ app.use(express.json());
 // Mount custom asset server for Minecraft textures and blockstates
 // This serves generated assets with fallback to prismarine-viewer's bundled assets
 app.use('/mc-assets', createAssetServer({
-  autoGenerate: false, // Don't auto-generate on request (use CLI instead)
+  autoGenerate: true, // Auto-generate on demand to keep textures/entities in sync
   fallbackToBundled: true, // Fallback to prismarine-viewer's bundled assets
 }));
 
