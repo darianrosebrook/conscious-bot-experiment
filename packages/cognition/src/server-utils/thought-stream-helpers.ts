@@ -10,68 +10,7 @@ import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
 import { broadcastThought } from '../routes/cognitive-stream-routes';
 import { createServerLogger } from './server-logger';
-
-// ============================================================================
-// Generic filler patterns (copied from llm-output-sanitizer to avoid import)
-// ============================================================================
-
-const GENERIC_FILLER_PATTERNS = [
-  /^maintaining awareness of surroundings\.?$/i,
-  /^observing surroundings\.?$/i,
-  /^monitoring the environment\.?$/i,
-  /^staying alert\.?$/i,
-  /^keeping watch\.?$/i,
-  /^looking around\.?$/i,
-  /^nothing to report\.?$/i,
-];
-
-/**
- * Detect code-like content using line density (copied from llm-output-sanitizer).
- */
-function hasCodeLikeDensity(text: string): boolean {
-  const lines = text.split('\n');
-
-  // Single-line / short text: check symbol density
-  if (lines.length < 3) {
-    const stripped = text.replace(/\s/g, '');
-    if (stripped.length < 10) return false;
-    const symbolChars = (stripped.match(/[(){}\[\];=<>|&!^~+\-*/\\@#$%]/g) || []).length;
-    return symbolChars / stripped.length > 0.25;
-  }
-
-  // Multi-line: line-by-line density scoring
-  let codeIndicators = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue;
-    // Code indicators: brackets, braces, semicolons, keywords
-    if (/[(){}\[\];]/.test(trimmed)) codeIndicators++;
-    if (/\b(const|let|var|function|import|export|class|interface|type)\b/.test(trimmed)) codeIndicators++;
-  }
-
-  return codeIndicators / lines.length > 0.4;
-}
-
-/**
- * Check if content is usable (not empty, not too short, not generic filler, not code).
- *
- * Copied from llm-output-sanitizer to avoid legacy import during PR4 migration.
- * This maintains semantic equivalence with the original isUsableContent function.
- */
-function isUsableForTTS(text: string): boolean {
-  const trimmed = text.trim();
-
-  if (trimmed.length === 0) return false;
-  if (trimmed.length < 5) return false;
-
-  if (hasCodeLikeDensity(trimmed)) return false;
-
-  for (const pattern of GENERIC_FILLER_PATTERNS) {
-    if (pattern.test(trimmed)) return false;
-  }
-
-  return true;
-}
+import { isUsableForTTS } from './tts-usable-content';
 
 export interface ThoughtStreamDeps {
   dashboardUrl: string;

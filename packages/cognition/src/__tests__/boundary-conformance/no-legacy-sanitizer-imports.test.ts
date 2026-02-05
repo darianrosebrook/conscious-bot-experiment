@@ -23,32 +23,39 @@ const ENFORCED_MODULES = [
 ];
 
 /**
+ * BASELINE: Grandfathered files allowed to import from llm-output-sanitizer.
+ *
+ * This Set is the PERMANENT BASELINE for the ratchet. It never changes unless
+ * you intentionally relax the policy (which you shouldn't).
+ *
+ * The actual grandfathered list (below) must be a subset of this baseline.
+ * - Shrinking the actual list is allowed (migration progress)
+ * - Adding to the actual list is blocked (can't exceed baseline)
+ *
+ * When you migrate a file, remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.
+ * Do NOT edit this baseline set unless the policy itself changes.
+ */
+const BASELINE_GRANDFATHERED_FILES = new Set([
+  'reasoning-surface/goal-extractor.ts',
+  'reasoning-surface/grounder.ts',
+  'reasoning-surface/eligibility.ts',
+  'thought-generator.ts',
+  'types.ts',
+  'index.ts',
+  'cognitive-core/llm-interface.ts',
+]);
+
+/**
  * GRANDFATHERED LEGACY SANITIZER IMPORTS
  *
  * These files are allowed to import from llm-output-sanitizer during migration.
- * This list MUST ONLY SHRINK, never grow.
+ * This Map must be a subset of BASELINE_GRANDFATHERED_FILES.
  *
- * After baseline: Do not add entries. Migrate the file to language-io instead.
- *
- * Each entry includes:
+ * Each entry includes migration metadata (execution plan):
  * - Current usage (what's being imported)
  * - Migration target (what to use from language-io instead)
  * - Priority (order of migration)
  */
-
-/**
- * MECHANICAL RATCHET: Maximum allowed grandfathered files.
- *
- * This constant enforces monotonic decrease. When you migrate a file:
- * 1. Remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS
- * 2. Update BASELINE_GRANDFATHERED_COUNT to new value (6, 5, 4, ...)
- * 3. Do NOT increase this value - the list can only shrink
- *
- * If a test fails because a new file needs legacy imports, migrate it to
- * language-io instead. Adding entries is not allowed.
- */
-const BASELINE_GRANDFATHERED_COUNT = 7;
-
 const GRANDFATHERED_LEGACY_SANITIZER_IMPORTS = new Map<string, {
   currentUsage: string;
   migrationTarget: string;
@@ -162,81 +169,39 @@ describe('I-MIGRATION-1: No Legacy Sanitizer Imports', () => {
 });
 
 describe('Grandfathered Legacy Imports (Strict Ratchet)', () => {
-  it('has exact baseline of 8 files with migration targets documented', () => {
-    // STRICT RATCHET: This list must match exactly.
-    // Any change (addition or removal) is a loud, reviewable diff.
-
-    const expectedBaseline = new Set([
-      'reasoning-surface/goal-extractor.ts',
-      'reasoning-surface/grounder.ts',
-      'reasoning-surface/eligibility.ts',
-      'thought-generator.ts',
-      'types.ts',
-      'index.ts',
-      'cognitive-core/llm-interface.ts',
-    ]);
-
+  it('enforces monotonic decrease (subset of baseline, never exceeds)', () => {
     const actualFiles = new Set(GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.keys());
 
-    // Exact match required - no additions, track removals
-    expect(actualFiles).toEqual(expectedBaseline);
-
-    // Every entry must have migration metadata
-    for (const [file, metadata] of GRANDFATHERED_LEGACY_SANITIZER_IMPORTS) {
-      expect(metadata.currentUsage).toBeTruthy();
-      expect(metadata.migrationTarget).toBeTruthy();
-      expect(['high', 'medium', 'low']).toContain(metadata.priority);
-    }
-  });
-
-  it('enforces monotonic decrease (baseline = 7, must only shrink)', () => {
-    const currentCount = GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.size;
-
-    // MECHANICAL RATCHET: Must match BASELINE_GRANDFATHERED_COUNT exactly
-    expect(currentCount).toBe(BASELINE_GRANDFATHERED_COUNT);
-
-    // MONOTONIC CONSTRAINT: Count must not exceed baseline (only shrink)
-    // This catches if someone adds a new entry without updating BASELINE_GRANDFATHERED_COUNT
-    expect(currentCount).toBeLessThanOrEqual(BASELINE_GRANDFATHERED_COUNT);
-
-    // When you migrate a file:
-    // 1. Remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS
-    // 2. Update BASELINE_GRANDFATHERED_COUNT to new value (6, 5, 4, ...)
-    // 3. Do NOT increase BASELINE_GRANDFATHERED_COUNT - only shrink
-  });
-
-  it('enforces no new keys (strict subset check)', () => {
-    // The actual files must be an exact subset of (or equal to) the expected baseline.
-    // Any NEW file that isn't in expectedBaseline violates the "only shrink" rule.
-
-    const expectedBaseline = new Set([
-      'reasoning-surface/goal-extractor.ts',
-      'reasoning-surface/grounder.ts',
-      'reasoning-surface/eligibility.ts',
-      'thought-generator.ts',
-      'types.ts',
-      'index.ts',
-      'cognitive-core/llm-interface.ts',
-    ]);
-
-    const actualFiles = new Set(GRANDFATHERED_LEGACY_SANITIZER_IMPORTS.keys());
-
-    // Check for unauthorized additions: any file in actualFiles that's NOT in expectedBaseline
-    const unauthorizedAdditions = [...actualFiles].filter(f => !expectedBaseline.has(f));
+    // RATCHET CONSTRAINT 1: No additions allowed (strict subset)
+    // Any file in actualFiles that's NOT in baseline violates the ratchet
+    const unauthorizedAdditions = [...actualFiles].filter(f => !BASELINE_GRANDFATHERED_FILES.has(f));
 
     if (unauthorizedAdditions.length > 0) {
       expect.fail(
-        `RATCHET VIOLATION: New files added to GRANDFATHERED_LEGACY_SANITIZER_IMPORTS:\n` +
+        `RATCHET VIOLATION: Unauthorized files in GRANDFATHERED_LEGACY_SANITIZER_IMPORTS:\n` +
         `  ${unauthorizedAdditions.join('\n  ')}\n\n` +
+        `These files are NOT in BASELINE_GRANDFATHERED_FILES.\n` +
         `The grandfather list can ONLY shrink. Do NOT add new entries.\n` +
         `If a file needs legacy imports, migrate it to language-io instead.`
       );
     }
 
-    expect(unauthorizedAdditions).toHaveLength(0);
+    // RATCHET CONSTRAINT 2: Count must not exceed baseline
+    expect(actualFiles.size).toBeLessThanOrEqual(BASELINE_GRANDFATHERED_FILES.size);
 
-    // Also verify the count constraint
-    expect(actualFiles.size).toBeLessThanOrEqual(expectedBaseline.size);
+    // When you migrate a file:
+    // 1. Remove it from GRANDFATHERED_LEGACY_SANITIZER_IMPORTS
+    // 2. Do NOT edit BASELINE_GRANDFATHERED_FILES (baseline is permanent)
+    // 3. This test will pass as long as actual ⊆ baseline
+  });
+
+  it('requires migration metadata for all grandfathered files', () => {
+    // Every entry must have complete migration metadata
+    for (const [file, metadata] of GRANDFATHERED_LEGACY_SANITIZER_IMPORTS) {
+      expect(metadata.currentUsage).toBeTruthy();
+      expect(metadata.migrationTarget).toBeTruthy();
+      expect(['high', 'medium', 'low']).toContain(metadata.priority);
+    }
   });
 
   it('documents migration order by priority', () => {
