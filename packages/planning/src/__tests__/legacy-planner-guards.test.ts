@@ -135,4 +135,28 @@ describe('Legacy Planner Guards (Phase 4)', () => {
       // Count command failed — skip
     }
   });
+
+  // -----------------------------------------------------------------------
+  // Guard PR4: No legacy semantic extraction in planning
+  // -----------------------------------------------------------------------
+
+  it('GoalTagV1 is not referenced in production code', () => {
+    const matches = grepProductionCode('GoalTagV1');
+    expect(matches).toEqual([]);
+  });
+
+  it('extractedGoal is not referenced in production code', () => {
+    const matches = grepProductionCode('extractedGoal');
+    expect(matches).toEqual([]);
+  });
+
+  it('[GOAL:] parsing is not present in production code', () => {
+    const matches = grepProductionCode('\\[GOAL:');
+    expect(matches).toEqual([]);
+  });
+
+  it('llm-output-sanitizer is not imported in production code', () => {
+    const matches = grepProductionCode('llm-output-sanitizer');
+    expect(matches).toEqual([]);
+  });
 });

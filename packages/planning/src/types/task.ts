@@ -78,6 +78,15 @@ export interface Task {
     pendingPlanningTicks?: number;
     /** Canonical goal key (action:target) for exact-match idempotency in drive tick */
     goalKey?: string;
+    /** Sterling provenance (opaque semantic artifacts) */
+    sterling?: {
+      committedIrDigest?: string;
+      committedGoalPropId?: string | null;
+      envelopeId?: string | null;
+      schemaVersion?: string | null;
+      reducerVersion?: string | null;
+      dedupeNamespace?: string | null;
+    };
     /** Sub-task dedup key — executor-created subtasks use this for idempotency */
     subtaskKey?: string;
     /** Provenance trail: which builder/converter/source created this task */

@@ -69,7 +69,7 @@ pnpm --filter @conscious-bot/cognition test -- --run src/__tests__/boundary-conf
 
 ## Migration B: Migrate cognitive-core/llm-interface.ts
 
-**Status**: Not started
+**Status**: Harness live (tripwire active, ready for migration)
 
 **Target files**:
 - `packages/cognition/src/cognitive-core/llm-interface.ts`
@@ -94,7 +94,11 @@ pnpm --filter @conscious-bot/cognition test -- --run src/__tests__/boundary-conf
   - Expected: same rejection behavior
 
 ### 3. Integration handshake
-- [ ] Contract test: envelope → reduce → result
+- [✓] B1 handshake tripwire is LIVE
+  - Pre-migration: `it.fails()` test executes and detects bypass
+  - Post-migration: flip to `it()` → proves Sterling reduce() called
+  - DI seam added: `LLMInterface(config, { languageIOClient })`
+- [ ] Contract test: envelope → reduce → result (post-migration)
   ```typescript
   // Test: Sterling reduce() is actually called
   const envelope = buildEnvelope(rawText);
@@ -102,8 +106,9 @@ pnpm --filter @conscious-bot/cognition test -- --run src/__tests__/boundary-conf
   expect(result.committed_ir).toBeDefined();
   expect(result.is_executable).toBeDefined();
   ```
-- [ ] TS does not "fix up" Sterling results
-  - Assertion: no code between reduce() and downstream consumption that modifies semantic fields
+- [✓] TS does not contain forbidden semantic patterns
+  - Negative test scans llm-interface.ts for ACTION_NORMALIZE_MAP, etc.
+  - Currently passes (no semantic patterns found)
 
 ### 4. Observability
 - [ ] Structured log at llm-interface seam

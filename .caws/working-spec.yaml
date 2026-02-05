@@ -1,48 +1,46 @@
-id: COG-LOG-1001
-title: "Unify cognition server logging with structured server logger"
-risk_tier: 3
+id: MCVIEW-103
+title: "Deduplicate Three.js and restore entity textures"
+risk_tier: 2
 scope:
   in:
-    - "Replace ad-hoc console logs in cognition server with structured server logger"
-    - "Remove emoji prefixes; use tags/subsystem fields or colorized logger output"
-    - "Add coherent middleware request logging (consistent fields)"
+    - "Force prismarine-viewer webpack bundle to use a single Three.js instance"
+    - "Normalize entity names to resolve textures/models"
+    - "Verify entity textures render for common mobs"
   out:
-    - "Changes to logging in other packages outside cognition server"
-    - "Behavioral changes to business logic"
-    - "New external logging dependencies"
+    - "Upgrading Three.js versions"
+    - "Replacing prismarine-viewer renderer"
+    - "Changing asset pipeline formats"
 invariants:
-  - "No change to API responses, status codes, or routes"
-  - "No change to thought generation behavior or timing"
-  - "Logging remains non-blocking and does not throw"
+  - "Viewer bundle loads with a single Three.js instance."
+  - "Known entities render with their textures instead of magenta fallback."
+  - "No regressions to terrain rendering or animated textures."
 acceptance:
   - id: A1
-    given: "server is running"
-    when: "startup, shutdown, and recurring tasks occur"
-    then: "logs are emitted with consistent fields and no emoji prefixes"
+    given: "viewer bundle is rebuilt"
+    when: "page loads"
+    then: "console does not warn about multiple Three.js instances"
   - id: A2
-    given: "middleware receives requests"
-    when: "response finishes"
-    then: "a structured log entry is emitted with operation type and success flag"
+    given: "entity name includes 'minecraft:' prefix"
+    when: "entity mesh is created"
+    then: "texture loads from prismarine-viewer public textures"
   - id: A3
-    given: "an error occurs in thought generation or external health check"
-    when: "error is caught"
-    then: "error is logged with subsystem and reason fields"
+    given: "world is rendering with 1.21.9"
+    when: "entities are visible"
+    then: "entities are textured (no magenta fallback for common mobs)"
 non_functional:
   a11y: []
   perf:
-    api_p95_ms: 250
+    lcp_ms: 2500
   security:
-    - "No sensitive data logged (PII redaction preserved)"
+    - "No new remote code loading"
 contracts:
   - type: openapi
-    path: "contracts/none"
+    path: "contracts/minecraft-interface-health.yaml"
 observability:
   logs:
-    - "startup/shutdown events (subsystem: cognition-server)"
-    - "thought_generation cycle logs (subsystem: thought-gen)"
-    - "request lifecycle logs (subsystem: middleware)"
+    - "Entity texture load failures include entity name"
   metrics: []
   traces: []
 migrations: []
 rollback:
-  - "Revert logging changes in cognition server"
+  - "Revert webpack alias and entity name normalization"

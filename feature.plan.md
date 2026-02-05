@@ -1,23 +1,23 @@
-# Feature Plan: COG-LOG-1001 Logging Coherence
+# Feature Plan: MCVIEW-103 — Three.js Dedupe + Entity Textures
 
 ## Design Sketch
-- Introduce a small server logger helper (or use existing logger) to emit structured logs with fields:
-  - `event`, `subsystem`, `category`, `tags`, `context`, `error`.
-- Replace ad-hoc `console.log/warn/error` in `server.ts` with the helper.
-- Middleware logging emits a structured entry with `operationType`, `success`, `statusCode`, `durationMs`, `path`, and `method`.
+- Webpack resolves all `three` imports to a single path to avoid duplicate globals.
+- Normalize entity names (strip `minecraft:`) before entity lookup.
+- Rebuild viewer bundle and verify warnings/textures.
 
 ## Test Matrix
-- Unit: verify log helper shapes and error serialization [A1, A3].
-- Integration: server emits middleware log and thought generation log [A1, A2].
-- E2E: N/A.
-- A11y: N/A.
+- Unit:
+  - webpack alias for `three` is set
+  - entity name normalization applied
+- Integration:
+  - no multiple-Three.js warning
+  - entity textures render
+- E2E Smoke:
+  - observe textured entities in viewer
 
 ## Data Plan
-- No new data. Use existing runtime state. Avoid logging PII.
+- Use existing prismarine-viewer public textures.
 
 ## Observability Plan
-- Logs:
-  - `cognition_server_start` / `cognition_server_stop`
-  - `thought_generation_started` / `thought_generation_error`
-  - `middleware_request`
-- Metrics/traces: unchanged.
+- Console warning check for duplicate Three.js.
+- Log missing entity texture names if encountered.
