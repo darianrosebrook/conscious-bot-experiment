@@ -61,11 +61,7 @@ const GRANDFATHERED_LEGACY_SANITIZER_IMPORTS = new Map<string, {
   migrationTarget: string;
   priority: 'high' | 'medium' | 'low';
 }>([
-  ['reasoning-surface/goal-extractor.ts', {
-    currentUsage: 'Re-exports all types/functions',
-    migrationTarget: 'Delete file entirely; consumers use language-io directly',
-    priority: 'high',
-  }],
+  // DELETED (Migration A): reasoning-surface/goal-extractor.ts - file deleted
   ['reasoning-surface/grounder.ts', {
     currentUsage: 'import type { GoalTagV1 }',
     migrationTarget: 'Use DeclaredMarker from language-io/envelope-types',
@@ -216,9 +212,9 @@ describe('Grandfathered Legacy Imports (Strict Ratchet)', () => {
     }
 
     // Document migration order for visibility
+    // UPDATED (Migration A): goal-extractor.ts deleted, 6 files remain
     expect(highPriority).toEqual([
-      'reasoning-surface/goal-extractor.ts',  // Delete entirely
-      'cognitive-core/llm-interface.ts',      // Heavy user of sanitizer
+      'cognitive-core/llm-interface.ts',      // Heavy user of sanitizer (Migration B)
     ]);
 
     expect(mediumPriority).toEqual([

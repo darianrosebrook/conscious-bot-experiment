@@ -34,10 +34,12 @@ export const SURFACE_VERSION = '1.1.0'; // Bumped for Sterling integration
  *
  * Regenerate with:
  *   shasum -a 256 packages/cognition/src/reasoning-surface/*.ts
+ *
+ * MIGRATION NOTE (PR4/Migration A):
+ * goal-extractor.ts deleted - no longer part of the reasoning surface.
  */
 export const SURFACE_DIGESTS = {
   frameRenderer: 'b63887aae45fba37d193c820cf1ad1cf3ddc0de4037fcf61898bf984cb6bc700',
-  goalExtractor: '44517d93cc2f81793cd34b5246c61db62a96c8ee7a7f8c0d3ebe16e81f12b9b6',
   grounder: '518648b6c6f37a29cc78cda176d797ec2b19def42d6628ad3ac09113a334b405',
   eligibility: 'fec54e4021da9e9925ec3771c9bb70d5620b2d91987db23fb4fd302faff85857',
 } as const;
@@ -63,29 +65,31 @@ export type {
 } from './frame-renderer';
 
 // ============================================================================
-// Goal Extraction (DEPRECATED - semantic exports removed in PR2)
+// Goal Extraction (DEPRECATED - migrating to language-io)
 // ============================================================================
 
+// MIGRATION NOTE (PR4):
+// goal-extractor.ts deleted. These imports now come directly from
+// llm-output-sanitizer until Migration B (llm-interface migration) completes.
+// After Migration B, these will be removed entirely or imported from language-io.
+
 export {
-  extractGoal,
-  extractGoalFromSanitized,
   extractGoalTag,
   extractIntent,
-  // DELETED (PR2): normalizeGoalAction - Sterling normalizes
-  // DELETED (PR2): canonicalGoalKey - use Sterling committed_goal_prop_id
   sanitizeLLMOutput,
-  // DELETED (PR2): CANONICAL_ACTIONS - Sterling validates
-  // DELETED (PR2): NORMALIZE_MAP_VERSION - Sterling normalizes
-} from './goal-extractor';
+} from '../llm-output-sanitizer';
 
 export type {
-  GoalExtractionResult,
   GoalTag,
   GoalTagV1,
   GoalTagFailReason,
   IntentLabel,
   IntentParse,
-} from './goal-extractor';
+} from '../llm-output-sanitizer';
+
+// DELETED (Migration A): extractGoal, extractGoalFromSanitized
+// These were wrappers in goal-extractor.ts. Consumers should use
+// sanitizeLLMOutput directly or migrate to language-io.
 
 // ============================================================================
 // Goal Grounding
@@ -122,10 +126,10 @@ export type {
 // Sterling Language IO Integration
 // ============================================================================
 
-import type { GoalTagV1 } from './goal-extractor';
+import type { GoalTagV1 } from '../llm-output-sanitizer';
 import type { GroundingContext } from './grounder';
 import type { EligibilityOutput, EligibilityReasoning, GroundingResult } from './eligibility';
-import { sanitizeLLMOutput } from './goal-extractor';
+import { sanitizeLLMOutput } from '../llm-output-sanitizer';
 import { groundGoal } from './grounder';
 import { deriveEligibility } from './eligibility';
 
