@@ -7,6 +7,8 @@
  * @author @darianrosebrook
  */
 
+import type { ReductionProvenance } from '@conscious-bot/cognition';
+
 /** Shape of thoughts returned by /api/cognitive-stream/recent */
 export interface CognitiveStreamThought {
   type: string;
@@ -26,26 +28,10 @@ export interface CognitiveStreamThought {
     model?: string;
     /** Observation fallback; do not convert to tasks */
     fallback?: boolean;
-    /** Structured goal extracted by the sanitizer boundary */
-    extractedGoal?: { version?: number; action: string; target: string; amount: number | null; raw?: string };
-    /** Sanitization flags from the LLM output sanitizer */
+    /** Sterling reduction provenance (opaque semantic artifacts) */
+    reduction?: ReductionProvenance;
+    /** Sanitization flags from envelope construction (non-semantic) */
     sanitizationFlags?: Record<string, any>;
-    /** Extracted intent label from INTENT: line */
-    extractedIntent?: string | null;
-    /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
-    intentParse?: string | null;
-    /** Source of the extracted goal ('llm' or 'drive-tick') */
-    extractedGoalSource?: string;
-    /** Canonical goal key for exact-match idempotency (action:target) */
-    goalKey?: string;
-    /** Sterling-committed goal proposition ID (stable identity from semantic authority) */
-    committedGoalPropId?: string | null;
-    /** Sterling-committed IR digest (provenance) */
-    committedIrDigest?: string | null;
-    /** Sterling envelope ID (provenance) */
-    envelopeId?: string | null;
-    /** Whether grounding was performed */
-    groundingPerformed?: boolean;
   };
   id: string;
   timestamp: number;
@@ -62,54 +48,6 @@ export interface CognitiveStreamClientConfig {
 const DEFAULT_BASE_URL =
   process.env.COGNITION_ENDPOINT || 'http://localhost:3003';
 const DEFAULT_TIMEOUT_MS = 5000;
-
-/** Action words used to filter actionable thoughts */
-const ACTIONABLE_WORDS = [
-  'gather',
-  'collect',
-  'wood',
-  'log',
-  'craft',
-  'build',
-  'make',
-  'create',
-  'mine',
-  'iron',
-  'stone',
-  'ore',
-  'dig',
-  'explore',
-  'search',
-  'scout',
-  'farm',
-  'plant',
-  'harvest',
-  'move',
-  'go to',
-  'walk',
-  'place',
-  'put',
-  'set',
-  'find',
-  'look for',
-  'get',
-  'obtain',
-  'acquire',
-  'need to',
-  'should',
-  'going to',
-  'plan to',
-  'want to',
-  'will',
-  'can',
-  'help',
-  'assist',
-  'work on',
-  'start',
-  'begin',
-  'continue',
-  'finish',
-];
 
 export class CognitiveStreamClient {
   private baseUrl: string;
@@ -208,21 +146,9 @@ export class CognitiveStreamClient {
     return recentThoughts.filter((thought) => {
       if (thought.processed) return false;
       if (thought.metadata?.fallback === true) return false;
-
-      const lower = thought.content.trim().toLowerCase();
-      if (
-        lower.startsWith('health:') ||
-        lower.startsWith('hunger:') ||
-        /observing\s+environment\s+and\s+deciding/.test(lower) ||
-        /^\d+%\.?\s*(health|hunger|observing)/.test(lower)
-      ) {
-        return false;
-      }
-
+      if (thought.convertEligible !== true) return false;
       if (now - thought.timestamp > fiveMinutesMs) return false;
-
-      const content = thought.content.toLowerCase();
-      return ACTIONABLE_WORDS.some((word) => content.includes(word));
+      return true;
     });
   }
 

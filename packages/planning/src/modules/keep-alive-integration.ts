@@ -283,7 +283,6 @@ export class KeepAliveIntegration {
               metadata: {
                 source: 'keepalive',
                 frameProfile: thought.frameProfile,
-                extractedGoal: thought.extractedGoal,
                 convertEligible: thought.eligibility.convertEligible,
               },
               convertEligible: thought.eligibility.convertEligible,

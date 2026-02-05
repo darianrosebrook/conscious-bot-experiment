@@ -3611,7 +3611,6 @@ serverConfig.addEndpoint('post', '/keep-alive/force-tick', async (req, res) => {
         thought: result.thought ? {
           id: result.thought.id,
           content: result.thought.content?.slice(0, 200),
-          extractedGoal: result.thought.extractedGoal,
           eligibility: result.thought.eligibility,
           groundingResult: result.thought.groundingResult ? {
             pass: result.thought.groundingResult.pass,

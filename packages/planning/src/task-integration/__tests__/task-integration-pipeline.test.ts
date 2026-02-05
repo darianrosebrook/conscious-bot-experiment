@@ -1659,6 +1659,47 @@ describe('Task origin envelope', () => {
     // Empty string must not survive projection — goalKey should be undefined
     expect(task.metadata.goalKey).toBeUndefined();
   });
+
+  it('addTask preserves metadata.sterling namespace', async () => {
+    const ti = new TaskIntegration({
+      enableRealTimeUpdates: false,
+      enableProgressTracking: false,
+      enableTaskStatistics: false,
+      enableTaskHistory: false,
+    });
+
+    const created = await ti.addTask({
+      id: 'sterling_meta_test',
+      title: 'Sterling Meta Preserve',
+      description: 'test',
+      type: 'sterling_ir',
+      priority: 0.1,
+      urgency: 0.1,
+      status: 'pending',
+      source: 'planner',
+      steps: [],
+      parameters: {},
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'sterling_ir',
+        sterling: {
+          committedIrDigest: 'deadbeef',
+          schemaVersion: 'v1',
+          envelopeId: 'env_123',
+        },
+        solver: { rigGChecked: true },
+      },
+    });
+
+    expect(created.metadata.sterling?.committedIrDigest).toBe('deadbeef');
+    expect(created.metadata.sterling?.envelopeId).toBe('env_123');
+    expect(created.metadata.solver?.rigGChecked).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

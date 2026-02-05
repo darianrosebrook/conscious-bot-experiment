@@ -1,0 +1,72 @@
+id: PR4-PLN-0003
+title: "Phase 3: Planning uses Sterling reduction for task conversion"
+risk_tier: 2
+scope:
+  in:
+    - "Replace GoalTagV1/extractedGoal usage in packages/planning with ReductionProvenance"
+    - "Fail-closed task conversion based on reduction flags and committed_ir_digest"
+    - "Deduplicate tasks by committed_ir_digest (optionally schema-version namespaced)"
+    - "Store Sterling provenance as opaque metadata only (envelope_id, committed_goal_prop_id, schema versions)"
+    - "Introduce a planning boundary ratchet test (no legacy semantics)"
+    - "Execution routing Pattern A: create generic Sterling IR tasks; executor resolves via digest"
+  out:
+    - "Changing Sterling reducer schema or Python-side behavior"
+    - "Phase 4 removal of legacy exports in cognition"
+invariants:
+  - "P-BOUNDARY-1: planning must not parse [GOAL:] or use GoalTagV1"
+  - "P-FAILCLOSED-1: if reduction missing OR sterlingProcessed false OR isExecutable false OR committed_ir_digest missing ⇒ no task is created or advanced"
+  - "P-DEDUP-1: task identity/dedupe uses committed_ir_digest (optionally schema-version namespaced)"
+  - "P-OPAQUE-1: planning treats Sterling artifacts as opaque provenance only"
+  - "P-NO-REGEX-1: planning must not search thought content for [GOAL:]"
+  - "P-NO-SEMENUM-1: planning must not define or branch on action enums derived from language"
+  - "P-NO-HEURISTIC-1: no keyword fallback or semantic salvage in planning"
+acceptance:
+  - id: A1
+    given: "thought with reduction missing or sterlingProcessed=false"
+    when: "thought-to-task conversion runs"
+    then: "no task is created and decision is fail-closed"
+  - id: A2
+    given: "thought with reduction.isExecutable=false"
+    when: "conversion runs"
+    then: "no task created; explicit reason indicates Sterling denial"
+  - id: A3
+    given: "thought with sterlingProcessed=true, isExecutable=true, committed_ir_digest present"
+    when: "conversion runs"
+    then: "task created with metadata.sterling.committedIrDigest and dedupe keyed by digest"
+  - id: A4
+    given: "two thoughts with same committed_ir_digest"
+    when: "both are converted"
+    then: "only one task is created; second is suppressed by dedupe"
+  - id: A5
+    given: "any file in packages/planning imports GoalTagV1 or sanitizer"
+    when: "boundary ratchet test runs"
+    then: "CI fails"
+  - id: A6
+    given: "thought with legacy extractedGoal present but convertEligible=false"
+    when: "conversion runs"
+    then: "no task created (legacy semantics ignored)"
+  - id: A7
+    given: "thought with [GOAL:] text but sterlingProcessed=false"
+    when: "conversion runs"
+    then: "no task created (fail-closed in planning)"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 300
+  security:
+    - "No semantic parsing of LLM text in planning"
+contracts:
+  - type: openapi
+    path: "contracts/cognition-observation.yaml"
+observability:
+  logs:
+    - "thought-to-task decision with reason and committed_ir_digest when present"
+  metrics:
+    - "planning_task_conversion_attempts_total"
+    - "planning_task_conversion_success_total"
+    - "planning_task_conversion_fail_closed_total"
+  traces:
+    - "thought_to_task_conversion span with committed_ir_digest attribute"
+migrations: []
+rollback:
+  - "PLANNING_STRICT_STERLING_TASKS=true (default). Setting false disables conversion to halt new tasks."

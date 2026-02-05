@@ -51,8 +51,8 @@ import { convertThoughtToTask } from './task-integration/thought-to-task-convert
 import {
   TaskManagementHandler,
   type ManagementResult,
+  type SterlingManagementAction,
 } from './task-integration/task-management-handler';
-import type { GoalTagV1 } from '@conscious-bot/cognition';
 import { adviseExecution } from './constraints/execution-advisor';
 import type { RigGMetadata } from './constraints/execution-advisor';
 import { buildDefaultMinecraftGraph } from './hierarchical/macro-planner';
@@ -272,6 +272,7 @@ const PROPAGATED_META_KEYS = [
   'goalKey',
   'subtaskKey',
   'taskProvenance',
+  'sterling',
 ] as const satisfies readonly (keyof Task['metadata'])[];
 
 /** Rate limiter for dev-only dropped-key warnings (one per key per session). */
@@ -347,6 +348,16 @@ function projectIncomingMetadata(
  * linter use exactly the same check.
  */
 const GOAL_RESOLVER_GATED_TYPES = new Set(['building']);
+
+function getSterlingDedupeKeyFromMetadata(metadata: Partial<Task['metadata']> | undefined): string | null {
+  const sterling = metadata?.sterling as
+    | { committedIrDigest?: string; schemaVersion?: string | null; dedupeNamespace?: string | null }
+    | undefined;
+  const digest = sterling?.committedIrDigest;
+  if (!digest) return null;
+  const namespace = sterling?.dedupeNamespace ?? sterling?.schemaVersion ?? 'unknown';
+  return `${namespace}:${digest}`;
+}
 
 /**
  * Apply a blocked state to a task atomically.
@@ -665,28 +676,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             // Wrap management handler to route through handleManagementAction
             // which applies hold protocol for goal-bound tasks
             managementHandler: {
-              handle: (goal: GoalTagV1, sourceThoughtId?: string) =>
-                this.handleManagementAction(goal, sourceThoughtId),
-            } as TaskManagementHandler,
+              handle: (action: SterlingManagementAction, sourceThoughtId?: string) =>
+                this.handleManagementAction(action, sourceThoughtId),
+            },
             config: {
               strictConvertEligibility: this.config.strictConvertEligibility,
-            },
-            getInventoryBand: (itemName: string) => {
-              // Use inventory from last bot context fetch for satisfaction-aware dedup
-              const activeTasks = this.getActiveTasks();
-              const relevantTask = activeTasks.find((t) =>
-                t.parameters?.requirementCandidate?.outputPattern?.includes(
-                  itemName
-                )
-              );
-              const qty =
-                relevantTask?.parameters?.requirementCandidate?.quantity ?? 0;
-              // Band: 0, 1-4, 5-9, 10-19, 20+
-              if (qty === 0) return '0';
-              if (qty < 5) return '1-4';
-              if (qty < 10) return '5-9';
-              if (qty < 20) return '10-19';
-              return '20+';
             },
           });
 
@@ -1687,9 +1681,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * mutations) without persisting, letting this wrapper apply the patch
    * atomically with hold state. Remove preconditioning once the handler
    * returns patches instead of persisting internally.
-   */
+  */
   handleManagementAction(
-    goal: GoalTagV1,
+    actionInput: SterlingManagementAction,
     sourceThoughtId?: string
   ): ManagementResult {
     // Pre-condition hold state on goal-bound tasks BEFORE calling handle().
@@ -1697,7 +1691,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // by adjusting hold metadata first, the handler's single persist includes
     // both the status change AND the correct hold state, preventing transient
     // illegal states (paused-without-hold, pending-with-hold) visible to observers.
-    const targetId = goal.targetId;
+    const targetId = actionInput.target.taskId ?? null;
     type PreAction = 'hold_applied' | 'hold_cleared' | 'none';
     let preAction: PreAction = 'none';
     let savedHold: GoalBinding['hold'] | undefined;
@@ -1709,7 +1703,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           | GoalBinding
           | undefined;
         if (binding) {
-          if (goal.action === 'pause') {
+          if (actionInput.action === 'pause') {
             // Snapshot existing hold before overwriting — rollback must
             // restore the prior hold, not just clear (else we destroy
             // preempted/materials_missing holds on rejection).
@@ -1725,13 +1719,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             });
             syncHoldToTaskFields(task);
             preAction = 'hold_applied';
-          } else if (goal.action === 'resume' && binding.hold) {
+          } else if (actionInput.action === 'resume' && binding.hold) {
             // Pre-clear hold so handler persists status=pending without hold
             savedHold = cloneHold(binding.hold);
             clearHold(task);
             syncHoldToTaskFields(task);
             preAction = 'hold_cleared';
-          } else if (goal.action === 'cancel' && binding.hold) {
+          } else if (actionInput.action === 'cancel' && binding.hold) {
             // Pre-clear hold so handler persists status=failed without hold
             savedHold = cloneHold(binding.hold);
             clearHold(task);
@@ -1747,11 +1741,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       ? this.taskStore.getTask(targetId)?.status
       : undefined;
 
-    const result = this.managementHandler.handle(goal, sourceThoughtId);
+    const result = this.managementHandler.handle(actionInput, sourceThoughtId);
 
     // If pre-conditioned but action was rejected, roll back
     if (preAction !== 'none' && result.decision !== 'applied') {
-      const task = this.taskStore.getTask(targetId!);
+      const task = targetId ? this.taskStore.getTask(targetId) : undefined;
       if (task) {
         const binding = (task.metadata as any).goalBinding as
           | GoalBinding
@@ -1849,8 +1843,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
     }
 
-    const existingTask = this.taskStore.findSimilarTask(taskData);
-    if (existingTask) return existingTask;
+    let sterlingDedupeKey: string | null = null;
+    let sterlingReserved = false;
+    if (taskData.type === 'sterling_ir') {
+      sterlingDedupeKey = getSterlingDedupeKeyFromMetadata(taskData.metadata);
+      if (sterlingDedupeKey) {
+        const existingTask = this.taskStore.findBySterlingDedupeKey(sterlingDedupeKey);
+        if (existingTask) return existingTask;
+        sterlingReserved = this.taskStore.reserveSterlingDedupeKey(sterlingDedupeKey);
+      }
+    }
+
+    try {
+      const similarTask = this.taskStore.findSimilarTask(taskData);
+      if (similarTask) return similarTask;
 
     // Advisory actions are NL-parsed cognitive intent markers that cannot produce
     // deterministic requirementCandidate values. Skip step generation entirely —
@@ -1914,6 +1920,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       task.metadata.solver = { ...taskData.metadata.solver };
     }
 
+    // Propagate Sterling provenance namespace (opaque). Keep as whole-object merge.
+    if (taskData.metadata?.sterling) {
+      task.metadata.sterling = { ...taskData.metadata.sterling };
+    }
+
     // Store solve observability from step generation result
     if (stepResult.noStepsReason) {
       task.metadata.solver ??= {};
@@ -1952,7 +1963,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       });
     }
 
-    return this.finalizeNewTask(task, blockedSentinel);
+      if (taskData.type === 'sterling_ir' && sterlingDedupeKey) {
+        const existing = this.taskStore.findBySterlingDedupeKey(sterlingDedupeKey);
+        if (existing) return existing;
+      }
+      return this.finalizeNewTask(task, blockedSentinel);
+    } finally {
+      if (sterlingReserved && sterlingDedupeKey) {
+        this.taskStore.releaseSterlingDedupeKey(sterlingDedupeKey);
+      }
+    }
   }
 
   updateTaskMetadata(

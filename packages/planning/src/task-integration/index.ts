@@ -5,10 +5,6 @@
  */
 
 export {
-  extractActionTitle,
-  extractResourceType,
-  extractItemType,
-  extractBlockType,
   calculateTaskPriority,
   calculateTaskUrgency,
   convertThoughtToTask,
@@ -25,4 +21,5 @@ export {
   TaskManagementHandler,
   type ManagementDecision,
   type ManagementResult,
+  type SterlingManagementAction,
 } from './task-management-handler';

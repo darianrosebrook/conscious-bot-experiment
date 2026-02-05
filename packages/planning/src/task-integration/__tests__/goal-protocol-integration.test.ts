@@ -33,7 +33,35 @@ import { GoalStatus } from '../../types';
 import type { VerifierRegistry } from '../../goals/verifier-registry';
 import { TaskStore } from '../task-store';
 import { TaskManagementHandler, type ManagementResult } from '../task-management-handler';
-import type { GoalTagV1 } from '@conscious-bot/cognition';
+import type { SterlingManagementAction } from '../task-management-handler';
+
+type LegacyManagementLike = {
+  action: string;
+  target?: string;
+  targetId?: string | null;
+  amount: number | null;
+};
+
+type ManagementInput = SterlingManagementAction | LegacyManagementLike;
+
+function normalizeManagementInput(input: ManagementInput): SterlingManagementAction {
+  if ((input as SterlingManagementAction).target && typeof (input as SterlingManagementAction).target === 'object') {
+    const target = (input as SterlingManagementAction).target as any;
+    if ('taskId' in target || 'committedIrDigest' in target || 'query' in target) {
+      return input as SterlingManagementAction;
+    }
+  }
+  const legacy = input as LegacyManagementLike;
+  return {
+    action: legacy.action,
+    target: {
+      taskId: legacy.targetId ?? null,
+      committedIrDigest: null,
+      query: legacy.target ?? null,
+    },
+    amount: legacy.amount ?? null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Minimal harness that replicates TaskIntegration's goal-binding wiring
@@ -156,10 +184,11 @@ class GoalProtocolHarness {
   // handleManagementAction — mirrors TaskIntegration
   // ---------------------------------------------------------------------------
 
-  handleManagementAction(goal: GoalTagV1, sourceThoughtId?: string): ManagementResult {
+  handleManagementAction(input: ManagementInput, sourceThoughtId?: string): ManagementResult {
+    const actionInput = normalizeManagementInput(input);
     // Pre-condition hold state BEFORE calling handle() so the handler's
     // persist includes both status + hold atomically. Mirrors TaskIntegration.
-    const targetId = goal.targetId;
+    const targetId = actionInput.target.taskId ?? null;
     type PreAction = 'hold_applied' | 'hold_cleared' | 'none';
     let preAction: PreAction = 'none';
     let savedHold: GoalBinding['hold'] | undefined;
@@ -169,7 +198,7 @@ class GoalProtocolHarness {
       if (task) {
         const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
         if (binding) {
-          if (goal.action === 'pause') {
+          if (actionInput.action === 'pause') {
             savedHold = cloneHold(binding.hold);
             applyHold(task, {
               reason: 'manual_pause',
@@ -179,12 +208,12 @@ class GoalProtocolHarness {
             });
             syncHoldToTaskFields(task);
             preAction = 'hold_applied';
-          } else if (goal.action === 'resume' && binding.hold) {
+          } else if (actionInput.action === 'resume' && binding.hold) {
             savedHold = cloneHold(binding.hold);
             clearHold(task);
             syncHoldToTaskFields(task);
             preAction = 'hold_cleared';
-          } else if (goal.action === 'cancel' && binding.hold) {
+          } else if (actionInput.action === 'cancel' && binding.hold) {
             savedHold = cloneHold(binding.hold);
             clearHold(task);
             syncHoldToTaskFields(task);
@@ -197,7 +226,7 @@ class GoalProtocolHarness {
     // Snapshot status before handler (handler persists internally)
     const beforeStatus = targetId ? this.taskStore.getTask(targetId)?.status : undefined;
 
-    const result = this.managementHandler.handle(goal, sourceThoughtId);
+    const result = this.managementHandler.handle(actionInput, sourceThoughtId);
 
     // Roll back if action was rejected
     if (preAction !== 'none' && result.decision !== 'applied') {
@@ -472,7 +501,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('applied');
       expect(result.newStatus).toBe('paused');
@@ -498,7 +527,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       // Then resume
       const result = harness.handleManagementAction({
@@ -506,7 +535,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('applied');
 
@@ -530,7 +559,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       // Cancel
       const result = harness.handleManagementAction({
@@ -538,7 +567,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('applied');
 
@@ -579,7 +608,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('applied');
       const updated = harness.taskStore.getTask(task.id)!;
@@ -607,7 +636,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('invalid_transition');
 
@@ -712,7 +741,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       // Verify hold is set
       const pausedTask = harness.taskStore.getTask(task.id)!;
@@ -798,7 +827,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       // Resume via management (explicit user action)
       const result = harness.handleManagementAction({
@@ -806,7 +835,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('applied');
 
@@ -886,7 +915,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(violations).toEqual([]);
       vi.restoreAllMocks();
@@ -901,7 +930,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       const violations: Array<{ taskId: string; state: string; violations: any[] }> = [];
 
@@ -928,7 +957,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(violations).toEqual([]);
       vi.restoreAllMocks();
@@ -1354,7 +1383,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       // Goal should have been notified of suspension
       const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
@@ -1370,7 +1399,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
       expect(update).toBeDefined();
@@ -1386,7 +1415,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       harness.goalStatusUpdates.length = 0; // clear previous updates
 
@@ -1396,7 +1425,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
       expect(update).toBeDefined();
@@ -1422,7 +1451,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(result.decision).toBe('invalid_transition');
       // No goal status update should have been produced
@@ -1459,7 +1488,7 @@ describe('Goal Protocol Integration', () => {
         target: task.title,
         targetId: task.id,
         amount: null,
-      } as GoalTagV1);
+      } as ManagementInput);
 
       expect(harness.goalStatusUpdates.length).toBe(0);
     });

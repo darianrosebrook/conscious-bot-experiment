@@ -1,19 +1,13 @@
 /**
  * Task Management Handler — processes management actions (cancel, prioritize,
- * pause, resume) from parsed goal tags.
+ * pause, resume) from explicit Sterling management payloads.
  *
- * Architecture principle: A management action must never apply without an
- * unambiguous target. ID-based resolution is authoritative; title-based
- * matching is assistive only (single-candidate + stable slug match).
- * Ambiguous resolution → `needs_disambiguation` result, not silent no-op.
- *
- * Every mutation is recorded with provenance (source thought ID, previous
- * state, new state).
+ * Architecture principle: management actions must not be inferred from text.
+ * They are accepted only when Sterling emits a contract payload.
  *
  * @author @darianrosebrook
  */
 
-import type { GoalTagV1 } from '@conscious-bot/cognition';
 import type { Task } from '../types/task';
 import type { TaskStore } from './task-store';
 
@@ -27,6 +21,16 @@ export type ManagementDecision =
   | 'target_not_found'
   | 'invalid_transition'
   | 'error';
+
+export interface SterlingManagementAction {
+  action: string;
+  target: {
+    taskId: string | null;
+    committedIrDigest: string | null;
+    query: string | null;
+  };
+  amount: number | null;
+}
 
 export interface ManagementResult {
   decision: ManagementDecision;
@@ -47,15 +51,11 @@ export interface ManagementResult {
 // Transition model
 // ---------------------------------------------------------------------------
 
-/**
- * Explicit transition table for management actions.
- * Immutable statuses (completed, failed) reject all management actions.
- */
 const TRANSITION_TABLE: Record<string, Record<string, Task['status'] | null>> = {
   pause: {
     pending: 'paused',
     active: 'paused',
-    paused: null,           // already paused → invalid
+    paused: null,
     pending_planning: null,
     completed: null,
     failed: null,
@@ -63,7 +63,7 @@ const TRANSITION_TABLE: Record<string, Record<string, Task['status'] | null>> = 
   },
   resume: {
     paused: 'pending',
-    pending: null,          // already pending → invalid
+    pending: null,
     active: null,
     pending_planning: null,
     completed: null,
@@ -80,7 +80,7 @@ const TRANSITION_TABLE: Record<string, Record<string, Task['status'] | null>> = 
     unplannable: 'failed',
   },
   prioritize: {
-    pending: 'pending',     // stays in same status, priority changes
+    pending: 'pending',
     active: 'active',
     paused: 'paused',
     pending_planning: 'pending_planning',
@@ -93,17 +93,6 @@ const TRANSITION_TABLE: Record<string, Record<string, Task['status'] | null>> = 
 const IMMUTABLE_STATUSES = new Set<Task['status']>(['completed', 'failed']);
 
 // ---------------------------------------------------------------------------
-// Slug helper
-// ---------------------------------------------------------------------------
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
-
-// ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
@@ -111,23 +100,22 @@ export class TaskManagementHandler {
   constructor(private readonly taskStore: TaskStore) {}
 
   /**
-   * Process a management action from a parsed goal tag.
+   * Process a management action from a Sterling payload.
    */
   handle(
-    goal: GoalTagV1,
+    actionInput: SterlingManagementAction,
     sourceThoughtId?: string,
   ): ManagementResult {
-    const action = goal.action;
+    const action = actionInput.action;
     const base: Partial<ManagementResult> = {
       action,
-      targetQuery: goal.target || '',
-      targetId: goal.targetId ?? undefined,
+      targetQuery: actionInput.target.query ?? actionInput.target.taskId ?? actionInput.target.committedIrDigest ?? '',
+      targetId: actionInput.target.taskId ?? undefined,
       sourceThoughtId,
     };
 
     try {
-      // Resolve target task
-      const resolution = this.resolveTarget(goal);
+      const resolution = this.resolveTarget(actionInput);
       if (resolution.decision !== 'applied') {
         return { ...base, ...resolution } as ManagementResult;
       }
@@ -135,7 +123,6 @@ export class TaskManagementHandler {
       const task = resolution.task!;
       base.affectedTaskId = task.id;
 
-      // Check transition validity
       const transitions = TRANSITION_TABLE[action];
       if (!transitions) {
         return {
@@ -157,9 +144,8 @@ export class TaskManagementHandler {
         } as ManagementResult;
       }
 
-      // Apply mutation
       if (action === 'prioritize') {
-        return this.applyPrioritize(task, goal, base);
+        return this.applyPrioritize(task, actionInput, base);
       }
 
       const previousStatus = task.status;
@@ -189,7 +175,7 @@ export class TaskManagementHandler {
   // Target resolution
   // -------------------------------------------------------------------------
 
-  private resolveTarget(goal: GoalTagV1): {
+  private resolveTarget(actionInput: SterlingManagementAction): {
     decision: ManagementDecision;
     task?: Task;
     candidates?: string[];
@@ -197,25 +183,68 @@ export class TaskManagementHandler {
     targetQuery: string;
     action: string;
   } {
-    const action = goal.action;
-    const targetQuery = goal.target || '';
+    const action = actionInput.action;
+    const targetQuery = actionInput.target.query ?? actionInput.target.taskId ?? actionInput.target.committedIrDigest ?? '';
 
-    // Path 1: explicit ID
-    if (goal.targetId) {
-      const task = this.taskStore.getTask(goal.targetId);
+    // Path 1: explicit task ID
+    const taskId = actionInput.target.taskId ?? null;
+    const digest = actionInput.target.committedIrDigest ?? null;
+    let taskById: Task | null = null;
+    let taskByDigest: Task | null = null;
+
+    if (taskId) {
+      const task = this.taskStore.getTask(taskId);
       if (!task) {
         return {
           decision: 'target_not_found',
           targetQuery,
           action,
-          reason: `no task with id '${goal.targetId}'`,
+          reason: `no task with id '${taskId}'`,
         };
       }
-      return { decision: 'applied', task, targetQuery, action };
+      taskById = task;
     }
 
-    // Path 2: slug-based matching (single-candidate only)
-    const query = targetQuery.toLowerCase().replace(/_/g, ' ').trim();
+    if (digest) {
+      const matches = this.taskStore.getTasks().filter(t =>
+        (t.metadata as any)?.sterling?.committedIrDigest === digest
+      );
+      if (matches.length === 0) {
+        return {
+          decision: 'target_not_found',
+          targetQuery,
+          action,
+          reason: `no tasks with committed_ir_digest '${digest}'`,
+        };
+      }
+      if (matches.length > 1) {
+        return {
+          decision: 'needs_disambiguation',
+          candidates: matches.map(t => t.id),
+          targetQuery,
+          action,
+          reason: `${matches.length} tasks match committed_ir_digest '${digest}'`,
+        };
+      }
+      taskByDigest = matches[0];
+    }
+
+    if (taskById && taskByDigest && taskById.id !== taskByDigest.id) {
+      return {
+        decision: 'needs_disambiguation',
+        targetQuery,
+        action,
+        reason: `conflicting targets: taskId '${taskById.id}' != digest '${taskByDigest.id}'`,
+      };
+    }
+
+    const resolved = taskById ?? taskByDigest;
+    if (resolved) {
+      return { decision: 'applied', task: resolved, targetQuery, action };
+    }
+
+    // Path 3: query-only is NOT actionable in Phase 3 (explicit target required).
+    const query = (actionInput.target.query ?? '').toLowerCase().replace(/_/g, ' ').trim();
     if (!query) {
       return {
         decision: 'target_not_found',
@@ -224,48 +253,11 @@ export class TaskManagementHandler {
         reason: 'no target identifier or query provided',
       };
     }
-
-    const querySlug = slugify(query);
-    const manageable = this.taskStore.getTasks({
-      status: ['pending', 'active', 'paused', 'pending_planning'],
-    });
-
-    const candidates: Task[] = [];
-    for (const task of manageable) {
-      if (task.id === query || task.id === querySlug) {
-        candidates.push(task);
-        continue;
-      }
-      const titleSlug = slugify(task.title);
-      if (titleSlug === querySlug) {
-        candidates.push(task);
-        continue;
-      }
-      // Partial match: slug contains query
-      if (titleSlug.includes(querySlug) || querySlug.includes(titleSlug)) {
-        candidates.push(task);
-      }
-    }
-
-    if (candidates.length === 0) {
-      return {
-        decision: 'target_not_found',
-        targetQuery,
-        action,
-        reason: `no matching tasks for query '${query}'`,
-      };
-    }
-
-    if (candidates.length === 1) {
-      return { decision: 'applied', task: candidates[0], targetQuery, action };
-    }
-
     return {
       decision: 'needs_disambiguation',
-      candidates: candidates.map(t => t.id),
       targetQuery,
       action,
-      reason: `${candidates.length} candidates match '${query}': ${candidates.map(t => t.id).join(', ')}`,
+      reason: `query-only management action requires explicit target reference: '${query}'`,
     };
   }
 
@@ -275,17 +267,15 @@ export class TaskManagementHandler {
 
   private applyPrioritize(
     task: Task,
-    goal: GoalTagV1,
+    actionInput: SterlingManagementAction,
     base: Partial<ManagementResult>,
   ): ManagementResult {
     const previousPriority = task.priority;
     let newPriority: number;
 
-    if (goal.amount !== null) {
-      // Explicit amount sets priority directly (clamped 0..1)
-      newPriority = Math.max(0, Math.min(1, goal.amount));
+    if (actionInput.amount !== null) {
+      newPriority = Math.max(0, Math.min(1, actionInput.amount));
     } else {
-      // Default boost: increase by 0.2, clamped to 1
       newPriority = Math.min(1, previousPriority + 0.2);
     }
 

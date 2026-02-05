@@ -1,134 +1,79 @@
 /**
- * Thought-to-task conversion: extract action type, title, and parameters
- * from cognitive stream thoughts.
+ * Thought-to-task conversion: Sterling reduction -> opaque task.
  *
- * Architecture principle: The sanitizer (llm-output-sanitizer.ts) is the single
- * deterministic boundary for goal extraction. This module reads structured
- * metadata (extractedGoal) — it never re-parses goal tags from raw text.
+ * Boundary principle: Planning does NOT parse goal tags or infer semantics.
+ * It only honors Sterling's reduction artifacts and fails closed otherwise.
  *
  * @author @darianrosebrook
  */
 
 import type { Task } from '../types/task';
 import type { CognitiveStreamThought } from '../modules/cognitive-stream-client';
-import { parseRequiredQuantityFromTitle } from '../modules/requirements';
-
-// Import shared types from cognition boundary — no local regex fork
-import type { GoalTagV1 } from '@conscious-bot/cognition';
-import type { TaskManagementHandler, ManagementResult } from './task-management-handler';
+import type { ManagementResult, SterlingManagementAction } from './task-management-handler';
+import type { ReductionProvenance } from '@conscious-bot/cognition';
 
 /**
  * Explicit decision state for task creation — makes "why nothing happened" visible.
- * Downstream consumers (dashboard, telemetry) can read this without guessing.
  */
 export type TaskDecision =
-  | 'created'              // task was successfully created
-  | 'blocked_unroutable'   // canonical action not in ROUTABLE_ACTIONS
-  | 'blocked_guard'        // thought filtered by content guard (status text, etc.)
-  | 'blocked_not_eligible' // thought has convertEligible=false (low-novelty, dedup noise)
-  | 'suppressed_dedup'     // same goal within dedup window
-  | 'dropped_sanitizer'    // no extractedGoal and keyword fallback didn't match
-  | 'dropped_seen'         // thought ID already processed
-  | 'management_applied'          // management action applied successfully
-  | 'management_needs_disambiguation' // management action ambiguous — multiple candidates
-  | 'management_failed'           // management action target not found or invalid transition
-  | 'error';               // exception during conversion
+  | 'created'
+  | 'blocked_guard'
+  | 'blocked_not_eligible'
+  | 'dropped_seen'
+  | 'suppressed_dedup'
+  | 'dropped_no_reduction'
+  | 'dropped_sterling_unavailable'
+  | 'dropped_not_executable'
+  | 'dropped_missing_digest'
+  | 'management_applied'
+  | 'management_needs_disambiguation'
+  | 'management_failed'
+  | 'management_unsupported'
+  | 'error';
 
 export interface ConvertThoughtResult {
   task: Task | null;
   decision: TaskDecision;
-  /** Reason string for debugging (e.g., "action 'explore' not routable") */
   reason?: string;
-  /** Management result when a management action was processed */
   managementResult?: ManagementResult;
 }
 
-/**
- * Management actions — handled by TaskManagementHandler, not by task creation.
- * Dispatched before ROUTABLE_ACTIONS check.
- */
-const MANAGEMENT_ACTIONS = new Set([
-  'cancel', 'prioritize', 'pause', 'resume',
-]);
+export interface ConvertThoughtToTaskDeps {
+  addTask: (taskData: Partial<Task>) => Promise<Task>;
+  markThoughtAsProcessed: (thoughtId: string) => Promise<void>;
+  seenThoughtIds: Set<string>;
+  trimSeenThoughtIds: () => void;
+  /** Management handler for explicit Sterling management actions. */
+  managementHandler?: {
+    handle: (action: SterlingManagementAction, sourceThoughtId?: string) => ManagementResult;
+  };
+  /** Configuration for conversion behavior */
+  config?: {
+    /**
+     * When true, require convertEligible === true for task creation (fail-closed).
+     * When false (default), only convertEligible === false blocks.
+     */
+    strictConvertEligibility?: boolean;
+  };
+}
 
-/**
- * Routable actions — structural routing set for actions that resolveRequirement + routeActionPlan can handle.
- * This is NOT semantic classification (Sterling already determined executability).
- * This is purely "can our execution layer handle this action type?"
- * Unroutable actions (check, continue) exist for cognitive observability only.
- */
-const ROUTABLE_ACTIONS = new Set([
-  'collect', 'mine', 'craft', 'build', 'gather', 'smelt', 'repair',
-  'navigate', 'explore', 'find',
-]);
+/** Recent digest hashes for 5-minute dedup window */
+const recentDigestHashes = new Map<string, number>();
+const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 
-/** Maps routable canonical actions to task types */
-const ACTION_TO_TASK_TYPE: Record<string, string> = {
-  collect: 'gathering',
-  mine: 'mining',
-  craft: 'crafting',
-  build: 'building',
-  gather: 'gathering',
-  smelt: 'crafting',
-  repair: 'building',
-  navigate: 'navigation',
-  explore: 'exploration',
-  find: 'exploration',
-};
-
-/** Regex to strip residual [GOAL:...] tags (and optional trailing amount) from display text */
-const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
-
-export function extractActionTitle(
-  content: string,
-  actionType: string
-): string {
-  const sentences = content.split(/[.!?]/);
-  for (const sentence of sentences) {
-    if (sentence.toLowerCase().includes(actionType)) {
-      return sentence.trim();
+function isDigestDuplicate(digestKey: string): boolean {
+  const now = Date.now();
+  const lastSeen = recentDigestHashes.get(digestKey);
+  if (lastSeen && now - lastSeen < DIGEST_DEDUP_WINDOW_MS) {
+    return true;
+  }
+  recentDigestHashes.set(digestKey, now);
+  if (recentDigestHashes.size > 100) {
+    for (const [key, ts] of recentDigestHashes) {
+      if (now - ts > DIGEST_DEDUP_WINDOW_MS) recentDigestHashes.delete(key);
     }
   }
-  return content;
-}
-
-export function extractResourceType(content: string): string {
-  // Specific wood types take priority over generic "wood"
-  if (content.includes('oak')) return 'oak_log';
-  if (content.includes('birch')) return 'birch_log';
-  if (content.includes('spruce')) return 'spruce_log';
-  if (content.includes('jungle')) return 'jungle_log';
-  if (content.includes('acacia')) return 'acacia_log';
-  if (content.includes('dark oak') || content.includes('dark_oak')) return 'dark_oak_log';
-  if (content.includes('mangrove')) return 'mangrove_log';
-  if (content.includes('cherry')) return 'cherry_log';
-  // Generic "wood" or "log" → suffix pattern that matches any wood type
-  if (content.includes('wood') || content.includes('log')) return '_log';
-  if (content.includes('iron')) return 'iron_ore';
-  if (content.includes('stone')) return 'cobblestone';
-  if (content.includes('diamond')) return 'diamond_ore';
-  if (content.includes('food')) return 'bread';
-  return '_log';
-}
-
-export function extractItemType(content: string): string {
-  if (content.includes('pickaxe')) return 'wooden_pickaxe';
-  if (content.includes('sword')) return 'wooden_sword';
-  if (content.includes('axe')) return 'wooden_axe';
-  if (content.includes('shovel')) return 'wooden_shovel';
-  if (content.includes('table')) return 'crafting_table';
-  if (content.includes('planks') || content.includes('plank'))
-    return 'oak_planks';
-  if (content.includes('stick')) return 'stick';
-  return 'oak_planks';
-}
-
-export function extractBlockType(content: string): string {
-  if (content.includes('iron')) return 'iron_ore';
-  if (content.includes('coal')) return 'coal_ore';
-  if (content.includes('stone')) return 'stone';
-  if (content.includes('diamond')) return 'diamond_ore';
-  return 'stone';
+  return false;
 }
 
 export function calculateTaskPriority(thought: CognitiveStreamThought): number {
@@ -158,72 +103,61 @@ export function calculateTaskUrgency(thought: CognitiveStreamThought): number {
   return Math.min(1.0, urgency);
 }
 
-export interface ConvertThoughtToTaskDeps {
-  addTask: (taskData: Partial<Task>) => Promise<Task>;
-  markThoughtAsProcessed: (thoughtId: string) => Promise<void>;
-  seenThoughtIds: Set<string>;
-  trimSeenThoughtIds: () => void;
-  /** Current inventory for satisfaction-aware dedup. Optional for backward compat. */
-  getInventoryBand?: (itemName: string) => string;
-  /** Management handler for cancel/pause/resume/prioritize actions. Optional for backward compat. */
-  managementHandler?: TaskManagementHandler;
-  /** Configuration for conversion behavior */
-  config?: {
-    /**
-     * When true, require convertEligible === true for task creation (fail-closed).
-     * When false (default), only convertEligible === false blocks — undefined is eligible.
-     * Enable once all producers reliably emit the field.
-     */
-    strictConvertEligibility?: boolean;
-    /**
-     * IDLE-2 Intent Contract Enforcement.
-     * When true (default), only explicit [GOAL:] tags from the sanitizer create tasks.
-     * When false, allow keyword-based fallback for backward compatibility.
-     *
-     * This enforces: "Thoughts never create tasks unless an explicit intent contract is emitted."
-     */
-    requireExplicitGoalTag?: boolean;
+function extractSterlingManagementAction(reduction: ReductionProvenance | null | undefined): SterlingManagementAction | null {
+  if (!reduction?.reducerResult) return null;
+  const raw = (reduction.reducerResult as unknown as { management_action?: unknown }).management_action;
+  if (!raw || typeof raw !== 'object') return null;
+  const action = (raw as { action?: unknown }).action;
+  const target = (raw as { target?: unknown }).target;
+  if (typeof action !== 'string' || !target || typeof target !== 'object') return null;
+
+  const targetObj = target as { task_id?: unknown; committed_ir_digest?: unknown; query?: unknown };
+  const out: SterlingManagementAction = {
+    action,
+    target: {
+      taskId: typeof targetObj.task_id === 'string' ? targetObj.task_id : null,
+      committedIrDigest: typeof targetObj.committed_ir_digest === 'string' ? targetObj.committed_ir_digest : null,
+      query: typeof targetObj.query === 'string' ? targetObj.query : null,
+    },
+    amount: typeof (raw as { amount?: unknown }).amount === 'number'
+      ? (raw as { amount?: number }).amount ?? null
+      : null,
   };
+
+  return out;
 }
 
-/** Recent goal hashes for 5-minute dedup window */
-const recentGoalHashes = new Map<string, number>();
-const GOAL_DEDUP_WINDOW_MS = 5 * 60 * 1000;
-
-/**
- * Check if goal is a duplicate within the dedup window.
- * Key includes inventory band when available so that a re-proposal
- * after the inventory state changed (e.g., items consumed/lost) is NOT suppressed.
- */
-function isGoalDuplicate(goal: GoalTagV1, inventoryBand?: string): boolean {
-  const invSuffix = inventoryBand ? `:inv=${inventoryBand}` : '';
-  const hash = `${goal.action}:${goal.target}:${goal.amount ?? ''}${invSuffix}`;
-  const now = Date.now();
-  const lastSeen = recentGoalHashes.get(hash);
-  if (lastSeen && now - lastSeen < GOAL_DEDUP_WINDOW_MS) {
-    return true;
+function resolveReduction(thought: CognitiveStreamThought): {
+  ok: boolean;
+  decision: TaskDecision;
+  reason: string;
+  reduction?: ReductionProvenance;
+} {
+  const reduction = thought.metadata?.reduction ?? null;
+  if (!reduction) {
+    return { ok: false, decision: 'dropped_no_reduction', reason: 'no reduction provided' };
   }
-  recentGoalHashes.set(hash, now);
-  // Clean old entries
-  if (recentGoalHashes.size > 50) {
-    for (const [key, ts] of recentGoalHashes) {
-      if (now - ts > GOAL_DEDUP_WINDOW_MS) recentGoalHashes.delete(key);
-    }
+  if (!reduction.sterlingProcessed) {
+    return { ok: false, decision: 'dropped_sterling_unavailable', reason: 'sterlingProcessed=false' };
   }
-  return false;
+  if (!reduction.isExecutable) {
+    return {
+      ok: false,
+      decision: 'dropped_not_executable',
+      reason: reduction.blockReason ?? 'sterling_not_executable',
+    };
+  }
+  const result = reduction.reducerResult;
+  if (!result || typeof result.committed_ir_digest !== 'string' || !result.committed_ir_digest) {
+    return { ok: false, decision: 'dropped_missing_digest', reason: 'committed_ir_digest missing' };
+  }
+  return { ok: true, decision: 'created', reason: 'sterling_executable', reduction };
 }
 
 /**
  * Convert a cognitive thought to a planning task.
  *
- * Primary path: reads `thought.metadata.extractedGoal` (populated by sanitizer).
- * Fallback: keyword-based classification from content.
- * No LLM fallback — the sanitizer is the single boundary.
- *
- * Returns `ConvertThoughtResult` with explicit decision state so callers
- * can distinguish "no task needed" from "task creation failed."
- *
- * Fail-closed: unroutable actions (find, explore, navigate, check, continue) → null.
+ * Only Sterling reduction artifacts are used. No local semantic parsing.
  */
 export async function convertThoughtToTask(
   thought: CognitiveStreamThought,
@@ -232,17 +166,6 @@ export async function convertThoughtToTask(
   try {
     if (thought.processed) return { task: null, decision: 'blocked_guard', reason: 'already processed' };
 
-    const lower = thought.content.trim().toLowerCase();
-    if (
-      lower.startsWith('health:') ||
-      lower.startsWith('hunger:') ||
-      /observing\s+environment\s+and\s+deciding/.test(lower) ||
-      /^\d+%\.?\s*(health|hunger|observing)/.test(lower) ||
-      /is complete\.\s*i have \d+ other tasks/.test(lower)
-    ) {
-      return { task: null, decision: 'blocked_guard', reason: 'status text filtered' };
-    }
-
     if (deps.seenThoughtIds.has(thought.id)) return { task: null, decision: 'dropped_seen', reason: 'thought ID already seen' };
     deps.seenThoughtIds.add(thought.id);
     if (deps.seenThoughtIds.size > 500) {
@@ -250,130 +173,53 @@ export async function convertThoughtToTask(
     }
 
     // Convert-eligibility gate.
-    // Strict mode: require convertEligible === true (fail-closed).
-    // Default mode: only convertEligible === false blocks; undefined is eligible (backwards compat).
     const strict = deps.config?.strictConvertEligibility === true;
     if (strict) {
       if (thought.convertEligible !== true) {
         return { task: null, decision: 'blocked_not_eligible', reason: 'strict mode: convertEligible !== true' };
       }
-    } else {
-      if (thought.convertEligible === false) {
-        return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
-      }
+    } else if (thought.convertEligible === false) {
+      return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
     }
 
-    // Primary path: use structured extractedGoal from sanitizer
-    const extractedGoal = thought.metadata?.extractedGoal as GoalTagV1 | undefined;
-
-    let actionType = 'general';
-    let taskTitle = thought.content;
-    let taskDescription = thought.content;
-
-    if (extractedGoal && extractedGoal.action) {
-      // Management action dispatch — before ROUTABLE_ACTIONS check
-      if (MANAGEMENT_ACTIONS.has(extractedGoal.action)) {
-        if (!deps.managementHandler) {
-          return { task: null, decision: 'management_failed', reason: 'management handler not available' };
-        }
-        const mgmtResult = deps.managementHandler.handle(
-          extractedGoal as GoalTagV1,
-          thought.id,
-        );
-        await deps.markThoughtAsProcessed(thought.id);
-        const decisionMap: Record<string, TaskDecision> = {
-          applied: 'management_applied',
-          needs_disambiguation: 'management_needs_disambiguation',
-          target_not_found: 'management_failed',
-          invalid_transition: 'management_failed',
-          error: 'management_failed',
-        };
-        return {
-          task: null,
-          decision: decisionMap[mgmtResult.decision] ?? 'management_failed',
-          reason: mgmtResult.reason ?? `management ${mgmtResult.action}: ${mgmtResult.decision}`,
-          managementResult: mgmtResult,
-        };
-      }
-
-      // Goal acceptance gate: must be routable
-      if (!ROUTABLE_ACTIONS.has(extractedGoal.action)) {
-        return { task: null, decision: 'blocked_unroutable', reason: `action '${extractedGoal.action}' not routable` };
-      }
-
-      // Goal dedup: skip if same goal was created recently
-      // Include inventory band if available for satisfaction-aware dedup
-      const inventoryBand = deps.getInventoryBand
-        ? deps.getInventoryBand(extractedGoal.target.replace(/\s+/g, '_'))
-        : undefined;
-      if ('version' in extractedGoal && isGoalDuplicate(extractedGoal as GoalTagV1, inventoryBand)) {
-        return { task: null, decision: 'suppressed_dedup', reason: `duplicate goal within ${GOAL_DEDUP_WINDOW_MS / 1000}s window` };
-      }
-
-      actionType = ACTION_TO_TASK_TYPE[extractedGoal.action] || 'general';
-      taskTitle = extractActionTitle(lower, extractedGoal.action);
-    } else {
-      // IDLE-2 Intent Contract: By default, require explicit [GOAL:] tags.
-      // Keyword fallback is gated behind requireExplicitGoalTag=false for backward compat.
-      const requireExplicitGoalTag = deps.config?.requireExplicitGoalTag !== false;
-
-      if (requireExplicitGoalTag) {
-        // Strict mode (default): no [GOAL:] tag → no task.
-        // This enforces: "Thoughts never create tasks unless an explicit intent contract is emitted."
-        return {
-          task: null,
-          decision: 'dropped_sanitizer',
-          reason: 'IDLE-2: no explicit [GOAL:] tag — keyword fallback disabled',
-        };
-      }
-
-      // Legacy fallback: keyword-based classification (no LLM re-parse)
-      // Only reachable when requireExplicitGoalTag=false
-      const content = lower;
-      if (
-        content.includes('gather') ||
-        content.includes('collect') ||
-        content.includes('wood') ||
-        content.includes('log')
-      ) {
-        actionType = 'gathering';
-        taskTitle = extractActionTitle(content, 'gather');
-      } else if (
-        content.includes('craft') ||
-        content.includes('build') ||
-        content.includes('make') ||
-        content.includes('create')
-      ) {
-        actionType = 'crafting';
-        taskTitle = extractActionTitle(content, 'craft');
-      } else if (
-        content.includes('mine') ||
-        content.includes('dig') ||
-        content.includes('ore')
-      ) {
-        actionType = 'mining';
-        taskTitle = extractActionTitle(content, 'mine');
-      } else if (
-        content.includes('farm') ||
-        content.includes('plant') ||
-        content.includes('harvest')
-      ) {
-        actionType = 'gathering';
-        taskTitle = extractActionTitle(content, 'gather');
-      } else {
-        // Truly general — not enough signal for a task
-        return { task: null, decision: 'dropped_sanitizer', reason: 'no structured goal and keyword fallback did not match' };
-      }
+    const reductionCheck = resolveReduction(thought);
+    if (!reductionCheck.ok) {
+      return { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
     }
 
-    // Strip [GOAL:] tags from title and description
-    taskTitle = taskTitle.replace(GOAL_TAG_STRIP, '').trim();
-    taskDescription = taskDescription.replace(GOAL_TAG_STRIP, '').trim();
+    const reduction = reductionCheck.reduction!;
+    const result = reduction.reducerResult!;
 
-    // Ensure we have a non-empty title
-    if (!taskTitle) taskTitle = thought.content.replace(GOAL_TAG_STRIP, '').trim();
-    if (!taskTitle) taskTitle = 'Autonomous task';
+    // Management actions: only if Sterling emits explicit payload.
+    const managementAction = extractSterlingManagementAction(reduction);
+    if (managementAction) {
+      if (!deps.managementHandler) {
+        return { task: null, decision: 'management_failed', reason: 'management handler not available' };
+      }
+      const mgmtResult = deps.managementHandler.handle(managementAction, thought.id);
+      await deps.markThoughtAsProcessed(thought.id);
+      const decisionMap: Record<string, TaskDecision> = {
+        applied: 'management_applied',
+        needs_disambiguation: 'management_needs_disambiguation',
+        target_not_found: 'management_failed',
+        invalid_transition: 'management_failed',
+        error: 'management_failed',
+      };
+      return {
+        task: null,
+        decision: decisionMap[mgmtResult.decision] ?? 'management_failed',
+        reason: mgmtResult.reason ?? `management ${mgmtResult.action}: ${mgmtResult.decision}`,
+        managementResult: mgmtResult,
+      };
+    }
 
+    const schemaVersion = result.schema_version || 'unknown';
+    const digestKey = `${schemaVersion}:${result.committed_ir_digest}`;
+    if (isDigestDuplicate(digestKey)) {
+      return { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
+    }
+
+    const title = thought.content.trim().slice(0, 160) || `Sterling task ${result.committed_ir_digest.slice(0, 12)}`;
     const parameters: Record<string, any> = {
       thoughtContent: thought.content,
       thoughtId: thought.id,
@@ -384,113 +230,11 @@ export async function convertThoughtToTask(
       model: thought.metadata.model,
     };
 
-    // Build requirement candidate from structured goal or keyword fallback
-    if (extractedGoal && extractedGoal.action && ROUTABLE_ACTIONS.has(extractedGoal.action)) {
-      parameters.requirementCandidate = {
-        kind: extractedGoal.action,
-        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
-        quantity: extractedGoal.amount ||
-          (extractedGoal.action === 'mine' ? 3 :
-           extractedGoal.action === 'collect' || extractedGoal.action === 'gather' ? 8 : 1),
-        extractionMethod: 'goal-tag',
-      };
-    } else if (actionType === 'crafting') {
-      const itemName = extractItemType(lower);
-      if (itemName) {
-        parameters.requirementCandidate = {
-          kind: 'craft',
-          outputPattern: itemName,
-          quantity: 1,
-          extractionMethod: 'thought-content',
-        };
-      }
-    } else if (actionType === 'gathering') {
-      const resource = extractResourceType(lower);
-      if (resource) {
-        parameters.requirementCandidate = {
-          kind: 'collect',
-          outputPattern: resource,
-          quantity: parseRequiredQuantityFromTitle(taskTitle, 8),
-          extractionMethod: 'thought-content',
-        };
-      }
-    } else if (actionType === 'mining') {
-      const blockType = extractBlockType(lower);
-      if (blockType) {
-        parameters.requirementCandidate = {
-          kind: 'mine',
-          outputPattern: blockType,
-          quantity: parseRequiredQuantityFromTitle(taskTitle, 3),
-          extractionMethod: 'thought-content',
-        };
-      }
-    } else if (actionType === 'building') {
-      parameters.requirementCandidate = {
-        kind: 'build',
-        outputPattern: 'basic_shelter_5x5',
-        quantity: 1,
-        extractionMethod: 'thought-content',
-      };
-    } else if (actionType === 'navigation' && extractedGoal) {
-      parameters.requirementCandidate = {
-        kind: 'navigate',
-        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
-        quantity: 1,
-        extractionMethod: 'goal-tag',
-      };
-    } else if (actionType === 'exploration' && extractedGoal) {
-      parameters.requirementCandidate = {
-        kind: extractedGoal.action === 'find' ? 'find' : 'explore',
-        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
-        quantity: extractedGoal.amount || 1,
-        extractionMethod: 'goal-tag',
-      };
-    }
-
-    if (actionType === 'gathering') {
-      parameters.resourceType = extractResourceType(lower);
-    } else if (actionType === 'crafting') {
-      parameters.itemType = extractItemType(lower);
-    } else if (actionType === 'mining') {
-      parameters.blockType = extractBlockType(lower);
-    }
-
-    const extractionMethod =
-      parameters.requirementCandidate?.extractionMethod || actionType;
-    const contentHash = Array.from(thought.content.slice(0, 80))
-      .reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0)
-      .toString(36)
-      .replace('-', 'n');
-
-    // Goal identity from Sterling semantic authority.
-    // Primary: committed_goal_prop_id (Sterling-assigned stable ID)
-    // Secondary: committed_ir_digest (provenance, content-addressed)
-    // Tertiary: envelope_id (verbatim marker identity for fallback/observability)
-    // Legacy: goalKey (deprecated, from old canonicalGoalKey() - kept for backward compat)
-    //
-    // IMPORTANT: Identity comes from Sterling, not TS string manipulation.
-    // If Sterling was not used (fallback mode), we use envelope_id as provenance only.
-    const sterlingGoalId = thought.metadata?.committedGoalPropId || undefined;
-    const sterlingIrDigest = thought.metadata?.committedIrDigest || undefined;
-    const envelopeId = thought.metadata?.envelopeId || undefined;
-    const legacyGoalKey = thought.metadata?.goalKey || undefined;
-
-    // Prefer Sterling-provided ID, fall back to IR digest, then envelope, then legacy
-    const goalKey = sterlingGoalId ?? sterlingIrDigest ?? envelopeId ?? legacyGoalKey;
-
-    // Warn if using legacy goalKey (indicates old code path or pre-Sterling thought)
-    if (!sterlingGoalId && !sterlingIrDigest && !envelopeId && legacyGoalKey) {
-      console.warn(
-        `[Thought-to-task] Using legacy goalKey (no Sterling identity): "${legacyGoalKey}". ` +
-        `This indicates thought was not processed through Sterling. Consider updating producer.`
-      );
-    }
-
     const task: Task = {
-      id: `cognitive-task-${thought.id}-${extractionMethod}-${contentHash}`,
-      title: taskTitle,
-      description: taskDescription,
-      type: actionType,
+      id: `cognitive-task-${thought.id}-${result.committed_ir_digest.slice(0, 12)}`,
+      title,
+      description: title,
+      type: 'sterling_ir',
       priority: calculateTaskPriority(thought),
       urgency: calculateTaskUrgency(thought),
       progress: 0,
@@ -505,8 +249,15 @@ export async function convertThoughtToTask(
         maxRetries: 3,
         childTaskIds: [],
         tags: ['cognitive', 'autonomous', thought.metadata.thoughtType],
-        category: actionType,
-        goalKey,
+        category: 'sterling_ir',
+        sterling: {
+          committedIrDigest: result.committed_ir_digest,
+          committedGoalPropId: result.committed_goal_prop_id ?? null,
+          envelopeId: reduction.envelopeId ?? result.source_envelope_id ?? null,
+          schemaVersion: result.schema_version ?? null,
+          reducerVersion: result.reducer_version ?? null,
+          dedupeNamespace: result.schema_version ?? null,
+        },
       },
     };
 

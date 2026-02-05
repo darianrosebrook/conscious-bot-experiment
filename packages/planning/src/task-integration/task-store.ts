@@ -31,9 +31,6 @@ function createEmptyStatistics(): TaskStatistics {
   };
 }
 
-/** Regex to strip [GOAL:...] tags from display titles */
-const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
-
 /**
  * Atomicity contract: this store is reference-based, NOT copy-on-write.
  *
@@ -53,22 +50,11 @@ const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
  */
 export class TaskStore {
   private tasks = new Map<string, Task>();
+  private sterlingIndex = new Map<string, Task>();
+  private sterlingReservations = new Map<string, number>();
   private taskHistory: Task[] = [];
   private progressTracker = new Map<string, TaskProgress>();
   private statistics: TaskStatistics = createEmptyStatistics();
-
-  /**
-   * Normalize display title on read: strip [GOAL:] tags from title
-   * and cache in metadata.titleDisplay for dashboard consumption.
-   * Raw title is preserved for audit.
-   */
-  private normalizeDisplayTitle(task: Task): void {
-    if (!task.metadata.titleDisplay && GOAL_TAG_STRIP.test(task.title)) {
-      task.metadata.titleDisplay = task.title.replace(GOAL_TAG_STRIP, '').trim();
-      // Reset regex lastIndex (global flag)
-      GOAL_TAG_STRIP.lastIndex = 0;
-    }
-  }
 
   setTask(
     task: Task,
@@ -95,12 +81,15 @@ export class TaskStore {
       );
     }
     this.tasks.set(task.id, task);
+    const dedupeKey = this.getSterlingDedupeKey(task);
+    if (dedupeKey) {
+      this.sterlingIndex.set(dedupeKey, task);
+      this.sterlingReservations.delete(dedupeKey);
+    }
   }
 
   getTask(taskId: string): Task | undefined {
-    const task = this.tasks.get(taskId);
-    if (task) this.normalizeDisplayTitle(task);
-    return task;
+    return this.tasks.get(taskId);
   }
 
   hasTask(taskId: string): boolean {
@@ -108,15 +97,50 @@ export class TaskStore {
   }
 
   deleteTask(taskId: string): boolean {
+    const existing = this.tasks.get(taskId);
     const deleted = this.tasks.delete(taskId);
     if (deleted) {
       this.progressTracker.delete(taskId);
+      const dedupeKey = existing ? this.getSterlingDedupeKey(existing) : null;
+      if (dedupeKey && this.sterlingIndex.get(dedupeKey)?.id === taskId) {
+        this.sterlingIndex.delete(dedupeKey);
+        this.sterlingReservations.delete(dedupeKey);
+      }
     }
     return deleted;
   }
 
   getAllTasks(): Task[] {
     return Array.from(this.tasks.values());
+  }
+
+  findBySterlingDedupeKey(dedupeKey: string): Task | null {
+    const indexed = this.sterlingIndex.get(dedupeKey);
+    if (indexed) {
+      if (this.tasks.has(indexed.id)) return indexed;
+      // Stale index entry: remove and fall through to history scan.
+      this.sterlingIndex.delete(dedupeKey);
+    }
+    // Fall back to history scan (most recent wins)
+    for (let i = this.taskHistory.length - 1; i >= 0; i--) {
+      const task = this.taskHistory[i];
+      if (this.getSterlingDedupeKey(task) === dedupeKey) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  reserveSterlingDedupeKey(dedupeKey: string): boolean {
+    if (this.sterlingIndex.has(dedupeKey) || this.sterlingReservations.has(dedupeKey)) {
+      return false;
+    }
+    this.sterlingReservations.set(dedupeKey, Date.now());
+    return true;
+  }
+
+  releaseSterlingDedupeKey(dedupeKey: string): void {
+    this.sterlingReservations.delete(dedupeKey);
   }
 
   getTasks(filters?: {
@@ -126,7 +150,6 @@ export class TaskStore {
     limit?: number;
   }): Task[] {
     let tasks = this.getAllTasks();
-    for (const t of tasks) this.normalizeDisplayTitle(t);
     if (filters?.status) {
       const statuses = Array.isArray(filters.status)
         ? filters.status
@@ -151,6 +174,11 @@ export class TaskStore {
   }
 
   findSimilarTask(taskData: Partial<Task>): Task | null {
+    if (taskData.type === 'sterling_ir') {
+      const dedupeKey = this.getSterlingDedupeKey(taskData);
+      if (!dedupeKey) return null;
+      return this.findBySterlingDedupeKey(dedupeKey);
+    }
     const title = taskData.title?.toLowerCase() || '';
     const type = taskData.type?.toLowerCase() || '';
     const source = taskData.source || '';
@@ -190,6 +218,16 @@ export class TaskStore {
     }
 
     return null;
+  }
+
+  private getSterlingDedupeKey(task: Partial<Task>): string | null {
+    const sterling = task.metadata?.sterling as
+      | { committedIrDigest?: string; schemaVersion?: string | null; dedupeNamespace?: string | null }
+      | undefined;
+    const digest = sterling?.committedIrDigest;
+    if (!digest) return null;
+    const namespace = sterling?.dedupeNamespace ?? sterling?.schemaVersion ?? 'unknown';
+    return `${namespace}:${digest}`;
   }
 
   pushHistory(task: Task): void {
