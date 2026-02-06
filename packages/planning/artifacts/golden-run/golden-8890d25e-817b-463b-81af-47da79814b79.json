@@ -1,0 +1,22 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "8890d25e-817b-463b-81af-47da79814b79",
+  "created_at": 1770400930257,
+  "updated_at": 1770400948017,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "idle_episode": {
+    "client_request_id": "idle_8890d25e-817b-463b-81af-47da79814b79",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "35243dbdcdc6aea5",
+    "duration_ms": 4
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770400943017_hpti9e",
+    "status": "error",
+    "error": "Expand timeout after 5000ms"
+  }
+}

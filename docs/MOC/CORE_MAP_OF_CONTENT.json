@@ -1,7 +1,7 @@
 {
-  "generated": "2026-02-06T09:29:32.251189",
+  "generated": "2026-02-06T13:06:02.602225",
   "author": "@darianrosebrook",
-  "total_modules": 127,
+  "total_modules": 215,
   "modules": [
     {
       "path": "cognition/src/constitutional-filter/index.ts",
@@ -4995,6 +4995,3734 @@
         "author": "@darianrosebrook",
         "has_main": false
       }
+    },
+    {
+      "path": "cognition/src/self-model/identity-tracker.ts",
+      "name": "identity-tracker.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements identity aspects for tracking and updating the agent's core traits, values, and capabilities during cognitive operations. Manages a list of personality traits such as Curious, Careful, Helpful, and Persistent. Provides methods to reinforce identity components and log changes to the self-model.",
+      "classes": [
+        "IdentityTracker"
+      ],
+      "functions": [
+        "getDefaultPersonalityTraits",
+        "getDefaultCoreValues"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.183430",
+        "modified": "2025-08-23T17:46:29.183589",
+        "modified_days_ago": 166,
+        "lines": 582,
+        "size_bytes": 15691,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/narrative-intelligence.ts",
+      "name": "narrative-intelligence.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements narrative synthesis, experience-to-narrative integration, and thematic coherence tracking to support the cognitive stream of the conscious-bot. Utilizes StorySynthesis, ExperienceIntegration, and NarrativeCoherence components. Maintains logical consistency and generates rich internal self-narrative models.",
+      "classes": [
+        "NarrativeIntelligence"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.183750",
+        "modified": "2025-08-23T17:46:29.183896",
+        "modified_days_ago": 166,
+        "lines": 1048,
+        "size_bytes": 29600,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/narrative-manager.ts",
+      "name": "narrative-manager.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements narrative integration of new experiences into the conscious-bot's identity. Maintains and updates the agent's life story by adding Experience objects as new NarrativeChapters. Ensures coherent self-narrative by tracking significance and contextual links to existing stories.",
+      "classes": [
+        "NarrativeManager"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.184005",
+        "modified": "2025-08-23T17:46:29.184125",
+        "modified_days_ago": 166,
+        "lines": 644,
+        "size_bytes": 17163,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Provides type definitions for identity, personality traits, and core values used by the self-model in the cognitive architecture of the conscious-bot. Defines structured models for trait consistency, value conflicts, and version tracking within the bot's reasoning process. Supports robust, typed representation necessary for accurate intent extraction and self-aware planning.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.184221",
+        "modified": "2025-08-23T17:46:29.184364",
+        "modified_days_ago": 166,
+        "lines": 579,
+        "size_bytes": 12401,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/cognitive-load-calculators.ts",
+      "name": "cognitive-load-calculators.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements creativity metric calculation by assessing system capacity and recent uptime, penalizing high memory usage over time, and normalizing the result to a 0\u20131 creativity score for the cognitive stream.",
+      "classes": [],
+      "functions": [
+        "calculateCognitiveLoad",
+        "calculateAttentionLevel",
+        "calculateCreativityLevel",
+        "getActiveProcessCount",
+        "getSystemCpuUsage",
+        "getMemoryLoad",
+        "getProcessLoad",
+        "getNetworkLoad"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:04:25.978441",
+        "modified": "2026-02-02T15:04:25.978597",
+        "modified_days_ago": 3,
+        "lines": 138,
+        "size_bytes": 4444,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/constants.ts",
+      "name": "constants.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Tries to standardize and sanitize text inputs for the LLM integration in conscious-bot's cognition module, filtering out status-like or tag-containing content from being processed as spoken thoughts. Exposes TypeScript utility constants to enforce consistent formatting and prevent miscommunication in intent extraction. Ensures only relevant cognitive content reaches the thought generation pipeline without contamination.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "GOAL_TAG_STRIP",
+        "TTS_EXCLUDED_TYPES",
+        "TTS_STATUS_LIKE",
+        "THOUGHT_CYCLE_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:03:02.003669",
+        "modified": "2026-02-02T15:03:02.008758",
+        "modified_days_ago": 3,
+        "lines": 20,
+        "size_bytes": 703,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/observation-helpers.ts",
+      "name": "observation-helpers.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides utility functions for constructing and sanitizing observation payloads for the cognitive module of conscious-bot. Implements position redaction and numerical coercion to protect sensitive spatial data during LLM processing.",
+      "classes": [],
+      "functions": [
+        "redactPositionForLog",
+        "coerceNumber",
+        "inferThreatLevel",
+        "buildObservationPayload"
+      ],
+      "imports": [],
+      "constants": [
+        "POSITION_REDACTION_GRANULARITY",
+        "HOSTILE_KEYWORDS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:03:25.604817",
+        "modified": "2026-02-02T15:03:25.605137",
+        "modified_days_ago": 3,
+        "lines": 203,
+        "size_bytes": 5925,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/server-logger.ts",
+      "name": "server-logger.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a tiered logging system for the cognition module, categorizing routine, lifecycle, research, and error events with color and context for the conscious-bot LLM integration. Implements automatic suppression of routine logs by default unless verbose mode is enabled. Ensures all critical and error events are always logged for traceability and debugging.",
+      "classes": [],
+      "functions": [
+        "classifyEvent",
+        "shouldEmit",
+        "colorize",
+        "formatValue",
+        "formatFields",
+        "createServerLogger",
+        "emit"
+      ],
+      "imports": [],
+      "constants": [
+        "LOG_LEVEL",
+        "VERBOSE_MODE",
+        "COLOR_ENABLED",
+        "COLORS",
+        "MAX_FIELD_LENGTH",
+        "ROUTINE_EVENTS",
+        "ROUTINE_PATHS",
+        "RESEARCH_EVENTS",
+        "LIFECYCLE_EVENTS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T13:26:30.628345",
+        "modified": "2026-02-04T13:26:30.628726",
+        "modified_days_ago": 1,
+        "lines": 234,
+        "size_bytes": 6381,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/step-generation-helpers.ts",
+      "name": "step-generation-helpers.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Step generation helpers: LLM-based task step generation with * intelligent fallback by task type.",
+      "classes": [],
+      "functions": [
+        "generateTaskSteps",
+        "parseNumberedListResponse",
+        "generateIntelligentFallbackSteps"
+      ],
+      "imports": [
+        "../react-arbiter/ReActArbiter"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:04:06.672947",
+        "modified": "2026-02-02T15:04:06.673118",
+        "modified_days_ago": 3,
+        "lines": 156,
+        "size_bytes": 5682,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/thought-stream-helpers.ts",
+      "name": "thought-stream-helpers.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides utility functions to send thoughts to the cognitive stream and execute the intrusion consideration step before passing messages to the LLM.",
+      "classes": [],
+      "functions": [
+        "createThoughtStreamHelpers",
+        "sendThoughtToCognitiveStream",
+        "runConsiderationStep"
+      ],
+      "imports": [
+        "@conscious-bot/core",
+        "../cognitive-core/llm-interface",
+        "./constants",
+        "../interoception-store",
+        "../stress-axis-computer",
+        "../routes/cognitive-stream-routes",
+        "./server-logger",
+        "./tts-usable-content"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T16:20:30.459131",
+        "modified": "2026-02-04T16:20:30.459268",
+        "modified_days_ago": 1,
+        "lines": 140,
+        "size_bytes": 5397,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/tts-usable-content.ts",
+      "name": "tts-usable-content.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a temporary wrapper for detecting code-like content in the cognitive module, replicating logic from llm-output-sanitizer. Implements isCodeLike and hasCodeLikeDensity for filtering TTS output. Ensures operational parity during the migration of the conscious-bot architecture.",
+      "classes": [],
+      "functions": [
+        "hasCodeLikeDensity",
+        "isUsableForTTS"
+      ],
+      "imports": [],
+      "constants": [
+        "GENERIC_FILLER_PATTERNS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T16:20:17.042101",
+        "modified": "2026-02-04T16:20:17.042239",
+        "modified_days_ago": 1,
+        "lines": 87,
+        "size_bytes": 3048,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server.ts",
+      "name": "server.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides LLM-driven thought processing for the conscious-bot's cognitive stream. Creates and manages services for intent extraction via the LLMInterface. Orchestrates event-driven reasoning with EnhancedThoughtGenerator and integrates state using botStateCache and world state utilities.",
+      "classes": [],
+      "functions": [
+        "logObservation",
+        "resilientFetchLogged",
+        "drainObservationQueue",
+        "enqueueObservation",
+        "startThoughtGeneration",
+        "stopThoughtGeneration"
+      ],
+      "imports": [
+        "express",
+        "cors",
+        "./react-arbiter/ReActArbiter",
+        "./cognitive-core/llm-interface",
+        "./environmental/saliency-reasoner",
+        "./thought-generator",
+        "./stress-boundary-logger",
+        "./intrusive-thought-processor",
+        "./social-awareness-manager",
+        "../../memory/src/social/social-memory-manager"
+      ],
+      "constants": [
+        "MAX_COGNITIVE_THOUGHTS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T10:34:31.801748",
+        "modified": "2026-02-04T10:34:31.801876",
+        "modified_days_ago": 1,
+        "lines": 1182,
+        "size_bytes": 37871,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-awareness-manager.ts",
+      "name": "social-awareness-manager.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements social interaction decision-making for the bot. Analyzes nearby entities and chat messages to determine if the bot should acknowledge or respond. Uses context, relationships, and user priority to guide appropriate cognitive responses.",
+      "classes": [
+        "SocialAwarenessManager"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-22T01:37:38.713785",
+        "modified": "2025-09-22T02:27:33.719564",
+        "modified_days_ago": 137,
+        "lines": 946,
+        "size_bytes": 27054,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/agent-modeler.ts",
+      "name": "agent-modeler.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements agent modeling by analyzing observations and extracting capabilities, personality, and behavioral patterns from other agents. Maintains up-to-date models using real-time interaction logs and adaptive inference algorithms. Triggers model updates when confidence thresholds for capabilities or behavior are exceeded.",
+      "classes": [
+        "AgentModeler"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.184784",
+        "modified": "2025-08-23T17:46:29.184900",
+        "modified_days_ago": 166,
+        "lines": 819,
+        "size_bytes": 22254,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/relationship-manager.ts",
+      "name": "relationship-manager.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Relationship Manager * * Tracks and manages social relationships and bonds over time. * Provides capabilities for trust calculation, bond tracking, and relationship quality assessment. * * @author @darianrosebrook",
+      "classes": [
+        "RelationshipManager"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./agent-modeler"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.185053",
+        "modified": "2025-08-23T17:46:29.185218",
+        "modified_days_ago": 166,
+        "lines": 1570,
+        "size_bytes": 45450,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/social-learner.ts",
+      "name": "social-learner.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Provides a social learning mechanism for the conscious-bot to infer and adapt strategies from agent interactions. Implements observation of behavior sequences and extraction of success indicators and learning opportunities. Enables the cognition module to store and utilize learned strategies for improved in-game decision-making.",
+      "classes": [
+        "SocialLearner"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./agent-modeler"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.185276",
+        "modified": "2025-08-23T17:46:29.185434",
+        "modified_days_ago": 166,
+        "lines": 1331,
+        "size_bytes": 38554,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/theory-of-mind-engine.ts",
+      "name": "theory-of-mind-engine.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements structured interpretation of LLM outputs for social cognition, extracting beliefs, intentions, and behaviors from agent interactions. Provides parsing of LLM responses to extract actionable intentions and mental state inferences.",
+      "classes": [
+        "TheoryOfMindEngine"
+      ],
+      "functions": [
+        "stripCodeFences",
+        "stripLeadingBulletIfPresent",
+        "extractFirstJsonValue",
+        "extractJson"
+      ],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./agent-modeler",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:24:06.878570",
+        "modified": "2026-02-03T05:24:06.878767",
+        "modified_days_ago": 3,
+        "lines": 1176,
+        "size_bytes": 34878,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "agent modeling types for the social cognition module in conscious-bot, defining structures for representing agents, their relationships, and inferred mental states during social interaction processing.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.185668",
+        "modified": "2025-08-23T17:46:29.185795",
+        "modified_days_ago": 166,
+        "lines": 937,
+        "size_bytes": 22919,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/stress-axis-computer.ts",
+      "name": "stress-axis-computer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides real-time Minecraft world state to compute axis scores (0-100) representing safety, resources, and progress for the cognitive stream. Implements individual axis calculations such as time since events and applies smoothing via blending. Supplies normalized axes to the context builder for LLM prompt generation.",
+      "classes": [],
+      "functions": [
+        "clamp100",
+        "computeTime",
+        "computeSituational",
+        "computeHealthHunger",
+        "computeResource",
+        "computeProtection",
+        "computeLocationDistance",
+        "computeStressAxes",
+        "blendAxes",
+        "buildStressContext"
+      ],
+      "imports": [
+        "./interoception-store"
+      ],
+      "constants": [
+        "MS_20_MIN",
+        "MS_10_MIN",
+        "ARMOR_PIECES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:17:47.120142",
+        "modified": "2026-01-31T20:17:47.120329",
+        "modified_days_ago": 5,
+        "lines": 287,
+        "size_bytes": 9986,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/stress-boundary-logger.ts",
+      "name": "stress-boundary-logger.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "event handler for logging decision boundary stress metrics, including intero state and axis vectors; records entries as JSON lines in the stress log for analysis; integrates with observation, intrusion, and task selection events within the cognition module.",
+      "classes": [],
+      "functions": [
+        "formatLine",
+        "writeToFile",
+        "logStressAtBoundary"
+      ],
+      "imports": [
+        "fs",
+        "./interoception-store"
+      ],
+      "constants": [
+        "LOG_PREFIX",
+        "DEFAULT_LOG_PATH"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:21:55.973553",
+        "modified": "2026-02-01T03:03:40.703711",
+        "modified_days_ago": 5,
+        "lines": 73,
+        "size_bytes": 1980,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/thought-generator.ts",
+      "name": "thought-generator.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "from packages.cognition.src import LLMInterface, computeEligibility  \n * Implements a deduplicator to prevent redundant thoughts during the cognitive stream generation.  \n * Uses LLMInterface and ReductionProvenance from reasoning-surface to ensure context-aware thought filtering.  \n * Maintains state to enhance the bot's reasoning efficiency and prevent loops.",
+      "classes": [
+        "ThoughtDeduplicator",
+        "EnhancedThoughtGenerator"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "./cognitive-core/llm-interface",
+        "./audit/thought-action-audit-logger",
+        "./interoception-store",
+        "./stress-axis-computer",
+        "./types",
+        "./reasoning-surface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.416778",
+        "modified": "2026-02-04T23:32:13.417409",
+        "modified_days_ago": 1,
+        "lines": 1906,
+        "size_bytes": 68440,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "to define the interface for interacting with an LLM provider used by the conscious-bot cognition module for sending prompts and receiving responses",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod",
+        "./language-io"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.417586",
+        "modified": "2026-02-04T23:32:13.417768",
+        "modified_days_ago": 1,
+        "lines": 837,
+        "size_bytes": 19392,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/vitest.config.ts",
+      "name": "vitest.config.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "the vitest module provides configuration for unit and integration tests in the cognition package of conscious-bot, enabling robust evaluation of LLM-driven thought processing and intent extraction through structured test setup and mocks.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "vitest/config",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 162 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:40.988880",
+        "modified": "2025-08-27T13:32:40.988956",
+        "modified_days_ago": 162,
+        "lines": 21,
+        "size_bytes": 576,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/advanced-need-generator.ts",
+      "name": "advanced-need-generator.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides context-aware need generation for the conscious-bot\u2019s planning system. Implements dynamic need evaluation using current context and memory signals.",
+      "classes": [
+        "AdvancedNeedGenerator",
+        "TrendAnalyzer"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.186087",
+        "modified": "2025-09-21T16:39:37.996791",
+        "modified_days_ago": 137,
+        "lines": 1306,
+        "size_bytes": 37386,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/advanced-signal-processor.ts",
+      "name": "advanced-signal-processor.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": ", implements advanced signal fusion and real-time processing pipelines for the conscious-bot's core systems, using Signal, FusedSignal, and SignalData types to integrate, analyze, and prioritize incoming data streams.",
+      "classes": [
+        "AdvancedSignalProcessor",
+        "PatternRecognizer",
+        "ThreatDetector",
+        "MemoryIntegrator",
+        "SocialProcessor"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.086474",
+        "modified": "2025-09-21T22:07:27.086617",
+        "modified_days_ago": 137,
+        "lines": 1131,
+        "size_bytes": 32418,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/arbiter.ts",
+      "name": "arbiter.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Contextualizes and validates all incoming signals and task executions for the conscious-bot, ensuring compliance with safety, performance, and routing requirements. Central coordinator that routes cognitive tasks between modules using prioritization and trend analysis. Maintains system integrity through event-driven architecture and failure detection mechanisms.",
+      "classes": [
+        "ReflexModule",
+        "Arbiter",
+        "RedundantArbiterManager"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "uuid",
+        "./signal-processor",
+        "./advanced-need-generator",
+        "./advanced-need-generator",
+        "./goal-template-manager",
+        "./priority-ranker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.086722",
+        "modified": "2025-10-01T21:37:07.573836",
+        "modified_days_ago": 127,
+        "lines": 1786,
+        "size_bytes": 52252,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/cognitive-stream-integration.ts",
+      "name": "cognitive-stream-integration.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides seamless integration with MCP capabilities and planning modules for dynamic decision-making.",
+      "classes": [
+        "NarrativeLLMInterface",
+        "CognitiveStreamIntegration"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "./mcp-capabilities/registry",
+        "./mcp-capabilities/dynamic-creation-flow"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.057600",
+        "modified": "2025-10-02T00:12:36.446628",
+        "modified_days_ago": 127,
+        "lines": 1176,
+        "size_bytes": 36265,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/debug-demo.ts",
+      "name": "debug-demo.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides a debug demo to analyze action aborts and collect environmental data from the conscious-bot agent during operation. Implements connection to Minecraft via Mineflayer and a debug listener for spawn and error events. Enables real-time logging and analysis for troubleshooting bot behavior and execution context.",
+      "classes": [],
+      "functions": [
+        "debugEnhancedDemo"
+      ],
+      "imports": [
+        "mineflayer",
+        "./minecraft-cognitive-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.763435",
+        "modified": "2025-08-30T02:39:07.763654",
+        "modified_days_ago": 160,
+        "lines": 337,
+        "size_bytes": 11119,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/debug-floor-check.ts",
+      "name": "debug-floor-check.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides the debug floor check functionality for the conscious-bot agent. Evaluates the current block the bot is standing on using the bot entity position. Logs position data and detects failures in the floor check by analyzing the underlying Minecraft block.",
+      "classes": [],
+      "functions": [
+        "debugFloorCheck"
+      ],
+      "imports": [
+        "mineflayer",
+        "vec3"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.763694",
+        "modified": "2025-08-30T02:39:07.763839",
+        "modified_days_ago": 160,
+        "lines": 178,
+        "size_bytes": 5852,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/demo-cognitive-stream.ts",
+      "name": "demo-cognitive-stream.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "API client for simulating cognitive stream interactions with Minecraft and MCP, enabling goal-driven state transitions for the bot. Initiates and updates the cognitive stream with bot state and task context to trigger adaptive behaviors like entering torch corridor when underground. Provides a clear integration demo for testing the bot's decision pipeline.",
+      "classes": [],
+      "functions": [
+        "demonstrateCognitiveStream"
+      ],
+      "imports": [
+        "./cognitive-stream-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 162 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:40.992459",
+        "modified": "2025-08-27T13:32:40.992554",
+        "modified_days_ago": 162,
+        "lines": 138,
+        "size_bytes": 4753,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/demo-full-system-capabilities.ts",
+      "name": "demo-full-system-capabilities.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "for the demo, provides a complete integration of the conscious-bot's planning and cognitive modules with real-time Mineflayer actions in Minecraft, enabling end-to-end autonomous task execution and step-wise reasoning.",
+      "classes": [],
+      "functions": [
+        "demoFullSystemCapabilities"
+      ],
+      "imports": [
+        "mineflayer",
+        "./minecraft-cognitive-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T04:13:55.810972",
+        "modified": "2026-02-01T04:13:55.811078",
+        "modified_days_ago": 5,
+        "lines": 270,
+        "size_bytes": 9765,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/demo-real-bot-integration.ts",
+      "name": "demo-real-bot-integration.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "bot integration demo provides a live Mineflayer agent that processes cognitive inputs and executes real-time Minecraft actions through the cognitive stream, enabling the conscious-bot to interact with the world using natural language commands.",
+      "classes": [],
+      "functions": [
+        "main"
+      ],
+      "imports": [
+        "mineflayer",
+        "./minecraft-cognitive-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.764144",
+        "modified": "2026-02-01T03:03:40.697253",
+        "modified_days_ago": 5,
+        "lines": 165,
+        "size_bytes": 5835,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/demo-working-capabilities.ts",
+      "name": "demo-working-capabilities.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides a functional demo of the cognitive integration within the conscious-bot system, initializing a real Minecraft bot and logging operational states to verify core capabilities work end-to-end.",
+      "classes": [],
+      "functions": [
+        "demoWorkingCapabilities"
+      ],
+      "imports": [
+        "mineflayer",
+        "./minecraft-cognitive-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T04:13:57.152213",
+        "modified": "2026-02-01T04:13:57.152377",
+        "modified_days_ago": 5,
+        "lines": 222,
+        "size_bytes": 7581,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/fix-action-aborts.ts",
+      "name": "fix-action-aborts.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides enhanced action abort handling for the conscious-bot's Minecraft agent by simulating timeout and argument issues in its execution flow. Implements custom error and spawn event hooks to validate the fixes before proceeding. Ensures robust testing of the planning and interaction modules against known abort scenarios.",
+      "classes": [],
+      "functions": [
+        "fixActionAborts"
+      ],
+      "imports": [
+        "mineflayer",
+        "./minecraft-cognitive-integration.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.764699",
+        "modified": "2026-02-01T03:03:40.703603",
+        "modified_days_ago": 5,
+        "lines": 243,
+        "size_bytes": 8570,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/goal-template-manager.ts",
+      "name": "goal-template-manager.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Implements goal template instantiation, auto-feasibility evaluation, and dependency resolution for the conscious-bot's planning engine.",
+      "classes": [
+        "GoalTemplateManager",
+        "ResourceMonitor",
+        "FeasibilityAnalyzer",
+        "RiskAssessor"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T14:38:58.479001",
+        "modified": "2026-01-28T14:38:58.479142",
+        "modified_days_ago": 8,
+        "lines": 1230,
+        "size_bytes": 33938,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/leaves/crafting-leaves.ts",
+      "name": "crafting-leaves.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides leaf crafting logic for the conscious-bot, including recipe validation and inventory updates via LeafImpl interface and error handling via LeafResult. Implements core crafting operations such as crafting and smelting using Bot and Vec3 utilities. Ensures safe execution by checking for timeouts and abort signals.",
+      "classes": [
+        "CraftRecipeLeaf",
+        "SmeltLeaf",
+        "IntrospectRecipeLeaf"
+      ],
+      "functions": [
+        "countByName",
+        "findNearestBlock"
+      ],
+      "imports": [
+        "mineflayer",
+        "vec3"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.058231",
+        "modified": "2025-09-21T11:46:22.546155",
+        "modified_days_ago": 137,
+        "lines": 674,
+        "size_bytes": 18971,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/leaves/interaction-leaves.ts",
+      "name": "interaction-leaves.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "contextually evaluates and places a torch when ambient light is below the specified threshold in the current Interaction Leaves interface.",
+      "classes": [
+        "PlaceTorchIfNeededLeaf",
+        "RetreatAndBlockLeaf",
+        "DigBlockLeaf",
+        "PlaceBlockLeaf",
+        "ConsumeFoodLeaf"
+      ],
+      "functions": [],
+      "imports": [
+        "mineflayer",
+        "vec3",
+        "mineflayer-pathfinder"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 254,
+            "content": "// TODO: Implement proper tracking of last torch position for optimal placement",
+            "file_path": "packages/core/src/leaves/interaction-leaves.ts"
+          }
+        ]
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.058448",
+        "modified": "2025-09-21T15:04:00.587985",
+        "modified_days_ago": 137,
+        "lines": 1196,
+        "size_bytes": 31672,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/leaves/movement-leaves.ts",
+      "name": "movement-leaves.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "with robust pathfinding integration, MoveToLeaf computes the shortest or goal-oriented route for the bot and executes movement using Mineflayer's navigation capabilities, returning structured results with status, position, and error metrics for transparency and reliability.",
+      "classes": [
+        "MoveToLeaf",
+        "StepForwardSafelyLeaf",
+        "FollowEntityLeaf"
+      ],
+      "functions": [
+        "ok",
+        "fail"
+      ],
+      "imports": [
+        "mineflayer",
+        "mineflayer-pathfinder",
+        "vec3"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.765189",
+        "modified": "2025-09-21T11:46:22.523916",
+        "modified_days_ago": 137,
+        "lines": 546,
+        "size_bytes": 15704,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/leaves/sensing-leaves.ts",
+      "name": "sensing-leaves.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides detection of hostile entities within a configurable radius using Mineflayer, returning detailed entity information in the result. Implements error handling and timeout mechanisms for reliable sensing feedback. Integrates with the core capabilities of conscious-bot to enhance safety checks during exploration.",
+      "classes": [
+        "SenseHostilesLeaf",
+        "ChatLeaf",
+        "WaitLeaf",
+        "GetLightLevelLeaf"
+      ],
+      "functions": [],
+      "imports": [
+        "mineflayer",
+        "vec3"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 162 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:40.996073",
+        "modified": "2025-08-27T13:32:40.996376",
+        "modified_days_ago": 162,
+        "lines": 593,
+        "size_bytes": 14781,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/llm/ollama-client.ts",
+      "name": "ollama-client.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* Ollama LLM Client * * Minimal client for local Ollama server. Supports /api/generate and * OpenAI-compatible /v1/chat/completions when OLLAMA_OPENAI=truish.",
+      "classes": [
+        "OllamaClient"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T19:29:56.998913",
+        "modified": "2026-01-28T19:29:56.999091",
+        "modified_days_ago": 8,
+        "lines": 129,
+        "size_bytes": 4273,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/logging/config.ts",
+      "name": "config.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides centralized configuration for logging verbosity settings throughout the conscious-bot monorepo modules. Exposes a LoggingConfig interface and a getLoggingConfig function to retrieve debug flags from environment variables. Enables consistent debug output for key subsystems such as environment, live stream, and actions when enabled.",
+      "classes": [],
+      "functions": [
+        "getLoggingConfig",
+        "isDebugEnabled",
+        "debugLog",
+        "logEnvironmentUpdate",
+        "logInventoryUpdate",
+        "logResourceUpdate",
+        "logLiveStreamUpdate",
+        "logMiniMapUpdate",
+        "logApiRequest"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.765380",
+        "modified": "2025-08-30T02:39:07.765462",
+        "modified_days_ago": 160,
+        "lines": 120,
+        "size_bytes": 3757,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/bt-dsl-parser.ts",
+      "name": "bt-dsl-parser.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides a TypeScript parser and compiler for the BT-DSL, translating declarative behavior into executable CompiledBTNode instances and enabling deterministic node execution. Implements schema validation using Ajv to ensure correct BT-DSL syntax before compilation. Enforces contract-based node execution with promised BTResult return and error handling.",
+      "classes": [
+        "SensorPredicateEvaluator",
+        "CompiledLeafNode",
+        "CompiledSequenceNode",
+        "CompiledSelectorNode",
+        "CompiledRepeatUntilNode",
+        "CompiledTimeoutDecoratorNode",
+        "CompiledFailOnTrueDecoratorNode",
+        "BTDSLParser"
+      ],
+      "functions": [],
+      "imports": [
+        "ajv",
+        "node:perf_hooks"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.766531",
+        "modified": "2025-08-30T02:39:07.766670",
+        "modified_days_ago": 160,
+        "lines": 953,
+        "size_bytes": 25007,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/bt-dsl-schema.ts",
+      "name": "bt-dsl-schema.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides a RepeatUntil node for iterative behavior in the BT-DSL, requiring a condition to succeed; enforces strict node typing hierarchy for behavior tree composition in the conscious-bot architecture.",
+      "classes": [],
+      "functions": [
+        "isBTNode",
+        "isSequenceNode",
+        "isSelectorNode",
+        "isRepeatUntilNode",
+        "isTimeoutDecoratorNode",
+        "isFailOnTrueDecoratorNode",
+        "isLeafNode",
+        "isSensorPredicate",
+        "getLeafNames",
+        "getSensorPredicates"
+      ],
+      "imports": [
+        "./leaf-contracts"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 164 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-25T07:45:22.064610",
+        "modified": "2025-08-25T08:11:23.913322",
+        "modified_days_ago": 164,
+        "lines": 451,
+        "size_bytes": 12445,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/capability-registry.ts",
+      "name": "capability-registry.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "registry module in the core package provides structured metadata and provenance tracking for capability registrations, managing authorship, code hashes, and version lineage, ensuring secure and traceable updates via type-safe interfaces.",
+      "classes": [
+        "CapabilityRegistry"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "node:perf_hooks",
+        "uuid",
+        "./working-leaf-factory",
+        "./bt-dsl-parser"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T17:52:37.242689",
+        "modified": "2025-09-21T16:43:13.514892",
+        "modified_days_ago": 137,
+        "lines": 715,
+        "size_bytes": 20316,
+        "author": "ed",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/capability-specs.ts",
+      "name": "capability-specs.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides structured validation for Minecraft capability requests by enforcing agent health and position constraints during execution context checks.",
+      "classes": [
+        "BaseMinecraftExecutor",
+        "BaseMinecraftValidator",
+        "MoveForwardExecutor",
+        "MoveForwardValidator",
+        "ExploreExecutor",
+        "ExploreValidator",
+        "PlaceBlockExecutor",
+        "PlaceBlockValidator",
+        "MineBlockExecutor",
+        "MineBlockValidator"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.187184",
+        "modified": "2025-09-22T03:56:04.002798",
+        "modified_days_ago": 137,
+        "lines": 889,
+        "size_bytes": 21593,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/constitutional-filter.ts",
+      "name": "constitutional-filter.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides a TypeScript-based constitutional filter for the conscious-bot's capabilities. Implements rule evaluation by checking capability requests against defined ethical and safety constraints in context. Flags violations with detailed severity and suggested actions for automated or human review.",
+      "classes": [
+        "ConstitutionalFilter"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T17:53:46.895397",
+        "modified": "2025-08-20T17:57:35.703270",
+        "modified_days_ago": 169,
+        "lines": 664,
+        "size_bytes": 18758,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/dynamic-creation-flow.ts",
+      "name": "dynamic-creation-flow.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "a dynamic creation flow that detects impasse through configurable failure thresholds and debouncing, monitors proposal metrics, and triggers automatic retirement of low-performing options to maintain efficient LLM usage",
+      "classes": [
+        "DynamicCreationFlow"
+      ],
+      "functions": [],
+      "imports": [
+        "node:perf_hooks",
+        "./registry",
+        "./bt-dsl-parser",
+        "./leaf-contracts",
+        "./llm-integration"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.768173",
+        "modified": "2025-10-02T00:12:36.504595",
+        "modified_days_ago": 127,
+        "lines": 584,
+        "size_bytes": 16233,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/leaf-contracts.ts",
+      "name": "leaf-contracts.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides leaf contracts for Mineflayer interactions, enforces validation and safety for primitive actions, and offers type definitions to ensure consistent execution patterns across the conscious-bot system.",
+      "classes": [],
+      "functions": [
+        "getErrorStats",
+        "clearErrorStats",
+        "readInventory",
+        "hostilePredicate",
+        "dist",
+        "validateLeafSpec",
+        "validateLeafImpl",
+        "mapExceptionToErrorCode",
+        "isRetryableError",
+        "createExecError"
+      ],
+      "imports": [
+        "mineflayer",
+        "vec3",
+        "node:perf_hooks",
+        "ajv"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:35:08.824401",
+        "modified": "2026-02-03T00:35:08.824518",
+        "modified_days_ago": 3,
+        "lines": 883,
+        "size_bytes": 24289,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/leaf-factory.ts",
+      "name": "leaf-factory.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides schema-compiled registration and execution for leaf implementations via AjV, enforces unique registry entries by (name@version), and manages rate limiting for the conscious-bot\u2019s leaf operations.",
+      "classes": [
+        "LeafFactory"
+      ],
+      "functions": [],
+      "imports": [
+        "ajv",
+        "node:perf_hooks"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T20:07:48.582668",
+        "modified": "2026-02-01T20:07:48.582809",
+        "modified_days_ago": 4,
+        "lines": 377,
+        "size_bytes": 9708,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/llm-integration.ts",
+      "name": "llm-integration.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides a dual-system LLM integration interface for conscious-bot's hierarchical reasoning, allowing abstract planning and detailed execution components to communicate through LLMModel and HRMReasoning configurations.",
+      "classes": [
+        "OllamaClient",
+        "HRMLLMInterface"
+      ],
+      "functions": [],
+      "imports": [
+        "./leaf-contracts"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T20:13:33.640644",
+        "modified": "2026-02-02T19:27:56.301202",
+        "modified_days_ago": 3,
+        "lines": 682,
+        "size_bytes": 18929,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/llm-interface.ts",
+      "name": "llm-interface.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "* LLM Interface for Dynamic Creation Flow * * Provides a proper interface for LLM-based option proposal and generation. * Replaces mock implementations with production-ready components. * * @author @darianrosebrook",
+      "classes": [
+        "ProductionLLMInterface"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 163 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-26T09:20:51.883117",
+        "modified": "2025-08-26T10:34:06.193093",
+        "modified_days_ago": 163,
+        "lines": 461,
+        "size_bytes": 12333,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/rate-limiter.ts",
+      "name": "rate-limiter.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "* Rate Limiter - Prevents capability abuse through sophisticated rate limiting * * Implements sliding window rate limiting with burst allowance, adaptive limits, * and capability-specific controls to prevent abuse while allowing legitimate usage. * * @author @darianrosebrook",
+      "classes": [
+        "CapabilityRateLimiter"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T17:55:02.255614",
+        "modified": "2025-08-20T17:57:35.714526",
+        "modified_days_ago": 169,
+        "lines": 567,
+        "size_bytes": 16280,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/registry.ts",
+      "name": "registry.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "registry module provides type definitions and metadata management for leaves and options within the conscious-bot system, enforcing separate registration paths for human-signed and LLM-authored entries while tracking provenance, permissions, and runtime quotas.",
+      "classes": [
+        "nominal",
+        "EnhancedRegistry"
+      ],
+      "functions": [],
+      "imports": [
+        "node:perf_hooks",
+        "./working-leaf-factory",
+        "./bt-dsl-parser"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 158 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.058870",
+        "modified": "2025-08-31T11:04:13.058963",
+        "modified_days_ago": 158,
+        "lines": 1065,
+        "size_bytes": 30239,
+        "author": "ed",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/task-timeframe-management.ts",
+      "name": "task-timeframe-management.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Implements configurable time buckets for the conscious-bot's task execution timelines. Provides 'tactical', 'short', 'standard', 'long', and 'expedition' buckets with duration caps and priority. Enables explainable bucket selection and supports pause/resume and checkpoint mechanisms.",
+      "classes": [
+        "TaskTimeframeManager"
+      ],
+      "functions": [],
+      "imports": [
+        "node:perf_hooks"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 164 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-25T08:36:29.010787",
+        "modified": "2025-08-25T08:41:13.589361",
+        "modified_days_ago": 164,
+        "lines": 662,
+        "size_bytes": 18277,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/types.ts",
+      "name": "types.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "state validation types used by the bot's capabilities to enforce safety constraints before action execution",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T17:50:25.509874",
+        "modified": "2025-09-21T16:20:55.945714",
+        "modified_days_ago": 137,
+        "lines": 492,
+        "size_bytes": 12557,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/working-leaf-factory.ts",
+      "name": "working-leaf-factory.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides a robust leaf registration mechanism with built-in Ajv validators and semver-based input/output validation for the conscious-bot system.",
+      "classes": [
+        "WorkingLeafFactory"
+      ],
+      "functions": [],
+      "imports": [
+        "ajv",
+        "semver",
+        "node:perf_hooks"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.769642",
+        "modified": "2025-08-30T02:39:07.769866",
+        "modified_days_ago": 160,
+        "lines": 426,
+        "size_bytes": 10960,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/minecraft-cognitive-integration.ts",
+      "name": "minecraft-cognitive-integration.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "real-time bridges the cognitiveStream with Mineflayer bot, translating thoughts and decisions into Minecraft actions through method calls like MoveToLeaf and PlaceBlockLeaf. Enables safe, timed execution of user intents via the configured action methods and emits progress events to the main cognitive module. Ensures only authorized actions are taken by checking the bot connection status and forwarding cognitive events to the Minecraft environment.",
+      "classes": [
+        "MinecraftCognitiveIntegration"
+      ],
+      "functions": [
+        "createMinecraftCognitiveIntegration"
+      ],
+      "imports": [
+        "events",
+        "./cognitive-stream-integration.js",
+        "mineflayer"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.769955",
+        "modified": "2025-08-30T02:39:07.770099",
+        "modified_days_ago": 160,
+        "lines": 309,
+        "size_bytes": 8123,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mock-bot-service.ts",
+      "name": "mock-bot-service.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides mock connectivity for the planning module during evaluation. Simulates bot state, including position, inventory, and health. Allows the core system to test task execution in isolation.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "express",
+        "cors"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T13:02:55.736284",
+        "modified": "2025-09-21T13:56:09.967250",
+        "modified_days_ago": 137,
+        "lines": 124,
+        "size_bytes": 2981,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/performance-monitor.ts",
+      "name": "performance-monitor.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Implements real-time operation timing by recording start and checkpoint latencies during task execution. Tracks performance metrics for each cognitive and action-based operations using a map. Triggers safety protocols if latency violations exceed configured thresholds.",
+      "classes": [
+        "TrackingSession",
+        "LatencyTracker",
+        "PerformanceMonitor"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T17:34:17.766501",
+        "modified": "2025-10-01T22:05:07.851683",
+        "modified_days_ago": 127,
+        "lines": 574,
+        "size_bytes": 15498,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/priority-ranker.ts",
+      "name": "priority-ranker.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "score and rank tasks using calculatedPriority, applying customizable boosts for commitment, novelty, and opportunity cost factors to determine the bot's next action.",
+      "classes": [
+        "PriorityRanker",
+        "CommitmentTracker",
+        "OpportunityTracker",
+        "ContextAnalyzer"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "uuid",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.187357",
+        "modified": "2025-09-21T17:26:25.259840",
+        "modified_days_ago": 137,
+        "lines": 997,
+        "size_bytes": 28176,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/alerting-system.ts",
+      "name": "alerting-system.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides real-time alert management for the conscious-bot's performance and system health metrics. Implements rule-based thresholds and escalation policies, emits events via custom EventEmitter to notify the dashboard and external channels. Central for triggering alerts when performance context exceeds defined limits and for handling notification delivery configurations.",
+      "classes": [
+        "AlertingSystem"
+      ],
+      "functions": [],
+      "imports": [
+        "eventemitter3",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T14:38:20.889157",
+        "modified": "2026-01-28T14:38:20.889257",
+        "modified_days_ago": 8,
+        "lines": 757,
+        "size_bytes": 19898,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/budget-enforcer.ts",
+      "name": "budget-enforcer.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Contextualizes and enforces system performance budgets using the current SystemLoad, monitoring and adjusting allocations via the thought process",
+      "classes": [
+        "BudgetEnforcer"
+      ],
+      "functions": [],
+      "imports": [
+        "eventemitter3",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T14:38:20.664014",
+        "modified": "2026-01-28T14:38:20.664171",
+        "modified_days_ago": 8,
+        "lines": 539,
+        "size_bytes": 16094,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/degradation-manager.ts",
+      "name": "degradation-manager.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* Degradation Manager - Graceful degradation and recovery strategies * * Implements intelligent degradation strategies when performance constraints * cannot be met, with automatic recovery when conditions improve. * * @author @darianrosebrook",
+      "classes": [
+        "DegradationManager"
+      ],
+      "functions": [],
+      "imports": [
+        "eventemitter3",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T14:38:20.774502",
+        "modified": "2026-01-28T14:38:20.774622",
+        "modified_days_ago": 8,
+        "lines": 720,
+        "size_bytes": 20799,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/performance-tracker.ts",
+      "name": "performance-tracker.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Implements real-time performance logging for the cognitive and execution layers, capturing operation timings and metrics per session. Maintains a bounded history of performance data for analysis and anomaly detection. Provides event emissions for tracking critical performance events in the conscious-bot agent's workflows.",
+      "classes": [
+        "BoundedHistory",
+        "PerformanceTracker"
+      ],
+      "functions": [],
+      "imports": [
+        "eventemitter3",
+        "uuid"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T14:38:20.554456",
+        "modified": "2026-01-28T14:38:20.554572",
+        "modified_days_ago": 8,
+        "lines": 816,
+        "size_bytes": 22233,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/types.ts",
+      "name": "types.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides type definitions for real-time performance budget tracking in the conscious-bot architecture, enabling enforcement and monitoring of operation-specific allocations within the core system.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T18:06:00.340207",
+        "modified": "2025-08-20T18:15:25.078132",
+        "modified_days_ago": 169,
+        "lines": 678,
+        "size_bytes": 17959,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/server.ts",
+      "name": "server.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides REST-based endpoints to register, update, and manage option (dynamic capability) registrations within the conscious-bot system. Manages request validation, capability creation, and response status for the /capabilities/option/register route. Central to capability lifecycle control and secure LLM-authenticated option deployment.",
+      "classes": [],
+      "functions": [
+        "createServer"
+      ],
+      "imports": [
+        "express",
+        "./mcp-capabilities/registry",
+        "./mcp-capabilities/dynamic-creation-flow",
+        "./mcp-capabilities/leaf-contracts"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T15:28:15.542819",
+        "modified": "2026-01-30T21:31:56.854730",
+        "modified_days_ago": 6,
+        "lines": 399,
+        "size_bytes": 11156,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/signal-processor.ts",
+      "name": "signal-processor.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Implements signal aggregation, prioritization, and filtering for the conscious-bot's input stream. Processes incoming signals through a bounded history and trend analysis to generate adaptive needs.",
+      "classes": [
+        "SignalProcessor"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:41.004134",
+        "modified": "2025-10-01T22:14:07.867458",
+        "modified_days_ago": 127,
+        "lines": 1407,
+        "size_bytes": 38544,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/sterling/sterling-client.ts",
+      "name": "sterling-client.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides a WebSocket client for Sterling's graph-reasoning server integration in the conscious-bot architecture. Manages connection state and implements circuit breaker/retry patterns for reliable message transmission. Handles Sterling protocol messages and connects using environment configuration.",
+      "classes": [
+        "SterlingClient"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "ws"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T08:22:16.714845",
+        "modified": "2026-02-06T06:48:57.308378",
+        "modified_days_ago": 0,
+        "lines": 858,
+        "size_bytes": 25169,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/sterling/types.ts",
+      "name": "types.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides type definitions for Sterling's WebSocket protocol messages and request types used across the conscious-bot system. Defines enum and interface structures for domain-specific solver communication in the core module.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T08:21:53.943956",
+        "modified": "2026-02-05T19:49:00.566980",
+        "modified_days_ago": 0,
+        "lines": 352,
+        "size_bytes": 10257,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/test-cognitive-pipeline.ts",
+      "name": "test-cognitive-pipeline.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "dependencies for the cognitive pipeline test are managed within the conscious-bot architecture, testing the end-to-end conversion from cognitive thoughts to executed behaviors, ensuring the thought-to-signal and signal-to-action flow works as intended. This test is currently disabled due to cross-package constraints in the conscious-bot monorepo. It validates the integration of cognition, planning, and execution components when restructured.",
+      "classes": [],
+      "functions": [
+        "testCognitivePipeline"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 11,
+            "content": "* TODO: Move to appropriate test directory when package structure is resolved",
+            "file_path": "packages/core/src/test-cognitive-pipeline.ts"
+          },
+          {
+            "line_number": 19,
+            "content": "* TODO: Move to appropriate test directory when package structure is resolved",
+            "file_path": "packages/core/src/test-cognitive-pipeline.ts"
+          }
+        ]
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T16:38:35.040852",
+        "modified": "2025-09-21T16:43:09.318889",
+        "modified_days_ago": 137,
+        "lines": 39,
+        "size_bytes": 1156,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/tts/tts-client.ts",
+      "name": "tts-client.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides a text-to-speech interface using Kokoro-ONNX for the conscious-bot architecture. Detects and initializes system audio streaming via sox process if available. Degrades gracefully when dependencies are missing, maintaining core functionality.",
+      "classes": [
+        "TTSClient"
+      ],
+      "functions": [],
+      "imports": [
+        "stream",
+        "child_process"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:37:02.139706",
+        "modified": "2026-02-05T19:34:23.863883",
+        "modified_days_ago": 0,
+        "lines": 308,
+        "size_bytes": 9009,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/types.ts",
+      "name": "types.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Provides Signal and NeedScore types to standardize and validate input to the cognitive modules of conscious-bot, ensuring reliable and structured data flow for health, nutrition, and safety evaluation.",
+      "classes": [
+        "BoundedHistory"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:41.004703",
+        "modified": "2025-10-01T22:14:07.867420",
+        "modified_days_ago": 127,
+        "lines": 604,
+        "size_bytes": 15299,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/utils/http-client.ts",
+      "name": "http-client.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "Client provides a robust HTTP request wrapper with built-in retry, circuit breaker, and timeout mechanisms to ensure safe and reliable communication for the conscious-bot system. It uses exponential backoff and maintains per-url circuit breaker states in memory. This utility supports all modules of the conscious-bot monorepo with consistent network reliability.",
+      "classes": [
+        "HttpClient"
+      ],
+      "functions": [
+        "createServiceClients"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 91 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-11-06T22:25:37.271799",
+        "modified": "2025-11-06T22:46:48.085101",
+        "modified_days_ago": 91,
+        "lines": 278,
+        "size_bytes": 7757,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/utils/resilient-service-client.ts",
+      "name": "resilient-service-client.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "Provides a resilient HTTP client for hot-reloading-aware service calls in conscious-bot. Automatically retries on transient connection errors with exponential backoff and configurable options. Integrates with the bot's modular service components to ensure robust external API interactions.",
+      "classes": [
+        "keying"
+      ],
+      "functions": [
+        "isTransientError",
+        "sleep",
+        "_classifyError",
+        "_shouldLog",
+        "_resetLogDedup",
+        "resilientFetch",
+        "waitForService"
+      ],
+      "imports": [],
+      "constants": [
+        "TRANSIENT_CODES",
+        "DEDUP_MAX_ENTRIES",
+        "DEDUP_COOLDOWN_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T14:38:15.448043",
+        "modified": "2026-02-01T14:38:15.448195",
+        "modified_days_ago": 4,
+        "lines": 233,
+        "size_bytes": 7145,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/App.tsx",
+      "name": "App.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "component dashboard-app provides the UI context for the dashboard, rendering the main viewer HUD and enabling secure access to the conscious-bot's current status and outputs via the DashboardProvider.",
+      "classes": [],
+      "functions": [
+        "App"
+      ],
+      "imports": [
+        "@/contexts/dashboard-context",
+        "@/components/Dashboard"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:05.820566",
+        "modified": "2026-02-03T00:58:05.820658",
+        "modified_days_ago": 3,
+        "lines": 12,
+        "size_bytes": 240,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/Dashboard.tsx",
+      "name": "Dashboard.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Modeals the main dashboard UI for the conscious-bot, rendering key components like Task streams, Brain status, and stress heatmap for real-time monitoring and control of the bot's operations. Integrates state from the dashboard store and uses hooks for task, history, and periodic refresh. Displays comprehensive bot status and evaluation metrics in a reactive Next.js/vite-based viewer HUD.",
+      "classes": [],
+      "functions": [
+        "isStatusOrEnvironmental",
+        "Dashboard"
+      ],
+      "imports": [
+        "react",
+        "@/stores/dashboard-store",
+        "@/types",
+        "@/lib/utils",
+        "@/hooks/use-cognitive-stream",
+        "@/hooks/use-ws-bot-state",
+        "@/hooks/use-initial-data-fetch",
+        "@/hooks/use-task-stream",
+        "@/hooks/use-periodic-refresh",
+        "@/lib/text-utils"
+      ],
+      "constants": [
+        "STATUS_TYPES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:03:00.545066",
+        "modified": "2026-02-03T18:03:00.545220",
+        "modified_days_ago": 2,
+        "lines": 1373,
+        "size_bytes": 55674,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/database-panel.tsx",
+      "name": "database-panel.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "from the dashboard module, provides a collapsible section wrapper for displaying and hiding the database panel, using React state and hooks for toggle behavior, and integrates visual components for enhanced user interaction with the bot's database state overview.",
+      "classes": [],
+      "functions": [
+        "CollapsibleSection",
+        "DatabasePanel"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "@/components/pill",
+        "@/components/empty-state",
+        "@/components/ui/button",
+        "@/components/ui/scroll-area",
+        "./database-panel.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:51:56.449265",
+        "modified": "2026-02-03T01:51:56.449549",
+        "modified_days_ago": 3,
+        "lines": 1024,
+        "size_bytes": 39185,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/embedding-viz-canvas.tsx",
+      "name": "embedding-viz-canvas.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides 3D embedding visualization for the dashboard; renders points with color-coded memory types using a custom WebGL component; exposes click and select event handlers for interactive exploration.",
+      "classes": [
+        "as",
+        "EmbeddingVizElement"
+      ],
+      "functions": [
+        "EmbeddingVizCanvas"
+      ],
+      "imports": [
+        "react",
+        "@/types"
+      ],
+      "constants": [
+        "WEB_COMPONENT_CODE",
+        "THREE",
+        "THREE",
+        "THREE",
+        "THREE",
+        "TYPE_COLORS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:21.935097",
+        "modified": "2026-02-03T01:05:21.935472",
+        "modified_days_ago": 3,
+        "lines": 461,
+        "size_bytes": 13549,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/embedding-viz-panel.tsx",
+      "name": "embedding-viz-panel.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a 3D embedding visualization panel for the dashboard. Implements interactive scatter chart rendering with loading states and color coding by memory type. Displays real-time updates and uses a Three.js canvas for smooth rendering.",
+      "classes": [],
+      "functions": [
+        "LoadingFallback",
+        "EmbeddingVizPanel"
+      ],
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/lib/utils",
+        "@/components/ui/button",
+        "./embedding-viz-panel.module.scss",
+        "@/types"
+      ],
+      "constants": [
+        "PROGRESSIVE_STAGES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:23:02.840657",
+        "modified": "2026-02-03T02:23:02.840824",
+        "modified_days_ago": 3,
+        "lines": 268,
+        "size_bytes": 8825,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/empty-state.tsx",
+      "name": "empty-state.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "the dashboard's EmptyState module implements a minimal UI component for rendering no-data placeholders in the conscious-bot viewer HUD, requiring an icon, title, and description, and optionally an action label to indicate absence of content",
+      "classes": [],
+      "functions": [
+        "EmptyState"
+      ],
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/lib/utils",
+        "./empty-state.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:17.993143",
+        "modified": "2026-02-03T00:58:17.993230",
+        "modified_days_ago": 3,
+        "lines": 35,
+        "size_bytes": 865,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/evaluation-panel.tsx",
+      "name": "evaluation-panel.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "metrics visualization component for the conscious-bot dashboard that dynamically renders evaluation results, alert status, and performance statistics using Lucide React charts and status indicators",
+      "classes": [],
+      "functions": [
+        "EvaluationPanel"
+      ],
+      "imports": [
+        "react",
+        "./section",
+        "./pill",
+        "./empty-state",
+        "@/lib/utils",
+        "./evaluation-panel.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:31:16.218801",
+        "modified": "2026-02-03T01:31:16.218911",
+        "modified_days_ago": 3,
+        "lines": 322,
+        "size_bytes": 9272,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/evaluation-tab.tsx",
+      "name": "evaluation-tab.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides the evaluation tab UI for the conscious-bot dashboard. Displays current task performance, decision quality metrics, system health status, and a timeline of recent activity. Integrates with InteroTimelineChart, SparklineChart, and memory modules to fetch and visualize evaluation data.",
+      "classes": [],
+      "functions": [
+        "EvaluationTab"
+      ],
+      "imports": [
+        "react",
+        "./section",
+        "./intero-timeline-chart",
+        "./sparkline-chart",
+        "./intero-current-snapshot",
+        "./valuation-panel",
+        "@/lib/utils",
+        "@/lib/task-normalize",
+        "./evaluation-tab.module.scss",
+        "@/types"
+      ],
+      "constants": [
+        "REFRESH_INTERVAL"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:32.997326",
+        "modified": "2026-02-05T02:47:57.217337",
+        "modified_days_ago": 1,
+        "lines": 379,
+        "size_bytes": 11939,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/hud-meter.tsx",
+      "name": "hud-meter.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides styled components for easy integration into the viewer HUD.",
+      "classes": [],
+      "functions": [
+        "HudMeter"
+      ],
+      "imports": [
+        "@/lib/utils",
+        "./hud-meter.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:33.000138",
+        "modified": "2026-02-03T01:05:33.000311",
+        "modified_days_ago": 3,
+        "lines": 46,
+        "size_bytes": 1112,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/intero-current-snapshot.tsx",
+      "name": "intero-current-snapshot.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "* Intero Current Snapshot * * Compact display of the current interoceptive state: * six horizontal bars (one per stress axis), three headline numbers * (composite stress, focus, curiosity), and an emotional state badge. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "InteroCurrentSnapshot"
+      ],
+      "imports": [
+        "@/lib/utils",
+        "@/types",
+        "./intero-current-snapshot.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:33.003054",
+        "modified": "2026-02-03T01:05:33.003214",
+        "modified_days_ago": 3,
+        "lines": 105,
+        "size_bytes": 3312,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/intero-timeline-chart.tsx",
+      "name": "intero-timeline-chart.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a multi-line SVG timeline for the conscious-bot dashboard. Implements axis coloring and dynamically renders stress metrics from InteroSnapshot data. Displays real-time stress values with grid lines and interactive hover tooltips for clear viewer HUD visualization.",
+      "classes": [],
+      "functions": [
+        "formatTimeLabel",
+        "InteroTimelineChart"
+      ],
+      "imports": [
+        "react",
+        "@/types",
+        "./intero-timeline-chart.module.scss"
+      ],
+      "constants": [
+        "AXIS_KEYS",
+        "PAD"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:17.996321",
+        "modified": "2026-02-03T00:58:17.996428",
+        "modified_days_ago": 3,
+        "lines": 306,
+        "size_bytes": 8766,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/inventory-display.tsx",
+      "name": "inventory-display.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": ";Provides a React component for rendering the conscious-bot's main inventory (slots 9\u201344) with item details and display logic. Implements display state, item rendering using sprites and metadata, and integrates with the ViewerHudOverlay for the hotbar (slots 0\u20138).",
+      "classes": [],
+      "functions": [
+        "SlotCell"
+      ],
+      "imports": [
+        "react",
+        "lucide-react",
+        "./section",
+        "./empty-state",
+        "@/lib/minecraft-sprites",
+        "@/lib/utils",
+        "./inventory-display.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:02:48.783709",
+        "modified": "2026-02-03T18:02:48.783872",
+        "modified_days_ago": 2,
+        "lines": 200,
+        "size_bytes": 7079,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/pill.tsx",
+      "name": "pill.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": ",\nThe dashboard's Pill component renders labeled or tagged metadata as clickable visual indicators within the viewer HUD, supporting multiple variants for visual distinction. \nIt is designed to cleanly display and highlight important information such as task sources or thought types. \nThis component integrates seamlessly with the dashboard's tagging system to enhance user clarity.",
+      "classes": [],
+      "functions": [
+        "Pill"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "./pill.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:17.997287",
+        "modified": "2026-02-03T00:58:17.997364",
+        "modified_days_ago": 3,
+        "lines": 36,
+        "size_bytes": 761,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/section.tsx",
+      "name": "section.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Implements a reusable section for organizing dashboard content in the conscious-bot dashboard Provides a structured layout with header and content wrappers Enforces consistent visual styling across all panel sections",
+      "classes": [],
+      "functions": [
+        "Section"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "./section.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:17.997813",
+        "modified": "2026-02-03T00:58:17.997896",
+        "modified_days_ago": 3,
+        "lines": 54,
+        "size_bytes": 1142,
+        "author": null,
+        "has_main": false
+      }
     }
   ],
   "categories": {
@@ -5077,7 +8805,30 @@
       "cognition/src/routes/telemetry-routes.ts",
       "cognition/src/routes/thought-routes.ts",
       "cognition/src/self-model/advanced-identity-analyzer.ts",
-      "cognition/src/self-model/contract-system.ts"
+      "cognition/src/self-model/contract-system.ts",
+      "cognition/src/self-model/identity-tracker.ts",
+      "cognition/src/self-model/narrative-intelligence.ts",
+      "cognition/src/self-model/narrative-manager.ts",
+      "cognition/src/self-model/types.ts",
+      "cognition/src/server-utils/cognitive-load-calculators.ts",
+      "cognition/src/server-utils/constants.ts",
+      "cognition/src/server-utils/observation-helpers.ts",
+      "cognition/src/server-utils/server-logger.ts",
+      "cognition/src/server-utils/step-generation-helpers.ts",
+      "cognition/src/server-utils/thought-stream-helpers.ts",
+      "cognition/src/server-utils/tts-usable-content.ts",
+      "cognition/src/server.ts",
+      "cognition/src/social-awareness-manager.ts",
+      "cognition/src/social-cognition/agent-modeler.ts",
+      "cognition/src/social-cognition/relationship-manager.ts",
+      "cognition/src/social-cognition/social-learner.ts",
+      "cognition/src/social-cognition/theory-of-mind-engine.ts",
+      "cognition/src/social-cognition/types.ts",
+      "cognition/src/stress-axis-computer.ts",
+      "cognition/src/stress-boundary-logger.ts",
+      "cognition/src/thought-generator.ts",
+      "cognition/src/types.ts",
+      "cognition/vitest.config.ts"
     ],
     "Shared utilities, TTS, API clients, base types": [
       "core/src/index.ts",
@@ -5085,10 +8836,75 @@
       "core/src/mcp-capabilities/index.ts",
       "core/src/real-time/index.ts",
       "core/src/sterling/index.ts",
-      "core/src/tts/index.ts"
+      "core/src/tts/index.ts",
+      "core/src/advanced-need-generator.ts",
+      "core/src/advanced-signal-processor.ts",
+      "core/src/arbiter.ts",
+      "core/src/cognitive-stream-integration.ts",
+      "core/src/debug-demo.ts",
+      "core/src/debug-floor-check.ts",
+      "core/src/demo-cognitive-stream.ts",
+      "core/src/demo-full-system-capabilities.ts",
+      "core/src/demo-real-bot-integration.ts",
+      "core/src/demo-working-capabilities.ts",
+      "core/src/fix-action-aborts.ts",
+      "core/src/goal-template-manager.ts",
+      "core/src/leaves/crafting-leaves.ts",
+      "core/src/leaves/interaction-leaves.ts",
+      "core/src/leaves/movement-leaves.ts",
+      "core/src/leaves/sensing-leaves.ts",
+      "core/src/llm/ollama-client.ts",
+      "core/src/logging/config.ts",
+      "core/src/mcp-capabilities/bt-dsl-parser.ts",
+      "core/src/mcp-capabilities/bt-dsl-schema.ts",
+      "core/src/mcp-capabilities/capability-registry.ts",
+      "core/src/mcp-capabilities/capability-specs.ts",
+      "core/src/mcp-capabilities/constitutional-filter.ts",
+      "core/src/mcp-capabilities/dynamic-creation-flow.ts",
+      "core/src/mcp-capabilities/leaf-contracts.ts",
+      "core/src/mcp-capabilities/leaf-factory.ts",
+      "core/src/mcp-capabilities/llm-integration.ts",
+      "core/src/mcp-capabilities/llm-interface.ts",
+      "core/src/mcp-capabilities/rate-limiter.ts",
+      "core/src/mcp-capabilities/registry.ts",
+      "core/src/mcp-capabilities/task-timeframe-management.ts",
+      "core/src/mcp-capabilities/types.ts",
+      "core/src/mcp-capabilities/working-leaf-factory.ts",
+      "core/src/minecraft-cognitive-integration.ts",
+      "core/src/mock-bot-service.ts",
+      "core/src/performance-monitor.ts",
+      "core/src/priority-ranker.ts",
+      "core/src/real-time/alerting-system.ts",
+      "core/src/real-time/budget-enforcer.ts",
+      "core/src/real-time/degradation-manager.ts",
+      "core/src/real-time/performance-tracker.ts",
+      "core/src/real-time/types.ts",
+      "core/src/server.ts",
+      "core/src/signal-processor.ts",
+      "core/src/sterling/sterling-client.ts",
+      "core/src/sterling/types.ts",
+      "core/src/test-cognitive-pipeline.ts",
+      "core/src/tts/tts-client.ts",
+      "core/src/types.ts",
+      "core/src/utils/http-client.ts",
+      "core/src/utils/resilient-service-client.ts"
     ],
     "Next.js dashboard, viewer HUD": [
-      "dashboard/src/types/index.ts"
+      "dashboard/src/types/index.ts",
+      "dashboard/src/App.tsx",
+      "dashboard/src/components/Dashboard.tsx",
+      "dashboard/src/components/database-panel.tsx",
+      "dashboard/src/components/embedding-viz-canvas.tsx",
+      "dashboard/src/components/embedding-viz-panel.tsx",
+      "dashboard/src/components/empty-state.tsx",
+      "dashboard/src/components/evaluation-panel.tsx",
+      "dashboard/src/components/evaluation-tab.tsx",
+      "dashboard/src/components/hud-meter.tsx",
+      "dashboard/src/components/intero-current-snapshot.tsx",
+      "dashboard/src/components/intero-timeline-chart.tsx",
+      "dashboard/src/components/inventory-display.tsx",
+      "dashboard/src/components/pill.tsx",
+      "dashboard/src/components/section.tsx"
     ],
     "Test scenarios and evaluation": [
       "evaluation/src/curriculum/index.ts",
@@ -5152,13 +8968,13 @@
   },
   "statistics": {
     "by_status": {
-      "stable": 38,
-      "active": 89
+      "stable": 81,
+      "active": 134
     },
     "by_category": {
-      "LLM integration, thought processing, intent extraction, cognitive stream": 79,
-      "Shared utilities, TTS, API clients, base types": 6,
-      "Next.js dashboard, viewer HUD": 1,
+      "LLM integration, thought processing, intent extraction, cognitive stream": 102,
+      "Shared utilities, TTS, API clients, base types": 57,
+      "Next.js dashboard, viewer HUD": 15,
       "Test scenarios and evaluation": 2,
       "Planning executor contracts": 1,
       "MCP server integration": 1,
@@ -5169,16 +8985,16 @@
       "P03/P21 conformance suites": 3,
       "World state, observation queue": 5
     },
-    "total_lines": 30323,
-    "total_classes": 37,
-    "total_functions": 162,
+    "total_lines": 81163,
+    "total_classes": 130,
+    "total_functions": 283,
     "todos_by_priority": {
       "P0-GOV": 0,
       "P1-METRIC": 0,
       "P2-QUAL": 0,
       "P3-UX": 0,
-      "untagged": 6
+      "untagged": 9
     },
-    "total_todos": 6
+    "total_todos": 9
   }
 }

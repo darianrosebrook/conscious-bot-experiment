@@ -700,7 +700,7 @@ export class SterlingClient extends EventEmitter {
       const timeout = setTimeout(() => {
         cleanup();
         this.recordFailure();
-        resolve({ success: false, error: `Language IO reduce timeout after ${timeoutMs}ms` });
+        resolve({ success: false, error: `CLIENT_TIMEOUT: Language IO reduce timeout after ${timeoutMs}ms` });
       }, timeoutMs);
 
       const handler = (msg: SterlingMessage) => {

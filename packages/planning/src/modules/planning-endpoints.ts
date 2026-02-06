@@ -1046,6 +1046,17 @@ export function createPlanningEndpoints(
         const runId = sanitizeRunId(runIdRaw);
 
         const recorder = getGoldenRunRecorder();
+        // Evidence hygiene: include executor mode/enablement so "no dispatch" isn't ambiguous.
+        const loopStarted = Boolean((globalThis as any).__planningExecutorState?.running);
+        recorder.recordRuntime(runId, {
+          executor: {
+            enabled: process.env.ENABLE_PLANNING_EXECUTOR === '1',
+            mode: (process.env.EXECUTOR_MODE || 'shadow').toLowerCase(),
+            loop_started: loopStarted,
+            enable_planning_executor_env: process.env.ENABLE_PLANNING_EXECUTOR,
+            executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
+          },
+        });
         recorder.recordInjection(runId, {
           committed_ir_digest,
           schema_version,

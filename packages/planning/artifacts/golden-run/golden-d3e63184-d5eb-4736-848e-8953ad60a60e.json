@@ -1,0 +1,34 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "d3e63184-d5eb-4736-848e-8953ad60a60e",
+  "created_at": 1770402210912,
+  "updated_at": 1770402210915,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "cb5ad10cb9fe86d7",
+    "request_id": "inject_d3e63184-d5eb-4736-848e-8953ad60a60e",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770402210912_bs9enl",
+    "status": "ok",
+    "plan_bundle_digest": "",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "step-1",
+        "leaf": "acquire_material",
+        "order": 1
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-d3e63184-d5eb-4736-848e-8953ad60a60e",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending"
+  }
+}

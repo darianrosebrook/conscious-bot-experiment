@@ -373,6 +373,17 @@ export class KeepAliveIntegration {
     this.lastIdleEpisodeAt = now;
 
     try {
+      // Evidence hygiene: keep the report explicit about whether an executor loop was running.
+      recorder.recordRuntime(runId, {
+        executor: {
+          enabled: process.env.ENABLE_PLANNING_EXECUTOR === '1',
+          mode: (process.env.EXECUTOR_MODE || 'shadow').toLowerCase(),
+          loop_started: true, // onIdle() is called from the autonomous executor scheduler
+          enable_planning_executor_env: process.env.ENABLE_PLANNING_EXECUTOR,
+          executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
+        },
+      });
+
       const client = getDefaultLanguageIOClient();
       await client.connect();
       const reducePromise = client.reduce(rawText, {
@@ -388,12 +399,19 @@ export class KeepAliveIntegration {
       const result = await Promise.race([reducePromise, timeoutPromise]);
 
       if ('code' in result) {
-      recorder.recordIdleEpisode(runId, {
-        client_request_id: requestId,
-        status: 'error',
-        reason: result.code,
-        duration_ms: result.durationMs,
-      });
+        const timeoutOrigin =
+          result.code === 'CLIENT_TIMEOUT'
+            ? 'client'
+            : result.code === 'STERLING_TIMEOUT'
+              ? 'server'
+              : undefined;
+        recorder.recordIdleEpisode(runId, {
+          client_request_id: requestId,
+          timeout_origin: timeoutOrigin,
+          status: 'error',
+          reason: result.code,
+          duration_ms: result.durationMs,
+        });
         return true;
       }
 
@@ -440,10 +458,12 @@ export class KeepAliveIntegration {
 
       return true;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       recorder.recordIdleEpisode(runId, {
         client_request_id: requestId,
+        timeout_origin: errorMessage.includes('idle_episode_timeout') ? 'client' : undefined,
         status: 'error',
-        reason: error instanceof Error ? error.message : String(error),
+        reason: errorMessage,
       });
       console.error('[KeepAliveIntegration] Idle episode failed:', error);
       return true;

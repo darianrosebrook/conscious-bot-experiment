@@ -1,0 +1,26 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "129736b5-8d8a-4df9-ba7b-94aebc7709ca",
+  "created_at": 1770400941520,
+  "updated_at": 1770400946526,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "35243dbdcdc6aea5",
+    "request_id": "inject_129736b5-8d8a-4df9-ba7b-94aebc7709ca",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770400941521_6waita",
+    "status": "error",
+    "error": "Expand timeout after 5000ms"
+  },
+  "task": {
+    "task_id": "sterling-ir-129736b5-8d8a-4df9-ba7b-94aebc7709ca",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  }
+}

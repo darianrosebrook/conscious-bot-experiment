@@ -37,6 +37,7 @@ export interface TaskBlockState {
  */
 export interface BlockEvaluableTask {
   status?: string;
+  steps?: Array<unknown>;
   metadata?: {
     blockedReason?: string;
     blockedAt?: number;
@@ -105,7 +106,9 @@ export function evaluateTaskBlockState(
  * Using an allowlist is safer than a denylist — new statuses must be
  * explicitly opted in rather than accidentally being executable.
  */
-const ELIGIBLE_STATUSES = new Set(['active', 'in_progress']);
+// Pending tasks are created before first execution attempt; the autonomous executor
+// must be able to pick them up once they have executable steps attached.
+const ELIGIBLE_STATUSES = new Set(['pending', 'active', 'in_progress']);
 
 /**
  * Determine if a task is eligible for execution.
@@ -125,6 +128,13 @@ export function isTaskEligible(
   // Status must be in allowlist
   if (!ELIGIBLE_STATUSES.has(task.status ?? '')) {
     return false;
+  }
+  // Pending tasks must have steps attached; otherwise they are "not yet planned"
+  // and should not be selected for execution (prevents noisy no-op blocking).
+  if ((task.status ?? '') === 'pending') {
+    if (!Array.isArray(task.steps) || task.steps.length === 0) {
+      return false;
+    }
   }
   // Must not be blocked
   if (task.metadata?.blockedReason) {

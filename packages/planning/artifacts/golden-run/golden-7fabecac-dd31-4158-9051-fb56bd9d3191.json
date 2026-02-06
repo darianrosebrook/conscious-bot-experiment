@@ -1,0 +1,26 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "7fabecac-dd31-4158-9051-fb56bd9d3191",
+  "created_at": 1770401178929,
+  "updated_at": 1770401238934,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "60ee61e91b6d2f34",
+    "request_id": "inject_7fabecac-dd31-4158-9051-fb56bd9d3191",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770401178929_mtbl1x",
+    "status": "error",
+    "error": "Expand timeout after 60000ms"
+  },
+  "task": {
+    "task_id": "sterling-ir-7fabecac-dd31-4158-9051-fb56bd9d3191",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  }
+}

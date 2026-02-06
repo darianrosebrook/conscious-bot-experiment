@@ -2289,6 +2289,23 @@ async function autonomousTaskExecutor() {
             console.log(
               `[Executor:shadow] Would execute: ${toolName} ${JSON.stringify(leafExec.args)}`
             );
+            const runId = (currentTask.metadata as any)?.goldenRun?.runId as
+              | string
+              | undefined;
+            if (runId) {
+              // Record "would execute" so a golden report can't be misread as "no dispatch".
+              getGoldenRunRecorder().recordShadowDispatch(runId, {
+                step_id: stepId,
+                leaf: leafExec.leafName,
+                args: leafExec.args,
+                observed_at: Date.now(),
+              });
+              getGoldenRunRecorder().recordVerification(runId, {
+                status: 'skipped',
+                kind: 'trace_only',
+                detail: { reason: 'shadow_mode', leaf: leafExec.leafName, step_id: stepId },
+              });
+            }
             await taskIntegration.startTaskStep(currentTask.id, nextStep.id, {
               dryRun: true,
             });
@@ -4242,9 +4259,19 @@ async function startServer() {
       console.log(`[Pipeline] MC interface: ${MC_ENDPOINT}`);
 
       let executorStarted = false;
+      let loggedEnvGate = false;
       const tryStartExecutor = () => {
         if (executorStarted) return;
-        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') return;
+        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
+          if (!loggedEnvGate) {
+            loggedEnvGate = true;
+            console.log(
+              '[Planning] Executor loop not started: ENABLE_PLANNING_EXECUTOR!=1. ' +
+                'Set ENABLE_PLANNING_EXECUTOR=1 to allow dispatch.'
+            );
+          }
+          return;
+        }
         if (!isSystemReady()) return;
         if (!readiness.executorReady) return;
         executorStarted = true;

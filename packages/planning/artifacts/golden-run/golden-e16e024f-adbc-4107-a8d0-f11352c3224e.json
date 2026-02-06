@@ -1,0 +1,26 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "e16e024f-adbc-4107-a8d0-f11352c3224e",
+  "created_at": 1770402038888,
+  "updated_at": 1770402038890,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "ab0019bce0447f9a",
+    "request_id": "inject_e16e024f-adbc-4107-a8d0-f11352c3224e",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770402038888_k3qbn4",
+    "status": "blocked",
+    "blocked_reason": "blocked_unimplemented"
+  },
+  "task": {
+    "task_id": "sterling-ir-e16e024f-adbc-4107-a8d0-f11352c3224e",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  }
+}

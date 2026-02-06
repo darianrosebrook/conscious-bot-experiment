@@ -1,0 +1,100 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "03ea08a0-af0a-4c7e-b930-e68f6e373e5f",
+  "created_at": 1770408901538,
+  "updated_at": 1770409089455,
+  "execution": {
+    "dispatched_steps": [],
+    "shadow_steps": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770409049455
+      },
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770409059454
+      },
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770409069462
+      },
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770409079454
+      },
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770409089455
+      }
+    ],
+    "verification": {
+      "status": "skipped",
+      "kind": "trace_only",
+      "detail": {
+        "reason": "shadow_mode",
+        "leaf": "acquire_material",
+        "step_id": "step-1"
+      }
+    }
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "shadow",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    }
+  },
+  "idle_episode": {
+    "client_request_id": "idle_03ea08a0-af0a-4c7e-b930-e68f6e373e5f",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "95bdff16806dd6c9",
+    "duration_ms": 4
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770408924624_wtnc8y",
+    "status": "ok",
+    "plan_bundle_digest": "",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "step-1",
+        "leaf": "acquire_material",
+        "order": 1
+      }
+    ]
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-03ea08a0-af0a-4c7e-b930-e68f6e373e5f-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending"
+  }
+}

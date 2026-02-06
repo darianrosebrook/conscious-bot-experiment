@@ -12,6 +12,15 @@ export type GoldenRunReport = {
   run_id: string;
   created_at: number;
   updated_at: number;
+  runtime?: {
+    executor?: {
+      enabled?: boolean;
+      mode?: 'shadow' | 'live' | string;
+      loop_started?: boolean;
+      enable_planning_executor_env?: string | undefined;
+      executor_live_confirm_env?: string | undefined;
+    };
+  };
   injection?: {
     committed_ir_digest?: string;
     schema_version?: string;
@@ -22,6 +31,7 @@ export type GoldenRunReport = {
   idle_episode?: {
     client_request_id?: string;
     request_id?: string;
+    timeout_origin?: 'client' | 'server';
     status?: 'ok' | 'blocked' | 'error';
     reason?: string;
     committed_ir_digest?: string;
@@ -50,12 +60,22 @@ export type GoldenRunReport = {
       args?: Record<string, unknown>;
       dispatched_at?: number;
     }>;
+    shadow_steps?: Array<{
+      step_id?: string;
+      leaf?: string;
+      args?: Record<string, unknown>;
+      observed_at?: number;
+    }>;
     verification?: GoldenRunVerification;
   };
 };
 
 type GoldenRunDispatchedStep = NonNullable<
   NonNullable<GoldenRunReport['execution']>['dispatched_steps']
+>[number];
+
+type GoldenRunShadowStep = NonNullable<
+  NonNullable<GoldenRunReport['execution']>['shadow_steps']
 >[number];
 
 const DEFAULT_BASE_DIR = path.join(
@@ -171,6 +191,11 @@ export class GoldenRunRecorder {
     this.update(runId, { injection: data ?? {} });
   }
 
+  recordRuntime(runId: string, data: GoldenRunReport['runtime']): void {
+    if (!runId) return;
+    this.update(runId, { runtime: data ?? {} });
+  }
+
   recordIdleEpisode(runId: string, data: GoldenRunReport['idle_episode']): void {
     if (!runId) return;
     this.update(runId, { idle_episode: data ?? {} });
@@ -191,6 +216,15 @@ export class GoldenRunRecorder {
     this.update(runId, {
       execution: {
         dispatched_steps: [data],
+      },
+    });
+  }
+
+  recordShadowDispatch(runId: string, data: GoldenRunShadowStep): void {
+    if (!runId) return;
+    this.update(runId, {
+      execution: {
+        shadow_steps: [data],
       },
     });
   }

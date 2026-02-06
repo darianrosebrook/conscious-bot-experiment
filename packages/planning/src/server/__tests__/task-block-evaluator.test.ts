@@ -135,6 +135,14 @@ describe('task-block-evaluator (pure functions)', () => {
   describe('isTaskEligible', () => {
     const now = Date.now();
 
+    it('returns true for pending tasks with steps and without blocks', () => {
+      expect(isTaskEligible({ status: 'pending', steps: [{}] }, now)).toBe(true);
+    });
+
+    it('returns false for pending tasks without steps', () => {
+      expect(isTaskEligible({ status: 'pending', steps: [] }, now)).toBe(false);
+    });
+
     it('returns true for active tasks without blocks', () => {
       expect(isTaskEligible({ status: 'active' }, now)).toBe(true);
     });

@@ -1,0 +1,44 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "824fafac-93bb-4ccf-a41d-8a36e5068cec",
+  "created_at": 1770408503485,
+  "updated_at": 1770408513877,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "shadow",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    }
+  },
+  "idle_episode": {
+    "client_request_id": "idle_824fafac-93bb-4ccf-a41d-8a36e5068cec",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "10e4c3e79f62c616",
+    "duration_ms": 4
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770408513873_va4wuu",
+    "status": "ok",
+    "plan_bundle_digest": "",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "step-1",
+        "leaf": "acquire_material",
+        "order": 1
+      }
+    ]
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-824fafac-93bb-4ccf-a41d-8a36e5068cec-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending"
+  }
+}

@@ -184,10 +184,13 @@ export class ReadinessMonitor {
 
         this._result = newResult;
 
-        // Notify listeners on state change OR when executor is newly ready.
-        // This ensures deferred tryStartExecutor() gets called even when
-        // the service state hasn't changed but the probe result was stale.
-        if (changed || newResult.executorReady) {
+        // Notify listeners only on state changes.
+        //
+        // Executor startup also waits on the global system-ready barrier, so
+        // firing callbacks on every "executorReady=true" re-probe is noisy and
+        // breaks the ReadinessMonitor contract used by tests: onChange means
+        // "state transition observed".
+        if (changed) {
           for (const cb of this._listeners) {
             try {
               cb(newResult);

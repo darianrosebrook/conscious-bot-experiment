@@ -167,7 +167,7 @@ export class SterlingReasoningService {
       client_trace_id?: string;
       transport_context?: Record<string, unknown>;
     },
-    timeoutMs: number = 5000,
+    timeoutMs?: number,
   ): Promise<
     | {
         status: 'ok';
@@ -188,8 +188,15 @@ export class SterlingReasoningService {
       return { status: 'blocked', blocked_reason: 'blocked_executor_unavailable' };
     }
 
+    const expandTimeoutMsRaw =
+      process.env.STERLING_EXECUTOR_TIMEOUT_MS ?? process.env.STERLING_EXPAND_TIMEOUT_MS ?? '5000';
+    const expandTimeoutMs = Number.isFinite(Number(expandTimeoutMsRaw))
+      ? Number(expandTimeoutMsRaw)
+      : 5000;
+    const effectiveTimeoutMs = typeof timeoutMs === 'number' ? timeoutMs : expandTimeoutMs;
+
     try {
-      return await this.client.expandByDigest(request, timeoutMs);
+      return await this.client.expandByDigest(request, effectiveTimeoutMs);
     } catch (err) {
       return {
         status: 'error',

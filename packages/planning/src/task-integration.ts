@@ -1926,6 +1926,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       );
     }
 
+    const expandTimeoutMsRaw =
+      process.env.STERLING_EXECUTOR_TIMEOUT_MS ?? process.env.STERLING_EXPAND_TIMEOUT_MS ?? '5000';
+    const expandTimeoutMs = Number.isFinite(Number(expandTimeoutMsRaw))
+      ? Number(expandTimeoutMsRaw)
+      : 5000;
+
     const response = await this.sterlingExecutorService.expandByDigest(
       {
         committed_ir_digest: digest,
@@ -1933,7 +1939,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         request_id: requestId,
         envelope_id: sterlingMeta?.envelopeId ?? undefined,
       },
-      5000,
+      expandTimeoutMs,
     );
 
     if (response.status === 'blocked') {

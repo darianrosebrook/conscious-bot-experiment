@@ -82,6 +82,7 @@ export interface ReduceResult {
 export interface ReduceError {
   /** Error code for programmatic handling */
   code:
+    | 'CLIENT_TIMEOUT'
     | 'STERLING_UNAVAILABLE'
     | 'STERLING_TIMEOUT'
     | 'SCHEMA_VERSION_MISMATCH'
@@ -164,11 +165,18 @@ export class SterlingLanguageIOClient extends EventEmitter {
 
   constructor(config: LanguageIOClientConfig = {}) {
     super();
+    const envReduceTimeoutRaw =
+      process.env.STERLING_LANGUAGE_IO_REDUCE_TIMEOUT_MS ??
+      process.env.STERLING_IDLE_EPISODES_TIMEOUT_MS ??
+      '';
+    const envReduceTimeout = Number.parseInt(envReduceTimeoutRaw, 10);
     this.config = {
       url: config.url || process.env.STERLING_WS_URL || 'ws://localhost:8766',
       enabled: config.enabled ?? process.env.STERLING_ENABLED !== 'false',
       fallbackPolicy: config.fallbackPolicy ?? 'markers_only',
-      reduceTimeout: config.reduceTimeout ?? 10000,
+      reduceTimeout:
+        config.reduceTimeout ??
+        (Number.isFinite(envReduceTimeout) && envReduceTimeout > 0 ? envReduceTimeout : 10000),
       maxRetries: config.maxRetries ?? 2,
     };
 
@@ -301,6 +309,14 @@ export class SterlingLanguageIOClient extends EventEmitter {
       }
 
       if (error instanceof Error && error.message.includes('timeout')) {
+        if (error.message.includes('CLIENT_TIMEOUT:')) {
+          return {
+            code: 'CLIENT_TIMEOUT',
+            message: error.message.replace('CLIENT_TIMEOUT: ', ''),
+            envelope,
+            durationMs,
+          };
+        }
         return {
           code: 'STERLING_TIMEOUT',
           message: `Reduce operation timed out after ${this.config.reduceTimeout}ms`,
@@ -380,7 +396,11 @@ export class SterlingLanguageIOClient extends EventEmitter {
     }
 
     // Sterling unavailable - check fallback policy
-    if (outcome.code === 'STERLING_UNAVAILABLE' || outcome.code === 'STERLING_TIMEOUT') {
+    if (
+      outcome.code === 'STERLING_UNAVAILABLE' ||
+      outcome.code === 'STERLING_TIMEOUT' ||
+      outcome.code === 'CLIENT_TIMEOUT'
+    ) {
       // Strict mode: fail closed, no fallback allowed
       if (this.config.fallbackPolicy === 'strict') {
         throw new Error(`Sterling unavailable and fallbackPolicy=strict: ${outcome.message}`);

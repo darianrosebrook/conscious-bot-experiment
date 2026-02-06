@@ -56,16 +56,20 @@ vi.mock('../../modules/cognition-outbox', () => ({
 }));
 
 const { resolveRequirementSpy } = vi.hoisted(() => ({
-  resolveRequirementSpy: vi.fn(() => {
-    throw new Error('resolveRequirement should not be called for sterling_ir');
-  }),
+  // Spy only. We assert call counts in the Sterling IR routing section.
+  // The rest of this file exercises the general pipeline and may legitimately
+  // resolve requirements for non-sterling tasks.
+  resolveRequirementSpy: vi.fn(),
 }));
 
 vi.mock('../../modules/requirements', async () => {
   const actual = await vi.importActual<any>('../../modules/requirements');
   return {
     ...actual,
-    resolveRequirement: resolveRequirementSpy,
+    resolveRequirement: (...args: any[]) => {
+      resolveRequirementSpy(...args);
+      return actual.resolveRequirement(...args);
+    },
   };
 });
 

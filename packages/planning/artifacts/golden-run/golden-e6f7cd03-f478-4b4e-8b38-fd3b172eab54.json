@@ -1,0 +1,17 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "e6f7cd03-f478-4b4e-8b38-fd3b172eab54",
+  "created_at": 1770402198607,
+  "updated_at": 1770402198607,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "idle_episode": {
+    "client_request_id": "idle_e6f7cd03-f478-4b4e-8b38-fd3b172eab54",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "cb5ad10cb9fe86d7",
+    "duration_ms": 5
+  }
+}

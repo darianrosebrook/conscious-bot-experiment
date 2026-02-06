@@ -163,11 +163,16 @@ export async function checkBotConnectionDetailed(): Promise<{
     });
     if (response.ok) {
       const status = (await response.json()) as {
+        // Newer /health shape
         status?: string;
         botStatus?: { connected?: boolean };
+        // Legacy /health shape still used by some callers
+        executionStatus?: { bot?: { connected?: boolean } };
       };
       const connected =
-        status.status === 'connected' || status.botStatus?.connected === true;
+        status.status === 'connected' ||
+        status.botStatus?.connected === true ||
+        status.executionStatus?.bot?.connected === true;
       return { ok: connected };
     }
     return {

@@ -1,0 +1,15 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "1867d7d8-6b7b-4da9-8de9-9abecf4d6e18",
+  "created_at": 1770399400598,
+  "updated_at": 1770399400598,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "idle_episode": {
+    "client_request_id": "idle_1867d7d8-6b7b-4da9-8de9-9abecf4d6e18",
+    "status": "error",
+    "reason": "STERLING_TIMEOUT",
+    "duration_ms": 10003
+  }
+}

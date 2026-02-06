@@ -1,0 +1,36 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "2d2ae965-c8c8-4d45-9209-5b9038091f2b",
+  "created_at": 1770410996817,
+  "updated_at": 1770411006905,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    }
+  },
+  "idle_episode": {
+    "client_request_id": "idle_2d2ae965-c8c8-4d45-9209-5b9038091f2b",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "e1fc8e83c464d4cd",
+    "duration_ms": 17
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770411006902_8d9awk",
+    "status": "blocked",
+    "blocked_reason": "blocked_unimplemented"
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-2d2ae965-c8c8-4d45-9209-5b9038091f2b-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  }
+}
