@@ -1,0 +1,86 @@
+id: STIR-001
+title: "PR4 Phase 4: Route sterling_ir tasks via Sterling executor contract"
+risk_tier: 2
+feature_flag: "STERLING_IR_ROUTING=1"
+scope:
+  in:
+    - "Route sterling_ir tasks with committed_ir_digest to Sterling executor path (Pattern A)"
+    - "Bypass requirementCandidate-based routing for sterling_ir (no resolveRequirement/routeActionPlan)"
+    - "Define minimal digest-to-next-action contract stub for Sterling (opaque leaf steps + plan_bundle_digest)"
+    - "Fail-closed routing when digest missing or executor unavailable"
+    - "Persist routing outcomes and blocked reasons in task metadata"
+    - "Add focused unit tests for routing decision and fail-closed behavior"
+  out:
+    - "Any TS-side semantic parsing or action taxonomy inference"
+    - "Changing Sterling reducer schema or Python-side planning semantics"
+    - "UI changes beyond surfacing existing blocked status metadata"
+invariants:
+  - "R-SEM-1: planning must not infer executor type or action semantics from language"
+  - "R-BOUNDARY-1: execution semantics remain Sterling-side; planning only transports opaque step bundles (see docs/planning/sterling-boundary-contract.md)"
+  - "R-ROUTE-STERLINGIR-1: sterling_ir tasks must bypass resolveRequirement() and routeActionPlan() regardless of STRICT_REQUIREMENTS mode"
+  - "R-EXECSEL-1: sterling_ir must not call resolveActionFromTask() or any title/step inference resolver"
+  - "R-ROUTE-STERLINGIR-2: sterling_ir routing must not depend on task.title, task.description, or any NL content"
+  - "R-DEDUPE-STERLINGIR-1: sterling_ir tasks with committed_ir_digest bypass similarity dedupe; only digest dedupe is authoritative"
+  - "R-NO-TITLE-INFER-1: sterling_ir must never use task-action-resolver title inference path"
+  - "R-CTX-1: sterling_ir executor requests include only digest + envelope/session identifiers; no free-text or NL content"
+  - "R-DET-1: same committed_ir_digest + envelope_id yields same plan_bundle_digest (materialize-only mode)"
+  - "R-BLOCKED-1: sterling_ir blocked states use applyTaskBlock with metadata.blockedReason; status is set per sterling-boundary-contract (never unplannable)"
+  - "R-FAILCLOSED-1: sterling_ir tasks without committed_ir_digest never route"
+  - "R-FAILCLOSED-2: Sterling executor unavailability yields blocked status, not fallback execution"
+  - "R-OPAQUE-1: committed_ir_digest and provenance are treated as opaque"
+  - "R-NO-ENUM-1: TS does not introduce new action enums for Sterling IR routing"
+  - "R-CONTRACT-1: Sterling executor request includes committed_ir_digest, schema_version, request_id; envelope_id is required when available in provenance"
+  - "R-CONTRACT-2: Sterling executor response provides status, blocked_reason when blocked, and plan_bundle_digest + leaf steps when ok"
+acceptance:
+  - id: A1
+    given: "sterling_ir task with committed_ir_digest present"
+    when: "routing decision runs"
+    then: "task routes to Sterling executor path and records route metadata"
+  - id: A2
+    given: "sterling_ir task missing committed_ir_digest"
+    when: "routing decision runs"
+    then: "task is blocked with reason blocked_missing_digest and no executor call occurs (must not be unplannable/no-requirement)"
+  - id: A3
+    given: "Sterling executor is unavailable or returns blocked"
+    when: "routing decision runs"
+    then: "task is blocked with reason from Sterling and no fallback execution occurs"
+  - id: A4
+    given: "non-sterling_ir task with requirementCandidate"
+    when: "routing decision runs"
+    then: "existing requirementCandidate-based routing remains unchanged"
+  - id: A5
+    given: "sterling_ir task with committed_ir_digest present"
+    when: "routing decision runs"
+    then: "task does not pass through resolveRequirement/routeActionPlan and is never marked unplannable/no-requirement"
+  - id: A6
+    given: "sterling_ir task is sent to resolveActionFromTask()"
+    when: "resolver runs"
+    then: "resolver fails deterministically with an explicit failureCode (no title inference fallback)"
+  - id: A7
+    given: "sterling_ir task with digest present"
+    when: "routing completes or blocks"
+    then: "task status is pending or pending_planning with blockedReason (never unplannable/no-requirement)"
+non_functional:
+  a11y: []
+  perf:
+    route_select_p95_ms: 5
+    expansion_call_p95_ms: 2000
+    expansion_call_timeout_ms: 5000
+  security:
+    - "No raw thought content sent in routing decision logs"
+    - "Executor call uses digest-only payload; envelope_id is required when available"
+contracts:
+  - type: openapi
+    path: "contracts/sterling-executor.yaml#/paths/~1sterling~1expand-by-digest/post"
+observability:
+  logs:
+    - "planning.sterling_ir.route with outcome and reason"
+    - "planning.sterling_ir.blocked with blocked_reason"
+  metrics:
+    - "planning_sterling_ir_route_total{outcome}"
+    - "planning_sterling_ir_blocked_total{reason}"
+  traces:
+    - "sterling_ir_route span with committed_ir_digest attribute"
+migrations: []
+rollback:
+  - "Disable STERLING_IR_ROUTING to revert to strict no-requirement unplannable behavior"

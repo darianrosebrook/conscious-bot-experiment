@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import { MinecraftExecutor } from '../reactive-executor/minecraft-executor';
 import { PlanStatus, PlanStepStatus, ActionType } from '../types';
 import { getSystemReadyState, markSystemReady } from '../startup-barrier';
+import { getGoldenRunRecorder, sanitizeRunId } from '../golden-run-recorder';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -1009,6 +1010,86 @@ export function createPlanningEndpoints(
       });
     }
   });
+
+  // Dev-only: inject a sterling_ir task for golden-run sink proof
+  if (process.env.ENABLE_DEV_ENDPOINTS === 'true') {
+    router.post('/api/dev/inject-sterling-ir', async (req: Request, res: Response) => {
+      try {
+        if (process.env.NODE_ENV === 'production') {
+          return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
+        }
+        const {
+          committed_ir_digest,
+          schema_version,
+          envelope_id,
+          run_id,
+        } = req.body ?? {};
+
+        if (!committed_ir_digest || typeof committed_ir_digest !== 'string') {
+          return res.status(400).json({ error: 'committed_ir_digest required' });
+        }
+        if (!schema_version || typeof schema_version !== 'string') {
+          return res.status(400).json({ error: 'schema_version required' });
+        }
+        const digestOk = /^[a-zA-Z0-9:._-]{6,256}$/.test(committed_ir_digest);
+        const schemaOk = /^[a-zA-Z0-9._-]{1,64}$/.test(schema_version);
+        if (!digestOk) {
+          return res.status(400).json({ error: 'committed_ir_digest format invalid' });
+        }
+        if (!schemaOk) {
+          return res.status(400).json({ error: 'schema_version format invalid' });
+        }
+
+        const runIdRaw = typeof run_id === 'string' && run_id.trim().length > 0
+          ? run_id.trim()
+          : crypto.randomUUID();
+        const runId = sanitizeRunId(runIdRaw);
+
+        const recorder = getGoldenRunRecorder();
+        recorder.recordInjection(runId, {
+          committed_ir_digest,
+          schema_version,
+          envelope_id: envelope_id ?? null,
+          request_id: `inject_${runId}`,
+          source: 'dev_injection',
+        });
+
+        const task = await planningSystem.goalFormulation.addTask({
+          id: `sterling-ir-${runId}`,
+          title: `Sterling IR injection ${runId.slice(0, 8)}`,
+          description: `Golden run injection ${runId}`,
+          type: 'sterling_ir',
+          source: 'manual',
+          metadata: {
+            tags: ['golden-run', 'dev-injection'],
+            category: 'sterling_ir',
+            sterling: {
+              committedIrDigest: committed_ir_digest,
+              schemaVersion: schema_version,
+              envelopeId: envelope_id ?? null,
+            },
+            goldenRun: {
+              runId,
+              requestedAt: Date.now(),
+              source: 'dev_injection',
+            },
+          },
+        });
+
+        return res.json({
+          success: true,
+          run_id: runId,
+          task_id: task?.id ?? null,
+        });
+      } catch (error) {
+        console.error('[dev inject] Failed to inject sterling_ir task:', error);
+        return res.status(500).json({
+          error: 'Failed to inject sterling_ir task',
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+  }
 
   // Helper functions for task-to-action mapping
   function mapTaskTypeToAction(taskType: string): string {

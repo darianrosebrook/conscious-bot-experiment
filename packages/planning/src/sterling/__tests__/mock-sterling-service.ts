@@ -29,6 +29,7 @@ import type { SterlingReasoningService } from '../sterling-reasoning-service';
 export const MOCK_SERVICE_REQUIRED_METHODS = [
   'isAvailable',
   'solve',
+  'expandByDigest',
   'getConnectionNonce',
   'registerDomainDeclaration',
   'initialize',
@@ -83,6 +84,7 @@ export function createMockSterlingService(
   return {
     isAvailable: vi.fn().mockReturnValue(true),
     solve: vi.fn().mockResolvedValue(opts?.solveResponse ?? DEFAULT_SOLVE_RESPONSE),
+    expandByDigest: vi.fn().mockResolvedValue({ status: 'blocked', blocked_reason: 'blocked_executor_unavailable' }),
     getConnectionNonce: vi.fn().mockReturnValue(opts?.connectionNonce ?? 1),
     registerDomainDeclaration: vi.fn().mockResolvedValue(
       opts?.registrationResult ?? { success: true },

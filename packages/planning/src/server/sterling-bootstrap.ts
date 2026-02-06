@@ -35,6 +35,7 @@ export interface SterlingBootstrapResult {
 
 export interface TaskIntegrationSolverRegistry {
   registerSolver(solver: unknown): void;
+  setSterlingExecutorService?(service: SterlingReasoningService | undefined): void;
 }
 
 /**
@@ -99,6 +100,10 @@ export async function createSterlingBootstrap(
       );
       taskIntegration.registerSolver(minecraftNavigationSolver);
       console.log('Minecraft navigation solver initialized');
+
+      if (taskIntegration.setSterlingExecutorService) {
+        taskIntegration.setSterlingExecutorService(sterlingService);
+      }
     }
   } catch (error) {
     console.warn(

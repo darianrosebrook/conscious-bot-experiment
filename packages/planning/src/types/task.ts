@@ -87,6 +87,12 @@ export interface Task {
       reducerVersion?: string | null;
       dedupeNamespace?: string | null;
     };
+    /** Golden run linkage (observability only) */
+    goldenRun?: {
+      runId: string;
+      requestedAt?: number;
+      source?: string;
+    };
     /** Sub-task dedup key — executor-created subtasks use this for idempotency */
     subtaskKey?: string;
     /** Provenance trail: which builder/converter/source created this task */

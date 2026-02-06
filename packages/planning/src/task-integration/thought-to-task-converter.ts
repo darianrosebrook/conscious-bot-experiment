@@ -25,6 +25,7 @@ export type TaskDecision =
   | 'dropped_sterling_unavailable'
   | 'dropped_not_executable'
   | 'dropped_missing_digest'
+  | 'dropped_missing_schema_version'
   | 'management_applied'
   | 'management_needs_disambiguation'
   | 'management_failed'
@@ -155,6 +156,9 @@ function resolveReduction(thought: CognitiveStreamThought): {
   if (!result || typeof result.committed_ir_digest !== 'string' || !result.committed_ir_digest) {
     return { ok: false, decision: 'dropped_missing_digest', reason: 'committed_ir_digest missing' };
   }
+  if (typeof result.schema_version !== 'string' || !result.schema_version) {
+    return { ok: false, decision: 'dropped_missing_schema_version', reason: 'schema_version missing' };
+  }
   return { ok: true, decision: 'created', reason: 'sterling_executable', reduction };
 }
 
@@ -188,6 +192,9 @@ export async function convertThoughtToTask(
 
     const reductionCheck = resolveReduction(thought);
     if (!reductionCheck.ok) {
+      if (reductionCheck.decision === 'dropped_missing_schema_version') {
+        await deps.markThoughtAsProcessed(thought.id);
+      }
       return { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
     }
 
@@ -217,7 +224,7 @@ export async function convertThoughtToTask(
       };
     }
 
-    const schemaVersion = result.schema_version || 'unknown';
+    const schemaVersion = result.schema_version;
     const digestKey = `${schemaVersion}:${result.committed_ir_digest}`;
     if (isDigestDuplicate(digestKey)) {
       return { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
@@ -254,13 +261,14 @@ export async function convertThoughtToTask(
         childTaskIds: [],
         tags: ['cognitive', 'autonomous', thought.metadata.thoughtType],
         category: 'sterling_ir',
+        goldenRun: thought.metadata?.goldenRun,
         sterling: {
           committedIrDigest: result.committed_ir_digest,
           committedGoalPropId: result.committed_goal_prop_id ?? null,
           envelopeId: reduction.envelopeId ?? result.source_envelope_id ?? null,
-          schemaVersion: result.schema_version ?? null,
+          schemaVersion,
           reducerVersion: result.reducer_version ?? null,
-          dedupeNamespace: result.schema_version ?? null,
+          dedupeNamespace: schemaVersion,
         },
       },
     };

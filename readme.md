@@ -18,6 +18,19 @@ We propose and implement a unified cognitive architecture that integrates **embo
 
 The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With 11 core TypeScript packages, dependency-aware architecture, and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
 
+## Semantic Authority Boundary
+
+**Current rule of record:** TypeScript does not interpret meaning from text for routing or execution. Executable tasks require Sterling-provided provenance, and `sterling_ir` tasks route exclusively through digest expansion.
+
+Canonical boundary artifacts:
+- `docs/planning/sterling-boundary-contract.md`
+- `contracts/sterling-executor.yaml`
+
+Enforcement points in code:
+- `packages/planning/src/task-integration.ts`
+- `packages/planning/src/server/task-action-resolver.ts`
+- `packages/core/src/sterling/sterling-client.ts`
+
 ## Quick Start
 
 ### Prerequisites

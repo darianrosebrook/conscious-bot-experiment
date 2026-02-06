@@ -1,5 +1,9 @@
 # Session Summary: Keep-Alive Pipeline & End-to-End Bot Functionality
 
+> Status: Legacy (pre-Pattern-A). This summary reflects the goal-tag pipeline prior to Sterling
+> semantic authority. For current routing/execution rules, see
+> `docs/planning/sterling-boundary-contract.md` and `contracts/sterling-executor.yaml`.
+
 **Date**: 2026-02-03
 **Goal**: Restore end-to-end bot functionality through the keep-alive intention-check pipeline
 

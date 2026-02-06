@@ -155,6 +155,49 @@ export class SterlingReasoningService {
     return this.client;
   }
 
+  /**
+   * Materialize a committed IR digest into an opaque leaf-step bundle.
+   */
+  async expandByDigest(
+    request: {
+      committed_ir_digest: string;
+      schema_version: string;
+      request_id?: string;
+      envelope_id?: string;
+      client_trace_id?: string;
+      transport_context?: Record<string, unknown>;
+    },
+    timeoutMs: number = 5000,
+  ): Promise<
+    | {
+        status: 'ok';
+        plan_bundle_digest: string;
+        steps: Array<{
+          id?: string;
+          order?: number;
+          leaf: string;
+          args: Record<string, unknown>;
+          meta?: Record<string, unknown>;
+        }>;
+        schema_version?: string;
+      }
+    | { status: 'blocked'; blocked_reason: string; retry_after_ms?: number }
+    | { status: 'error'; error: string }
+  > {
+    if (!this.enabled) {
+      return { status: 'blocked', blocked_reason: 'blocked_executor_unavailable' };
+    }
+
+    try {
+      return await this.client.expandByDigest(request, timeoutMs);
+    } catch (err) {
+      return {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Reasoning Methods
   // --------------------------------------------------------------------------

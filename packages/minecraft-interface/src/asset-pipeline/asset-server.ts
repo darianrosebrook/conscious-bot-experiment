@@ -9,10 +9,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { createRequire } from 'module';
 import type { Request, Response, NextFunction, Router } from 'express';
 import { Router as ExpressRouter } from 'express';
 import { AssetPipeline } from './pipeline.js';
 import type { AssetServerOptions } from './types.js';
+
+const require = createRequire(import.meta.url);
 
 /**
  * Creates an Express middleware/router for serving generated Minecraft assets.
@@ -47,7 +50,23 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
     }
   }
 
-  const pvPublicDir = findPvPublicDir();
+  let pvPublicDir = findPvPublicDir();
+  if (pvPublicDir) {
+    const sentinelFiles = ['index.html', 'index.js', 'worker.js'];
+    const hasSentinel = sentinelFiles.some((file) =>
+      fs.existsSync(path.join(pvPublicDir, file))
+    );
+    if (!hasSentinel) {
+      console.warn(
+        `[asset-server] Prismarine viewer public dir missing sentinel files (${sentinelFiles.join(', ')}): ${pvPublicDir}`
+      );
+      pvPublicDir = null;
+    } else {
+      console.log(`[asset-server] Prismarine viewer public dir: ${pvPublicDir}`);
+    }
+  } else {
+    console.warn('[asset-server] Prismarine viewer public dir not found; bundled fallback disabled');
+  }
 
   /**
    * Serves a texture atlas PNG.
@@ -144,7 +163,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         console.log(`[asset-server] Auto-generating assets for ${version}...`);
 
         try {
-          await pipeline.generate(version);
+          await pipeline.generate(version, { ensureRawAssets: ['entity'] });
           generatingVersions.delete(version);
 
           if (fs.existsSync(paths.blockStatesPath)) {

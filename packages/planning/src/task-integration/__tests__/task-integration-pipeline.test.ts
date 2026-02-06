@@ -55,6 +55,20 @@ vi.mock('../../modules/cognition-outbox', () => ({
   },
 }));
 
+const { resolveRequirementSpy } = vi.hoisted(() => ({
+  resolveRequirementSpy: vi.fn(() => {
+    throw new Error('resolveRequirement should not be called for sterling_ir');
+  }),
+}));
+
+vi.mock('../../modules/requirements', async () => {
+  const actual = await vi.importActual<any>('../../modules/requirements');
+  return {
+    ...actual,
+    resolveRequirement: resolveRequirementSpy,
+  };
+});
+
 // Suppress global fetch calls (dashboard notify, etc.)
 const originalFetch = globalThis.fetch;
 beforeEach(() => {
@@ -62,12 +76,14 @@ beforeEach(() => {
 });
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  resolveRequirementSpy.mockClear();
 });
 
 import { TaskIntegration, canonicalizeIntentParams, type GoalBindingDriftEvent } from '../../task-integration';
 import type { Task } from '../../types/task';
 import type { RigGMetadata } from '../../constraints/execution-advisor';
 import type { RigGSignals } from '../../constraints/partial-order-plan';
+import { createMockSterlingService } from '../../sterling/__tests__/mock-sterling-service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,6 +105,36 @@ function makeTaskData(overrides: Partial<Task> = {}): Partial<Task> {
       childTaskIds: [],
       tags: [],
       category: 'general',
+    },
+    ...overrides,
+  };
+}
+
+function makeSterlingTask(overrides: Partial<Task> = {}): Partial<Task> {
+  return {
+    id: 'sterling-ir-1',
+    title: 'Sterling IR Task',
+    description: 'Sterling IR Task',
+    type: 'sterling_ir',
+    priority: 0.2,
+    urgency: 0.2,
+    status: 'pending',
+    source: 'autonomous',
+    steps: [],
+    parameters: {},
+    metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 3,
+      childTaskIds: [],
+      tags: [],
+      category: 'sterling_ir',
+      sterling: {
+        committedIrDigest: 'deadbeef',
+        schemaVersion: 'v1',
+        envelopeId: 'env_123',
+      },
     },
     ...overrides,
   };
@@ -230,6 +276,104 @@ describe('Rig E sentinel handling in addTask', () => {
     // The hasExecutableStep heuristic should NOT overwrite it.
     expect(task.metadata.blockedReason).toBe('rig_e_solver_unimplemented');
     expect(task.metadata.blockedReason).not.toBe('no-executable-plan');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sterling IR routing
+// ---------------------------------------------------------------------------
+
+describe('Sterling IR routing', () => {
+  let ti: TaskIntegration;
+  const originalStrict = process.env.STRICT_REQUIREMENTS;
+
+  beforeEach(() => {
+    process.env.STRICT_REQUIREMENTS = 'false';
+    ti = new TaskIntegration({
+      enableRealTimeUpdates: false,
+      enableProgressTracking: false,
+      enableTaskStatistics: false,
+      enableTaskHistory: false,
+    });
+  });
+
+  afterEach(() => {
+    process.env.STRICT_REQUIREMENTS = originalStrict;
+  });
+
+  it('bypasses resolveRequirement and materializes steps via Sterling executor', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_1',
+      steps: [{ leaf: 'dig_block', args: { blockType: 'oak_log' } }],
+      schema_version: 'v1',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const findSimilarSpy = vi.spyOn((ti as any).taskStore, 'findSimilarTask');
+    const created = await ti.addTask(makeSterlingTask());
+
+    expect(resolveRequirementSpy).not.toHaveBeenCalled();
+    expect(findSimilarSpy).not.toHaveBeenCalled();
+    expect(expandByDigest).toHaveBeenCalled();
+    expect(created.status).toBe('pending');
+    expect(created.steps.length).toBe(1);
+    expect(created.steps[0].meta?.leaf).toBe('dig_block');
+    expect((created.metadata as any).sterling?.exec?.planBundleDigest).toBe('bundle_1');
+  });
+
+  it('blocks when digest is missing', async () => {
+    const findSimilarSpy = vi.spyOn((ti as any).taskStore, 'findSimilarTask');
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'sterling_ir',
+        sterling: {
+          schemaVersion: 'v1',
+        },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_missing_digest');
+    expect(findSimilarSpy).not.toHaveBeenCalled();
+  });
+
+  it('propagates blocked reason from Sterling executor', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'blocked',
+      blocked_reason: 'blocked_digest_unknown',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const findSimilarSpy = vi.spyOn((ti as any).taskStore, 'findSimilarTask');
+    const created = await ti.addTask(makeSterlingTask());
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_digest_unknown');
+    expect(findSimilarSpy).not.toHaveBeenCalled();
+  });
+
+  it('marks executor error with blocked_executor_error and exec state error', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'error',
+      error: 'Sterling executor error',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask());
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_executor_error');
+    expect((created.metadata as any).sterling?.exec?.state).toBe('error');
   });
 });
 

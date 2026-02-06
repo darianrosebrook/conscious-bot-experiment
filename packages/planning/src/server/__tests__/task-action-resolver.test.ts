@@ -375,6 +375,23 @@ describe('task-action-resolver', () => {
         expect(result.failureCode).toContain('mapping_invalid:unknown_type');
       }
     });
+
+    it('rejects sterling_ir tasks explicitly', () => {
+      const task = {
+        id: 'sterling-ir-1',
+        title: 'Sterling IR Task',
+        type: 'sterling_ir',
+        parameters: {},
+        steps: [],
+      };
+
+      const result = resolveActionFromTask(task as any);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failureCode).toBe('mapping_invalid:sterling_ir');
+      }
+    });
   });
 
   describe('isMappingFailure helper', () => {

@@ -22,6 +22,7 @@ import type {
   EpisodeLinkage,
   EpisodeOutcomeClass,
   EpisodeAck,
+  SterlingReasoningService,
 } from './sterling';
 import { buildSterlingEpisodeLinkage, buildSterlingEpisodeLinkageFromResult } from './sterling';
 import { SOLVER_IDS } from './sterling/solver-ids';
@@ -48,6 +49,7 @@ import {
 import { TaskStore } from './task-integration/task-store';
 import { SterlingPlanner } from './task-integration/sterling-planner';
 import { convertThoughtToTask } from './task-integration/thought-to-task-converter';
+import { getGoldenRunRecorder } from './golden-run-recorder';
 import {
   TaskManagementHandler,
   type ManagementResult,
@@ -277,6 +279,7 @@ const PROPAGATED_META_KEYS = [
   'subtaskKey',
   'taskProvenance',
   'sterling',
+  'goldenRun',
 ] as const satisfies readonly (keyof Task['metadata'])[];
 
 /** Rate limiter for dev-only dropped-key warnings (one per key per session). */
@@ -548,6 +551,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private thoughtPollingInterval?: NodeJS.Timeout;
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
   private _inventoryProvider?: () => { items: any[]; ts: number } | undefined;
+  private sterlingExecutorService?: SterlingReasoningService;
 
   private thoughtPollInFlight = false;
   private seenThoughtIds = new Set<string>();
@@ -582,6 +586,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   getMcDataPublic(): any {
     return this.sterlingPlanner.getMcData();
+  }
+
+  setSterlingExecutorService(service: SterlingReasoningService | undefined): void {
+    this.sterlingExecutorService = service;
   }
 
   private getMcData(): any {
@@ -1527,6 +1535,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       this.notifyDashboard('taskAdded', task);
     }
 
+    const runId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
+    if (runId) {
+      const recorder = getGoldenRunRecorder();
+      const dedupeKey = getSterlingDedupeKeyFromMetadata(task.metadata);
+      recorder.recordTask(runId, {
+        task_id: task.id,
+        dedupe_key: dedupeKey,
+        status: task.status,
+      });
+    }
+
     return task;
   }
 
@@ -1864,6 +1883,135 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return result;
   }
 
+  private async materializeSterlingIrSteps(
+    taskData: Partial<Task>
+  ): Promise<
+    | { outcome: 'ok'; steps: TaskStep[]; planBundleDigest?: string; schemaVersion?: string; requestId: string }
+    | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
+    | { outcome: 'error'; error: string; requestId: string }
+  > {
+    const routingEnabled = process.env.STERLING_IR_ROUTING !== '0';
+    const requestId = `sterling_exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const runId = (taskData.metadata as any)?.goldenRun?.runId as string | undefined;
+    const recorder = runId ? getGoldenRunRecorder() : null;
+    const recordExpansion = (data: Record<string, unknown>) => {
+      if (!runId || !recorder) return;
+      recorder.recordExpansion(runId, data as any);
+    };
+    if (!routingEnabled) {
+      recordExpansion({ request_id: requestId, status: 'blocked', blocked_reason: 'blocked_routing_disabled' });
+      return { outcome: 'blocked', reason: 'blocked_routing_disabled', requestId };
+    }
+    const sterlingMeta = taskData.metadata?.sterling as
+      | { committedIrDigest?: string; schemaVersion?: string | null; envelopeId?: string | null }
+      | undefined;
+    const digest = sterlingMeta?.committedIrDigest;
+    if (!digest) {
+      recordExpansion({ request_id: requestId, status: 'blocked', blocked_reason: 'blocked_missing_digest' });
+      return { outcome: 'blocked', reason: 'blocked_missing_digest', requestId };
+    }
+    const schemaVersion = sterlingMeta?.schemaVersion ?? undefined;
+    if (!schemaVersion) {
+      recordExpansion({ request_id: requestId, status: 'blocked', blocked_reason: 'blocked_missing_schema_version' });
+      return { outcome: 'blocked', reason: 'blocked_missing_schema_version', requestId };
+    }
+    if (!this.sterlingExecutorService) {
+      recordExpansion({ request_id: requestId, status: 'blocked', blocked_reason: 'blocked_executor_unavailable' });
+      return { outcome: 'blocked', reason: 'blocked_executor_unavailable', requestId };
+    }
+
+    if (runId) {
+      console.log(
+        `[GoldenRun] Expansion request run_id=${runId} request_id=${requestId} digest=${digest.slice(0, 12)}`
+      );
+    }
+
+    const response = await this.sterlingExecutorService.expandByDigest(
+      {
+        committed_ir_digest: digest,
+        schema_version: schemaVersion,
+        request_id: requestId,
+        envelope_id: sterlingMeta?.envelopeId ?? undefined,
+      },
+      5000,
+    );
+
+    if (response.status === 'blocked') {
+      recordExpansion({
+        request_id: requestId,
+        status: 'blocked',
+        blocked_reason: response.blocked_reason || 'blocked_executor_unavailable',
+      });
+      return {
+        outcome: 'blocked',
+        reason: response.blocked_reason || 'blocked_executor_unavailable',
+        retryAfterMs: response.retry_after_ms,
+        requestId,
+      };
+    }
+
+    if (response.status === 'error') {
+      recordExpansion({
+        request_id: requestId,
+        status: 'error',
+        error: response.error || 'Sterling executor error',
+      });
+      return {
+        outcome: 'error',
+        error: response.error || 'Sterling executor error',
+        requestId,
+      };
+    }
+
+    if (!response.steps || response.steps.length === 0) {
+      recordExpansion({
+        request_id: requestId,
+        status: 'blocked',
+        blocked_reason: 'blocked_invalid_steps_bundle',
+      });
+      return {
+        outcome: 'blocked',
+        reason: 'blocked_invalid_steps_bundle',
+        requestId,
+      };
+    }
+
+    const steps: TaskStep[] = response.steps.map((step, index) => ({
+      id: step.id ?? `sterling-step-${index + 1}`,
+      label: step.id ? `Leaf: ${step.leaf}` : `Leaf: ${step.leaf}`,
+      done: false,
+      order: step.order ?? index + 1,
+      meta: {
+        ...(step.meta ?? {}),
+        leaf: step.leaf,
+        args: step.args,
+        executable: true,
+        authority: 'sterling',
+        source: 'sterling',
+      },
+    }));
+
+    recordExpansion({
+      request_id: requestId,
+      status: 'ok',
+      plan_bundle_digest: response.plan_bundle_digest,
+      schema_version: response.schema_version ?? schemaVersion,
+      steps: response.steps.map((step, index) => ({
+        id: step.id ?? `sterling-step-${index + 1}`,
+        leaf: step.leaf,
+        order: step.order ?? index + 1,
+      })),
+    });
+
+    return {
+      outcome: 'ok',
+      steps,
+      planBundleDigest: response.plan_bundle_digest,
+      schemaVersion: response.schema_version ?? schemaVersion,
+      requestId,
+    };
+  }
+
   async addTask(taskData: Partial<Task>): Promise<Task> {
     // Goal-sourced task interception: route through GoalResolver when enabled
     if (
@@ -1891,25 +2039,48 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     try {
-      const similarTask = this.taskStore.findSimilarTask(taskData);
-      if (similarTask) return similarTask;
+      if (taskData.type !== 'sterling_ir') {
+        const similarTask = this.taskStore.findSimilarTask(taskData);
+        if (similarTask) return similarTask;
+      }
 
     // Advisory actions are NL-parsed cognitive intent markers that cannot produce
     // deterministic requirementCandidate values. Skip step generation entirely —
     // they serve as observable markers, not executable plans.
     const isAdvisory = taskData.type === 'advisory_action';
+    const isSterlingIr = taskData.type === 'sterling_ir';
 
-    const stepResult = isAdvisory
-      ? { steps: [], noStepsReason: 'advisory-skip' as const, route: undefined }
-      : await this.sterlingPlanner.generateDynamicSteps(taskData);
-    const steps = stepResult.steps;
+    let stepResult:
+      | { steps: TaskStep[]; noStepsReason?: string; route?: { backend: string; requiredRig: string | null; reason: string } }
+      | undefined;
+    let steps: TaskStep[] = [];
+    let sterlingExpansion:
+      | { outcome: 'ok'; steps: TaskStep[]; planBundleDigest?: string; schemaVersion?: string; requestId: string }
+      | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
+      | { outcome: 'error'; error: string; requestId: string }
+      | undefined;
+
+    if (isAdvisory) {
+      stepResult = { steps: [], noStepsReason: 'advisory-skip' as const, route: undefined };
+      steps = [];
+    } else if (isSterlingIr) {
+      sterlingExpansion = await this.materializeSterlingIrSteps(taskData);
+      if (sterlingExpansion.outcome === 'ok') {
+        steps = sterlingExpansion.steps;
+      } else {
+        steps = [];
+      }
+    } else {
+      stepResult = await this.sterlingPlanner.generateDynamicSteps(taskData);
+      steps = stepResult.steps;
+    }
 
     // Detect blocked sentinel from solver (e.g., Rig E solver not implemented)
     const blockedSentinel =
-      steps.length === 1 && steps[0].meta?.blocked === true;
+      !isSterlingIr && steps.length === 1 && steps[0].meta?.blocked === true;
 
     // Resolve requirements for the task
-    const requirement = resolveRequirement(taskData);
+    const requirement = isSterlingIr ? null : resolveRequirement(taskData);
 
     // Normalize priority/urgency from string (e.g. intrusive thought: low/medium/high) to 0..1
     const priority = this.normalizePriorityOrUrgency(taskData.priority, 0.5);
@@ -1925,10 +2096,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       priority,
       urgency,
       progress: 0,
-      status: 'pending',
+      status: isSterlingIr && (!sterlingExpansion || sterlingExpansion.outcome !== 'ok')
+        ? 'pending_planning'
+        : 'pending',
       source: taskData.source || 'manual',
-      steps:
-        taskData.steps && taskData.steps.length > 0 ? taskData.steps : steps,
+      steps: isSterlingIr ? steps : (taskData.steps && taskData.steps.length > 0 ? taskData.steps : steps),
       parameters: taskData.parameters || {},
       metadata: {
         createdAt: Date.now(),
@@ -1962,7 +2134,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     // Store solve observability from step generation result
-    if (stepResult.noStepsReason) {
+    if (stepResult?.noStepsReason) {
       task.metadata.solver ??= {};
       task.metadata.solver.noStepsReason = stepResult.noStepsReason;
       task.metadata.solver.routeBackend = stepResult.route?.backend;
@@ -1972,7 +2144,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Invariant guard: internal sub-tasks MUST carry requirementCandidate.
     // advisory_action tasks are exempt — they intentionally skip step generation.
     if (
-      stepResult.noStepsReason === 'no-requirement' &&
+      stepResult?.noStepsReason === 'no-requirement' &&
       taskData.source === 'autonomous' &&
       !isAdvisory &&
       (taskData as any).metadata?.parentTaskId
@@ -1987,6 +2159,35 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Mark them blocked so the executor's eligibility filter skips them.
     if (isAdvisory) {
       applyTaskBlock(task, 'advisory_action');
+    }
+
+    if (isSterlingIr && sterlingExpansion) {
+      task.metadata.sterling ??= {};
+      (task.metadata.sterling as any).exec = {
+        requestId: sterlingExpansion.requestId,
+        status: sterlingExpansion.outcome,
+        state:
+          sterlingExpansion.outcome === 'ok'
+            ? 'expanded'
+            : sterlingExpansion.outcome === 'blocked'
+              ? 'blocked'
+              : 'error',
+        planBundleDigest: sterlingExpansion.outcome === 'ok' ? sterlingExpansion.planBundleDigest : undefined,
+        schemaVersion: sterlingExpansion.outcome === 'ok' ? sterlingExpansion.schemaVersion : undefined,
+        blockedReason: sterlingExpansion.outcome === 'blocked' ? sterlingExpansion.reason : undefined,
+        error: sterlingExpansion.outcome === 'error' ? sterlingExpansion.error : undefined,
+      };
+      if (sterlingExpansion.outcome === 'blocked') {
+        applyTaskBlock(task, sterlingExpansion.reason, {
+          status: 'pending_planning',
+          clearSteps: true,
+        });
+      } else if (sterlingExpansion.outcome === 'error') {
+        applyTaskBlock(task, 'blocked_executor_error', {
+          status: 'pending_planning',
+          clearSteps: true,
+        });
+      }
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
@@ -2243,6 +2444,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         stepId,
         step
       );
+      const runId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
+      if (runId) {
+        try {
+          const evidence = await this.buildGoldenRunVerificationEvidence(
+            taskId,
+            stepId,
+            step,
+            verification
+          );
+          getGoldenRunRecorder().recordVerification(runId, evidence);
+        } catch (error) {
+          console.warn('[GoldenRun] Failed to record verification evidence:', error);
+        }
+      }
       if (verification.status === 'failed') {
         console.warn(
           `⚠️ Step verification failed [${verification.status}]: ${step.label}`,
@@ -2573,6 +2788,115 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return setResult('failed', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  }
+
+  private async buildGoldenRunVerificationEvidence(
+    taskId: string,
+    stepId: string,
+    step: TaskStep,
+    verification: ActionVerification
+  ): Promise<{
+    status: 'verified' | 'failed' | 'skipped';
+    kind?: 'inventory_delta' | 'position_delta' | 'trace_only' | 'unknown';
+    detail?: Record<string, unknown>;
+  }> {
+    const { effectiveLeaf, effectiveArgs } = this.deriveLeafAndArgs(step);
+    const baseDetail: Record<string, unknown> = {
+      leaf: effectiveLeaf ?? null,
+      actualResult: verification.actualResult,
+    };
+
+    if (!effectiveLeaf) {
+      return { status: verification.status, kind: 'trace_only', detail: baseDetail };
+    }
+
+    const snapshot = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as
+      | StepSnapshot
+      | undefined;
+
+    const computeInventoryDelta = async (
+      itemId: string | null,
+      isMineStep: boolean
+    ): Promise<{
+      kind: 'inventory_delta';
+      detail: Record<string, unknown>;
+    }> => {
+      const inventory = await this.getInventoryItems();
+      const afterIdx = this.buildInventoryIndex(inventory);
+      const accepted = itemId
+        ? this.getInventoryNamesForVerification(itemId, isMineStep)
+        : [];
+      if (accepted.length > 0) {
+        const before = accepted.reduce(
+          (sum, name) => sum + (snapshot?.inventoryByName?.[name] ?? 0),
+          0
+        );
+        const after = accepted.reduce(
+          (sum, name) => sum + (afterIdx[name] ?? 0),
+          0
+        );
+        return {
+          kind: 'inventory_delta',
+          detail: {
+            ...baseDetail,
+            item: itemId,
+            acceptedNames: accepted,
+            before,
+            after,
+            delta: after - before,
+          },
+        };
+      }
+
+      const totalBefore = snapshot?.inventoryTotal ?? 0;
+      const totalAfter = Array.isArray(inventory)
+        ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
+        : 0;
+      return {
+        kind: 'inventory_delta',
+        detail: {
+          ...baseDetail,
+          item: itemId ?? 'any',
+          before: totalBefore,
+          after: totalAfter,
+          delta: totalAfter - totalBefore,
+        },
+      };
+    };
+
+    switch (effectiveLeaf) {
+      case 'acquire_material': {
+        const producedItem = (step.meta?.produces as any)?.[0]?.name;
+        const item = this.canonicalItemId(
+          effectiveArgs?.item ?? effectiveArgs?.blockType ?? producedItem ?? 'unknown'
+        );
+        const evidence = await computeInventoryDelta(item, true);
+        return { status: verification.status, ...evidence };
+      }
+      case 'craft_recipe': {
+        const producedItem = (step.meta?.produces as any)?.[0]?.name;
+        const item = this.canonicalItemId(
+          effectiveArgs?.recipe ?? producedItem ?? 'unknown'
+        );
+        const evidence = await computeInventoryDelta(item, false);
+        return { status: verification.status, ...evidence };
+      }
+      case 'smelt': {
+        const producedItem = (step.meta?.produces as any)?.[0]?.name;
+        const item = this.canonicalItemId(
+          producedItem ?? effectiveArgs?.item ?? 'unknown'
+        );
+        const evidence = await computeInventoryDelta(item, false);
+        return { status: verification.status, ...evidence };
+      }
+      case 'collect_items':
+      case 'pickup_item': {
+        const evidence = await computeInventoryDelta(null, false);
+        return { status: verification.status, ...evidence };
+      }
+      default:
+        return { status: verification.status, kind: 'trace_only', detail: baseDetail };
     }
   }
 

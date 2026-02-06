@@ -1,14 +1,2157 @@
 {
-  "generated": "2026-02-02T20:44:05.342192",
+  "generated": "2026-02-06T09:29:32.251189",
   "author": "@darianrosebrook",
-  "total_modules": 5,
+  "total_modules": 127,
   "modules": [
+    {
+      "path": "cognition/src/constitutional-filter/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Constitutional Filter System * * Provides ethical rules enforcement and norm compliance for agent behavior. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.206246",
+        "modified": "2025-08-21T11:10:01.206329",
+        "modified_days_ago": 168,
+        "lines": 12,
+        "size_bytes": 287,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Eval Harness \u2014 Main Entry Point * * This module provides the complete eval harness infrastructure for * evaluating thought generation against scenario suites. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:57:30.151396",
+        "modified": "2026-02-03T04:57:30.151502",
+        "modified_days_ago": 3,
+        "lines": 36,
+        "size_bytes": 1793,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Cognition Package * * Core cognitive capabilities including reasoning, internal dialogue, * creative problem solving, conversation management, reflection, * context optimization, and self-modeling. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.414355",
+        "modified": "2026-02-04T23:32:13.414538",
+        "modified_days_ago": 1,
+        "lines": 171,
+        "size_bytes": 4746,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusion-interface/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Intrusion Interface Module * * Exports for the intrusion interface system that handles external suggestions * with robust filtering and evaluation mechanisms. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.181534",
+        "modified": "2025-08-23T17:46:29.181653",
+        "modified_days_ago": 166,
+        "lines": 41,
+        "size_bytes": 951,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/keep-alive/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Keep-Alive Module \u2014 Main Entry Point * * Provides the keep-alive intention check loop for allowing * (but not compelling) goal emission during idle periods. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:03:05.448154",
+        "modified": "2026-02-03T05:03:05.448711",
+        "modified_days_ago": 3,
+        "lines": 73,
+        "size_bytes": 1558,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Language IO Boundary Module * * This module provides the TypeScript side of the Sterling Language IO boundary. * It constructs envelopes for Sterling to consume, extracts verbatim markers, * and handles Sterling responses. * * Key principle: TypeScript is an EVIDENCE EMITTER, not a semantic authority. * Sterling handles all semantic interpretation. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T08:45:06.894408",
+        "modified": "2026-02-04T08:48:58.528092",
+        "modified_days_ago": 1,
+        "lines": 111,
+        "size_bytes": 3615,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/reasoning-surface/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Reasoning Surface \u2014 Production API Boundary * * This module is the canonical boundary for thought processing logic. * Both production code and eval harness import from here, ensuring * they use identical code paths (LF-4).",
+      "classes": [],
+      "functions": [
+        "computeEligibility",
+        "processLLMOutputAsync",
+        "handleFallbackResult",
+        "mapSterlingResultToPipelineResult",
+        "processLLMOutput"
+      ],
+      "imports": [
+        "../types",
+        "./grounder",
+        "./eligibility",
+        "./grounder",
+        "./eligibility"
+      ],
+      "constants": [
+        "SURFACE_VERSION",
+        "SURFACE_DIGESTS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.416365",
+        "modified": "2026-02-04T23:32:13.416673",
+        "modified_days_ago": 1,
+        "lines": 427,
+        "size_bytes": 13762,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Routes barrel export.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:08:29.462544",
+        "modified": "2026-02-02T15:08:29.462642",
+        "modified_days_ago": 3,
+        "lines": 27,
+        "size_bytes": 1017,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Self-Model Module * * Manages the agent's identity, narrative continuity, and self-awareness. * Provides sophisticated identity tracking, narrative intelligence, and contract management. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.183627",
+        "modified": "2025-08-23T17:46:29.183717",
+        "modified_days_ago": 166,
+        "lines": 20,
+        "size_bytes": 612,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/server-utils/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Server utilities barrel export.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:04:29.106357",
+        "modified": "2026-02-02T15:04:29.106616",
+        "modified_days_ago": 3,
+        "lines": 34,
+        "size_bytes": 861,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/social-cognition/index.ts",
+      "name": "index.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Social Cognition Module * * Enables understanding, modeling, and interaction with other agents through * sophisticated theory of mind capabilities, relationship tracking, and social learning. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.184945",
+        "modified": "2025-08-23T17:46:29.185022",
+        "modified_days_ago": 166,
+        "lines": 17,
+        "size_bytes": 514,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* @conscious-bot/core - Foundational signal-driven control architecture * * Exports all core components for building cognitive agents with * real-time constraints and signal-driven behavior. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T01:26:09.468783",
+        "modified": "2026-02-02T19:27:56.300066",
+        "modified_days_ago": 3,
+        "lines": 262,
+        "size_bytes": 6365,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/leaves/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "* Leaf Implementations Index * * Exports all leaf implementations for Mineflayer bot operations * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 162 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:40.995377",
+        "modified": "2025-08-27T13:32:40.995618",
+        "modified_days_ago": 162,
+        "lines": 19,
+        "size_bytes": 364,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/mcp-capabilities/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* @conscious-bot/core/mcp-capabilities - Embodied action interface * * Exports all MCP Capabilities components for safe, structured Minecraft interactions * with constitutional oversight and performance monitoring. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "MCP_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.768838",
+        "modified": "2026-02-02T19:27:56.316376",
+        "modified_days_ago": 3,
+        "lines": 38,
+        "size_bytes": 1077,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/real-time/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "stable",
+      "description": "* @conscious-bot/core/real-time - Real-time performance monitoring * * Exports all real-time performance monitoring components for maintaining * responsive, predictable behavior under strict timing constraints. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "REALTIME_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T18:11:27.744268",
+        "modified": "2025-08-20T18:15:25.923014",
+        "modified_days_ago": 169,
+        "lines": 20,
+        "size_bytes": 603,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/sterling/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* Sterling reasoning client * * WebSocket client for connecting to Sterling's unified graph-search server.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T13:10:38.190199",
+        "modified": "2026-01-28T13:10:38.190304",
+        "modified_days_ago": 8,
+        "lines": 32,
+        "size_bytes": 785,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "core/src/tts/index.ts",
+      "name": "index.ts",
+      "category": "Shared utilities, TTS, API clients, base types",
+      "status": "active",
+      "description": "* TTS client * * Fire-and-forget text-to-speech via Kokoro-ONNX (optional sibling service).",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T01:26:02.219924",
+        "modified": "2026-02-02T01:26:02.220011",
+        "modified_days_ago": 4,
+        "lines": 8,
+        "size_bytes": 199,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/types/index.ts",
+      "name": "index.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "* Dashboard Types * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:20.868257",
+        "modified": "2026-02-05T19:34:23.801490",
+        "modified_days_ago": 0,
+        "lines": 389,
+        "size_bytes": 8701,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/curriculum/index.ts",
+      "name": "index.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "* Curriculum Module * * Exports for the curriculum system that handles progressive skill building, * regression testing, and ablation study coordination. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.459017",
+        "modified": "2025-08-23T17:46:29.459136",
+        "modified_days_ago": 166,
+        "lines": 75,
+        "size_bytes": 1626,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/index.ts",
+      "name": "index.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "* Evaluation Framework for Complex Multi-Step Reasoning * * Comprehensive evaluation system for testing HRM-inspired cognitive architecture * against complex reasoning scenarios across multiple domains * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createEvaluationFramework",
+        "quickEvaluate",
+        "batchEvaluate",
+        "generateEvaluationReport",
+        "evaluateCurriculumProgression"
+      ],
+      "imports": [],
+      "constants": [
+        "EVALUATION_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 114 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.459620",
+        "modified": "2025-10-14T18:12:41.676730",
+        "modified_days_ago": 114,
+        "lines": 372,
+        "size_bytes": 10458,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/index.ts",
+      "name": "index.ts",
+      "category": "Planning executor contracts",
+      "status": "active",
+      "description": "* @conscious-bot/executor-contracts * * Plan-Body Interface (PBI) contracts and runtime guards for reliable plan execution. * * This package provides the \"capability discipline\" that ensures plans reliably become * actions by enforcing strict contracts between planning and execution systems. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "healthCheck"
+      ],
+      "imports": [
+        "@conscious-bot/executor-contracts",
+        "@conscious-bot/executor-contracts"
+      ],
+      "constants": [
+        "VERSION",
+        "DESCRIPTION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T23:01:25.035629",
+        "modified": "2026-01-28T23:01:25.035781",
+        "modified_days_ago": 8,
+        "lines": 201,
+        "size_bytes": 5450,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "mcp-server/src/index.ts",
+      "name": "index.ts",
+      "category": "MCP server integration",
+      "status": "active",
+      "description": "* Conscious Bot MCP Server Package * * Exports the production-ready MCP server implementation. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T23:01:25.015195",
+        "modified": "2026-01-28T23:01:25.015300",
+        "modified_days_ago": 8,
+        "lines": 22,
+        "size_bytes": 690,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Episodic memory system exports. * * Provides comprehensive episodic memory functionality including * event logging, salience scoring, consolidation, retrieval, and narrative generation. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.461476",
+        "modified": "2025-08-23T17:46:29.461568",
+        "modified_days_ago": 166,
+        "lines": 35,
+        "size_bytes": 1227,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Enhanced Memory System with Vector Search + GraphRAG * * This package provides a comprehensive memory system combining: * - Enhanced vector search with PostgreSQL + pgvector * - GraphRAG for structured knowledge retrieval * - Hybrid search combining both approaches * - Intelligent chunking for optimal memory storage * - Multi-modal retrieval (temporal, spatial, semantic) * * Plus all existing...",
+      "classes": [],
+      "functions": [
+        "createDefaultMemorySystem",
+        "createCustomMemorySystem"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 91 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.097094",
+        "modified": "2025-11-06T22:46:48.090830",
+        "modified_days_ago": 91,
+        "lines": 157,
+        "size_bytes": 4884,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Provenance Memory System * * Provides decision tracking, evidence management, audit trails, * and explanation generation for accountability and transparency. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createProvenanceSystem"
+      ],
+      "imports": [
+        "./provenance-system"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.210734",
+        "modified": "2025-08-21T11:10:01.210840",
+        "modified_days_ago": 168,
+        "lines": 24,
+        "size_bytes": 619,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Semantic Memory System * * Provides knowledge graph storage, GraphRAG-first retrieval, * and relationship extraction for factual knowledge. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createSemanticMemory"
+      ],
+      "imports": [
+        "./knowledge-graph-core",
+        "./graph-rag",
+        "./relationship-extractor",
+        "./query-engine",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 158 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.064005",
+        "modified": "2025-08-31T11:04:13.064070",
+        "modified_days_ago": 158,
+        "lines": 44,
+        "size_bytes": 1209,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/skills/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Skills Module Index * * Exports the skill registry and related components * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 165 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-24T12:12:01.124057",
+        "modified": "2025-08-24T12:50:35.039092",
+        "modified_days_ago": 165,
+        "lines": 18,
+        "size_bytes": 314,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/index.ts",
+      "name": "index.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Working memory system exports. * * Provides working memory functionality including central executive, * context management, goal tracking, and attention management. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createWorkingMemory"
+      ],
+      "imports": [
+        "./central-executive",
+        "./context-manager",
+        "./goal-tracker",
+        "./attention-manager",
+        "./memory-integration"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.465842",
+        "modified": "2025-08-23T17:46:29.465956",
+        "modified_days_ago": 166,
+        "lines": 79,
+        "size_bytes": 2011,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/index.ts",
+      "name": "index.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "* Minecraft Asset Extraction Pipeline * * This pipeline extracts textures and blockStates directly from Minecraft JARs, * eliminating dependency on upstream `minecraft-assets` package updates.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "./asset-pipeline",
+        "express",
+        "./asset-pipeline"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T09:14:19.253943",
+        "modified": "2026-02-04T09:14:19.254081",
+        "modified_days_ago": 1,
+        "lines": 184,
+        "size_bytes": 4438,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/entity-belief/index.ts",
+      "name": "index.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T22:27:55.371249",
+        "modified": "2026-01-31T22:27:55.371324",
+        "modified_days_ago": 5,
+        "lines": 41,
+        "size_bytes": 844,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/extensions/index.ts",
+      "name": "index.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "stable",
+      "description": "* Extensions Index - Export all Mineflayer extension integrations * * This module provides access to all Mineflayer extensions that have been * integrated with our planning system while preserving emergent behavior. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 157 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-01T14:04:39.077752",
+        "modified": "2025-09-01T14:09:13.615825",
+        "modified_days_ago": 157,
+        "lines": 24,
+        "size_bytes": 628,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/index.ts",
+      "name": "index.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "* Minecraft Interface for Conscious Bot Planning System * * Main entry point for the Minecraft integration layer. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createMinecraftInterface",
+        "createMinecraftInterfaceWithoutConnect",
+        "runMinecraftScenario"
+      ],
+      "imports": [
+        "./bot-adapter",
+        "./observation-mapper",
+        "./action-translator",
+        "./plan-executor",
+        "./types",
+        "./plan-executor"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T17:15:37.463619",
+        "modified": "2026-02-05T19:34:23.863990",
+        "modified_days_ago": 0,
+        "lines": 193,
+        "size_bytes": 5237,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/reflex/index.ts",
+      "name": "index.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:32:09.975238",
+        "modified": "2026-01-31T20:32:09.975343",
+        "modified_days_ago": 5,
+        "lines": 12,
+        "size_bytes": 240,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/constraints/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Constraints Module \u2014 Partial-Order Plans, Feasibility, Linearization * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T16:02:46.624296",
+        "modified": "2026-02-01T16:02:46.624386",
+        "modified_days_ago": 4,
+        "lines": 61,
+        "size_bytes": 1421,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/goals/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Goal Binding Protocol \u2014 Public API * * Exports the full goal-binding subsystem for use by other packages. * * @see docs/internal/goal-binding-protocol.md",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T01:08:19.712410",
+        "modified": "2026-02-02T01:08:19.712542",
+        "modified_days_ago": 4,
+        "lines": 68,
+        "size_bytes": 3894,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/hierarchical/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Hierarchical Planning Module \u2014 Macro/Micro Planning (Rig E) * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T15:59:50.556116",
+        "modified": "2026-02-01T15:59:50.556208",
+        "modified_days_ago": 4,
+        "lines": 62,
+        "size_bytes": 1474,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/hierarchical-planner/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Hierarchical Planning Module * * Retains CognitiveTaskRouter for task routing decisions. * Legacy planners (HRM, HTN, IntegratedPlanningSystem) have been retired. * New hierarchical macro/micro planning lives in ../hierarchical/. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T01:50:00.243241",
+        "modified": "2026-02-01T01:50:00.243342",
+        "modified_days_ago": 5,
+        "lines": 34,
+        "size_bytes": 948,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Planning and goal management system for conscious bot * * This package provides: * - Goal formulation and homeostasis monitoring * - Cognitive task routing * - Sterling solver integration (crafting, building, tool progression) * - Reactive execution with safety reflexes * - Capability-aware action plan routing * * Legacy planners (HRM, GOAP planTo, HTN decompose, IntegratedPlanningCoordinator)...",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:23:26.980119",
+        "modified": "2026-02-01T03:03:40.703591",
+        "modified_days_ago": 5,
+        "lines": 133,
+        "size_bytes": 3740,
+        "author": "@darianrose",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/interfaces/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Planning interfaces for dependency injection * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T16:13:39.294844",
+        "modified": "2026-02-01T03:03:40.653589",
+        "modified_days_ago": 5,
+        "lines": 9,
+        "size_bytes": 262,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Planning server modules: Sterling bootstrap, cognitive task handling, * and autonomous executor scheduling. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:55:40.902364",
+        "modified": "2026-02-02T20:55:40.902472",
+        "modified_days_ago": 3,
+        "lines": 45,
+        "size_bytes": 992,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Skill Integration Module - Exports skill-related planning components * * Legacy exports removed: * - HybridSkillPlanner, HybridPlanningContext, HybridPlan, PlanningDecision \u2014 deleted * - integration-example, comprehensive-integration-example \u2014 deleted * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:23:46.076895",
+        "modified": "2026-02-01T03:03:40.703398",
+        "modified_days_ago": 5,
+        "lines": 51,
+        "size_bytes": 1511,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Sterling reasoning integration for planning",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T03:02:43.202955",
+        "modified": "2026-02-03T03:02:43.203126",
+        "modified_days_ago": 3,
+        "lines": 268,
+        "size_bytes": 7251,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/primitives/p03/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* P03 Primitive Capsule \u2014 Temporal Planning with Durations, Batching, Capacity",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T03:43:43.381734",
+        "modified": "2026-02-01T03:43:43.381863",
+        "modified_days_ago": 5,
+        "lines": 68,
+        "size_bytes": 1487,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/primitives/p21/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T00:24:36.425010",
+        "modified": "2026-02-01T00:24:36.425132",
+        "modified_days_ago": 5,
+        "lines": 42,
+        "size_bytes": 921,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/task-integration/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Task integration submodules: thought-to-task conversion, task store, Sterling planner. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.369773",
+        "modified": "2026-02-04T23:32:13.369992",
+        "modified_days_ago": 1,
+        "lines": 25,
+        "size_bytes": 618,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/temporal/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Temporal Planning \u2014 Integration Seam * * Capsule-driven temporal utilities for Rig C. All temporal logic * delegates to an injected P03TemporalAdapter \u2014 the same adapter * proven by conformance tests. * * No new temporal types are invented here. All state representations * use P03 capsule types from sterling/primitives/p03/.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T04:47:47.582304",
+        "modified": "2026-02-01T04:47:47.582442",
+        "modified_days_ago": 5,
+        "lines": 72,
+        "size_bytes": 1709,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/types/index.ts",
+      "name": "index.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Types index - exports all types from the planning package * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T19:10:05.284413",
+        "modified": "2026-02-01T03:03:40.177114",
+        "modified_days_ago": 5,
+        "lines": 10,
+        "size_bytes": 226,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "safety/src/fail-safes/index.ts",
+      "name": "index.ts",
+      "category": "Safety checks and guards",
+      "status": "stable",
+      "description": "* Fail-Safes Module - Comprehensive Safety and Recovery Systems * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "FAIL_SAFES_MODULE_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T21:02:16.483933",
+        "modified": "2025-08-20T21:02:17.244708",
+        "modified_days_ago": 169,
+        "lines": 19,
+        "size_bytes": 504,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "safety/src/index.ts",
+      "name": "index.ts",
+      "category": "Safety checks and guards",
+      "status": "stable",
+      "description": "* @conscious-bot/safety - Safety and monitoring systems * * Exports all safety-related components for comprehensive safety assurance * including monitoring, privacy protection, and fail-safe mechanisms. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "SAFETY_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.493727",
+        "modified": "2025-08-23T17:46:29.493829",
+        "modified_days_ago": 166,
+        "lines": 27,
+        "size_bytes": 713,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "safety/src/monitoring/index.ts",
+      "name": "index.ts",
+      "category": "Safety checks and guards",
+      "status": "stable",
+      "description": "* @conscious-bot/safety/monitoring - Comprehensive safety monitoring system * * Exports all safety monitoring components for real-time telemetry collection, * health monitoring, anomaly detection, and alerting. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T19:50:36.418998",
+        "modified": "2025-08-20T20:13:31.620156",
+        "modified_days_ago": 169,
+        "lines": 16,
+        "size_bytes": 517,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "safety/src/privacy/index.ts",
+      "name": "index.ts",
+      "category": "Safety checks and guards",
+      "status": "stable",
+      "description": "* Privacy Module - Data Protection and Server Safety Compliance * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "PRIVACY_MODULE_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T20:47:58.298961",
+        "modified": "2025-08-20T20:52:33.507153",
+        "modified_days_ago": 169,
+        "lines": 33,
+        "size_bytes": 742,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "testkits/src/index.ts",
+      "name": "index.ts",
+      "category": "P03/P21 conformance suites",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T03:38:02.778322",
+        "modified": "2026-02-01T03:38:02.778763",
+        "modified_days_ago": 5,
+        "lines": 36,
+        "size_bytes": 783,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "testkits/src/p03/index.ts",
+      "name": "index.ts",
+      "category": "P03/P21 conformance suites",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T03:35:50.084724",
+        "modified": "2026-02-01T03:35:50.084822",
+        "modified_days_ago": 5,
+        "lines": 4,
+        "size_bytes": 183,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "testkits/src/p21/index.ts",
+      "name": "index.ts",
+      "category": "P03/P21 conformance suites",
+      "status": "active",
+      "description": "",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T03:09:50.950938",
+        "modified": "2026-02-01T03:09:50.951069",
+        "modified_days_ago": 5,
+        "lines": 39,
+        "size_bytes": 1160,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "world/src/index.ts",
+      "name": "index.ts",
+      "category": "World state, observation queue",
+      "status": "stable",
+      "description": "* @conscious-bot/world - World sensing, navigation, and embodied interaction * * Exports all world-related components for embodied cognition including * visible-only sensing, spatial navigation, and sensorimotor integration. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "WORLD_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.503326",
+        "modified": "2025-08-23T17:46:29.503470",
+        "modified_days_ago": 166,
+        "lines": 99,
+        "size_bytes": 2971,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "world/src/navigation/index.ts",
+      "name": "index.ts",
+      "category": "World state, observation queue",
+      "status": "stable",
+      "description": "* @conscious-bot/world/navigation - D* Lite pathfinding system * * Exports all navigation-related components for intelligent pathfinding * with dynamic replanning and environmental hazard awareness. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T19:14:57.577851",
+        "modified": "2025-08-20T19:19:30.540478",
+        "modified_days_ago": 169,
+        "lines": 17,
+        "size_bytes": 539,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "world/src/perception/index.ts",
+      "name": "index.ts",
+      "category": "World state, observation queue",
+      "status": "stable",
+      "description": "* @conscious-bot/world/perception - Advanced visual perception system * * Exports all perception-related components for human-like visual processing * including field of view management, object recognition, and confidence tracking. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T18:59:25.290511",
+        "modified": "2025-08-20T19:01:37.961963",
+        "modified_days_ago": 169,
+        "lines": 17,
+        "size_bytes": 595,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "world/src/place-graph/index.ts",
+      "name": "index.ts",
+      "category": "World state, observation queue",
+      "status": "stable",
+      "description": "* Place Graph System * * Provides spatial memory, navigation, and location-based memory organization. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "createPlaceGraph"
+      ],
+      "imports": [
+        "./place-graph-core",
+        "./place-memory",
+        "./spatial-navigator"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.216791",
+        "modified": "2025-08-21T11:10:01.216882",
+        "modified_days_ago": 168,
+        "lines": 31,
+        "size_bytes": 766,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "world/src/sensorimotor/index.ts",
+      "name": "index.ts",
+      "category": "World state, observation queue",
+      "status": "stable",
+      "description": "* @conscious-bot/world/sensorimotor - Embodied motor control system * * Exports all sensorimotor-related components for embodied intelligence * with real-time motor control and sensory feedback integration. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 169 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-20T19:26:35.147031",
+        "modified": "2025-08-20T19:31:47.386621",
+        "modified_days_ago": 169,
+        "lines": 16,
+        "size_bytes": 516,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
     {
       "path": "cognition/src/audit/thought-action-audit-logger.ts",
       "name": "thought-action-audit-logger.ts",
       "category": "LLM integration, thought processing, intent extraction, cognitive stream",
       "status": "active",
-      "description": "* Thought-to-Action Audit Logger * * Captures the complete pipeline from need identification through action execution * for debugging and validation purposes. * * @author @darianrosebrook",
+      "description": "Implements detailed audit logging of the thought process in the cognition module. Tracks each stage from need identification to action completion in every session. Provides structured logs for debugging and analyzing the bot's decision pipeline.",
       "classes": [
         "ThoughtActionAuditLogger"
       ],
@@ -38,7 +2181,7 @@
       "archive_reasons": [],
       "metadata": {
         "created": "2025-10-01T21:25:28.826685",
-        "modified": "2026-02-02T18:52:07.219447",
+        "modified": "2026-02-05T19:34:23.856788",
         "modified_days_ago": 0,
         "lines": 449,
         "size_bytes": 12524,
@@ -51,7 +2194,7 @@
       "name": "bot-state-cache.ts",
       "category": "LLM integration, thought processing, intent extraction, cognitive stream",
       "status": "active",
-      "description": "* Bot State Cache \u2014 Cognition-Side Versioned State Singleton * * The periodic thought loop already fetches GET /state from minecraft-interface * every 60s and constructs ThoughtContext.currentState. This module promotes that * to a module-level versioned cache so all cognition surfaces (social chat, etc.) * can read grounded state without additional HTTP calls.",
+      "description": "state management module that maintains a versioned, time-stamped, and immutable currentState for the cognition layer, ensuring consistent access across all bot surface interactions without additional network calls.",
       "classes": [],
       "functions": [
         "buildInventoryMap",
@@ -86,7 +2229,7 @@
       "metadata": {
         "created": "2026-02-02T01:05:06.797038",
         "modified": "2026-02-02T01:05:06.797217",
-        "modified_days_ago": 0,
+        "modified_days_ago": 4,
         "lines": 162,
         "size_bytes": 5580,
         "author": null,
@@ -98,7 +2241,7 @@
       "name": "cognition-state.ts",
       "category": "LLM integration, thought processing, intent extraction, cognitive stream",
       "status": "active",
-      "description": "* Cognition Mutable State Container * * Replaces closure-scoped mutable variables with an explicit state * object. Server.ts creates a single instance and passes specific * fields by reference or via accessor functions to router factories.",
+      "description": "Provides and manages the mutable state for cognitive operations in the conscious-bot LLM integration. Initializes key fields such as cognitiveThoughts, spawnPosition, and ttsEnabled via createInitialState. Ensures the state is safely passed and updated throughout the cognitive stream.",
       "classes": [],
       "functions": [
         "createInitialState"
@@ -124,10 +2267,51 @@
       "metadata": {
         "created": "2026-02-02T16:17:12.802059",
         "modified": "2026-02-02T16:17:12.802183",
-        "modified_days_ago": 0,
+        "modified_days_ago": 3,
         "lines": 40,
         "size_bytes": 1301,
         "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/chat-formatting.ts",
+      "name": "chat-formatting.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides text cleanup functions for chat output formatting in the cognitive module of conscious-bot. Strips protocol markers and enforces character limits without semantic analysis. Normalizes whitespace and ensures responses comply with boundary rules for structured chat content.",
+      "classes": [],
+      "functions": [
+        "stripProtocolMarkers",
+        "normalizeWhitespace",
+        "formatForDisplay",
+        "formatForChat"
+      ],
+      "imports": [],
+      "constants": [
+        "CHAT_MAX_CHARS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.413152",
+        "modified": "2026-02-04T23:32:13.413318",
+        "modified_days_ago": 1,
+        "lines": 115,
+        "size_bytes": 3530,
+        "author": "@darianrosebrook",
         "has_main": false
       }
     },
@@ -136,7 +2320,7 @@
       "name": "context-optimizer.ts",
       "category": "LLM integration, thought processing, intent extraction, cognitive stream",
       "status": "stable",
-      "description": "* Context optimization system for advanced memory integration. * * Provides sophisticated context building, memory retrieval, * and token optimization for LLM interactions. * * @author @darianrosebrook",
+      "description": "Implements context optimization by integrating and prioritizing memory retrieval, synthesizing relevant context across modules, and applying token and compression strategies to enhance LLM input context for efficient reasoning in the conscious-bot framework.",
       "classes": [
         "ContextOptimizer"
       ],
@@ -156,7 +2340,7 @@
       "staleness_level": "stable",
       "staleness_score": 0.2,
       "staleness_indicators": [
-        "Not modified in 133 days (over 3 months)"
+        "Not modified in 137 days (over 3 months)"
       ],
       "recommendation": "Stable - monitor for relevance",
       "archive_candidate": false,
@@ -164,7 +2348,7 @@
       "metadata": {
         "created": "2025-08-23T17:46:29.179689",
         "modified": "2025-09-22T00:32:55.013544",
-        "modified_days_ago": 133,
+        "modified_days_ago": 137,
         "lines": 612,
         "size_bytes": 17420,
         "author": "@darianrosebrook",
@@ -197,7 +2381,7 @@
       "staleness_level": "stable",
       "staleness_score": 0.2,
       "staleness_indicators": [
-        "Not modified in 133 days (over 3 months)"
+        "Not modified in 137 days (over 3 months)"
       ],
       "recommendation": "Stable - monitor for relevance",
       "archive_candidate": false,
@@ -205,9 +2389,2609 @@
       "metadata": {
         "created": "2025-08-23T17:46:29.179885",
         "modified": "2025-09-22T00:32:56.915086",
-        "modified_days_ago": 133,
+        "modified_days_ago": 137,
         "lines": 718,
         "size_bytes": 18426,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/creative-solver.ts",
+      "name": "creative-solver.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements creative problem-solving with analogical reasoning, constraint relaxation, and solution generation using the LLM interface. Integrates domain knowledge and maintains a solution history for traceable, adaptive responses. Enables customizable configuration for controlling analogy use, relaxation depth, and solution diversity.",
+      "classes": [
+        "CreativeProblemSolver"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T20:13:39.037954",
+        "modified": "2026-01-28T20:13:39.038069",
+        "modified_days_ago": 8,
+        "lines": 610,
+        "size_bytes": 17156,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/emotional-memory-llm-adapter.ts",
+      "name": "emotional-memory-llm-adapter.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Contextualizes LLM responses with the bot's emotional memory and self-narrative, enhancing outputs by considering accumulated emotional experiences and identity-aware factors during reasoning. Integrates emotional state, recent experiences, and identity reinforcement into the cognitive stream. Allows controlled application of emotional focus via configuration.",
+      "classes": [
+        "EmotionalMemoryLLMAdapter",
+        "if",
+        "close"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T20:13:35.847744",
+        "modified": "2026-01-28T20:13:35.847853",
+        "modified_days_ago": 8,
+        "lines": 819,
+        "size_bytes": 23522,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/internal-dialogue.ts",
+      "name": "internal-dialogue.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements internal thought generation for consciousness-like self-reflection within the cognitive module of conscious-bot. Evaluates triggers and constructs a context-rich stream of InternalThought objects using the LLM interface. Maintains a bounded queue of thoughts and updates the cognitive state during processing.",
+      "classes": [
+        "InternalDialogue"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T13:40:46.643508",
+        "modified": "2026-02-01T03:03:40.653133",
+        "modified_days_ago": 5,
+        "lines": 536,
+        "size_bytes": 14870,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/llm-interface.ts",
+      "name": "llm-interface.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "with a clean text interface, provides safe text preprocessing to strip guillemets and prevent prompt injection attacks in the cognitive stream.",
+      "classes": [
+        "LLMInterface"
+      ],
+      "functions": [
+        "stripGuillemets"
+      ],
+      "imports": [
+        "../types",
+        "../bot-state-cache",
+        "../server-utils/tts-usable-content",
+        "./chat-formatting",
+        "./llm-output-reducer"
+      ],
+      "constants": [
+        "INV_HARD_CAP"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.413467",
+        "modified": "2026-02-05T19:34:23.863830",
+        "modified_days_ago": 0,
+        "lines": 786,
+        "size_bytes": 27193,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/llm-output-reducer.ts",
+      "name": "llm-output-reducer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements the LLM output reduction to assemble raw LLM responses into Sterling envelopes, ensuring strict adherence to the semantic boundary by mapping errors and attaching provenance before forwarding to downstream components.",
+      "classes": [
+        "ReductionError"
+      ],
+      "functions": [
+        "isReduceError",
+        "hashForLogging",
+        "reduceRawLLMOutput",
+        "logReduction",
+        "createMockReductionResult"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.414097",
+        "modified": "2026-02-04T23:32:13.414255",
+        "modified_days_ago": 1,
+        "lines": 297,
+        "size_bytes": 9652,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/memory-aware-llm.ts",
+      "name": "memory-aware-llm.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Provides a memory-aware LLM interaction layer that enables retrieval, storage, and recall of cognitive patterns during thought processing in the conscious-bot architecture.",
+      "classes": [
+        "MemoryAwareLLMInterface"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface",
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T14:09:29.108291",
+        "modified": "2025-10-02T00:13:02.109646",
+        "modified_days_ago": 127,
+        "lines": 902,
+        "size_bytes": 25285,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/reflection-engine.ts",
+      "name": "reflection-engine.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Analysis module within the cognitive architecture of conscious-bot, processes recent experiences to extract actionable insights and identify recurring patterns for intent refinement. Utilizes ExperienceAnalysis and Pattern detection to support continuous self-improvement and learning synthesis. Drives adaptive thought evolution by storing and evaluating reflection data in the cognitive stream.",
+      "classes": [
+        "AdvancedReflectionEngine"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.180440",
+        "modified": "2025-08-23T17:46:29.180563",
+        "modified_days_ago": 166,
+        "lines": 773,
+        "size_bytes": 21275,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-metrics-tracker.ts",
+      "name": "cognitive-metrics-tracker.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "CognitiveMetricsTracker maintains and reports key performance metrics for the conscious-bot's cognitive processes. It tracks optimizations, conversations, solutions generated, violations blocked, and intrusions handled. The class provides counters, increments, and a reset method to monitor system efficiency.",
+      "classes": [
+        "CognitiveMetricsTracker"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:02:24.456740",
+        "modified": "2026-02-02T15:02:24.457044",
+        "modified_days_ago": 3,
+        "lines": 74,
+        "size_bytes": 1636,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-state-tracker.ts",
+      "name": "cognitive-state-tracker.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements conversation and operation logging in the cognitive-bot architecture. Maintains a set of active conversations and an array of recent operations with metrics such as cognitive load and attention level. Provides methods to start, end conversations and track system activity for audit and process monitoring.",
+      "classes": [
+        "CognitiveStateTracker"
+      ],
+      "functions": [],
+      "imports": [
+        "./cognitive-metrics-tracker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:02:45.520093",
+        "modified": "2026-02-02T15:02:45.520236",
+        "modified_days_ago": 3,
+        "lines": 214,
+        "size_bytes": 6248,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-stream-logger.ts",
+      "name": "cognitive-stream-logger.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "API logging service within the cognitive-bot package, forwards structured cognition events and metadata to the dashboard for real-time monitoring and analysis of the bot's thoughts and intent tracking.  Handles JSON payload formatting and integrates with the cognitive stream endpoint for secure, centralized logging.  Enables traceability of the cognitive process for debugging and safety evaluation.",
+      "classes": [
+        "CognitiveStreamLogger"
+      ],
+      "functions": [],
+      "imports": [
+        "@conscious-bot/core",
+        "./server-utils/server-logger"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:02:19.551876",
+        "modified": "2026-02-04T10:13:46.797570",
+        "modified_days_ago": 1,
+        "lines": 200,
+        "size_bytes": 5712,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/config/llm-token-config.ts",
+      "name": "llm-token-config.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Recommended maxTokens and temperature per LLM call source. * Tuned for latency vs quality: lower maxTokens = faster MLX responses. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "getLLMConfig"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T17:50:14.233771",
+        "modified": "2026-02-01T03:03:40.703374",
+        "modified_days_ago": 5,
+        "lines": 47,
+        "size_bytes": 1560,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/constitutional-filter/constitutional-filter.ts",
+      "name": "constitutional-filter.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Use LLM-generated proposals to evaluate actions, goals, and messages against constitutional rules via RulesEngine, returning compliance results and optional explanations. Implements strict, standard, and advisory enforcement levels with real-time monitoring for norm drift. Central to ethical decision-making in the cognitive stream.",
+      "classes": [
+        "ConstitutionalFilter"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./rules-database",
+        "./rules-engine"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.180670",
+        "modified": "2025-08-23T17:46:29.180797",
+        "modified_days_ago": 166,
+        "lines": 767,
+        "size_bytes": 24158,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/constitutional-filter/rules-database.ts",
+      "name": "rules-database.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Constitutional rules database. * * Manages the storage, retrieval, and versioning of constitutional rules * that govern agent behavior and decision-making. * * @author @darianrosebrook",
+      "classes": [
+        "RulesDatabase"
+      ],
+      "functions": [
+        "getCoreRules"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.206361",
+        "modified": "2025-08-21T11:10:01.206467",
+        "modified_days_ago": 168,
+        "lines": 481,
+        "size_bytes": 15477,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/constitutional-filter/rules-engine.ts",
+      "name": "rules-engine.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "rules engine evaluates user actions, goals, and messages against the conscious-bot's constitutional rules and conflict resolution strategies, ensuring ethical compliance and safety; it utilizes a RulesDatabase for rule retrieval and optionally an LLMInterface for advanced assessments; tracks reasoning traces and logging for auditability.",
+      "classes": [
+        "RulesEngine"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./rules-database"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.206501",
+        "modified": "2025-08-21T11:10:01.206628",
+        "modified_days_ago": 168,
+        "lines": 726,
+        "size_bytes": 21689,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/constitutional-filter/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Provides type definitions for constitutional filtering rules used by the cognitive module in the conscious-bot framework for LLM command filtering and intent enforcement.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 33,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/cognition/src/constitutional-filter/types.ts"
+          },
+          {
+            "line_number": 45,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/cognition/src/constitutional-filter/types.ts"
+          },
+          {
+            "line_number": 55,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/cognition/src/constitutional-filter/types.ts"
+          },
+          {
+            "line_number": 156,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/cognition/src/constitutional-filter/types.ts"
+          },
+          {
+            "line_number": 192,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/cognition/src/constitutional-filter/types.ts"
+          }
+        ]
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.206703",
+        "modified": "2025-09-22T00:34:31.837933",
+        "modified_days_ago": 137,
+        "lines": 299,
+        "size_bytes": 6975,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/environmental/observation-reasoner.ts",
+      "name": "observation-reasoner.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements a structured ObservationPayload type for the cognitive stream, integrating entity and event snapshots with spatial data for LLM input, Enables the LLM to process recent observations, optionally enriched with entity/event details,",
+      "classes": [
+        "ObservationReasoner"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "../config/llm-token-config",
+        "zod",
+        "../audit/thought-action-audit-logger",
+        "../stress-boundary-logger",
+        "../interoception-store",
+        "../stress-axis-computer"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:18:55.045842",
+        "modified": "2026-02-02T19:27:56.325432",
+        "modified_days_ago": 3,
+        "lines": 455,
+        "size_bytes": 14621,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/environmental/saliency-reasoner.ts",
+      "name": "saliency-reasoner.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides saliency-based reasoning over entity tracks. Maintains a cognition-side view by applying and comparing saliency deltas with existing track summaries. Enables the cognitive module to reclassify or flag unknown entities while supporting awareness updates without LLM involvement.",
+      "classes": [],
+      "functions": [
+        "cleanupOldAwareness",
+        "shouldEmitAwareness",
+        "createSaliencyReasonerState",
+        "applySaliencyEnvelope",
+        "applyDelta",
+        "generateAwarenessThought",
+        "hasSignificantThreat",
+        "generateThreatResponse"
+      ],
+      "imports": [],
+      "constants": [
+        "AWARENESS_DEDUP_WINDOW_MS",
+        "MAX_SUPERSEDED_STREAMS_PER_BOT"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T03:51:08.519981",
+        "modified": "2026-02-03T03:51:08.520120",
+        "modified_days_ago": 3,
+        "lines": 394,
+        "size_bytes": 11862,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/eval-orchestrator.ts",
+      "name": "eval-orchestrator.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "EvalOrchestrator in the cognition module orchestrates LLM-based eval runs by initializing the reasoning surface and emitting structured event payloads to track evaluation progress and results. It configures each eval session with the current state and invokes the production LF-4 code for scoring and summary extraction. The orchestrator compiles input scenarios and aggregates evaluation outputs into results bundles for downstream analysis.",
+      "classes": [],
+      "functions": [
+        "defaultLLMGenerator",
+        "runEval",
+        "runScenario",
+        "buildPrompt"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "./scenario-loader",
+        "./event-emitter",
+        "./metrics-collector",
+        "./frame-profiles",
+        "./sampler-profiles",
+        "./result-bundle"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:57:18.738567",
+        "modified": "2026-02-03T04:57:18.738682",
+        "modified_days_ago": 3,
+        "lines": 507,
+        "size_bytes": 15720,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/event-emitter.ts",
+      "name": "event-emitter.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a TypeScript event emitter for the cognition module, logging eval run lifecycle events to events.jsonl according to the official conscious-bot schema. Ensures centralized and authoritative tracking of evaluation processes for consistency and auditability.",
+      "classes": [
+        "EvalEventEmitter"
+      ],
+      "functions": [
+        "buildSuiteLoadedPayload",
+        "buildSuiteInvalidPayload",
+        "buildProductionSurfacePayload",
+        "buildScenarioStartedPayload",
+        "buildScenarioResultPayload",
+        "buildModePayload"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:54:48.820785",
+        "modified": "2026-02-03T04:54:48.820915",
+        "modified_days_ago": 3,
+        "lines": 313,
+        "size_bytes": 7551,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/frame-profiles.ts",
+      "name": "frame-profiles.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides predefined frame profile configurations for the cognition module.",
+      "classes": [],
+      "functions": [
+        "getFrameProfile",
+        "isValidFrameProfile",
+        "getFrameProfileNames",
+        "getFrameProfileSummary"
+      ],
+      "imports": [
+        "../../reasoning-surface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:54:01.418993",
+        "modified": "2026-02-03T04:54:01.419101",
+        "modified_days_ago": 3,
+        "lines": 79,
+        "size_bytes": 2006,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/metrics-collector.ts",
+      "name": "metrics-collector.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements collects and aggregates per-scenario metrics for the cognition module's evaluation harness, tracking action_taken, grounding_pass, repetition, and anchoring_ratio for each evaluation run.",
+      "classes": [
+        "MetricsCollector"
+      ],
+      "functions": [
+        "countAvailableFacts"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:55:55.134686",
+        "modified": "2026-02-03T04:55:55.134988",
+        "modified_days_ago": 3,
+        "lines": 354,
+        "size_bytes": 11014,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/result-bundle.ts",
+      "name": "result-bundle.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Result Bundle for Eval Harness * * Creates content-addressed result bundles for eval runs. * Bundle IDs are deterministic based on content, not timestamps. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "computeBundleId",
+        "createResultBundle",
+        "generateRunId",
+        "buildOutputDir"
+      ],
+      "imports": [
+        "crypto",
+        "fs",
+        "path",
+        "./metrics-collector"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:10:17.963344",
+        "modified": "2026-02-03T05:10:17.963538",
+        "modified_days_ago": 3,
+        "lines": 187,
+        "size_bytes": 5484,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/sampler-profiles.ts",
+      "name": "sampler-profiles.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides predefined sampler profiles for the cognition module, allowing the LLM integration to select optimal generation parameters such as temperature, Top- P, and max tokens during intent extraction and cognitive stream processing.",
+      "classes": [],
+      "functions": [
+        "getSamplerProfile",
+        "isValidSamplerProfile",
+        "getSamplerProfileNames",
+        "getSamplerProfileSummary",
+        "getDefaultSamplerProfile"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:54:19.204063",
+        "modified": "2026-02-03T04:54:19.204174",
+        "modified_days_ago": 3,
+        "lines": 166,
+        "size_bytes": 4565,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/harness/scenario-loader.ts",
+      "name": "scenario-loader.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements scenario loading and validation for the cognition module, parsing and validating each line against an Ajv schema to ensure correct structure for the conscious-bot's intent extraction process.",
+      "classes": [
+        "ScenarioLoader"
+      ],
+      "functions": [
+        "discoverSuites",
+        "getSuiteId"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "crypto",
+        "ajv",
+        "ajv-formats",
+        "../schemas/scenario_line.schema.json"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:55:14.549268",
+        "modified": "2026-02-03T04:55:14.549535",
+        "modified_days_ago": 3,
+        "lines": 262,
+        "size_bytes": 7043,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/evals/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides type definitions for evaluating the cognitive stimulus and action affordances within the conscious-bot's LLM integration layer. Defines enum and type structures for tracking event types, threat levels, and time of day states used in eval scenarios. Enables consistent, reusable types for the evaluation framework.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:57:41.502524",
+        "modified": "2026-02-03T04:57:41.502650",
+        "modified_days_ago": 3,
+        "lines": 106,
+        "size_bytes": 2065,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/event-driven-thought-generator.ts",
+      "name": "event-driven-thought-generator.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides event-based triggers for the cognitive stream by analyzing BotLifecycleEvent context.",
+      "classes": [
+        "EventDrivenThoughtGenerator"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:27:49.109781",
+        "modified": "2026-02-03T02:27:49.109928",
+        "modified_days_ago": 3,
+        "lines": 417,
+        "size_bytes": 12093,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intero-history.ts",
+      "name": "intero-history.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a ring buffer for timestamped intero snapshots used by the cognition module to persist and retrieve the bot's recent emotional and stress state changes.",
+      "classes": [],
+      "functions": [
+        "appendLine",
+        "recordInteroSnapshot",
+        "getInteroHistory",
+        "loadInteroHistory",
+        "getInteroHistorySummary"
+      ],
+      "imports": [
+        "fs",
+        "./interoception-store",
+        "./server-utils/server-logger"
+      ],
+      "constants": [
+        "MAX_ENTRIES",
+        "MAX_FILE_BYTES",
+        "LOG_PREFIX",
+        "PERSIST_PATH"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:53:05.153019",
+        "modified": "2026-02-04T10:13:37.887892",
+        "modified_days_ago": 1,
+        "lines": 155,
+        "size_bytes": 4397,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/interoception-store.ts",
+      "name": "interoception-store.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides an in-memory store for the bot's interoceptive state, calculating a weighted composite stress score from six axes such as healthHunger, resource, and locationDistance, ensuring values remain clamped between 0 and 100. Manages current focus and curiosity levels for the cognitive stream. Supplies the computed stress and emotional state to higher-level reasoning in the cognition module.",
+      "classes": [],
+      "functions": [
+        "clamp",
+        "computeComposite",
+        "makeDefaultState",
+        "getInteroState",
+        "setStressAxis",
+        "setStressAxes",
+        "decayStressAxes",
+        "updateStress",
+        "setStress",
+        "updateFocus"
+      ],
+      "imports": [],
+      "constants": [
+        "MIN",
+        "MAX",
+        "DEFAULTS",
+        "STRESS_RESIST_DECREASE",
+        "STRESS_ACCEPT_DETRIMENTAL_INCREASE",
+        "STRESS_ACCEPT_BENEFICIAL_DECREASE"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:29:27.859066",
+        "modified": "2026-02-01T03:03:40.464383",
+        "modified_days_ago": 5,
+        "lines": 220,
+        "size_bytes": 6489,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusion-interface/intrusion-interface.ts",
+      "name": "intrusion-interface.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "input and validate external suggestions, parsing and classifying their content for risk assessment, then routing decisions through the cognitive pipeline for the conscious-bot's intrusion handling system.",
+      "classes": [
+        "IntrusionInterface"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "../constitutional-filter/constitutional-filter",
+        "./intrusion-parser",
+        "./taxonomy-classifier"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.181695",
+        "modified": "2025-08-23T17:46:29.181831",
+        "modified_days_ago": 166,
+        "lines": 667,
+        "size_bytes": 18730,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusion-interface/intrusion-parser.ts",
+      "name": "intrusion-parser.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Input and parses raw intrusion content into a structured format for the cognitive stream. Extracts intent, urgency, and context while applying configuration settings. Returns parsed result with confidence score and optional warnings for error handling.",
+      "classes": [
+        "IntrusionParser"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.181885",
+        "modified": "2025-08-23T17:46:29.182044",
+        "modified_days_ago": 166,
+        "lines": 380,
+        "size_bytes": 10455,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusion-interface/taxonomy-classifier.ts",
+      "name": "taxonomy-classifier.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "classification results are retrieved or computed from intrusion content using LLM-based intent analysis and configured taxonomies, assigning risk levels and content types for filtering decisions. The class integrates LLM reasoning with static or dynamic taxonomies to evaluate and categorize incoming intrusion messages. Caching improves performance for recurring content types.",
+      "classes": [
+        "TaxonomyClassifier"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.182086",
+        "modified": "2025-08-23T17:46:29.182230",
+        "modified_days_ago": 166,
+        "lines": 427,
+        "size_bytes": 12637,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusion-interface/types.ts",
+      "name": "types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "commented as types that structure external intrusion inputs for robust filtering, risk analysis, and decision making within the conscious-bot cognition module.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.182276",
+        "modified": "2025-08-23T17:46:29.182396",
+        "modified_days_ago": 166,
+        "lines": 288,
+        "size_bytes": 6749,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/intrusive-thought-processor.ts",
+      "name": "intrusive-thought-processor.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements the conversion of intrusive thoughts into structured Task objects that the planning module uses to drive bot behavior, assigning actions, priorities, and confidence levels. Ensures each task retains a traceable thought origin and is formatted for the bot's decision-making pipeline. Facilitates the integration of user-generated intrusive thoughts into actionable plans with debug support.",
+      "classes": [
+        "PlanningMCPClient",
+        "IntrusiveThoughtProcessor"
+      ],
+      "functions": [
+        "buildResponseDebug",
+        "makeRequestId"
+      ],
+      "imports": [
+        "events",
+        "crypto"
+      ],
+      "constants": [
+        "PLANNING_INGEST_DEBUG_400"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T17:21:30.473745",
+        "modified": "2026-02-05T00:17:32.616527",
+        "modified_days_ago": 1,
+        "lines": 1432,
+        "size_bytes": 40069,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/keep-alive/event-types.ts",
+      "name": "event-types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements keep-alive event types for tracking system health and activity within the cognitive stream. Defines standardized payload schemas for tick, thought, and status events.",
+      "classes": [],
+      "functions": [
+        "createTickEvent",
+        "createThoughtEvent",
+        "createSkipNotIdleEvent",
+        "createViolationEvent"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:10:32.100729",
+        "modified": "2026-02-03T05:10:32.100896",
+        "modified_days_ago": 3,
+        "lines": 208,
+        "size_bytes": 6075,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/keep-alive/idle-detector.ts",
+      "name": "idle-detector.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Implements idle detection for the keep-alive gate in the cognitive module of conscious-bot. Evaluates the current state to determine if the bot is idle by checking active plans, task conversions, threat level, and user command presence.",
+      "classes": [],
+      "functions": [
+        "detectIdle",
+        "buildIdleContext",
+        "estimateThreatLevel"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:01:53.484983",
+        "modified": "2026-02-03T05:01:53.485300",
+        "modified_days_ago": 3,
+        "lines": 187,
+        "size_bytes": 5902,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/keep-alive/intention-check-prompt.ts",
+      "name": "intention-check-prompt.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "a non-injective intention check prompt that presents the current situation without suggesting actions, prompting the model to optionally declare its intent using the [GOAL: <action> <target>] format when appropriate",
+      "classes": [],
+      "functions": [
+        "renderIntentionCheckPrompt",
+        "getIntentionCheckVariants",
+        "validateNonInjectivePrompt"
+      ],
+      "imports": [],
+      "constants": [
+        "INTENTION_CHECK_TEMPLATE",
+        "INTENTION_CHECK_MINIMAL",
+        "INTENTION_CHECK_REFLECTIVE",
+        "INTENTION_CHECK_VARIANTS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T06:24:16.997155",
+        "modified": "2026-02-03T06:24:16.997280",
+        "modified_days_ago": 3,
+        "lines": 163,
+        "size_bytes": 5463,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/keep-alive/keep-alive-controller.ts",
+      "name": "keep-alive-controller.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides an idle detection pathway for the cognition module to decide when the LF-4 reasoning surface should be prompted for new goals. Implements a strict invariant that never injects goals, only presents facts and waits for model initiative. Controls the flow by emitting KeepAliveEvents only when goals are present.",
+      "classes": [
+        "KeepAliveController"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "./intention-check-prompt"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.414989",
+        "modified": "2026-02-04T23:32:13.415276",
+        "modified_days_ago": 1,
+        "lines": 617,
+        "size_bytes": 18680,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/envelope-builder.ts",
+      "name": "envelope-builder.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "context for constructing LanguageIOEnvelopeV1 from raw LLM output with optional metadata",
+      "classes": [],
+      "functions": [
+        "buildLanguageIOEnvelope",
+        "computeEnvelopeId",
+        "verifyEnvelopeId"
+      ],
+      "imports": [
+        "crypto",
+        "./marker-extractor",
+        "./sanitization-pipeline",
+        "./envelope-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:34:31.417366",
+        "modified": "2026-02-03T18:34:31.417612",
+        "modified_days_ago": 2,
+        "lines": 114,
+        "size_bytes": 3868,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/envelope-types.ts",
+      "name": "envelope-types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides type definitions for SanitizationFlags used in the conscious-bot cognition module to track modifications applied to user input during text processing.",
+      "classes": [],
+      "functions": [
+        "createDefaultSanitizationFlags"
+      ],
+      "imports": [],
+      "constants": [
+        "LANGUAGE_IO_ENVELOPE_SCHEMA_ID",
+        "LANGUAGE_IO_ENVELOPE_SCHEMA_VERSION",
+        "SANITIZATION_VERSION"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:33:47.731181",
+        "modified": "2026-02-03T18:33:47.731319",
+        "modified_days_ago": 2,
+        "lines": 128,
+        "size_bytes": 4502,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/execution-gate.ts",
+      "name": "execution-gate.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Execution gate for task conversion. * * This module provides the SINGLE choke point for deciding if a * reducer result can be converted to a task. * * Key invariant: Uses is_executable ONLY, not advisory presence or confidence. * Advisory is for routing hints, NOT execution authority. * * @author @darianrosebrook",
+      "classes": [
+        "ExecutionGateError"
+      ],
+      "functions": [
+        "canConvertToTask",
+        "requireExecutable",
+        "getExecutionBlockReason",
+        "isSemanticEmpty"
+      ],
+      "imports": [
+        "./reducer-result-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:37:44.372945",
+        "modified": "2026-02-03T18:37:44.373172",
+        "modified_days_ago": 2,
+        "lines": 106,
+        "size_bytes": 3318,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/marker-extractor.ts",
+      "name": "marker-extractor.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides verbatim extraction of [GOAL:...] markers from text as part of the conscious-bot cognition module. Returns markers with exact spans and type. Does not interpret or normalize markers\u2014raw extraction only.",
+      "classes": [],
+      "functions": [
+        "extractVerbatimMarkers",
+        "countGoalTags",
+        "hasGoalTag"
+      ],
+      "imports": [
+        "./envelope-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:33:56.760441",
+        "modified": "2026-02-03T18:33:56.760681",
+        "modified_days_ago": 2,
+        "lines": 69,
+        "size_bytes": 2040,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/reducer-result-types.ts",
+      "name": "reducer-result-types.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides type-safety for committed goal, execution status, and optional advisory routing hints without exposing semantic details.",
+      "classes": [],
+      "functions": [
+        "isValidReducerResponse",
+        "parseReducerResult"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:37:30.137141",
+        "modified": "2026-02-03T18:37:30.137416",
+        "modified_days_ago": 2,
+        "lines": 169,
+        "size_bytes": 5519,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/sanitization-pipeline.ts",
+      "name": "sanitization-pipeline.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Versioned sanitization pipeline for Language IO envelopes. * * This is a DETERMINISTIC, VERSIONED evidence transform - it produces * another observational surface, not canonical meaning. * * The sanitization pipeline removes LLM artifacts (code fences, degeneration, * etc.) while preserving the semantic content for Sterling to interpret.",
+      "classes": [],
+      "functions": [
+        "sanitize",
+        "stripCodeFences",
+        "stripThinkingBlocks",
+        "truncateDegeneration",
+        "normalizeWhitespace"
+      ],
+      "imports": [
+        "./envelope-types",
+        "./envelope-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:34:16.477264",
+        "modified": "2026-02-03T18:34:16.477386",
+        "modified_days_ago": 2,
+        "lines": 166,
+        "size_bytes": 5022,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/schema-compatibility.ts",
+      "name": "schema-compatibility.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Schema version compatibility for Language IO boundary. * * TS must fail closed on unknown versions rather than * attempting \"best effort\" parsing. * * @author @darianrosebrook",
+      "classes": [
+        "SchemaVersionError"
+      ],
+      "functions": [
+        "validateEnvelopeVersion",
+        "validateReducerResultVersion",
+        "validateWorldSnapshotVersion",
+        "isVersionSupported"
+      ],
+      "imports": [],
+      "constants": [
+        "ENVELOPE_SUPPORTED_VERSIONS",
+        "REDUCER_RESULT_SUPPORTED_VERSIONS",
+        "WORLD_SNAPSHOT_SUPPORTED_VERSIONS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:37:09.698140",
+        "modified": "2026-02-03T18:37:09.698259",
+        "modified_days_ago": 2,
+        "lines": 103,
+        "size_bytes": 3636,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/sterling-language-io-client.ts",
+      "name": "sterling-language-io-client.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "required to convert LLM outputs into executable planning tasks via the LanguageIOEnvelope roundtrip interface",
+      "classes": [
+        "SterlingLanguageIOClient"
+      ],
+      "functions": [
+        "getDefaultLanguageIOClient",
+        "setDefaultLanguageIOClient"
+      ],
+      "imports": [
+        "events",
+        "./envelope-types",
+        "./envelope-builder",
+        "./reducer-result-types",
+        "./reducer-result-types",
+        "./transport",
+        "./transport"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T09:15:56.688169",
+        "modified": "2026-02-04T09:15:56.688331",
+        "modified_days_ago": 1,
+        "lines": 448,
+        "size_bytes": 14306,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/language-io/transport.ts",
+      "name": "transport.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a WebSocket adapter for sending and receiving LanguageIO protocol messages between the cognition module and external LLM systems. Implements the LanguageIOReduceResponse interface to strictly forward data without semantic interpretation. Enables the cognition layer to decouple communication from actual LLM integration for flexible testing and mock scenarios.",
+      "classes": [
+        "SterlingTransportAdapter",
+        "MockLanguageIOTransport"
+      ],
+      "functions": [
+        "getDefaultTransport",
+        "setDefaultTransport"
+      ],
+      "imports": [
+        "./envelope-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T08:22:56.148295",
+        "modified": "2026-02-04T08:22:56.148422",
+        "modified_days_ago": 1,
+        "lines": 288,
+        "size_bytes": 8851,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/llm-output-sanitizer.ts",
+      "name": "llm-output-sanitizer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "output sanitization transforms user LLM responses to deobfuscate and clean evidence before forwarding to Sterling for semantic analysis.",
+      "classes": [],
+      "functions": [
+        "stripWrappingQuotes",
+        "stripCodeFences",
+        "stripSystemPromptLeaks",
+        "extractGoalTag",
+        "extractIntent",
+        "stripInlineIntent",
+        "truncateDegeneration",
+        "stripTrailingGarbage",
+        "normalizeWhitespace",
+        "hasCodeLikeDensity"
+      ],
+      "imports": [
+        "@conscious-bot/cognition/language-io"
+      ],
+      "constants": [
+        "SYSTEM_PROMPT_PREFIXES",
+        "GENERIC_FILLER_PATTERNS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:32:14.224416",
+        "modified": "2026-02-04T12:32:14.224712",
+        "modified_days_ago": 1,
+        "lines": 734,
+        "size_bytes": 26995,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/react-arbiter/ReActArbiter.ts",
+      "name": "ReActArbiter.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* ReAct Arbiter - Implements reason\u2194act loop for grounded cognition * * Orchestrates a ReAct loop that interleaves short reasoning with single tool calls; * selects goals, decides next option/skill, reads environment feedback, and iterates. * * @author @darianrosebrook",
+      "classes": [
+        "ReActArbiter"
+      ],
+      "functions": [],
+      "imports": [
+        "zod",
+        "../cognitive-core/llm-interface",
+        "../audit/thought-action-audit-logger"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T20:13:31.366081",
+        "modified": "2026-02-01T03:03:40.704288",
+        "modified_days_ago": 5,
+        "lines": 612,
+        "size_bytes": 17575,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/reasoning-surface/eligibility.ts",
+      "name": "eligibility.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "only computes convertEligible using the current Sterling reduction provenance and checks for grounding validity before returning eligibility status",
+      "classes": [],
+      "functions": [
+        "deriveEligibility",
+        "assertEligibilityInvariant"
+      ],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.415694",
+        "modified": "2026-02-04T23:32:13.415891",
+        "modified_days_ago": 1,
+        "lines": 156,
+        "size_bytes": 4729,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/reasoning-surface/frame-renderer.ts",
+      "name": "frame-renderer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides a structured rendering of the current situation frame for the cognition module, filtering out any goals or actions.",
+      "classes": [],
+      "functions": [
+        "renderSituationFrame",
+        "formatTimeOfDay",
+        "formatDelta",
+        "computeFrameDigest",
+        "thoughtContextToFrameContext",
+        "ticksToTimeOfDay",
+        "estimateThreatLevel",
+        "eventTypeToDeltaType"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:51:48.445498",
+        "modified": "2026-02-03T04:51:48.445673",
+        "modified_days_ago": 3,
+        "lines": 475,
+        "size_bytes": 14028,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/reasoning-surface/grounder.ts",
+      "name": "grounder.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Goal Grounder \u2014 Sterling-Owned Semantic Boundary * * MIGRATION (PR4): Grounding is now Sterling-owned.",
+      "classes": [],
+      "functions": [
+        "isReductionProvenance",
+        "groundGoal",
+        "createGroundingContext"
+      ],
+      "imports": [
+        "../types",
+        "./eligibility"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.415989",
+        "modified": "2026-02-04T23:32:13.416233",
+        "modified_days_ago": 1,
+        "lines": 196,
+        "size_bytes": 6288,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/cognitive-stream-routes.ts",
+      "name": "cognitive-stream-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Cognitive stream routes: lifecycle events, thought acking, task review, * recent thoughts, mark processed, and SSE streaming. * * Supports eval isolation via evalRunId filtering (AC-ISO-01, AC-ISO-02, AC-ISO-03).",
+      "classes": [],
+      "functions": [
+        "pruneThoughtQueue",
+        "broadcastThought",
+        "createCognitiveStreamRoutes"
+      ],
+      "imports": [
+        "express",
+        "@conscious-bot/core",
+        "../thought-generator",
+        "../cognition-state"
+      ],
+      "constants": [
+        "THOUGHT_QUEUE_MAX_LENGTH",
+        "NON_ACTIONABLE_MAX_AGE_MS",
+        "ACTIONABLE_MAX_AGE_MS",
+        "PROCESSED_MAX_AGE_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T13:21:04.748367",
+        "modified": "2026-02-04T13:21:04.748502",
+        "modified_days_ago": 1,
+        "lines": 507,
+        "size_bytes": 18806,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/process-routes.ts",
+      "name": "process-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides the /process endpoint for the conscious-bot cognition module, handling intrusion detection and route-specific payloads for environmental_awareness, social_interaction, and external_chat. Implements filtering to prevent setting convertEligible: true in route handlers, ensuring safe operation. Enforces LF-2 conformance by delegating eligibility decisions to the thought-generation pipeline.",
+      "classes": [],
+      "functions": [
+        "createProcessRoutes"
+      ],
+      "imports": [
+        "express",
+        "@conscious-bot/core",
+        "../cognitive-core/llm-interface",
+        "../intrusive-thought-processor",
+        "../react-arbiter/ReActArbiter",
+        "../thought-generator",
+        "../cognition-state",
+        "../server-utils/constants",
+        "../stress-boundary-logger",
+        "../interoception-store"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:53:23.522258",
+        "modified": "2026-02-03T05:53:23.522361",
+        "modified_days_ago": 3,
+        "lines": 857,
+        "size_bytes": 32239,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/reasoning-routes.ts",
+      "name": "reasoning-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Input context is parsed and processed by the ReActArbiter to generate a reasoning step, which is returned to the client alongside the current state and timestamp. Handles ReAct-style interaction, extracting intent from inputs and integrating tools like inventory and goal stack manipulation. Provides robust error handling and clear JSON responses for step execution in the cognitive stream.",
+      "classes": [],
+      "functions": [
+        "createReasoningRoutes"
+      ],
+      "imports": [
+        "express",
+        "../react-arbiter/ReActArbiter",
+        "../server-utils/step-generation-helpers"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:05:26.409550",
+        "modified": "2026-02-02T15:05:26.409649",
+        "modified_days_ago": 3,
+        "lines": 135,
+        "size_bytes": 3809,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/reflection-generation-contract.ts",
+      "name": "reflection-generation-contract.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": ", the reflection generation contract defines the interface for capturing and processing player reflections via LLM integration in the cognition module, ensuring deterministic keys and structure while delegating text generation to the LLM and persisting results through the memory module.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [
+        "REFLECTION_PROMPT_TEMPLATE"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 159,
+            "content": "* - content: static placeholder text (same as current TODOs)",
+            "file_path": "packages/cognition/src/routes/reflection-generation-contract.ts"
+          }
+        ]
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:19:43.088333",
+        "modified": "2026-02-02T20:19:43.088507",
+        "modified_days_ago": 3,
+        "lines": 247,
+        "size_bytes": 9704,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/social-memory-routes.ts",
+      "name": "social-memory-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Social memory routes: entity retrieval, search, stats, fact recording.",
+      "classes": [],
+      "functions": [
+        "createSocialMemoryRoutes"
+      ],
+      "imports": [
+        "express",
+        "../../../memory/src/social/social-memory-manager"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:08:26.564397",
+        "modified": "2026-02-02T15:08:26.564554",
+        "modified_days_ago": 3,
+        "lines": 144,
+        "size_bytes": 4252,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/social-routes.ts",
+      "name": "social-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Social routes: social consideration, nearby entities, chat consideration, * departure communication, social cognition processing.",
+      "classes": [],
+      "functions": [
+        "createSocialRoutes"
+      ],
+      "imports": [
+        "express",
+        "../thought-generator",
+        "../social-awareness-manager",
+        "../cognition-state"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:06:43.767542",
+        "modified": "2026-02-02T15:06:43.767714",
+        "modified_days_ago": 3,
+        "lines": 346,
+        "size_bytes": 11165,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/system-routes.ts",
+      "name": "system-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides system-level control for thought generation in the conscious-bot cognition module. Implements start, stop, and readiness status endpoints for controlling LLM-based intent extraction and cognitive stream initialization. Exposes REST routes to safely enable/disable text-to-speech and check operational status.",
+      "classes": [],
+      "functions": [
+        "createSystemRoutes"
+      ],
+      "imports": [
+        "express"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:37:22.974286",
+        "modified": "2026-02-02T15:37:22.974428",
+        "modified_days_ago": 3,
+        "lines": 110,
+        "size_bytes": 3001,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/telemetry-routes.ts",
+      "name": "telemetry-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides telemetry-related endpoints for the cognitive module, enabling monitoring of system stress, spawn position, and network activity for the conscious-bot's thought processes.",
+      "classes": [],
+      "functions": [
+        "createTelemetryRoutes"
+      ],
+      "imports": [
+        "express",
+        "../cognitive-metrics-tracker",
+        "../cognitive-state-tracker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T15:05:13.301928",
+        "modified": "2026-02-02T15:05:13.302088",
+        "modified_days_ago": 3,
+        "lines": 204,
+        "size_bytes": 7017,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/routes/thought-routes.ts",
+      "name": "thought-routes.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "Provides endpoints for retrieving the bot's recent thoughts via the cognitive stream, using a filtered and sorted list of thoughts from internal and external sources, and returns paginated results with timestamp metadata.",
+      "classes": [],
+      "functions": [
+        "createThoughtRoutes"
+      ],
+      "imports": [
+        "express",
+        "../thought-generator",
+        "../cognition-state"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:54:03.420162",
+        "modified": "2026-02-03T05:54:03.420234",
+        "modified_days_ago": 3,
+        "lines": 165,
+        "size_bytes": 5372,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/advanced-identity-analyzer.ts",
+      "name": "advanced-identity-analyzer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Advanced identity analysis and evolution tracking. * * Provides sophisticated personality trait analysis, value system * tracking, and identity evolution monitoring for deep self-understanding. * * @author @darianrosebrook",
+      "classes": [
+        "AdvancedIdentityAnalyzer"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.182965",
+        "modified": "2025-08-23T17:46:29.183105",
+        "modified_days_ago": 166,
+        "lines": 802,
+        "size_bytes": 23134,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/self-model/contract-system.ts",
+      "name": "contract-system.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "Implements contract-based tracking of commitments and promises within the cognitive architecture. Maintains commitment and promise state using structured contracts and enforces integrity assessment with TrustScore calculation. Provides integrity monitoring and accountability reporting for the conscious-bot's thought process.",
+      "classes": [
+        "ContractSystem"
+      ],
+      "functions": [],
+      "imports": [
+        "../cognitive-core/llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.183160",
+        "modified": "2025-08-23T17:46:29.183308",
+        "modified_days_ago": 166,
+        "lines": 911,
+        "size_bytes": 25037,
         "author": "@darianrosebrook",
         "has_main": false
       }
@@ -215,31 +4999,186 @@
   ],
   "categories": {
     "LLM integration, thought processing, intent extraction, cognitive stream": [
+      "cognition/src/constitutional-filter/index.ts",
+      "cognition/src/evals/harness/index.ts",
+      "cognition/src/index.ts",
+      "cognition/src/intrusion-interface/index.ts",
+      "cognition/src/keep-alive/index.ts",
+      "cognition/src/language-io/index.ts",
+      "cognition/src/reasoning-surface/index.ts",
+      "cognition/src/routes/index.ts",
+      "cognition/src/self-model/index.ts",
+      "cognition/src/server-utils/index.ts",
+      "cognition/src/social-cognition/index.ts",
       "cognition/src/audit/thought-action-audit-logger.ts",
       "cognition/src/bot-state-cache.ts",
       "cognition/src/cognition-state.ts",
+      "cognition/src/cognitive-core/chat-formatting.ts",
       "cognition/src/cognitive-core/context-optimizer.ts",
-      "cognition/src/cognitive-core/conversation-manager.ts"
+      "cognition/src/cognitive-core/conversation-manager.ts",
+      "cognition/src/cognitive-core/creative-solver.ts",
+      "cognition/src/cognitive-core/emotional-memory-llm-adapter.ts",
+      "cognition/src/cognitive-core/internal-dialogue.ts",
+      "cognition/src/cognitive-core/llm-interface.ts",
+      "cognition/src/cognitive-core/llm-output-reducer.ts",
+      "cognition/src/cognitive-core/memory-aware-llm.ts",
+      "cognition/src/cognitive-core/reflection-engine.ts",
+      "cognition/src/cognitive-metrics-tracker.ts",
+      "cognition/src/cognitive-state-tracker.ts",
+      "cognition/src/cognitive-stream-logger.ts",
+      "cognition/src/config/llm-token-config.ts",
+      "cognition/src/constitutional-filter/constitutional-filter.ts",
+      "cognition/src/constitutional-filter/rules-database.ts",
+      "cognition/src/constitutional-filter/rules-engine.ts",
+      "cognition/src/constitutional-filter/types.ts",
+      "cognition/src/environmental/observation-reasoner.ts",
+      "cognition/src/environmental/saliency-reasoner.ts",
+      "cognition/src/evals/harness/eval-orchestrator.ts",
+      "cognition/src/evals/harness/event-emitter.ts",
+      "cognition/src/evals/harness/frame-profiles.ts",
+      "cognition/src/evals/harness/metrics-collector.ts",
+      "cognition/src/evals/harness/result-bundle.ts",
+      "cognition/src/evals/harness/sampler-profiles.ts",
+      "cognition/src/evals/harness/scenario-loader.ts",
+      "cognition/src/evals/types.ts",
+      "cognition/src/event-driven-thought-generator.ts",
+      "cognition/src/intero-history.ts",
+      "cognition/src/interoception-store.ts",
+      "cognition/src/intrusion-interface/intrusion-interface.ts",
+      "cognition/src/intrusion-interface/intrusion-parser.ts",
+      "cognition/src/intrusion-interface/taxonomy-classifier.ts",
+      "cognition/src/intrusion-interface/types.ts",
+      "cognition/src/intrusive-thought-processor.ts",
+      "cognition/src/keep-alive/event-types.ts",
+      "cognition/src/keep-alive/idle-detector.ts",
+      "cognition/src/keep-alive/intention-check-prompt.ts",
+      "cognition/src/keep-alive/keep-alive-controller.ts",
+      "cognition/src/language-io/envelope-builder.ts",
+      "cognition/src/language-io/envelope-types.ts",
+      "cognition/src/language-io/execution-gate.ts",
+      "cognition/src/language-io/marker-extractor.ts",
+      "cognition/src/language-io/reducer-result-types.ts",
+      "cognition/src/language-io/sanitization-pipeline.ts",
+      "cognition/src/language-io/schema-compatibility.ts",
+      "cognition/src/language-io/sterling-language-io-client.ts",
+      "cognition/src/language-io/transport.ts",
+      "cognition/src/llm-output-sanitizer.ts",
+      "cognition/src/react-arbiter/ReActArbiter.ts",
+      "cognition/src/reasoning-surface/eligibility.ts",
+      "cognition/src/reasoning-surface/frame-renderer.ts",
+      "cognition/src/reasoning-surface/grounder.ts",
+      "cognition/src/routes/cognitive-stream-routes.ts",
+      "cognition/src/routes/process-routes.ts",
+      "cognition/src/routes/reasoning-routes.ts",
+      "cognition/src/routes/reflection-generation-contract.ts",
+      "cognition/src/routes/social-memory-routes.ts",
+      "cognition/src/routes/social-routes.ts",
+      "cognition/src/routes/system-routes.ts",
+      "cognition/src/routes/telemetry-routes.ts",
+      "cognition/src/routes/thought-routes.ts",
+      "cognition/src/self-model/advanced-identity-analyzer.ts",
+      "cognition/src/self-model/contract-system.ts"
+    ],
+    "Shared utilities, TTS, API clients, base types": [
+      "core/src/index.ts",
+      "core/src/leaves/index.ts",
+      "core/src/mcp-capabilities/index.ts",
+      "core/src/real-time/index.ts",
+      "core/src/sterling/index.ts",
+      "core/src/tts/index.ts"
+    ],
+    "Next.js dashboard, viewer HUD": [
+      "dashboard/src/types/index.ts"
+    ],
+    "Test scenarios and evaluation": [
+      "evaluation/src/curriculum/index.ts",
+      "evaluation/src/index.ts"
+    ],
+    "Planning executor contracts": [
+      "executor-contracts/src/index.ts"
+    ],
+    "MCP server integration": [
+      "mcp-server/src/index.ts"
+    ],
+    "Vector DB, reflection memory, hybrid search": [
+      "memory/src/episodic/index.ts",
+      "memory/src/index.ts",
+      "memory/src/provenance/index.ts",
+      "memory/src/semantic/index.ts",
+      "memory/src/skills/index.ts",
+      "memory/src/working/index.ts"
+    ],
+    "Minecraft client, leaves, interaction, navigation": [
+      "minecraft-interface/src/asset-pipeline/index.ts",
+      "minecraft-interface/src/entity-belief/index.ts",
+      "minecraft-interface/src/extensions/index.ts",
+      "minecraft-interface/src/index.ts",
+      "minecraft-interface/src/reflex/index.ts"
+    ],
+    "Task integration, Sterling solver, cognitive thought processor": [
+      "planning/src/constraints/index.ts",
+      "planning/src/goals/index.ts",
+      "planning/src/hierarchical/index.ts",
+      "planning/src/hierarchical-planner/index.ts",
+      "planning/src/index.ts",
+      "planning/src/interfaces/index.ts",
+      "planning/src/server/index.ts",
+      "planning/src/skill-integration/index.ts",
+      "planning/src/sterling/index.ts",
+      "planning/src/sterling/primitives/p03/index.ts",
+      "planning/src/sterling/primitives/p21/index.ts",
+      "planning/src/task-integration/index.ts",
+      "planning/src/temporal/index.ts",
+      "planning/src/types/index.ts"
+    ],
+    "Safety checks and guards": [
+      "safety/src/fail-safes/index.ts",
+      "safety/src/index.ts",
+      "safety/src/monitoring/index.ts",
+      "safety/src/privacy/index.ts"
+    ],
+    "P03/P21 conformance suites": [
+      "testkits/src/index.ts",
+      "testkits/src/p03/index.ts",
+      "testkits/src/p21/index.ts"
+    ],
+    "World state, observation queue": [
+      "world/src/index.ts",
+      "world/src/navigation/index.ts",
+      "world/src/perception/index.ts",
+      "world/src/place-graph/index.ts",
+      "world/src/sensorimotor/index.ts"
     ]
   },
   "statistics": {
     "by_status": {
-      "active": 3,
-      "stable": 2
+      "stable": 38,
+      "active": 89
     },
     "by_category": {
-      "LLM integration, thought processing, intent extraction, cognitive stream": 5
+      "LLM integration, thought processing, intent extraction, cognitive stream": 79,
+      "Shared utilities, TTS, API clients, base types": 6,
+      "Next.js dashboard, viewer HUD": 1,
+      "Test scenarios and evaluation": 2,
+      "Planning executor contracts": 1,
+      "MCP server integration": 1,
+      "Vector DB, reflection memory, hybrid search": 6,
+      "Minecraft client, leaves, interaction, navigation": 5,
+      "Task integration, Sterling solver, cognitive thought processor": 14,
+      "Safety checks and guards": 4,
+      "P03/P21 conformance suites": 3,
+      "World state, observation queue": 5
     },
-    "total_lines": 1981,
-    "total_classes": 3,
-    "total_functions": 10,
+    "total_lines": 30323,
+    "total_classes": 37,
+    "total_functions": 162,
     "todos_by_priority": {
       "P0-GOV": 0,
       "P1-METRIC": 0,
       "P2-QUAL": 0,
       "P3-UX": 0,
-      "untagged": 0
+      "untagged": 6
     },
-    "total_todos": 0
+    "total_todos": 6
   }
 }

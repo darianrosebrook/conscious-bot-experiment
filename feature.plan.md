@@ -1,41 +1,28 @@
-# Feature Plan: PR4-PLANNING-OBS-400
-
-## Risk Tier
-2
+# Plan — STIR-510 Golden Run Proof
 
 ## Design Sketch
-- Planning `/task` endpoint
-  - Extract/assign request id (`x-request-id`), echo back in response header.
-  - On 400 in debug mode (`PLANNING_INGEST_DEBUG_400=1`):
-    - Log structured request shape (keys, key presence booleans, content-type, body size).
-    - Return 400 with debug details (missing fields, reason code).
-- Cognition planning bridge
-  - On non-2xx: read response body (truncated), hash, log URL + status + hash.
-- Task integration
-  - Debug-only ACK gating for thoughts that fail closed (bounded retries per thought id).
+Sequence (Stage 1):
+1) Dev endpoint injects `sterling_ir` task (digest + schema).
+2) TaskIntegration.addTask → materializeSterlingIrSteps → expandByDigest.
+3) Executor dispatches leaf; verification runs.
+4) GoldenRunRecorder writes artifact.
+
+Sequence (Stage 2):
+1) KeepAliveIntegration detects idle (no_tasks).
+2) Sterling idle episode reduction via Language IO transport.
+3) Thought posted to cognition with reduction + convertEligible.
+4) TaskIntegration converts thought → task → expansion → dispatch → verification.
+5) GoldenRunRecorder writes artifact including idle episode.
 
 ## Test Matrix
-- Unit
-  - Debug flag off: 400 response does not include validation details.
-  - Debug flag on: 400 response includes missing fields and request id.
-  - Logs contain no free-text content.
-  - Request id propagated via header.
-- Integration
-  - Malformed planning request → 400 + debug logs (flag on).
-  - Valid planning request → 2xx.
-- E2E smoke
-  - Cognition non-2xx → log includes URL, status, response hash.
+- Unit: GoldenRunRecorder merge + file write.
+- Integration: dev injection endpoint + expansion recording + dispatch/verification recording.
+- Manual E2E: sink proof, then source proof.
 
 ## Data Plan
-- No new persisted data.
-- Request id generated per request if missing.
-- Debug state: in-memory retry counter for ACK deferral.
+- Golden run reports written under `artifacts/golden-run/`.
+- Report fields: run_id, injection/task, idle_episode, expansion, execution.
 
 ## Observability Plan
-- Logs (debug only)
-  - `planning.thought_ingest.request` with key presence.
-  - `planning.thought_ingest.reject` with missing fields.
-  - `cognition.planning_bridge.error` with response hash.
-- Metrics (if available)
-  - `planning_thought_ingest_400_total{reason_code}`
-  - `planning_thought_ingest_missing_field_total{field}`
+- Structured logs: injection, expansion, dispatch, verification.
+- Golden run report as durable evidence artifact.

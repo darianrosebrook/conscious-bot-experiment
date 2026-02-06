@@ -82,6 +82,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+artifacts/golden-run/**
 
 # Optional npm cache directory
 .npm

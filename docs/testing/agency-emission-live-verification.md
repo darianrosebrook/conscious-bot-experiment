@@ -1,5 +1,9 @@
 # Agency Emission: Live Verification Report
 
+> Status: Legacy (pre-Pattern-A). This verification flow assumes goal-tag based intent extraction.
+> For current routing/execution rules, see `docs/planning/sterling-boundary-contract.md` and
+> `contracts/sterling-executor.yaml`.
+
 Verifies the three properties that matter for the agency emission pipeline:
 
 1. **goalKey canonicalization is stable end-to-end** (cognition -> stream -> planning -> task)

@@ -23,6 +23,7 @@ import type {
   SterlingSearchEdge,
   SterlingSolutionEdge,
   SterlingLanguageReducerResult,
+  SterlingExpandByDigestStep,
 } from './types';
 
 // ============================================================================
@@ -733,6 +734,100 @@ export class SterlingClient extends EventEmitter {
         this.recordFailure();
         resolve({
           success: false,
+          error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    });
+  }
+
+  /**
+   * Materialize a committed IR digest into an opaque leaf-step bundle.
+   *
+   * Sends expand_by_digest_v1 command and waits for expand_by_digest.result.
+   */
+  async expandByDigest(
+    request: {
+      committed_ir_digest: string;
+      schema_version: string;
+      request_id?: string;
+      envelope_id?: string;
+      client_trace_id?: string;
+      transport_context?: Record<string, unknown>;
+    },
+    timeoutMs: number = 5000,
+  ): Promise<
+    | { status: 'ok'; plan_bundle_digest: string; steps: SterlingExpandByDigestStep[]; schema_version?: string }
+    | { status: 'blocked'; blocked_reason: string; retry_after_ms?: number }
+    | { status: 'error'; error: string }
+  > {
+    if (this.isCircuitOpen()) {
+      return { status: 'error', error: 'Circuit breaker is open' };
+    }
+
+    if (this.connectionState !== 'connected') {
+      try {
+        await this.connect();
+      } catch (err) {
+        return {
+          status: 'error',
+          error: `Connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+
+    const requestId =
+      request.request_id || `expand_${++this.requestIdCounter}_${Date.now()}`;
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        this.recordFailure();
+        resolve({ status: 'error', error: `Expand timeout after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      const handler = (msg: SterlingMessage) => {
+        if (msg.type === 'expand_by_digest.result' && msg.request_id === requestId) {
+          cleanup();
+          if (msg.status === 'ok') {
+            this.recordSuccess();
+            resolve({
+              status: 'ok',
+              plan_bundle_digest: msg.plan_bundle_digest || '',
+              steps: msg.steps || [],
+              schema_version: msg.schema_version,
+            });
+          } else if (msg.status === 'blocked') {
+            this.recordSuccess();
+            resolve({
+              status: 'blocked',
+              blocked_reason: msg.blocked_reason || 'blocked_executor_unavailable',
+              retry_after_ms: msg.retry_after_ms,
+            });
+          } else {
+            this.recordFailure();
+            resolve({ status: 'error', error: msg.error || 'Sterling error' });
+          }
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'expand_by_digest_v1',
+          request_id: requestId,
+          ...request,
+        });
+      } catch (err) {
+        cleanup();
+        this.recordFailure();
+        resolve({
+          status: 'error',
           error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
         });
       }

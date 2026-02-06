@@ -13,6 +13,7 @@
     "smoke": "pnpm run build && node scripts/run-smoke.mjs",
     "smoke:ts": "tsx scripts/run-smoke.ts",
     "test": "vitest run",
+    "test:golden-run": "vitest run src/__tests__/golden-run-recorder.test.ts",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",

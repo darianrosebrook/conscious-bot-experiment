@@ -1,6 +1,8 @@
 # Keep-Alive + Rolling Scenario Eval — Acceptance Criteria
 
-Status: Draft (review-ready)
+Status: Legacy (pre-Pattern-A). This document assumes goal-tag based intent extraction.
+For current routing/execution rules, see `docs/planning/sterling-boundary-contract.md` and
+`contracts/sterling-executor.yaml`.
 Date: 2026-02-03
 Scope: Define objective, observable acceptance criteria for (A) a keep-alive observation loop that respects autonomy and invariants, and (B) a rolling scenario eval harness that produces reproducible, hot-swappable telemetry.
 

@@ -28,6 +28,7 @@
     "clear-cognitive-state": "node scripts/clear-cognitive-state.js",
     "clear-cognitive-state:db": "node scripts/clear-cognitive-state.js --db",
     "lint": "turbo lint",
+    "docs:lint": "node scripts/docs-boundary-lint.js",
     "test": "turbo test",
     "clean": "turbo clean",
     "type-check": "turbo type-check",

@@ -243,6 +243,9 @@ function getEntityMesh (entity, scene) {
   const normalizedName = rawName ? rawName.replace(/^minecraft:/, '') : null
   const textureVersion = globalThis.__MC_VERSION || '1.21.9'
   const loggedFallbacks = (globalThis.__ENTITY_FALLBACK_LOGGED ||= new Set())
+  const loggedFailures = (globalThis.__ENTITY_LOAD_FAIL ||= new Set())
+  if (loggedFailures.size > 500) loggedFailures.clear()
+  const failureKey = normalizedName ? `${textureVersion}:${normalizedName}` : `unknown:${textureVersion}`
   const fallbackMap = {
     glow_squid: 'squid',
     breeze: 'player',
@@ -284,11 +287,26 @@ function getEntityMesh (entity, scene) {
           }
           return e.mesh
         } catch (fallbackErr) {
-          console.log(fallbackErr)
+          if (!loggedFailures.has(failureKey)) {
+            loggedFailures.add(failureKey)
+            console.warn(
+              `[viewer] Entity load failed: ${normalizedName} -> ${fallbackName} (${fallbackErr?.message || fallbackErr}) [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
+            )
+          }
         }
       }
-      console.log(err)
+      if (!loggedFailures.has(failureKey)) {
+        loggedFailures.add(failureKey)
+        console.warn(
+          `[viewer] Entity load failed: ${normalizedName} (${err?.message || err}) [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
+        )
+      }
     }
+  } else if (!loggedFailures.has(failureKey)) {
+    loggedFailures.add(failureKey)
+    console.warn(
+      `[viewer] Entity load failed: missing name [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
+    )
   }
 
   // Use defaults if entity dimensions are missing to prevent NaN geometry

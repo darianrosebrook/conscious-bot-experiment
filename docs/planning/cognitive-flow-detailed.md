@@ -101,6 +101,24 @@ Components that turn plans into actions:
   - [PBI Enforcer](../../packages/executor-contracts/src/pbi-enforcer.ts)
   - [Capability Registry](../../packages/executor-contracts/src/capability-registry.ts)
 
+## Semantic Authority Boundary (Current)
+
+**Current rule of record:** TypeScript does not interpret meaning from text for routing or execution. Executable tasks require Sterling-provided provenance, and `sterling_ir` tasks route exclusively through digest expansion.
+
+**Canonical boundary artifacts:**
+- `docs/planning/sterling-boundary-contract.md`
+- `contracts/sterling-executor.yaml` (materialize-only: digest → leaf bundle)
+
+**Operational consequences:**
+- `sterling_ir` tasks bypass `resolveRequirement()` and `routeActionPlan()` entirely.
+- `sterling_ir` tasks never use `resolveActionFromTask()` or title-based inference.
+- Digest expansion uses WS `expand_by_digest_v1` and correlates strictly on `request_id`.
+
+**Enforcement points in code (current):**
+- `packages/planning/src/task-integration.ts` (bypass + expansion + `pending_planning` semantics)
+- `packages/planning/src/server/task-action-resolver.ts` (hard-stop for `sterling_ir`)
+- `packages/core/src/sterling/sterling-client.ts` (WS request/response correlation)
+
 ## Component Coupling and Contracts
 
 ### 1) Input Processing ↔ Planning: "Intent Objects"
@@ -480,7 +498,11 @@ private analyzePosition(worldState: any): CognitiveThought | null {
 }
 ```
 
-### **LLM Output Sanitization Pipeline**
+## Legacy (pre-Pattern-A)
+
+The sections below describe the pre-Pattern-A pipeline where TS parsed `[GOAL:]` tags and structured intent locally. This behavior is deprecated and retained only for historical context.
+
+### Legacy: LLM Output Sanitization Pipeline (pre-Pattern-A)
 
 All LLM-generated text passes through a deterministic sanitization pipeline at the `generateResponse()` boundary in `LLMInterface`. This is the **single sanitization boundary** — downstream code never re-parses goal tags from raw text; it reads structured metadata (`extractedGoal`, `sanitizationFlags`).
 
@@ -540,7 +562,7 @@ interface GoalTagV1 {
 
 ---
 
-### **Thought-to-Task Conversion (Single-Boundary Contract)**
+### Legacy: Thought-to-Task Conversion (pre-Pattern-A)
 
 **Module:** `packages/planning/src/task-integration/thought-to-task-converter.ts`
 
@@ -1362,7 +1384,7 @@ This approach ensures that the existing functionality continues to work while ad
 
 ---
 
-## Resolved Bugs
+## Legacy: Resolved Bugs (pre-Pattern-A)
 
 ### RESOLVED: Executor Inaction — Cognitive Tasks Always Blocked
 
@@ -1404,7 +1426,7 @@ This approach ensures that the existing functionality continues to work while ad
 
 ---
 
-## Inter-Service API Reference
+## Inter-Service API Reference (Current)
 
 ```
 Planning :3002 ──GET /api/cognitive-stream/recent──► Cognition :3003

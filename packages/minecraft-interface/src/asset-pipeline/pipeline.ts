@@ -108,6 +108,13 @@ export class AssetPipeline {
     const versionId = resolved.id;
 
     const paths = this.getOutputPaths(versionId);
+    const metaPath = path.join(this.generatedDir, versionId, 'meta.json');
+    await fs.promises.mkdir(path.dirname(paths.texturePath), { recursive: true });
+    const lockPath = path.join(this.generatedDir, versionId, '.generate.lock');
+    const lockAcquired = await this.acquireGenerationLock(lockPath);
+    if (!lockAcquired) {
+      throw new Error(`Timed out waiting for generation lock: ${versionId}`);
+    }
     const missingRawAssets = ensureRawAssets.some((subdir) => {
       const targetDir = path.join(paths.rawAssetsPath, subdir);
       if (!fs.existsSync(targetDir)) return true;
@@ -117,22 +124,35 @@ export class AssetPipeline {
         return true;
       }
     });
-    const shouldForce = force || missingRawAssets;
+    let metaEnsures: string[] | null = null;
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf-8'));
+        metaEnsures = Array.isArray(meta.ensureRawAssets) ? meta.ensureRawAssets : null;
+      } catch {
+        metaEnsures = null;
+      }
+    }
+    const ensureMismatch =
+      ensureRawAssets.length > 0 &&
+      (!metaEnsures || ensureRawAssets.some((asset) => !metaEnsures.includes(asset)));
+    const shouldForce = force || missingRawAssets || ensureMismatch;
 
     // Check if already generated
-    if (!shouldForce && (await this.isGenerated(versionId))) {
-      const cachedPaths = this.getOutputPaths(versionId);
-      const stats = await fs.promises.stat(cachedPaths.texturePath);
-      return {
-        version: versionId,
-        texturePath: cachedPaths.texturePath,
-        blockStatesPath: cachedPaths.blockStatesPath,
-        rawAssetsPath: cachedPaths.rawAssetsPath,
-        fromCache: true,
-        generatedAt: stats.mtime,
-        atlasInfo: await this.getAtlasInfo(versionId),
-      };
-    }
+    try {
+      if (!shouldForce && (await this.isGenerated(versionId))) {
+        const cachedPaths = this.getOutputPaths(versionId);
+        const stats = await fs.promises.stat(cachedPaths.texturePath);
+        return {
+          version: versionId,
+          texturePath: cachedPaths.texturePath,
+          blockStatesPath: cachedPaths.blockStatesPath,
+          rawAssetsPath: cachedPaths.rawAssetsPath,
+          fromCache: true,
+          generatedAt: stats.mtime,
+          atlasInfo: await this.getAtlasInfo(versionId),
+        };
+      }
 
     // Stage 2: Download JAR
     onProgress?.({ stage: 'downloading', message: `Downloading Minecraft ${versionId} client...` });
@@ -164,6 +184,18 @@ export class AssetPipeline {
     await fs.promises.mkdir(path.dirname(paths.texturePath), { recursive: true });
     await fs.promises.writeFile(paths.texturePath, atlas.image);
     await fs.promises.writeFile(paths.blockStatesPath, JSON.stringify(blockStates));
+    await fs.promises.writeFile(
+      metaPath,
+      JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        atlasInfo: {
+          width: atlas.width,
+          height: atlas.height,
+          textureCount: atlas.textureCount,
+        },
+        ensureRawAssets,
+      })
+    );
 
     return {
       version: versionId,
@@ -178,6 +210,9 @@ export class AssetPipeline {
         textureCount: atlas.textureCount,
       },
     };
+    } finally {
+      await this.releaseGenerationLock(lockPath);
+    }
   }
 
   /**
@@ -280,6 +315,43 @@ export class AssetPipeline {
     const blockStatesDest = path.join(pvPublicDir, 'blocksStates', `${version}.json`);
     await fs.promises.mkdir(path.dirname(blockStatesDest), { recursive: true });
     await fs.promises.copyFile(paths.blockStatesPath, blockStatesDest);
+  }
+
+  private async acquireGenerationLock(lockPath: string, timeoutMs: number = 60000): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const fd = fs.openSync(lockPath, 'wx');
+        fs.closeSync(fd);
+        return true;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw err;
+        }
+      }
+
+      try {
+        const stats = await fs.promises.stat(lockPath);
+        const ageMs = Date.now() - stats.mtimeMs;
+        if (ageMs > 15 * 60 * 1000) {
+          await fs.promises.unlink(lockPath);
+          continue;
+        }
+      } catch {
+        // Ignore stat/unlink errors and keep waiting.
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return false;
+  }
+
+  private async releaseGenerationLock(lockPath: string): Promise<void> {
+    try {
+      await fs.promises.unlink(lockPath);
+    } catch {
+      // Ignore - lock may have been cleaned up.
+    }
   }
 
   /**

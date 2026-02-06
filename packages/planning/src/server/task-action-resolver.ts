@@ -160,6 +160,17 @@ export function resolveActionFromTask(task: Task): ResolveResult {
     checked: {},
   };
 
+  if (task.type?.toLowerCase() === 'sterling_ir') {
+    return {
+      ok: false,
+      category: 'mapping_invalid',
+      reason: 'sterling_ir tasks must use Sterling executor expansion (no resolver fallback)',
+      evidence,
+      retryable: false,
+      failureCode: 'mapping_invalid:sterling_ir',
+    };
+  }
+
   // Unknown task type
   if (!actionType) {
     return {

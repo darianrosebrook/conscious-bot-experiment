@@ -58,7 +58,8 @@ export interface SterlingRequest {
     | 'update_config'
     | 'register_domain_declaration_v1'
     | 'get_domain_declaration_v1'
-    | 'language_io.reduce';
+    | 'language_io.reduce'
+    | 'expand_by_digest_v1';
   domain?: SterlingDomain;
   [key: string]: unknown;
 }
@@ -229,6 +230,32 @@ export interface SterlingDeclarationNotFoundMessage {
   requestId?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Digest Expansion (materialize-only)
+// ---------------------------------------------------------------------------
+
+export interface SterlingExpandByDigestStep {
+  id?: string;
+  order?: number;
+  leaf: string;
+  args: Record<string, unknown>;
+  meta?: Record<string, unknown>;
+}
+
+export type SterlingExpandByDigestStatus = 'ok' | 'blocked' | 'error';
+
+export interface SterlingExpandByDigestResultMessage {
+  type: 'expand_by_digest.result';
+  request_id: string;
+  status: SterlingExpandByDigestStatus;
+  blocked_reason?: string;
+  error?: string;
+  plan_bundle_digest?: string;
+  steps?: SterlingExpandByDigestStep[];
+  schema_version?: string;
+  retry_after_ms?: number;
+}
+
 /** Discriminated union of all server-to-client message types */
 export type SterlingMessage =
   | SterlingDiscoverMessage
@@ -248,6 +275,7 @@ export type SterlingMessage =
   | SterlingDeclarationRegisteredMessage
   | SterlingDeclarationRetrievedMessage
   | SterlingDeclarationNotFoundMessage
+  | SterlingExpandByDigestResultMessage
   | SterlingLanguageIOResultMessage;
 
 // ============================================================================

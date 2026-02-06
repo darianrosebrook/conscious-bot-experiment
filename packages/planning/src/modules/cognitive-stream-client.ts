@@ -32,6 +32,8 @@ export interface CognitiveStreamThought {
     reduction?: ReductionProvenance;
     /** Sanitization flags from envelope construction (non-semantic) */
     sanitizationFlags?: Record<string, any>;
+    /** Golden run linkage (observability only) */
+    goldenRun?: { runId: string; requestedAt?: number; source?: string };
   };
   id: string;
   timestamp: number;

@@ -1,0 +1,45 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "example",
+  "created_at": 0,
+  "updated_at": 0,
+  "injection": {
+    "committed_ir_digest": "example_digest",
+    "schema_version": "v1",
+    "envelope_id": "example_envelope",
+    "request_id": "inject_example",
+    "source": "dev_injection"
+  },
+  "task": {
+    "task_id": "example-task",
+    "dedupe_key": "v1:example_digest",
+    "status": "pending"
+  },
+  "expansion": {
+    "request_id": "expand_example",
+    "status": "ok",
+    "plan_bundle_digest": "example_bundle",
+    "schema_version": "v1",
+    "steps": [
+      { "leaf": "acquire_material", "id": "step-1", "order": 1 }
+    ]
+  },
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": { "item": "oak_log", "count": 1 },
+        "dispatched_at": 0
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "inventory_delta",
+      "detail": {
+        "item": "oak_log",
+        "delta": 1
+      }
+    }
+  }
+}

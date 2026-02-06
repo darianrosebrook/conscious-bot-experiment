@@ -1,5 +1,9 @@
 # Idle Introspection Design: Emergent Behavior through Memory-Driven Cognition
 
+> Status: Legacy (pre-Pattern-A). This document predates the Sterling semantic-authority boundary.
+> For current routing/execution rules, see `docs/planning/sterling-boundary-contract.md` and
+> `contracts/sterling-executor.yaml`.
+
 ## Status: Design Draft v2 — Implementation Pending
 
 **Author**: Claude with @darianrosebrook

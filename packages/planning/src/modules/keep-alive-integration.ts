@@ -14,6 +14,9 @@ import type {
   KeepAliveTickResult,
   KeepAliveThought,
 } from '@conscious-bot/cognition';
+import { getDefaultLanguageIOClient } from '@conscious-bot/cognition';
+import crypto from 'crypto';
+import { getGoldenRunRecorder } from '../golden-run-recorder';
 
 // ============================================================================
 // Types
@@ -33,6 +36,12 @@ export interface KeepAliveIntegrationConfig {
   maxRefreshesPerMinute: number;
   /** Cognition service URL */
   cognitionServiceUrl: string;
+  /** Whether to emit Sterling idle episodes (source proof) */
+  enableSterlingIdleEpisodes: boolean;
+  /** Cooldown between idle episodes (ms) */
+  idleEpisodeCooldownMs: number;
+  /** Timeout for idle reduction requests (ms) */
+  idleEpisodeTimeoutMs: number;
 }
 
 /**
@@ -44,6 +53,10 @@ export const DEFAULT_KEEPALIVE_INTEGRATION_CONFIG: KeepAliveIntegrationConfig = 
   minIntervalMs: 30_000,
   maxRefreshesPerMinute: 3,
   cognitionServiceUrl: 'http://localhost:3003',
+  enableSterlingIdleEpisodes:
+    process.env.STERLING_IDLE_EPISODES_ENABLED === 'true',
+  idleEpisodeCooldownMs: 300_000,
+  idleEpisodeTimeoutMs: 12_000,
 };
 
 /**
@@ -62,6 +75,8 @@ export interface ExecutorState {
   lastUserCommand: number;
   /** Recent task conversion count */
   recentTaskConversions: number;
+  /** Count of pending_planning sterling_ir tasks */
+  pendingPlanningSterlingIrCount?: number;
 }
 
 /**
@@ -98,6 +113,8 @@ export class KeepAliveIntegration {
   private controller: KeepAliveController | null = null;
   private initialized = false;
   private lastTickTime = 0;
+  private idleEpisodeInFlight = false;
+  private lastIdleEpisodeAt = 0;
 
   // Track recent task conversions for idle detection
   private recentConversions: number[] = [];
@@ -165,6 +182,16 @@ export class KeepAliveIntegration {
     // Other reasons (backoff, blocked, etc.) are transient
     if (executorState.idleReason !== 'no_tasks') {
       return null;
+    }
+
+    if (this.config.enableSterlingIdleEpisodes) {
+      if ((executorState.pendingPlanningSterlingIrCount ?? 0) > 0) {
+        return null;
+      }
+      const sent = await this.trySterlingIdleEpisode(executorState, botState);
+      if (sent) {
+        return null;
+      }
     }
 
     // Build keep-alive context from executor and bot state
@@ -267,31 +294,161 @@ export class KeepAliveIntegration {
       ` (eligible=${thought.eligibility.convertEligible})`
     );
 
-    // Post thought to cognition service
+    await this.postThoughtToCognition({
+      id: thought.id,
+      type: 'observation',
+      content: thought.content,
+      timestamp: thought.timestamp,
+      metadata: {
+        source: 'keepalive',
+        frameProfile: thought.frameProfile,
+        convertEligible: thought.eligibility.convertEligible,
+      },
+      convertEligible: thought.eligibility.convertEligible,
+    });
+  }
+
+  private async postThoughtToCognition(thought: Record<string, unknown>): Promise<void> {
     try {
-      await fetch(
-        `${this.config.cognitionServiceUrl}/thought-generated`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            thought: {
-              id: thought.id,
-              type: 'observation',
-              content: thought.content,
-              timestamp: thought.timestamp,
-              metadata: {
-                source: 'keepalive',
-                frameProfile: thought.frameProfile,
-                convertEligible: thought.eligibility.convertEligible,
-              },
-              convertEligible: thought.eligibility.convertEligible,
-            },
-          }),
-        }
-      );
+      await fetch(`${this.config.cognitionServiceUrl}/thought-generated`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thought }),
+      });
     } catch (error) {
       console.error('[KeepAliveIntegration] Failed to post thought:', error);
+    }
+  }
+
+  private buildIdleEpisodeText(
+    executorState: ExecutorState,
+    botState: BotState,
+    runId: string
+  ): string {
+    const payload = {
+      kind: 'idle_episode_v1',
+      run_id: runId,
+      idle_reason: executorState.idleReason,
+      timestamp_ms: Date.now(),
+      bot_state: {
+        position: botState.position,
+        health: botState.health,
+        food: botState.food,
+        time_of_day: botState.timeOfDay,
+        weather: botState.weather,
+        biome: botState.biome,
+        dimension: botState.dimension,
+        nearby_hostiles: botState.nearbyHostiles,
+        nearby_passives: botState.nearbyPassives,
+        inventory_summary: botState.inventory?.map((item) => ({
+          name: item.name,
+          count: item.count,
+        })) ?? [],
+      },
+      budgets: {
+        max_steps: 8,
+        max_ms: 2000,
+      },
+    };
+
+    return `IDLE_EPISODE_V1\n${JSON.stringify(payload)}`;
+  }
+
+  private async trySterlingIdleEpisode(
+    executorState: ExecutorState,
+    botState: BotState
+  ): Promise<boolean> {
+    if (this.idleEpisodeInFlight) return false;
+    const now = Date.now();
+    if (now - this.lastIdleEpisodeAt < this.config.idleEpisodeCooldownMs) {
+      return false;
+    }
+
+    const runId = crypto.randomUUID();
+    const requestId = `idle_${runId}`;
+    const rawText = this.buildIdleEpisodeText(executorState, botState, runId);
+    const recorder = getGoldenRunRecorder();
+
+    this.idleEpisodeInFlight = true;
+    this.lastIdleEpisodeAt = now;
+
+    try {
+      const client = getDefaultLanguageIOClient();
+      await client.connect();
+      const reducePromise = client.reduce(rawText, {
+        modelId: 'idle-episode',
+        promptDigest: 'idle_episode_v1',
+      });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('idle_episode_timeout')),
+          this.config.idleEpisodeTimeoutMs
+        )
+      );
+      const result = await Promise.race([reducePromise, timeoutPromise]);
+
+      if ('code' in result) {
+      recorder.recordIdleEpisode(runId, {
+        client_request_id: requestId,
+        status: 'error',
+        reason: result.code,
+        duration_ms: result.durationMs,
+      });
+        return true;
+      }
+
+      const reducer = result.result;
+      const executable = reducer.is_executable === true;
+      const status = executable ? 'ok' : 'blocked';
+      const reason = executable ? undefined : result.blockReason ?? 'blocked_no_action';
+
+      recorder.recordIdleEpisode(runId, {
+        client_request_id: requestId,
+        status,
+        reason,
+        committed_ir_digest: reducer.committed_ir_digest,
+        schema_version: reducer.schema_version,
+        envelope_id: reducer.source_envelope_id ?? null,
+        duration_ms: result.durationMs,
+      });
+
+      if (executable) {
+        const reduction = {
+          sterlingProcessed: true,
+          envelopeId: result.envelope.envelope_id,
+          reducerResult: reducer,
+          isExecutable: reducer.is_executable,
+          blockReason: result.blockReason ?? null,
+          durationMs: result.durationMs,
+          sterlingError: null,
+        };
+
+        await this.postThoughtToCognition({
+          id: `idle-episode-${runId}`,
+          type: 'observation',
+          content: 'Idle episode (sterling executable)',
+          timestamp: Date.now(),
+          metadata: {
+            thoughtType: 'idle-episode',
+            source: 'keepalive',
+            reduction,
+            goldenRun: { runId, requestedAt: now, source: 'idle_episode' },
+          },
+          convertEligible: true,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      recorder.recordIdleEpisode(runId, {
+        client_request_id: requestId,
+        status: 'error',
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      console.error('[KeepAliveIntegration] Idle episode failed:', error);
+      return true;
+    } finally {
+      this.idleEpisodeInFlight = false;
     }
   }
 

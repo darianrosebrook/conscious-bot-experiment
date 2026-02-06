@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info:
+  title: Sterling Executor Contract (Digest Expansion)
+  version: 0.1.0
+paths:
+  /sterling/expand-by-digest:
+    post:
+      operationId: expandByDigest
+      summary: Materialize a committed IR digest into an opaque leaf-step bundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpandByDigestRequest'
+      responses:
+        '200':
+          description: Materialization result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpandByDigestResponse'
+        '400':
+          description: Invalid request
+        '503':
+          description: Executor unavailable
+components:
+  schemas:
+    ExpandByDigestRequest:
+      type: object
+      required:
+        - committed_ir_digest
+        - schema_version
+        - request_id
+      properties:
+        committed_ir_digest:
+          type: string
+          description: Opaque digest of committed IR (authoritative key)
+        schema_version:
+          type: string
+          description: Digest schema version for compatibility
+        request_id:
+          type: string
+          description: Correlation ID for logs/traces
+        envelope_id:
+          type: string
+          description: Required when available in provenance; binds to exact Sterling envelope
+        client_trace_id:
+          type: string
+          description: Optional distributed trace identifier
+        transport_context:
+          type: object
+          additionalProperties: false
+          description: Optional transport context (no NL/semantic fields)
+          properties:
+            domain_session_id:
+              type: string
+            world_id:
+              type: string
+            capability_set_digest:
+              type: string
+            budget:
+              type: object
+              additionalProperties: false
+              properties:
+                max_steps:
+                  type: integer
+                max_ms:
+                  type: integer
+                max_depth:
+                  type: integer
+    ExpandByDigestResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ExpandByDigestOk'
+        - $ref: '#/components/schemas/ExpandByDigestBlocked'
+        - $ref: '#/components/schemas/ExpandByDigestError'
+    ExpandByDigestOk:
+      type: object
+      required:
+        - status
+        - plan_bundle_digest
+        - steps
+        - schema_version
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        plan_bundle_digest:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeafPlanStepV1'
+        schema_version:
+          type: string
+    ExpandByDigestBlocked:
+      type: object
+      required:
+        - status
+        - blocked_reason
+      properties:
+        status:
+          type: string
+          enum: [blocked]
+        blocked_reason:
+          type: string
+          description: "blocked_missing_digest | blocked_missing_envelope_id | blocked_digest_unknown | blocked_executor_unavailable | blocked_contract_version_mismatch | blocked_invalid_steps_bundle"
+        retry_after_ms:
+          type: integer
+    ExpandByDigestError:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: string
+    LeafPlanStepV1:
+      type: object
+      required:
+        - leaf
+        - args
+      properties:
+        id:
+          type: string
+        order:
+          type: integer
+        leaf:
+          type: string
+          description: Opaque capability leaf identifier
+        args:
+          type: object
+          additionalProperties: true
+          description: Opaque args for the leaf
+        meta:
+          type: object
+          additionalProperties: true
+          description: Optional opaque metadata

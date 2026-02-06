@@ -72,6 +72,7 @@ import {
   createKeepAliveIntegration,
   type KeepAliveIntegration,
 } from './modules/keep-alive-integration';
+import { getGoldenRunRecorder } from './golden-run-recorder';
 // Dynamic import to avoid TypeScript path resolution issues
 // import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
 
@@ -1847,6 +1848,9 @@ async function autonomousTaskExecutor() {
         try {
           // Get bot state for keep-alive context
           const botState = await getBotState().catch(() => ({}));
+          const pendingPlanningSterlingIrCount = activeTasks.filter(
+            (task) => task.type === 'sterling_ir' && task.status === 'pending_planning'
+          ).length;
 
           const result = await global.keepAliveIntegration.onIdle(
             {
@@ -1856,6 +1860,7 @@ async function autonomousTaskExecutor() {
               circuitBreakerOpen,
               lastUserCommand: global.lastUserCommand || 0,
               recentTaskConversions: 0, // Tracked internally by integration
+              pendingPlanningSterlingIrCount,
             },
             botState
           );
@@ -2314,6 +2319,17 @@ async function autonomousTaskExecutor() {
           console.log(
             `[Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
+          const runId = (currentTask.metadata as any)?.goldenRun?.runId as
+            | string
+            | undefined;
+          if (runId) {
+            getGoldenRunRecorder().recordDispatch(runId, {
+              step_id: stepId,
+              leaf: leafExec.leafName,
+              args: leafExec.args,
+              dispatched_at: Date.now(),
+            });
+          }
           const actionResult = await toolExecutor.execute(
             toolName,
             leafExec.args,
@@ -3587,6 +3603,7 @@ serverConfig.addEndpoint('post', '/keep-alive/force-tick', async (req, res) => {
         circuitBreakerOpen: false,
         lastUserCommand: 0,
         recentTaskConversions: 0,
+        pendingPlanningSterlingIrCount: 0,
       },
       {
         // Minimal bot state
@@ -3734,6 +3751,16 @@ async function startServer() {
         enabled: process.env.KEEPALIVE_ENABLED !== 'false',
         baseIntervalMs: parseInt(process.env.KEEPALIVE_INTERVAL_MS || '120000', 10),
         cognitionServiceUrl: process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
+        enableSterlingIdleEpisodes:
+          process.env.STERLING_IDLE_EPISODES_ENABLED === 'true',
+        idleEpisodeCooldownMs: parseInt(
+          process.env.STERLING_IDLE_EPISODES_COOLDOWN_MS || '300000',
+          10
+        ),
+        idleEpisodeTimeoutMs: parseInt(
+          process.env.STERLING_IDLE_EPISODES_TIMEOUT_MS || '12000',
+          10
+        ),
       });
       console.log('[Planning] Keep-alive integration initialized');
     } catch (error) {

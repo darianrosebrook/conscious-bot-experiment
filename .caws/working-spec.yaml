@@ -1,57 +1,59 @@
-id: PR4-PLANNING-OBS-400
-title: "Instrument planning 400s for thought ingestion"
+id: STIR-510
+title: "Golden Run Proof for Sterling IR Pipeline"
 risk_tier: 2
-feature_flag: "PLANNING_INGEST_DEBUG_400=1"
 scope:
   in:
-    - "Add structured 400 rejection logging at the planning ingestion endpoint"
-    - "Echo request id and include validation details in 400 response (debug only)"
-    - "Log caller-side 400 response body text (truncated) with hash in cognition"
-    - "Temporarily gate ACKs to avoid dropping failing thoughts (debug only)"
+    - "Dev-gated sterling_ir injection endpoint for sink proof"
+    - "Golden run recorder emitting artifacts from planning runtime"
+    - "Idle episode -> Sterling reduction -> sterling_ir task path"
+    - "Report linkage across reduction/expansion/dispatch/verification"
   out:
-    - "Changing task conversion semantics"
-    - "Altering Sterling reduction contents or schema"
+    - "UI changes or dashboard modifications"
+    - "Any TS-side semantic parsing or goal inference"
+    - "Sterling semantic policy changes"
 invariants:
-  - "No semantic interpretation added to planning."
-  - "Logs include key presence booleans only (no full content)."
-  - "Any 400 response includes rejection reason or validation issues when debug flag is enabled."
-  - "ACK gating only active when debug flag enabled."
-  - "Instrumentation does not allocate or stringify full request body unless debug flag enabled and response is 400."
+  - "No semantic authority creep: TS does not parse text or infer requirements"
+  - "Injected tasks flow through TaskIntegration.addTask() and materializeSterlingIrSteps()"
+  - "Golden run reporting is observational only; no behavior changes"
+  - "sterling_ir tasks bypass resolveRequirement() and similarity dedupe"
+  - "Idle episodes create tasks only when Sterling returns executable reduction"
 acceptance:
   - id: A1
-    given: "planning receives a malformed thought payload"
-    when: "endpoint returns 400"
-    then: "logs include request id, route, content-type, size, top-level keys, and missing required fields"
+    given: "dev injection request with committed_ir_digest + schema_version"
+    when: "planning injects sterling_ir task"
+    then: "task is created via TaskIntegration and expansion is attempted once"
   - id: A2
-    given: "planning returns 400"
-    when: "cognition submits the request"
-    then: "cognition logs URL, status code, and response body text (truncated) with hash"
+    given: "expansion returns ok with steps"
+    when: "task is created"
+    then: "task becomes pending with attached steps and expansion metadata recorded"
   - id: A3
-    given: "thought is rejected due to missing fields"
-    when: "planning is in debug mode"
-    then: "thought is not ACKed for a bounded number of retries"
+    given: "executor dispatches a leaf step"
+    when: "verification completes"
+    then: "golden run report captures dispatch + verification evidence"
   - id: A4
-    given: "debug flag is off"
-    when: "400 occurs"
-    then: "response does not include validation issues and logs include only baseline info"
+    given: "idle conditions met and idle episodes enabled"
+    when: "Sterling returns executable reduction"
+    then: "a sterling_ir task is created from reduction without TS semantics"
+  - id: A5
+    given: "a golden run"
+    when: "run completes"
+    then: "artifacts/golden-run/golden-<run_id>.json exists with task, expansion, dispatch, verification"
 non_functional:
-  a11y: []
   perf:
-    api_p95_ms: 250
+    api_p95_ms: 2000
   security:
-    - "No logging of full thought content or PII"
+    - "Dev injection endpoint gated by ENABLE_DEV_ENDPOINTS=true"
 contracts:
   - type: openapi
-    path: "TBD: resolve planning ingest contract path before merge"
+    path: "contracts/sterling-executor.yaml#/paths/~1sterling~1expand-by-digest/post"
 observability:
   logs:
-    - "planning.thought_ingest.reject with missing_fields (debug only)"
-    - "planning.thought_ingest.request with key_presence (debug only)"
-    - "cognition.planning_bridge.error with response_body_hash (debug only)"
-  metrics:
-    - "planning_thought_ingest_400_total{reason_code}"
-    - "planning_thought_ingest_missing_field_total{field}"
+    - "[GoldenRun] injection"
+    - "[GoldenRun] expansion"
+    - "[GoldenRun] dispatch"
+    - "[GoldenRun] verification"
+  metrics: []
   traces: []
-migrations: []
 rollback:
-  - "Disable PLANNING_INGEST_DEBUG_400 and remove debug logging + ack gating"
+  - "Disable ENABLE_DEV_ENDPOINTS or remove golden run recording"
+  - "Disable STERLING_IDLE_EPISODES_ENABLED"
