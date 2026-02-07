@@ -77,12 +77,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
         baseIntervalMs: 100,
         minIntervalMs: 50,
         idleConfig: {
-          minIdleMs: 0,
-          maxActivePlanSteps: 10,
-          maxRecentConversions: 10,
-          recentConversionWindowMs: 60000,
-          threatLevelThreshold: 10,
-          userCommandCooldownMs: 0,
+          recentTaskConversionWindowMs: 60000,
+          recentUserCommandWindowMs: 0,
         },
       }
     );
@@ -113,12 +109,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
         baseIntervalMs: 100,
         minIntervalMs: 50,
         idleConfig: {
-          minIdleMs: 0,
-          maxActivePlanSteps: 10,
-          maxRecentConversions: 10,
-          recentConversionWindowMs: 60000,
-          threatLevelThreshold: 10,
-          userCommandCooldownMs: 0,
+          recentTaskConversionWindowMs: 60000,
+          recentUserCommandWindowMs: 0,
         },
       }
     );
@@ -166,12 +158,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
         baseIntervalMs: 100,
         minIntervalMs: 50,
         idleConfig: {
-          minIdleMs: 0,
-          maxActivePlanSteps: 10,
-          maxRecentConversions: 10,
-          recentConversionWindowMs: 60000,
-          threatLevelThreshold: 10,
-          userCommandCooldownMs: 0,
+          recentTaskConversionWindowMs: 60000,
+          recentUserCommandWindowMs: 0,
         },
       }
     );
@@ -218,12 +206,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
             baseIntervalMs: 100,
             minIntervalMs: 50,
             idleConfig: {
-              minIdleMs: 0,
-              maxActivePlanSteps: 10,
-              maxRecentConversions: 10,
-              recentConversionWindowMs: 60000,
-              threatLevelThreshold: 10,
-              userCommandCooldownMs: 0,
+              recentTaskConversionWindowMs: 60000,
+              recentUserCommandWindowMs: 0,
             },
           }
         );
@@ -275,12 +259,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
         baseIntervalMs: 100,
         minIntervalMs: 50,
         idleConfig: {
-          minIdleMs: 0,
-          maxActivePlanSteps: 10,
-          maxRecentConversions: 10,
-          recentConversionWindowMs: 60000,
-          threatLevelThreshold: 10,
-          userCommandCooldownMs: 0,
+          recentTaskConversionWindowMs: 60000,
+          recentUserCommandWindowMs: 0,
         },
       }
     );
@@ -315,12 +295,8 @@ describe('Sterling Runtime Integration (PR1 Acceptance)', () => {
         baseIntervalMs: 100,
         minIntervalMs: 50,
         idleConfig: {
-          minIdleMs: 0,
-          maxActivePlanSteps: 10,
-          maxRecentConversions: 10,
-          recentConversionWindowMs: 60000,
-          threatLevelThreshold: 10,
-          userCommandCooldownMs: 0,
+          recentTaskConversionWindowMs: 60000,
+          recentUserCommandWindowMs: 0,
         },
       }
     );
@@ -374,12 +350,8 @@ describe('Eligibility Rule Enforcement', () => {
           baseIntervalMs: 100,
           minIntervalMs: 50,
           idleConfig: {
-            minIdleMs: 0,
-            maxActivePlanSteps: 10,
-            maxRecentConversions: 10,
-            recentConversionWindowMs: 60000,
-            threatLevelThreshold: 10,
-            userCommandCooldownMs: 0,
+            recentTaskConversionWindowMs: 60000,
+            recentUserCommandWindowMs: 0,
           },
         }
       );

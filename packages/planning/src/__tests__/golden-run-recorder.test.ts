@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { GoldenRunRecorder, toDispatchResult } from '../golden-run-recorder';
+import {
+  GoldenRunRecorder,
+  toDispatchResult,
+  type ExecutionDecision,
+} from '../golden-run-recorder';
 
 async function readJson(filePath: string) {
   const data = await fs.readFile(filePath, 'utf8');
@@ -109,6 +113,43 @@ describe('GoldenRunRecorder', () => {
     expect(report.execution?.executor_blocked_payload?.args).toEqual({
       target: 'plank',
     });
+    expect(Array.isArray(report.execution?.decisions)).toBe(true);
+    expect(report.execution.decisions).toHaveLength(1);
+    expect(report.execution.decisions[0]).toMatchObject({
+      reason: 'unknown_leaf',
+      leaf: 'task_type_craft',
+    });
+    expect(typeof report.execution.decisions[0].ts).toBe('number');
+  });
+
+  it('appends execution.decisions in order for block then dispatch then block', () => {
+    const recorder = new GoldenRunRecorder();
+    const runId = 'decisions-run-1';
+    recorder.recordExecutorBlocked(runId, 'rate_limited', {
+      leaf: 'craft_recipe',
+    });
+    recorder.recordDispatch(runId, {
+      step_id: 'step-1',
+      leaf: 'craft_recipe',
+      args: { recipe: 'oak_planks', qty: 4 },
+      dispatched_at: Date.now(),
+    });
+    recorder.recordExecutorBlocked(runId, 'planning_incomplete', {
+      leaf: 'unknown_leaf',
+    });
+
+    const report = recorder.getReport(runId);
+    expect(report).not.toBeNull();
+    const decisions = report!.execution?.decisions as ExecutionDecision[] | undefined;
+    expect(decisions).toBeDefined();
+    expect(decisions).toHaveLength(3);
+    expect(decisions![0].reason).toBe('rate_limited');
+    expect(decisions![0].leaf).toBe('craft_recipe');
+    expect(decisions![1].reason).toBe('dispatch');
+    expect(decisions![1].leaf).toBe('craft_recipe');
+    expect(decisions![1].step_id).toBe('step-1');
+    expect(decisions![2].reason).toBe('planning_incomplete');
+    expect(decisions![2].leaf).toBe('unknown_leaf');
   });
 
   it('throttles duplicate recordExecutorBlocked (same runId, reason, leaf) within window', async () => {

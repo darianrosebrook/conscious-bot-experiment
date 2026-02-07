@@ -53,8 +53,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   let pvPublicDir = findPvPublicDir();
   if (pvPublicDir) {
     const sentinelFiles = ['index.html', 'index.js', 'worker.js'];
+    const dir = pvPublicDir;
     const hasSentinel = sentinelFiles.some((file) =>
-      fs.existsSync(path.join(pvPublicDir, file))
+      fs.existsSync(path.join(dir, file))
     );
     if (!hasSentinel) {
       console.warn(

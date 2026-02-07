@@ -11,9 +11,18 @@ import {
   normalizeTaskStepsToOptionA,
 } from '../step-option-a-normalizer';
 
+/** Step shape used by normalizer; meta may have args, leaf, produces, etc. */
+type StepWithMeta = { id: string; meta?: Record<string, unknown> };
+/** Task shape used by normalizer; metadata may have planningIncomplete, etc. */
+type TaskWithMeta = {
+  id: string;
+  steps?: Array<{ id?: string; meta?: Record<string, unknown> }>;
+  metadata?: Record<string, unknown>;
+};
+
 describe('materializeStepToOptionA', () => {
   it('returns true when step already has plain object meta.args (explicit Option A)', () => {
-    const step = {
+    const step: StepWithMeta = {
       id: 's1',
       meta: { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
     };
@@ -22,7 +31,7 @@ describe('materializeStepToOptionA', () => {
   });
 
   it('returns false and does not mutate step when step has only produces (derived) and default options', () => {
-    const step = {
+    const step: StepWithMeta = {
       id: 's1',
       meta: { leaf: 'craft_recipe', produces: [{ name: 'oak_planks', count: 4 }] },
     };
@@ -33,7 +42,7 @@ describe('materializeStepToOptionA', () => {
   });
 
   it('materializes and returns true when step has produces and allowMaterialize: true', () => {
-    const step = {
+    const step: StepWithMeta = {
       id: 's1',
       meta: { leaf: 'craft_recipe', produces: [{ name: 'oak_planks', count: 4 }] },
     };
@@ -42,29 +51,29 @@ describe('materializeStepToOptionA', () => {
   });
 
   it('when allowMaterialize true, preserves originalLeaf where applicable', () => {
-    const step = {
+    const step: StepWithMeta = {
       id: 's1',
       meta: { leaf: 'dig_block', produces: [{ name: 'oak_log', count: 1 }] },
     };
     expect(materializeStepToOptionA(step, { allowMaterialize: true })).toBe(true);
     expect(step.meta?.args).toEqual({ item: 'oak_log', count: 1 });
-    expect((step.meta as Record<string, unknown>).originalLeaf).toBe('dig_block');
+    expect(step.meta?.originalLeaf).toBe('dig_block');
   });
 
   it('returns false when step has no leaf', () => {
-    const step = { id: 's1', meta: { args: { x: 1 } } };
+    const step: StepWithMeta = { id: 's1', meta: { args: { x: 1 } } };
     expect(materializeStepToOptionA(step)).toBe(false);
   });
 
   it('returns false when step has unknown leaf', () => {
-    const step = { id: 's1', meta: { leaf: 'unknown_leaf_xyz' } };
+    const step: StepWithMeta = { id: 's1', meta: { leaf: 'unknown_leaf_xyz' } };
     expect(materializeStepToOptionA(step)).toBe(false);
   });
 });
 
 describe('normalizeTaskStepsToOptionA', () => {
   it('sets planningIncomplete when a step cannot be materialized (strict default)', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [
         { id: 's1', meta: { leaf: 'craft_recipe', args: { recipe: 'x', qty: 1 } } },
@@ -80,7 +89,7 @@ describe('normalizeTaskStepsToOptionA', () => {
   });
 
   it('does not set planningIncomplete when all steps are explicit Option A', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [
         { id: 's1', meta: { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } } },
@@ -93,7 +102,7 @@ describe('normalizeTaskStepsToOptionA', () => {
   });
 
   it('with strict default, step with only produces leaves task planningIncomplete and does not write meta.args', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [
         { id: 's1', meta: { leaf: 'craft_recipe', produces: [{ name: 'oak_planks', count: 4 }] } },
@@ -106,7 +115,7 @@ describe('normalizeTaskStepsToOptionA', () => {
   });
 
   it('with allowMaterialize true, materializes steps and sets optionACompatUsed', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [
         { id: 's1', meta: { leaf: 'craft_recipe', produces: [{ name: 'oak_planks', count: 4 }] } },
@@ -120,7 +129,7 @@ describe('normalizeTaskStepsToOptionA', () => {
   });
 
   it('clears planningIncomplete when all steps are already Option A', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [{ id: 's1', meta: { leaf: 'craft_recipe', args: { recipe: 'x', qty: 1 } } }],
       metadata: { planningIncomplete: true, planningIncompleteReasons: [{ reason: 'unknown_leaf' }] },
@@ -131,7 +140,7 @@ describe('normalizeTaskStepsToOptionA', () => {
   });
 
   it('unknown leaf adds planningIncompleteReasons with leaf and reason unknown_leaf', () => {
-    const task = {
+    const task: TaskWithMeta = {
       id: 't1',
       steps: [{ id: 's1', meta: { leaf: 'unsupported_leaf_xyz' } }],
       metadata: {},

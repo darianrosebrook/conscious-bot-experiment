@@ -52,32 +52,41 @@ export async function executeSterlingStep(
   },
   ctx: SterlingStepExecutorContext
 ): Promise<void> {
-  const leafExec = stepToLeafExecution(nextStep);
-  if (!leafExec) return;
-
   const stepId = String(nextStep.id || nextStep.order || 'unknown');
-  const { config, leafAllowlist, mode } = ctx;
   const runId = (
     (task.metadata as Record<string, unknown>)?.goldenRun as
       | Record<string, unknown>
       | undefined
   )?.runId as string | undefined;
 
-  // Planning-incomplete: normalizer could not materialize Option A for at least one step (deterministic: condition does not clear without plan mutation).
+  // Planning-incomplete: normalizer could not materialize Option A for at least one step (deterministic: condition does not clear without plan mutation). Check before leaf resolution so unknown-leaf steps also get backoff (no hot-loop).
   if ((task.metadata as Record<string, unknown>)?.planningIncomplete === true) {
     ctx.updateTaskMetadata(task.id, {
       blockedReason: 'planning_incomplete',
       nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
     });
     if (runId) {
+      const leafName = (nextStep.meta?.leaf as string) ?? 'unknown';
       ctx.getGoldenRunRecorder().recordExecutorBlocked(
         runId,
         'planning_incomplete',
-        { leaf: leafExec.leafName }
+        { leaf: leafName }
       );
     }
     return;
   }
+
+  const leafExec = stepToLeafExecution(nextStep);
+  if (!leafExec) {
+    if (runId) {
+      ctx.getGoldenRunRecorder().recordExecutorBlocked(runId, 'unknown_leaf', {
+        leaf: (nextStep.meta?.leaf as string) ?? 'unknown',
+      });
+    }
+    return;
+  }
+
+  const { config, leafAllowlist, mode } = ctx;
 
   // Live mode: block derived args (Option A requires explicit executor-native args)
   if (mode === 'live' && leafExec.argsSource === 'derived') {
@@ -326,11 +335,15 @@ export async function executeSterlingStep(
         | undefined
     )?.runId as string | undefined;
     if (runId) {
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(runId, 'invalid_args', {
-        leaf: leafExec.leafName,
-        validation_error:
-          'task_type_* only allowed when EXECUTOR_MODE=shadow and ENABLE_TASK_TYPE_BRIDGE=1',
-      });
+      ctx.getGoldenRunRecorder().recordExecutorBlocked(
+        runId,
+        'task_type_bridge_only_shadow',
+        {
+          leaf: leafExec.leafName,
+          validation_error:
+            'task_type_* only allowed when EXECUTOR_MODE=shadow and ENABLE_TASK_TYPE_BRIDGE=1',
+        }
+      );
     }
     return;
   }
@@ -437,14 +450,26 @@ export async function executeSterlingStep(
     ctx.getGoldenRunRecorder().recordDispatch(runId, dispatchPayload);
   }
 
-  const noMappedAction =
-    (actionResult?.metadata as Record<string, unknown>)?.reason ===
-    'no_mapped_action';
+  const actionMeta = (actionResult as Record<string, unknown> | null | undefined)
+    ?.metadata as Record<string, unknown> | undefined;
+  const noMappedAction = actionMeta?.reason === 'no_mapped_action';
   if (noMappedAction) {
     ctx.updateTaskMetadata(task.id, {
       blockedReason: 'no_mapped_action',
       nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
     });
+    if (runId) {
+      const payload: Record<string, unknown> = {
+        leaf: leafExec.leafName,
+        args: leafExec.args,
+      };
+      if (leafExec.originalLeaf) payload.original_leaf = leafExec.originalLeaf;
+      ctx.getGoldenRunRecorder().recordExecutorBlocked(
+        runId,
+        'no_mapped_action',
+        payload
+      );
+    }
     return;
   }
 
@@ -477,6 +502,16 @@ export async function executeSterlingStep(
   }
 
   if (isNavigatingError(actionResult?.error)) {
+    if (runId) {
+      ctx.getGoldenRunRecorder().recordExecutorBlocked(
+        runId,
+        'navigating_in_progress',
+        {
+          leaf: leafExec.leafName,
+          error: actionResult?.error,
+        }
+      );
+    }
     return;
   }
 

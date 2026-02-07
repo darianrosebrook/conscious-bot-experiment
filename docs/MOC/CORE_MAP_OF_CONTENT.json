@@ -1,7 +1,7 @@
 {
-  "generated": "2026-02-07T00:22:04.909357",
+  "generated": "2026-02-07T02:17:37.784953",
   "author": "@darianrosebrook",
-  "total_modules": 472,
+  "total_modules": 516,
   "modules": [
     {
       "path": "cognition/src/audit/thought-action-audit-logger.ts",
@@ -19647,6 +19647,1889 @@
         "author": null,
         "has_main": false
       }
+    },
+    {
+      "path": "planning/src/reactive-executor/goap-types.ts",
+      "name": "goap-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides the necessary interfaces for integrating task planning into the conscious-bot's reactive execution context. Implements minimal types for world state, resource tracking, and threat assessment used by the retired GOAP planner. Maintains backward compatibility as the core task integration layer.",
+      "classes": [
+        "GOAPPlanner",
+        "PlanRepair"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:33:57.000051",
+        "modified": "2026-02-01T03:03:40.616709",
+        "modified_days_ago": 5,
+        "lines": 254,
+        "size_bytes": 6709,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/reactive-executor/minecraft-executor.ts",
+      "name": "minecraft-executor.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "from packages.minecraft-interface, runs plan steps by sending commands to the Minecraft client via the interface API, returning execution results, and integrating with the cognitive solver for step-by-step task execution.",
+      "classes": [
+        "MinecraftExecutor"
+      ],
+      "functions": [],
+      "imports": [
+        "../types",
+        "../server/execution-gateway",
+        "../server/gateway-wrappers"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T21:30:13.607520",
+        "modified": "2026-02-02T21:30:13.607671",
+        "modified_days_ago": 4,
+        "lines": 382,
+        "size_bytes": 10552,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/reactive-executor/reactive-executor.ts",
+      "name": "reactive-executor.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides real-time execution of GOAP plans within the reactive executor * * Integrates plan repair, safety reflex activation, and tool execution via MCP * * Enforces operational status tracking for the cognitive workflow",
+      "classes": [
+        "ReactiveExecutor",
+        "DefaultExecutionContextBuilder",
+        "DefaultRealTimeAdapter"
+      ],
+      "functions": [],
+      "imports": [
+        "zod",
+        "../interfaces/reactive-executor",
+        "../server/execution-gateway",
+        "../server/gateway-wrappers"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:54:47.225793",
+        "modified": "2026-02-06T15:01:09.259180",
+        "modified_days_ago": 0,
+        "lines": 2311,
+        "size_bytes": 64624,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/reactive-executor/safety-reflexes.ts",
+      "name": "safety-reflexes.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Safety Reflexes \u2014 reactive veto/pause for emergency responses. * * These are NOT deliberative planning. Reflexes may veto, pause, or insert * a small fixed sequence, but they do NOT search. If a reflex needs search, * it's a planning capability and belongs in Sterling. * * @pivot 5 \u2014 Safety reflexes depend on minimal ExecutionSnapshot, not GOAP-era WorldState. * * @author @darianrosebrook",
+      "classes": [
+        "SafetyReflexes"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:17:58.544584",
+        "modified": "2026-01-31T14:17:58.544739",
+        "modified_days_ago": 6,
+        "lines": 138,
+        "size_bytes": 4380,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/action-response.ts",
+      "name": "action-response.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "response parser for the /action endpoint, converting MC response payloads into the standardized NormalizedActionResponse structure, enforcing the contract that ok is only true on successful leaf-level outcomes",
+      "classes": [],
+      "functions": [
+        "normalizeActionResponse",
+        "extractLeafError",
+        "extractFailureCode"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T16:08:01.815937",
+        "modified": "2026-02-02T16:08:01.816039",
+        "modified_days_ago": 4,
+        "lines": 100,
+        "size_bytes": 3528,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/autonomous-executor.ts",
+      "name": "autonomous-executor.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements periodic execution of autonomous tasks using runCycle, with exponential backoff and circuit breaker for resilience in the conscious-bot planning system.",
+      "classes": [
+        "StepRateLimiter"
+      ],
+      "functions": [
+        "parseGeofenceConfig",
+        "isInsideGeofence",
+        "evaluateGuards",
+        "parseExecutorConfig",
+        "startAutonomousExecutor",
+        "stopAutonomousExecutor",
+        "initExecutorAbortController",
+        "getExecutorAbortSignal",
+        "emergencyStopExecutor"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T14:28:05.642388",
+        "modified": "2026-02-01T14:28:05.642889",
+        "modified_days_ago": 5,
+        "lines": 331,
+        "size_bytes": 12189,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/cognitive-task-handler.ts",
+      "name": "cognitive-task-handler.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides sentence-level extraction of actionable steps from cognitive reflections for the conscious-bot planning pipeline. Analyzes user thought content to identify executable commands using predefined action terms. Converts high-level reflections into structured task directives for the autonomous executor.",
+      "classes": [],
+      "functions": [
+        "detectActionableSteps",
+        "extractActionableSteps",
+        "determineActionType",
+        "convertCognitiveReflectionToTasks"
+      ],
+      "imports": [
+        "../interfaces/task-integration"
+      ],
+      "constants": [
+        "ACTIONABLE_KEYWORDS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T09:06:16.284280",
+        "modified": "2026-02-01T09:06:16.284511",
+        "modified_days_ago": 5,
+        "lines": 223,
+        "size_bytes": 6759,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/execution-gateway.ts",
+      "name": "execution-gateway.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* ExecutionGateway \u2014 single sanctioned path for planning-side world mutations. * * Every planning-side caller that wants to cause a Minecraft world mutation * MUST go through this gateway. It applies: * 1. Bot connection pre-flight * 2. Mode gating (shadow vs live) * 3. Response normalization (normalizeActionResponse) * 4.",
+      "classes": [],
+      "functions": [
+        "resolveMode",
+        "getExecutorMode",
+        "onGatewayAudit",
+        "emitAudit",
+        "executeViaGateway"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:55:34.606784",
+        "modified": "2026-02-02T20:55:34.606980",
+        "modified_days_ago": 4,
+        "lines": 309,
+        "size_bytes": 8958,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/execution-readiness.ts",
+      "name": "execution-readiness.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides executor enablement by probing essential services and determining readiness for the planning module. Evaluates the status of 'minecraft', 'memory', 'cognition', and 'dashboard' endpoints at periodic intervals. Ensures the cognitive solver only activates when required services are healthy.",
+      "classes": [
+        "ReadinessMonitor"
+      ],
+      "functions": [
+        "probeOne",
+        "probeServices"
+      ],
+      "imports": [
+        "@conscious-bot/core"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T14:58:43.355560",
+        "modified": "2026-02-06T12:04:52.315739",
+        "modified_days_ago": 0,
+        "lines": 238,
+        "size_bytes": 6861,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/executor-circuit-breaker.ts",
+      "name": "executor-circuit-breaker.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides infra error detection and controlled pause for task scheduling. Trips the circuit breaker on systemic errors, tracks retry count, and enforces exponential backoff to avoid task-level over-retry during outages. Ensures all task executions wait for the system recovery via a centralized breaker.",
+      "classes": [],
+      "functions": [
+        "tripCircuitBreaker",
+        "recordSuccess",
+        "isCircuitBreakerOpen",
+        "getCircuitBreakerState",
+        "_resetCircuitBreaker",
+        "_getSuccessStreak"
+      ],
+      "imports": [],
+      "constants": [
+        "INITIAL_BACKOFF_MS",
+        "MAX_BACKOFF_MS",
+        "RESET_AFTER_SUCCESS_COUNT"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T21:24:37.485754",
+        "modified": "2026-02-02T21:24:37.485871",
+        "modified_days_ago": 4,
+        "lines": 128,
+        "size_bytes": 3491,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/gateway-wrappers.ts",
+      "name": "gateway-wrappers.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": ", the `executeTaskViaGateway` function ensures task context is properly attached to actions from the executor, requiring a `taskId` for every invocation to maintain correlation and lease tracking. The wrappers replace unsafe direct calls with typed, structured requests to the gateway, improving safety and clarity. This mechanism is essential for the planning module to correctly integrate task-driven actions in the conscious-bot architecture.",
+      "classes": [],
+      "functions": [
+        "executeTaskViaGateway",
+        "executeReactiveViaGateway",
+        "executeSafetyViaGateway",
+        "executeCognitionViaGateway"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T21:28:04.456013",
+        "modified": "2026-02-02T21:28:04.456113",
+        "modified_days_ago": 4,
+        "lines": 115,
+        "size_bytes": 3050,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/sterling-bootstrap.ts",
+      "name": "sterling-bootstrap.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides initialization and registration of SterlingReasoningService and various Minecraft solvers within the planning module. Integrates and configures the solver registry with task processing capabilities for crafting, building, tool progression, and navigation. Ensures safe startup and seamless handoff to Language IO transport for LLM interaction if available.",
+      "classes": [],
+      "functions": [
+        "createSterlingBootstrap"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T09:01:01.643824",
+        "modified": "2026-02-05T05:15:09.540393",
+        "modified_days_ago": 1,
+        "lines": 122,
+        "size_bytes": 4388,
+        "author": "ity",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/task-action-resolver.ts",
+      "name": "task-action-resolver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Centralized Task \u2192 Action Parameter Resolver * * Every execution path (reactive, autonomous, BT tool executor) must use this * resolver to turn a task into gateway-ready action args. If the resolver * cannot produce valid args, it fails deterministically (no backoff, no retries). * * Design principles: * 1. Fail-closed: Unknown/missing is NOT a valid value \u2014 it's a classification result * 2.",
+      "classes": [],
+      "functions": [
+        "resolveActionFromTask",
+        "resolveCraftAction",
+        "resolveMineAction",
+        "resolveGatherAction",
+        "resolveExploreAction",
+        "resolveMoveAction",
+        "resolveNavigateAction",
+        "resolvePlaceAction",
+        "resolveFindAction",
+        "inferItemFromTitle"
+      ],
+      "imports": [
+        "../types/task"
+      ],
+      "constants": [
+        "TERMINAL_CODES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:12:28.589543",
+        "modified": "2026-02-05T05:16:12.155262",
+        "modified_days_ago": 1,
+        "lines": 908,
+        "size_bytes": 28797,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/server/task-block-evaluator.ts",
+      "name": "task-block-evaluator.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides evaluation functions for task block states in the planning module of conscious-bot. Enforces TTL and fail behaviors using the BlockEvaluableTask interface.",
+      "classes": [],
+      "functions": [
+        "shouldAutoUnblockTask",
+        "evaluateTaskBlockState",
+        "isTaskEligible"
+      ],
+      "imports": [],
+      "constants": [
+        "DEFAULT_BLOCKED_TTL_MS",
+        "ELIGIBLE_STATUSES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T21:23:06.305984",
+        "modified": "2026-02-06T12:10:38.918075",
+        "modified_days_ago": 0,
+        "lines": 148,
+        "size_bytes": 4916,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/signal-extraction-pipeline.ts",
+      "name": "signal-extraction-pipeline.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides a modular signal extraction framework for the planning module of conscious-bot.",
+      "classes": [
+        "SignalExtractionPipeline",
+        "MemoryBackedExtractor",
+        "LLMExtractor",
+        "HeuristicExtractor"
+      ],
+      "functions": [],
+      "imports": [
+        "./cognitive-thought-processor"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T23:44:00.933368",
+        "modified": "2026-02-01T03:03:40.176600",
+        "modified_days_ago": 5,
+        "lines": 606,
+        "size_bytes": 17685,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/llm-skill-composer.ts",
+      "name": "llm-skill-composer.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* LLM Skill Composer - Integrates Language Models with Skill Composition * * This enhanced version of the SkillComposer uses language models to: * - Refine and expand goal descriptions * - Generate new skill combinations * - Analyze execution feedback for improvement * - Create adaptive skill curricula * * @author @darianrosebrook",
+      "classes": [
+        "LLMSkillComposer"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "./types",
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T20:13:38.218839",
+        "modified": "2026-02-01T03:03:40.653333",
+        "modified_days_ago": 5,
+        "lines": 1008,
+        "size_bytes": 29774,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/mcp-capabilities-adapter.ts",
+      "name": "mcp-capabilities-adapter.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides dynamic capability execution for the planning system in the conscious-bot architecture. Adapts user capabilities to execution requests using the CapabilityRegistry and executes shadow runs via the MCP interface. Enables the planner to respond to impasse with meaningful error feedback and retry logic.",
+      "classes": [
+        "DynamicCreationFlow",
+        "ExecError",
+        "MCPCapabilitiesAdapter"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:25:02.877328",
+        "modified": "2026-02-01T03:03:40.197274",
+        "modified_days_ago": 5,
+        "lines": 837,
+        "size_bytes": 24276,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/mcp-integration.ts",
+      "name": "mcp-integration.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides dynamic capability registration and LLM-assisted skill composition for the conscious-bot planner module. Integrates with the MCPSkillConfig to enable adaptive task decomposition and execution. Facilitates real-time capability selection and orchestration during task planning.",
+      "classes": [
+        "DynamicCreationFlow",
+        "MCPSkillIntegration",
+        "DefaultAdaptiveCapabilitySelector"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "../modules/capability-registry",
+        "./llm-skill-composer",
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-01T14:38:52.401728",
+        "modified": "2026-02-01T03:03:40.622731",
+        "modified_days_ago": 5,
+        "lines": 1298,
+        "size_bytes": 37894,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/skill-composer-adapter.ts",
+      "name": "skill-composer-adapter.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "stable",
+      "description": ";Implements skill composition logic to dynamically build and integrate skills with the conscious-bot planner using SkillRegistry interactions and Skill metadata.",
+      "classes": [
+        "SkillRegistry",
+        "SkillComposerAdapter"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "./types",
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 138 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-01T14:28:43.724581",
+        "modified": "2025-09-21T15:30:20.023857",
+        "modified_days_ago": 138,
+        "lines": 639,
+        "size_bytes": 19239,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/skill-planner-adapter.ts",
+      "name": "skill-planner-adapter.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides skill-based task decomposition by mapping SkillRegistry entries to PlanNode structures for BehaviorTreeRunner integration in the cognitive planning layer.",
+      "classes": [
+        "SkillRegistry",
+        "SkillPlannerAdapter"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "@conscious-bot/memory"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:24:53.203820",
+        "modified": "2026-01-31T14:24:53.204093",
+        "modified_days_ago": 6,
+        "lines": 805,
+        "size_bytes": 23511,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/skill-integration/types.ts",
+      "name": "types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "stable",
+      "description": "Provides type definitions for composing and executing skills in the conscious-bot planning module. Defines interfaces for ExecutionStep, ComposedSkill, and ExecutionContext to model task integration and resource constraints. Ensures consistent validation and metadata for skill composition within the cognitive workflow.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 158 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-01T16:56:33.229963",
+        "modified": "2025-09-01T16:59:33.653942",
+        "modified_days_ago": 158,
+        "lines": 116,
+        "size_bytes": 2625,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/startup-barrier.ts",
+      "name": "startup-barrier.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "provides setReadinessMonitor, getReadinessMonitor, isServiceReachable.",
+      "classes": [],
+      "functions": [
+        "setReadinessMonitor",
+        "getReadinessMonitor",
+        "isServiceReachable",
+        "isSystemReady",
+        "getSystemReadyState",
+        "markSystemReady",
+        "waitForSystemReady"
+      ],
+      "imports": [
+        "./server/execution-readiness"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T14:14:07.875917",
+        "modified": "2026-02-01T14:14:07.876005",
+        "modified_days_ago": 5,
+        "lines": 65,
+        "size_bytes": 1837,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/base-domain-solver.ts",
+      "name": "base-domain-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements the base domain solver for Sterling, providing plan parameter validation and solve logic. Handles episode reporting, identity field tracking, and operator registry management. Ensures strict protocol compliance and phase state latching for reliable task integration in the conscious-bot planning module.",
+      "classes": [
+        "BaseDomainSolver"
+      ],
+      "functions": [
+        "isReportIdentityFieldsEnabled",
+        "buildLatchKey",
+        "areIdentityFieldsRejected",
+        "latchIdentityFieldsRejected",
+        "__resetIdentityLatchForTests",
+        "logIdentityFieldStatusOnce"
+      ],
+      "imports": [
+        "./sterling-reasoning-service",
+        "@conscious-bot/core",
+        "./solve-bundle-types",
+        "./domain-declaration",
+        "./domain-declaration"
+      ],
+      "constants": [
+        "IDENTITY_LATCH_MAX",
+        "MISSING_OUTCOME_CLASS_WARN_MAX"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T03:31:29.445127",
+        "modified": "2026-02-03T03:31:29.445276",
+        "modified_days_ago": 3,
+        "lines": 525,
+        "size_bytes": 20829,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/compat-linter.ts",
+      "name": "compat-linter.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements Sterling's compatibility linter to validate task rules against known hazards and enforce code constraints during CI. Evaluates rule structure and numeric requirements, issues detailed reports for violations, and integrates with the planning solver only when acquire hardening is enabled or the specific solverId is set.",
+      "classes": [],
+      "functions": [
+        "lintRules",
+        "lintGoal"
+      ],
+      "imports": [
+        "./solve-bundle-types",
+        "./solver-ids"
+      ],
+      "constants": [
+        "TIER_GATED_PRODUCTS",
+        "VALID_ACTION_TYPES",
+        "MAX_BASE_COST"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:54:30.807002",
+        "modified": "2026-02-02T23:54:30.807374",
+        "modified_days_ago": 3,
+        "lines": 418,
+        "size_bytes": 15822,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/degeneracy-detection.ts",
+      "name": "degeneracy-detection.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "*\n * Implements strategy degeneracy detection for the conscious-bot planner by evaluating the cost spread among top-ranked candidates.\n * Flags a degenerate situation when top strategies\u2019 costs are nearly equal within a given epsilon.\n * Triggers a diagnostic to indicate when the heuristic refinement in M2-b is necessary.\n *",
+      "classes": [],
+      "functions": [
+        "detectStrategyDegeneracy"
+      ],
+      "imports": [
+        "./minecraft-acquisition-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T20:05:18.336259",
+        "modified": "2026-02-01T20:05:18.336377",
+        "modified_days_ago": 5,
+        "lines": 73,
+        "size_bytes": 2387,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/domain-declaration.ts",
+      "name": "domain-declaration.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Domain Declaration V1 * * Cross-boundary claim object that a solver sends to Sterling to register * what capabilities it provides. Sterling stores these in an in-memory * registry keyed by content-addressed digest. * * The declaration is orthogonal to solve messages \u2014 claim plumbing cannot * contaminate solver reliability. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "computeDeclarationDigest",
+        "computeRegistrationDigest",
+        "validateDeclaration",
+        "buildRegisterMessage",
+        "buildGetMessage"
+      ],
+      "imports": [
+        "./primitive-namespace",
+        "./primitive-namespace",
+        "./solve-bundle"
+      ],
+      "constants": [
+        "DECLARATION_DIGEST_PREFIX",
+        "REGISTRATION_DIGEST_PREFIX"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T18:13:05.172457",
+        "modified": "2026-02-02T18:13:05.172585",
+        "modified_days_ago": 4,
+        "lines": 189,
+        "size_bytes": 6695,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/episode-classification.ts",
+      "name": "episode-classification.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "outcome classification system within the conscious-bot planning module, mapping solveBundle signals to standardized episode outcomes using predefined join keys and fallback string matching on error fields for D8 episodes.",
+      "classes": [
+        "from"
+      ],
+      "functions": [
+        "extractSolveJoinKeys",
+        "buildSterlingEpisodeLinkage",
+        "classifyOutcome",
+        "buildSterlingEpisodeLinkageFromResult"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 221,
+            "content": "// TODO(2026-03-01): Remove these aliases and update all call sites to use",
+            "file_path": "packages/planning/src/sterling/episode-classification.ts"
+          },
+          {
+            "line_number": 229,
+            "content": "// TODO(2026-03-01): remove alias",
+            "file_path": "packages/planning/src/sterling/episode-classification.ts"
+          },
+          {
+            "line_number": 236,
+            "content": "// TODO(2026-03-01): remove alias",
+            "file_path": "packages/planning/src/sterling/episode-classification.ts"
+          }
+        ]
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T03:17:21.770858",
+        "modified": "2026-02-03T03:17:21.771034",
+        "modified_days_ago": 3,
+        "lines": 237,
+        "size_bytes": 8957,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/label-utils.ts",
+      "name": "label-utils.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides mapping of degraded edge labels for task integration in the Sterling solver. Implements a MappingDegradation interface that marks steps as degraded.",
+      "classes": [],
+      "functions": [
+        "extractActionName"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T07:54:31.329622",
+        "modified": "2026-02-01T07:54:31.329742",
+        "modified_days_ago": 5,
+        "lines": 45,
+        "size_bytes": 1756,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/leaf-routing.ts",
+      "name": "leaf-routing.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides the mapping from action types to leaf names for the planning module in the conscious-bot architecture, enabling the crafting solvers to route intentions correctly. Centralizes the 'crafting' and 'place' dispatch logic to enforce domain-specific action handling. Ensures conformance to the action mapping used by both CraftingSolver and ToolProgressionSolver.",
+      "classes": [],
+      "functions": [
+        "parsePlaceAction",
+        "actionTypeToLeaf",
+        "actionTypeToLeafExtended",
+        "derivePlaceMeta",
+        "estimateDuration",
+        "actionToAcquisitionLeaf"
+      ],
+      "imports": [],
+      "constants": [
+        "WORKSTATION_TYPES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T22:03:32.200627",
+        "modified": "2026-02-01T22:03:32.200800",
+        "modified_days_ago": 5,
+        "lines": 111,
+        "size_bytes": 4184,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-acquisition-priors.ts",
+      "name": "minecraft-acquisition-priors.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Minecraft Acquisition Strategy Priors (Rig D) * * In-memory prior store for acquisition strategy learning. * Prior updates are execution-grounded: planId is required. * * @author @darianrosebrook",
+      "classes": [
+        "StrategyPriorStore"
+      ],
+      "functions": [],
+      "imports": [
+        "./minecraft-acquisition-types",
+        "./minecraft-acquisition-types"
+      ],
+      "constants": [
+        "EMA_ALPHA"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T19:51:13.577892",
+        "modified": "2026-02-01T19:51:13.578116",
+        "modified_days_ago": 5,
+        "lines": 131,
+        "size_bytes": 4101,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-acquisition-rules.ts",
+      "name": "minecraft-acquisition-rules.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Minecraft Acquisition Rules (Rig D) * * Strategy enumeration, ranking, and context building for multi-strategy * item acquisition. Builds AcquisitionContextV1 from raw world state and * enumerates viable strategies with cost estimates. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "distanceToBucket",
+        "buildAcquisitionContext",
+        "buildAcquisitionStrategies",
+        "buildMineCandidate",
+        "buildTradeCandidate",
+        "buildLootCandidate",
+        "buildSalvageCandidates",
+        "buildSalvageCandidatesWithInventory",
+        "findRequiredTier",
+        "rankStrategies"
+      ],
+      "imports": [
+        "./solve-bundle"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T22:24:26.323007",
+        "modified": "2026-02-01T22:24:26.323206",
+        "modified_days_ago": 5,
+        "lines": 499,
+        "size_bytes": 17686,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-acquisition-solver.ts",
+      "name": "minecraft-acquisition-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements coordinated acquisition planning in conscious-bot\u2019s planning module. Delegates sub-solvers for mining and salvage/trade strategies using SterlingCraftingSolver and Sterling (trade/loot) logic. Integrates rules, context, and rationale for efficient Minecraft resource gathering decisions.",
+      "classes": [
+        "MinecraftAcquisitionSolver"
+      ],
+      "functions": [
+        "buildTradeRules",
+        "buildLootRules",
+        "buildSalvageRules"
+      ],
+      "imports": [
+        "./base-domain-solver",
+        "./domain-declaration",
+        "./solver-ids",
+        "./minecraft-crafting-solver",
+        "./minecraft-crafting-rules",
+        "./minecraft-acquisition-priors",
+        "./compat-linter",
+        "./solve-bundle-types",
+        "./search-health",
+        "./episode-classification"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:53:39.513361",
+        "modified": "2026-02-02T23:53:39.513488",
+        "modified_days_ago": 3,
+        "lines": 680,
+        "size_bytes": 21192,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-acquisition-types.ts",
+      "name": "minecraft-acquisition-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": ", the `minecraft-acquisition-types` module in the `planning` package provides structured, bucketed world state types for the acquisition solver in conscious-bot, enabling efficient and abstraction-rich coordination between sub-strategies like mine, trade, loot, and salvage.",
+      "classes": [
+        "field"
+      ],
+      "functions": [
+        "hashAcquisitionContext",
+        "lexCmp",
+        "costToMillis",
+        "computeCandidateSetDigest"
+      ],
+      "imports": [
+        "./solve-bundle",
+        "./solve-bundle-types"
+      ],
+      "constants": [
+        "PRIOR_MIN",
+        "PRIOR_MAX"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:17:41.579930",
+        "modified": "2026-02-02T20:17:41.580087",
+        "modified_days_ago": 4,
+        "lines": 226,
+        "size_bytes": 8575,
+        "author": "@darianro",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-building-rules.ts",
+      "name": "minecraft-building-rules.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "rules engine that converts world observations into feasible building modules using placementFeasible and siteCaps checks",
+      "classes": [],
+      "functions": [
+        "buildModulesWithFeasibility",
+        "inventoryForBuilding",
+        "getRelevantMaterials",
+        "buildSiteState",
+        "computeSiteCaps",
+        "getBasicShelterTemplate"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T17:20:26.926362",
+        "modified": "2026-01-28T17:20:26.926522",
+        "modified_days_ago": 9,
+        "lines": 227,
+        "size_bytes": 6809,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-building-solver.ts",
+      "name": "minecraft-building-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements building task integration by converting Sterling's solution into a TaskStep array, enforcing dependency and support constraints to ensure feasibility, and manages material deficits by extracting required items and coordinating retry logic with the executor",
+      "classes": [
+        "MinecraftBuildingSolver"
+      ],
+      "functions": [],
+      "imports": [
+        "./base-domain-solver",
+        "./domain-declaration",
+        "./solver-ids",
+        "./solve-bundle-types",
+        "./search-health",
+        "./episode-classification",
+        "../types/task-step",
+        "../constraints/dag-builder",
+        "../constraints/linearization",
+        "../constraints/feasibility-checker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:13:12.527565",
+        "modified": "2026-02-03T00:13:12.527709",
+        "modified_days_ago": 3,
+        "lines": 565,
+        "size_bytes": 19339,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-building-types.ts",
+      "name": "minecraft-building-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides type definitions for building modules used by the conscious-bot's planning solver, tracking required materials and module dependencies without inventory mutation.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:17:34.349249",
+        "modified": "2026-02-02T20:17:34.349361",
+        "modified_days_ago": 4,
+        "lines": 168,
+        "size_bytes": 6735,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-crafting-rules.ts",
+      "name": "minecraft-crafting-rules.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "types provides type definitions for Mineflayer's Minecraft data structures used in the conscious-bot's planning module. It validates and normalizes recipes and items for accurate dependency tracing in goal-driven crafting tasks. This ensures the Sterling solver can interpret crafting rules safely and correctly during plan generation.",
+      "classes": [],
+      "functions": [
+        "isValidMcData",
+        "buildCraftingRules",
+        "trace",
+        "inventoryToRecord",
+        "goalFromTaskRequirement",
+        "addMineRule",
+        "extractIngredientIds",
+        "isLargeRecipe"
+      ],
+      "imports": [
+        "../modules/requirements"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T10:30:16.494139",
+        "modified": "2026-02-02T10:30:16.494317",
+        "modified_days_ago": 4,
+        "lines": 265,
+        "size_bytes": 8645,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-crafting-solver.ts",
+      "name": "minecraft-crafting-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides crafting solution generation for the conscious-bot's planning module. Builds Minecraft crafting rules from mcData and interfaces with Sterling for optimal recipes. Maps results into TaskStep[] format and integrates temporal constraints via TemporalEnrichment.",
+      "classes": [
+        "MinecraftCraftingSolver"
+      ],
+      "functions": [],
+      "imports": [
+        "./base-domain-solver",
+        "./domain-declaration",
+        "./solver-ids",
+        "./minecraft-crafting-rules",
+        "./compat-linter",
+        "./search-health",
+        "./episode-classification",
+        "../types/task-step",
+        "./label-utils",
+        "../temporal/temporal-enrichment"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:13:24.008961",
+        "modified": "2026-02-03T00:13:24.009117",
+        "modified_days_ago": 3,
+        "lines": 533,
+        "size_bytes": 19241,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-crafting-types.ts",
+      "name": "minecraft-crafting-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Minecraft Crafting Domain Type Definitions * * Types for integrating Minecraft crafting with Sterling's graph-search solver. * The crafting domain models inventory states as graph nodes and crafting/mining * actions as edges, allowing Sterling's A* with path-algebra learning to find * optimal crafting sequences. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:17:30.230967",
+        "modified": "2026-02-02T20:17:30.231098",
+        "modified_days_ago": 4,
+        "lines": 119,
+        "size_bytes": 4995,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-furnace-rules.ts",
+      "name": "minecraft-furnace-rules.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Furnace Scheduling Rule Builder * * Generates typed operators for the four furnace operator families: * - load_furnace: Place item into furnace slot * - add_fuel: Add fuel to furnace * - wait_tick: Wait for smelting to complete * - retrieve_output: Remove smelted item from furnace * * Maps to existing Sterling action types: * - load_furnace \u2192 'craft' (inventory manipulation) * - add_fuel \u2192...",
+      "classes": [],
+      "functions": [
+        "buildFurnaceRules",
+        "buildFurnaceGoal",
+        "checkSlotPrecondition"
+      ],
+      "imports": [
+        "./minecraft-furnace-types"
+      ],
+      "constants": [
+        "DEFAULT_SMELT_DURATION_TICKS",
+        "DEFAULT_FUEL_DURATION_TICKS",
+        "ITEMS_PER_FUEL"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T15:54:20.240652",
+        "modified": "2026-02-01T15:54:20.240782",
+        "modified_days_ago": 5,
+        "lines": 186,
+        "size_bytes": 6326,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-furnace-solver.ts",
+      "name": "minecraft-furnace-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "ts: Provides the planning solver for Minecraft furnace operations by constructing rules, executing with Sterling, and returning structured solve steps.",
+      "classes": [
+        "MinecraftFurnaceSolver"
+      ],
+      "functions": [],
+      "imports": [
+        "./base-domain-solver",
+        "./solver-ids",
+        "./minecraft-furnace-rules",
+        "./compat-linter",
+        "./compat-linter",
+        "./solve-bundle-types",
+        "./search-health",
+        "./episode-classification",
+        "./primitives/p03/p03-reference-adapter",
+        "../temporal/time-state"
+      ],
+      "constants": [
+        "MAX_NODES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:53:50.762509",
+        "modified": "2026-02-02T23:53:50.762697",
+        "modified_days_ago": 3,
+        "lines": 304,
+        "size_bytes": 8941,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-furnace-types.ts",
+      "name": "minecraft-furnace-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Implements FurnaceSearchState for the conscious-bot planning module, encapsulating the current schedule hash and necessary metadata for efficient state comparison during planning and solving. Maintains a consistent representation required by the Sterling solver to ensure hashable and comparable search states. Enables the planning module to track and validate optimal furnace operation schedules.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "./index"
+      ],
+      "constants": [
+        "FURNACE_HASH_EXCLUDED_FIELDS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:17:49.312004",
+        "modified": "2026-02-02T20:17:49.312125",
+        "modified_days_ago": 4,
+        "lines": 173,
+        "size_bytes": 6019,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-navigation-solver.ts",
+      "name": "minecraft-navigation-solver.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "* Minecraft Navigation Solver * * Orchestrates navigation solves: builds occupancy grid payload, sends to * Sterling, and maps results to NavigationPrimitive[] for the leaf. * * Pattern follows MinecraftCraftingSolver: validate \u2192 build payload \u2192 * send to Sterling \u2192 extract planId \u2192 create SolveBundle \u2192 return. * * Key difference from crafting: no pre-built rules.",
+      "classes": [
+        "MinecraftNavigationSolver"
+      ],
+      "functions": [],
+      "imports": [
+        "./base-domain-solver",
+        "./solver-ids",
+        "@conscious-bot/core",
+        "./search-health",
+        "./episode-classification",
+        "./solve-bundle-types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:54:06.073027",
+        "modified": "2026-02-02T23:54:06.073201",
+        "modified_days_ago": 3,
+        "lines": 370,
+        "size_bytes": 11989,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "planning/src/sterling/minecraft-navigation-types.ts",
+      "name": "minecraft-navigation-types.ts",
+      "category": "Task integration, Sterling solver, cognitive thought processor",
+      "status": "active",
+      "description": "Provides OccupancyGrid representations for the Sterling navigation system in the conscious-bot's planning module. Encodes block states using defined types, supports passability checks (only air is passable), and enables spatial reasoning for pathfinding in Phase 1 movement constraints.",
+      "classes": [],
+      "functions": [
+        "gridAt",
+        "isPassable",
+        "isSolid",
+        "hashOccupancyGrid",
+        "encodeGridToBase64",
+        "computeHazardPolicyId",
+        "hasArrived",
+        "computeNavigationHeuristic",
+        "hashNavigationGoal",
+        "hashNavigationStart"
+      ],
+      "imports": [
+        "node:crypto",
+        "./base-domain-solver",
+        "./solve-bundle-types"
+      ],
+      "constants": [
+        "BLOCK_TYPE",
+        "MOVEMENT_COSTS",
+        "CARDINAL_DIRECTIONS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T20:17:45.882938",
+        "modified": "2026-02-02T20:17:45.883321",
+        "modified_days_ago": 4,
+        "lines": 311,
+        "size_bytes": 10508,
+        "author": null,
+        "has_main": false
+      }
     }
   ],
   "categories": {
@@ -20126,7 +22009,51 @@
       "planning/src/modules/solve-contract.ts",
       "planning/src/modules/step-to-leaf-execution.ts",
       "planning/src/modules/timeout-policy.ts",
-      "planning/src/planning-runtime-config.ts"
+      "planning/src/planning-runtime-config.ts",
+      "planning/src/reactive-executor/goap-types.ts",
+      "planning/src/reactive-executor/minecraft-executor.ts",
+      "planning/src/reactive-executor/reactive-executor.ts",
+      "planning/src/reactive-executor/safety-reflexes.ts",
+      "planning/src/server/action-response.ts",
+      "planning/src/server/autonomous-executor.ts",
+      "planning/src/server/cognitive-task-handler.ts",
+      "planning/src/server/execution-gateway.ts",
+      "planning/src/server/execution-readiness.ts",
+      "planning/src/server/executor-circuit-breaker.ts",
+      "planning/src/server/gateway-wrappers.ts",
+      "planning/src/server/sterling-bootstrap.ts",
+      "planning/src/server/task-action-resolver.ts",
+      "planning/src/server/task-block-evaluator.ts",
+      "planning/src/signal-extraction-pipeline.ts",
+      "planning/src/skill-integration/llm-skill-composer.ts",
+      "planning/src/skill-integration/mcp-capabilities-adapter.ts",
+      "planning/src/skill-integration/mcp-integration.ts",
+      "planning/src/skill-integration/skill-composer-adapter.ts",
+      "planning/src/skill-integration/skill-planner-adapter.ts",
+      "planning/src/skill-integration/types.ts",
+      "planning/src/startup-barrier.ts",
+      "planning/src/sterling/base-domain-solver.ts",
+      "planning/src/sterling/compat-linter.ts",
+      "planning/src/sterling/degeneracy-detection.ts",
+      "planning/src/sterling/domain-declaration.ts",
+      "planning/src/sterling/episode-classification.ts",
+      "planning/src/sterling/label-utils.ts",
+      "planning/src/sterling/leaf-routing.ts",
+      "planning/src/sterling/minecraft-acquisition-priors.ts",
+      "planning/src/sterling/minecraft-acquisition-rules.ts",
+      "planning/src/sterling/minecraft-acquisition-solver.ts",
+      "planning/src/sterling/minecraft-acquisition-types.ts",
+      "planning/src/sterling/minecraft-building-rules.ts",
+      "planning/src/sterling/minecraft-building-solver.ts",
+      "planning/src/sterling/minecraft-building-types.ts",
+      "planning/src/sterling/minecraft-crafting-rules.ts",
+      "planning/src/sterling/minecraft-crafting-solver.ts",
+      "planning/src/sterling/minecraft-crafting-types.ts",
+      "planning/src/sterling/minecraft-furnace-rules.ts",
+      "planning/src/sterling/minecraft-furnace-solver.ts",
+      "planning/src/sterling/minecraft-furnace-types.ts",
+      "planning/src/sterling/minecraft-navigation-solver.ts",
+      "planning/src/sterling/minecraft-navigation-types.ts"
     ],
     "Safety checks and guards": [
       "safety/src/fail-safes/index.ts",
@@ -20149,8 +22076,8 @@
   },
   "statistics": {
     "by_status": {
-      "active": 306,
-      "stable": 166
+      "active": 348,
+      "stable": 168
     },
     "by_category": {
       "LLM integration, thought processing, intent extraction, cognitive stream": 102,
@@ -20161,21 +22088,21 @@
       "MCP server integration": 3,
       "Vector DB, reflection memory, hybrid search": 63,
       "Minecraft client, leaves, interaction, navigation": 69,
-      "Task integration, Sterling solver, cognitive thought processor": 90,
+      "Task integration, Sterling solver, cognitive thought processor": 134,
       "Safety checks and guards": 4,
       "World state, observation queue": 5,
       "P03/P21 conformance suites": 3
     },
-    "total_lines": 217758,
-    "total_classes": 341,
-    "total_functions": 750,
+    "total_lines": 235194,
+    "total_classes": 374,
+    "total_functions": 873,
     "todos_by_priority": {
       "P0-GOV": 0,
       "P1-METRIC": 0,
       "P2-QUAL": 0,
       "P3-UX": 0,
-      "untagged": 24
+      "untagged": 27
     },
-    "total_todos": 24
+    "total_todos": 27
   }
 }

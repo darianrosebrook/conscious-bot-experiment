@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeSterlingStep } from '../sterling-step-executor';
 import type { SterlingStepExecutorContext } from '../sterling-step-executor.types';
 import { GoldenRunRecorder } from '../../golden-run-recorder';
+import { normalizeTaskStepsToOptionA } from '../../modules/step-option-a-normalizer';
 
 function createMockContext(
   overrides: Partial<SterlingStepExecutorContext> = {}
@@ -448,6 +449,68 @@ describe('executeSterlingStep', () => {
       'run-1',
       'planning_incomplete',
       expect.objectContaining({ leaf: expect.any(String) })
+    );
+  });
+
+  it('unknown leaf: normalize sets planningIncomplete and planningIncompleteReasons; executor blocks with deterministic backoff (no hot-loop)', async () => {
+    const task = {
+      id: 'task-unknown-leaf',
+      title: 'Task with unknown leaf',
+      steps: [
+        {
+          id: 'step-1',
+          order: 1,
+          meta: { leaf: 'unsupported_leaf_xyz' },
+        },
+      ],
+      metadata: {} as Record<string, unknown>,
+    };
+    normalizeTaskStepsToOptionA(task);
+    expect(task.metadata?.planningIncomplete).toBe(true);
+    const reasons = task.metadata?.planningIncompleteReasons as Array<{
+      leaf?: string;
+      reason: string;
+    }>;
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0].leaf).toBe('unsupported_leaf_xyz');
+    expect(reasons[0].reason).toBe('unknown_leaf');
+
+    const nextStep = task.steps![0] as {
+      id: string;
+      order: number;
+      meta: Record<string, unknown>;
+    };
+    const recordExecutorBlocked = vi.fn();
+    const ctx = createMockContext({
+      getGoldenRunRecorder: () => ({
+        recordExecutorBlocked,
+        recordShadowDispatch: vi.fn(),
+        recordVerification: vi.fn(),
+        recordDispatch: vi.fn(),
+      }),
+    });
+    const now = Date.now();
+    await executeSterlingStep(
+      { ...task, metadata: { ...task.metadata, goldenRun: { runId: 'run-unknown-leaf' } } },
+      nextStep,
+      ctx
+    );
+
+    expect(ctx.executeTool).not.toHaveBeenCalled();
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      task.id,
+      expect.objectContaining({
+        blockedReason: 'planning_incomplete',
+        nextEligibleAt: expect.any(Number),
+      })
+    );
+    const updateCall = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(updateCall.nextEligibleAt).toBeGreaterThanOrEqual(now + 299_000);
+    expect(updateCall.nextEligibleAt).toBeLessThanOrEqual(now + 301_000);
+    expect(recordExecutorBlocked).toHaveBeenCalledWith(
+      'run-unknown-leaf',
+      'planning_incomplete',
+      expect.objectContaining({ leaf: 'unsupported_leaf_xyz' })
     );
   });
 });

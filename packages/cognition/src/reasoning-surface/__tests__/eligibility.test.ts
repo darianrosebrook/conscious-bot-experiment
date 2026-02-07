@@ -36,11 +36,15 @@ function mockSterlingExecutable(goalPropId: string | null = 'prop_abc123'): Redu
     sterlingProcessed: true,
     envelopeId: 'env_test123',
     reducerResult: {
-      intent_family: 'PLAN',
-      intent_type: 'TASK_EXECUTE',
       committed_goal_prop_id: goalPropId,
+      committed_ir_digest: '',
+      source_envelope_id: 'env_test123',
       is_executable: true,
-      grounding: { passed: true, reason: 'grounded' },
+      is_semantically_empty: false,
+      advisory: { intent_family: 'PLAN', intent_type: 'TASK_EXECUTE', confidence: 0, suggested_domain: null },
+      grounding: { passed: true, reason: 'grounded', world_snapshot_digest: null },
+      schema_version: '1',
+      reducer_version: 'test',
     },
     isExecutable: true,
     blockReason: null,
@@ -57,11 +61,15 @@ function mockSterlingNotExecutable(reason: string = 'grounding_failed'): Reducti
     sterlingProcessed: true,
     envelopeId: 'env_test456',
     reducerResult: {
-      intent_family: 'PLAN',
-      intent_type: 'TASK_EXECUTE',
       committed_goal_prop_id: 'prop_xyz789',
+      committed_ir_digest: '',
+      source_envelope_id: 'env_test456',
       is_executable: false,
-      grounding: { passed: false, reason },
+      is_semantically_empty: false,
+      advisory: { intent_family: 'PLAN', intent_type: 'TASK_EXECUTE', confidence: 0, suggested_domain: null },
+      grounding: { passed: false, reason, world_snapshot_digest: null },
+      schema_version: '1',
+      reducer_version: 'test',
     },
     isExecutable: false,
     blockReason: reason,
@@ -367,12 +375,15 @@ describe('boundary contract: TS does NOT interpret Sterling semantics', () => {
         sterlingProcessed: true,
         envelopeId: 'env_weird',
         reducerResult: {
-          // Unusual but valid Sterling output
-          intent_family: null, // No intent detected
-          intent_type: null,
-          committed_goal_prop_id: null, // No goal
-          is_executable: true, // But Sterling says executable anyway
+          committed_goal_prop_id: null,
+          committed_ir_digest: '',
+          source_envelope_id: 'env_weird',
+          is_executable: true,
+          is_semantically_empty: false,
+          advisory: null,
           grounding: null,
+          schema_version: '1',
+          reducer_version: 'test',
         },
         isExecutable: true, // Trust this flag
         blockReason: null,
@@ -396,11 +407,15 @@ describe('boundary contract: TS does NOT interpret Sterling semantics', () => {
         sterlingProcessed: true,
         envelopeId: 'env_grounding_conflict',
         reducerResult: {
-          intent_family: 'PLAN',
-          intent_type: 'TASK_EXECUTE',
           committed_goal_prop_id: 'prop_123',
-          is_executable: false, // Sterling says no
-          grounding: { passed: true, reason: 'looks_grounded' }, // But grounding looks ok?
+          committed_ir_digest: '',
+          source_envelope_id: 'env_grounding_conflict',
+          is_executable: false,
+          is_semantically_empty: false,
+          advisory: { intent_family: 'PLAN', intent_type: 'TASK_EXECUTE', confidence: 0, suggested_domain: null },
+          grounding: { passed: true, reason: 'looks_grounded', world_snapshot_digest: null },
+          schema_version: '1',
+          reducer_version: 'test',
         },
         isExecutable: false, // Trust this
         blockReason: 'sterling_decision',

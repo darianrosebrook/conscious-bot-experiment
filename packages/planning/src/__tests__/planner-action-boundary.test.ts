@@ -162,7 +162,8 @@ describe('planner -> /action boundary conformance', () => {
           resource: 'wood',
           checkRadius: 10,
         });
-
+        expect(mapped).not.toBeNull();
+        if (!mapped) return;
         expect(ACCEPTED_ACTION_TYPES.has(mapped.type)).toBe(true);
       });
     }
@@ -179,6 +180,8 @@ describe('planner -> /action boundary conformance', () => {
         recipe: 'oak_planks',
         qty: 1,
       });
+      expect(mapped).not.toBeNull();
+      if (!mapped) return;
       expect(mapped.type).toBe('craft');
       expect(mapped.parameters?.item).toBe('oak_planks');
     });
@@ -189,6 +192,8 @@ describe('planner -> /action boundary conformance', () => {
         predicate_lemma: 'craft_wooden_pickaxe',
         proposition: { type: 'craft', output: 'stick' },
       });
+      expect(mapped).not.toBeNull();
+      if (!mapped) return;
       expect(mapped.parameters?.item).toBe('wooden_pickaxe');
       expect(mapped.parameters?.predicate_lemma).toBeUndefined();
       expect(mapped.parameters?.proposition).toBeUndefined();
@@ -198,11 +203,15 @@ describe('planner -> /action boundary conformance', () => {
       const withRecipe = mapBTActionToMinecraft('craft_recipe', {
         recipe: 'oak_planks',
       });
+      expect(withRecipe).not.toBeNull();
+      if (!withRecipe) return;
       expect(withRecipe.parameters?.item).toBe('oak_planks');
 
       const withItem = mapBTActionToMinecraft('craft_recipe', {
         item: 'torch',
       });
+      expect(withItem).not.toBeNull();
+      if (!withItem) return;
       expect(withItem.parameters?.item).toBe('torch');
     });
   });
@@ -258,6 +267,8 @@ describe('planner -> /action boundary conformance', () => {
           radius: 25,
           duration: 15000,
         });
+        expect(mapped).not.toBeNull();
+        if (!mapped) return;
         // Explicitly assert these are NOT accepted — this test documents the gap.
         // When they are fixed, this test should be moved to the round-trip suite.
         expect(ACCEPTED_ACTION_TYPES.has(mapped.type)).toBe(false);

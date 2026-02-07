@@ -211,7 +211,12 @@ export function mapBTActionToMinecraft(
   tool: string,
   args: Record<string, any>,
   options?: MapBTActionOptions
-): { type: string; parameters: Record<string, any>; debug?: unknown } | null {
+): {
+  type: string;
+  parameters: Record<string, any>;
+  debug?: unknown;
+  timeout?: number;
+} | null {
   const strict = options?.strict === true;
   // Strip "minecraft." prefix if present to normalize the action name
   const normalizedTool = tool.replace(/^minecraft\./, '');

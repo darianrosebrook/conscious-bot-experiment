@@ -7,6 +7,14 @@ export type GoldenRunVerification = {
   detail?: Record<string, unknown>;
 };
 
+/** One entry in the linear execution story: block or dispatch. Bounded; prefer small payloads. */
+export type ExecutionDecision = {
+  step_id?: string;
+  leaf?: string;
+  reason: string;
+  ts: number;
+};
+
 export type GoldenRunReport = {
   schema_version: 'golden_run_report_v1';
   /** Revision marker for downstream compatibility; additive features listed. */
@@ -79,6 +87,8 @@ export type GoldenRunReport = {
     }>;
   };
   execution?: {
+    /** Append-only linear story of blocks and dispatches (bounded). */
+    decisions?: ExecutionDecision[];
     dispatched_steps?: Array<{
       step_id?: string;
       leaf?: string;
@@ -120,6 +130,9 @@ const BLOCKED_THROTTLE_MS = 5000;
 
 /** Evict throttle/shadow state for runs not updated in this long to avoid unbounded growth. */
 const RUN_STALE_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Max length of execution.decisions so artifact stays bounded. */
+const MAX_DECISIONS = 200;
 
 /** Keys omitted from payload fingerprint so timestamp noise does not defeat idempotency. */
 const FINGERPRINT_NOISE_KEYS = new Set([
@@ -312,11 +325,16 @@ export class GoldenRunRecorder {
     const created: GoldenRunReport = {
       schema_version: 'golden_run_report_v1',
       schema_revision: 1,
-      features: ['original_leaf', 'blocked_throttle_v1', 'strict_mapping_v1'],
+      features: [
+        'original_leaf',
+        'blocked_throttle_v1',
+        'strict_mapping_v1',
+        'execution_decisions_v1',
+      ],
       run_id: safeRunId,
       created_at: Date.now(),
       updated_at: Date.now(),
-      execution: { dispatched_steps: [] },
+      execution: { dispatched_steps: [], decisions: [] },
     };
     this.runs.set(safeRunId, created);
     return created;
@@ -367,6 +385,10 @@ export class GoldenRunRecorder {
       const report = this.ensureRun(runId);
       const merged = mergeDeep(report as Record<string, unknown>, patch);
       merged.updated_at = Date.now();
+      const exec = merged.execution as { decisions?: ExecutionDecision[] } | undefined;
+      if (Array.isArray(exec?.decisions) && exec.decisions.length > MAX_DECISIONS) {
+        exec.decisions = exec.decisions.slice(-MAX_DECISIONS);
+      }
       const safeRunId = sanitizeRunId(runId);
       this.runs.set(safeRunId, merged as GoldenRunReport);
       this.queueWrite(safeRunId, merged as GoldenRunReport);
@@ -427,9 +449,16 @@ export class GoldenRunRecorder {
 
   recordDispatch(runId: string, data: GoldenRunDispatchedStep): void {
     if (!runId) return;
+    const decision: ExecutionDecision = {
+      step_id: data.step_id,
+      leaf: data.leaf,
+      reason: 'dispatch',
+      ts: Date.now(),
+    };
     this.update(runId, {
       execution: {
         dispatched_steps: [data],
+        decisions: [decision],
         executor_blocked_reason: undefined,
         executor_blocked_payload: undefined,
       },
@@ -450,9 +479,16 @@ export class GoldenRunRecorder {
       this.shadowObservedStepKeys.set(safeRunId, set);
     }
     set.add(stepKey);
+    const decision: ExecutionDecision = {
+      step_id: data.step_id,
+      leaf: data.leaf,
+      reason: 'shadow',
+      ts: Date.now(),
+    };
     this.update(runId, {
       execution: {
         shadow_steps: [data],
+        decisions: [decision],
         executor_blocked_reason: undefined,
         executor_blocked_payload: undefined,
       },
@@ -496,8 +532,15 @@ export class GoldenRunRecorder {
       return;
     }
     this.lastBlockedByKey.set(key, { at: now, payloadFingerprint: fingerprint });
+    const decision: ExecutionDecision = {
+      step_id: payload?.step_id as string | undefined,
+      leaf: payload?.leaf as string | undefined,
+      reason,
+      ts: now,
+    };
     this.update(runId, {
       execution: {
+        decisions: [decision],
         executor_blocked_reason: reason,
         ...(payload && Object.keys(payload).length > 0
           ? { executor_blocked_payload: payload }

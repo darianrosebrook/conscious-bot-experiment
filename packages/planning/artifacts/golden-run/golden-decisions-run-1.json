@@ -7,9 +7,9 @@
     "strict_mapping_v1",
     "execution_decisions_v1"
   ],
-  "run_id": "loop-closure-run-1",
-  "created_at": 1770459482391,
-  "updated_at": 1770459482391,
+  "run_id": "decisions-run-1",
+  "created_at": 1770459482357,
+  "updated_at": 1770459482358,
   "execution": {
     "dispatched_steps": [
       {
@@ -19,19 +19,30 @@
           "recipe": "oak_planks",
           "qty": 4
         },
-        "dispatched_at": 1770459482391,
-        "result": {
-          "status": "ok"
-        }
+        "dispatched_at": 1770459482358
       }
     ],
     "decisions": [
       {
+        "leaf": "craft_recipe",
+        "reason": "rate_limited",
+        "ts": 1770459482357
+      },
+      {
         "step_id": "step-1",
         "leaf": "craft_recipe",
         "reason": "dispatch",
-        "ts": 1770459482391
+        "ts": 1770459482358
+      },
+      {
+        "leaf": "unknown_leaf",
+        "reason": "planning_incomplete",
+        "ts": 1770459482358
       }
-    ]
+    ],
+    "executor_blocked_reason": "planning_incomplete",
+    "executor_blocked_payload": {
+      "leaf": "unknown_leaf"
+    }
   }
 }
