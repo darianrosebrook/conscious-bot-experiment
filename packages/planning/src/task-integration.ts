@@ -2027,6 +2027,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         id: step.id ?? `sterling-step-${index + 1}`,
         leaf: step.leaf,
         order: step.order ?? index + 1,
+        args: step.args ?? {},
       })),
     });
 

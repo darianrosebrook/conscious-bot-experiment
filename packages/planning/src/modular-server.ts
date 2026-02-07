@@ -289,6 +289,7 @@ import {
   isSystemReady,
   waitForSystemReady,
   setReadinessMonitor,
+  markSystemReady,
 } from './startup-barrier';
 import { ReadinessMonitor } from './server/execution-readiness';
 
@@ -409,6 +410,12 @@ const KNOWN_LEAF_NAMES = new Set([
   'build_module',
   'place_feature',
 ]);
+
+/** Option B bridge: task_type_* leaves from Sterling expand-by-digest. Only allowlisted when ENABLE_TASK_TYPE_BRIDGE=1 (dev/golden only; forbidden in production). */
+const TASK_TYPE_BRIDGE_LEAF_NAMES = new Set<string>(['task_type_craft']);
+
+const ENABLE_TASK_TYPE_BRIDGE = String(process.env.ENABLE_TASK_TYPE_BRIDGE || '') === '1';
+
 // mc-fetch helpers are imported from modules/mc-client
 
 /**
@@ -480,12 +487,23 @@ const DASHBOARD_STREAM_URL = process.env.DASHBOARD_ENDPOINT
 
 const executorConfig: ExecutorConfig = (() => {
   const cfg = parseExecutorConfig();
-  // Canonical tool names: minecraft.${leaf} — used for both allowlist check and execute()
-  cfg.leafAllowlist = new Set(
-    [...KNOWN_LEAF_NAMES].map((l) => `minecraft.${l}`)
-  );
+  cfg.leafAllowlist = buildLeafAllowlist(KNOWN_LEAF_NAMES, TASK_TYPE_BRIDGE_LEAF_NAMES, ENABLE_TASK_TYPE_BRIDGE);
   return cfg;
 })();
+
+/**
+ * Build allowlist for testing and at module load. Bridge leaves only when bridgeEnabled.
+ * Exported for debt tripwire: tests assert task_type_* not in allowlist when bridge disabled.
+ */
+export function buildLeafAllowlist(
+  known: Set<string>,
+  bridgeLeaves: Set<string>,
+  bridgeEnabled: boolean
+): Set<string> {
+  const base = [...known];
+  const leaves = bridgeEnabled ? [...base, ...bridgeLeaves] : base;
+  return new Set(leaves.map((l) => `minecraft.${l}`));
+}
 const stepRateLimiter = new StepRateLimiter(executorConfig.maxStepsPerMinute);
 const geofenceConfig = parseGeofenceConfig();
 
@@ -1955,53 +1973,54 @@ async function autonomousTaskExecutor() {
       taskKey
     );
 
-    // Circuit breaker around bot health
-    console.log('[AUTONOMOUS EXECUTOR] Checking bot connection...');
-    const botConnection = await checkBotConnectionDetailed();
-    console.log(`[AUTONOMOUS EXECUTOR] Bot connected: ${botConnection.ok}`);
+    // Circuit breaker around bot health (skip in shadow + EXECUTOR_SKIP_READINESS for golden-run proof)
+    const skipBotChecks =
+      executorConfig.mode === 'shadow' &&
+      process.env.EXECUTOR_SKIP_READINESS === '1';
+    if (!skipBotChecks) {
+      console.log('[AUTONOMOUS EXECUTOR] Checking bot connection...');
+      const botConnection = await checkBotConnectionDetailed();
+      console.log(`[AUTONOMOUS EXECUTOR] Bot connected: ${botConnection.ok}`);
 
-    if (!botConnection.ok) {
-      const st = global.__planningExecutorState;
-      if (st.breaker === 'closed' && botConnection.failureKind !== 'timeout') {
-        st.breaker = 'open';
-        console.warn('[Executor] Bot unavailable — opening circuit');
+      if (!botConnection.ok) {
+        const st = global.__planningExecutorState;
+        if (st.breaker === 'closed' && botConnection.failureKind !== 'timeout') {
+          st.breaker = 'open';
+          console.warn('[Executor] Bot unavailable — opening circuit');
+        }
+        return;
       }
-      // schedule half-open probe next tick
-      return;
-    } else {
       const st = global.__planningExecutorState;
       if (st.breaker !== 'closed') {
         console.log(
           `[AUTONOMOUS EXECUTOR] Circuit breaker was ${st.breaker}, closing it`
         );
-        console.log('✅ Bot reachable — closing circuit');
+        console.log('Bot reachable — closing circuit');
         st.breaker = 'closed';
         st.failures = 0;
       }
-    }
 
-    // Defense-in-depth: verify bot is actually spawned, not just HTTP-reachable
-    try {
-      const healthRes = await mcFetch('/health', {
-        method: 'GET',
-        timeoutMs: 3000,
-      });
-      if (healthRes.ok) {
-        const healthData = (await healthRes.json()) as {
-          connectionState?: string;
-        };
-        if (healthData.connectionState !== 'spawned') {
-          console.log(
-            '[Executor] Bot reachable but not spawned — skipping cycle'
-          );
-          return;
+      // Defense-in-depth: verify bot is actually spawned, not just HTTP-reachable
+      try {
+        const healthRes = await mcFetch('/health', {
+          method: 'GET',
+          timeoutMs: 3000,
+        });
+        if (healthRes.ok) {
+          const healthData = (await healthRes.json()) as {
+            connectionState?: string;
+          };
+          if (healthData.connectionState !== 'spawned') {
+            console.log(
+              '[Executor] Bot reachable but not spawned — skipping cycle'
+            );
+            return;
+          }
         }
+      } catch {
+        console.log('[Executor] Health re-check failed — skipping cycle');
+        return;
       }
-    } catch {
-      // If health fetch fails here, the earlier checkBotConnectionDetailed passed,
-      // so this is a transient issue — skip rather than dispatch to an unready bot
-      console.log('[Executor] Health re-check failed — skipping cycle');
-      return;
     }
 
     // Check crafting table prerequisite for crafting tasks
@@ -2281,6 +2300,14 @@ async function autonomousTaskExecutor() {
               taskId: currentTask.id,
               leaf: leafExec.leafName,
             });
+            const runIdUnknownLeaf = (currentTask.metadata as any)?.goldenRun
+              ?.runId as string | undefined;
+            if (runIdUnknownLeaf) {
+              getGoldenRunRecorder().recordExecutorBlocked(runIdUnknownLeaf, 'unknown_leaf', {
+                leaf: leafExec.leafName,
+                args: leafExec.args,
+              });
+            }
             return;
           }
 
@@ -3939,7 +3966,11 @@ async function startServer() {
 
     // Mount planning endpoints (getServerBanner wires golden-run banner capture via WS server_info_v1)
     const planningRouter = createPlanningEndpoints(planningSystem, {
-      getServerBanner: () => sterlingService?.getServerBanner() ?? Promise.resolve(null),
+      getServerBanner: (timeoutMs?: number) =>
+        sterlingService?.getServerBanner(timeoutMs) ?? Promise.resolve(null),
+      sendLanguageIOReduce: (envelope, timeoutMs) =>
+        sterlingService?.sendLanguageIOReduce(envelope, timeoutMs) ??
+        Promise.resolve({ success: false, error: 'Sterling not available' }),
     });
     serverConfig.mountRouter('/', planningRouter);
 
@@ -4220,11 +4251,18 @@ async function startServer() {
     console.log('[Planning] Server started successfully');
 
     // --- Service readiness gate (never blocks boot) ---
+    // Golden run proof: skip minecraft requirement so executor can run in shadow and record dispatch.
+    // Forbidden in production; dev/golden only. See docs/planning/PATTERN_A_GOLDEN_RUN_SESSION_OVERVIEW.md.
+    const skipReadinessForExecutor =
+      String(process.env.EXECUTOR_SKIP_READINESS || '').toLowerCase() === '1';
     const readiness = new ReadinessMonitor({
-      executionRequired: ['minecraft'],
+      executionRequired: skipReadinessForExecutor ? [] : ['minecraft'],
     });
     const readinessResult = await readiness.probe();
     setReadinessMonitor(readiness);
+    if (skipReadinessForExecutor) {
+      markSystemReady('executor_skip_readiness');
+    }
 
     console.log(
       '[Planning:startup] Service readiness:',

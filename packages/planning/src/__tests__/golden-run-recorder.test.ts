@@ -76,4 +76,31 @@ describe('GoldenRunRecorder', () => {
     expect(report.run_id).toBe(sanitized);
     expect(report.injection?.committed_ir_digest).toBe('digest-2');
   });
+
+  it('records executor_blocked_reason and payload when dispatch does not occur', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'golden-run-'));
+    const recorder = new GoldenRunRecorder(baseDir);
+    const runId = 'blocked-run-1';
+
+    recorder.recordInjection(runId, { committed_ir_digest: 'd1', schema_version: '1.0' });
+    recorder.recordExecutorBlocked(runId, 'unknown_leaf', {
+      leaf: 'task_type_craft',
+      args: { target: 'plank' },
+    });
+
+    const reportPath = path.join(baseDir, `golden-${runId}.json`);
+    for (let i = 0; i < 10; i += 1) {
+      try {
+        await fs.access(reportPath);
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+
+    const report = await readJson(reportPath);
+    expect(report.execution?.executor_blocked_reason).toBe('unknown_leaf');
+    expect(report.execution?.executor_blocked_payload?.leaf).toBe('task_type_craft');
+    expect(report.execution?.executor_blocked_payload?.args).toEqual({ target: 'plank' });
+  });
 });

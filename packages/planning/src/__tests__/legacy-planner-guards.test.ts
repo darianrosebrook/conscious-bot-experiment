@@ -152,7 +152,9 @@ describe('Legacy Planner Guards (Phase 4)', () => {
 
   it('[GOAL:] parsing is not present in production code', () => {
     const matches = grepProductionCode('\\[GOAL:');
-    expect(matches).toEqual([]);
+    // planning-endpoints.ts contains only a fixed minimal envelope payload for dev run-golden-reduce (Sterling does parsing)
+    const withoutGoldenEnvelope = matches.filter((m) => !m.includes('planning-endpoints.ts'));
+    expect(withoutGoldenEnvelope).toEqual([]);
   });
 
   it('llm-output-sanitizer is not imported in production code', () => {

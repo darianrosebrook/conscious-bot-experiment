@@ -225,9 +225,44 @@ export function broadcastTaskUpdate(event: string, task: any): void {
   }
 }
 
+/** Minimal Language IO envelope for golden-run reduce (Sterling IntentReducerV1). */
+function buildMinimalReduceEnvelope(): Record<string, unknown> {
+  const raw = '[GOAL: craft plank]';
+  const envelopeId = crypto.createHash('sha256').update(raw, 'utf8').digest('hex').slice(0, 16);
+  return {
+    schema_id: 'sterling.language_io_envelope.v1',
+    schema_version: '1.0.0',
+    raw_text_verbatim: raw,
+    sanitized_text: raw,
+    sanitization_version: '',
+    sanitization_flags: {},
+    declared_markers: [
+      { marker_type: 'GOAL_TAG', verbatim_text: raw, span: [0, raw.length] },
+    ],
+    envelope_id: envelopeId,
+    timestamp_ms: Date.now(),
+  };
+}
+
 export interface PlanningEndpointsDeps {
   /** Fetch Sterling server banner for golden-run evidence. If provided, inject requires valid banner. */
-  getServerBanner?: () => Promise<string | null>;
+  getServerBanner?: (timeoutMs?: number) => Promise<string | null>;
+  /** Send language_io.reduce to Sterling. Used by run-golden-reduce to register a digest. */
+  sendLanguageIOReduce?: (
+    envelope: Record<string, unknown>,
+    timeoutMs?: number
+  ) => Promise<
+    | {
+        success: true;
+        result: {
+          committed_ir_digest: string;
+          schema_version: string;
+          source_envelope_id: string;
+          has_committed_propositions?: boolean;
+        };
+      }
+    | { success: false; error: string }
+  >;
 }
 
 export function createPlanningEndpoints(
@@ -1058,8 +1093,19 @@ export function createPlanningEndpoints(
         const recorder = getGoldenRunRecorder();
 
         if (deps?.getServerBanner) {
-          const bannerLine = await deps.getServerBanner();
+          const bannerLine = await deps.getServerBanner(8000);
+          if (process.env.DEBUG_STERLING_BANNER === '1') {
+            console.log('[Planning][Inject] DEBUG_STERLING_BANNER: getServerBanner result', {
+              gotBanner: Boolean(bannerLine),
+              length: typeof bannerLine === 'string' ? bannerLine.length : 0,
+              preview: typeof bannerLine === 'string' ? bannerLine.slice(0, 80) + (bannerLine.length > 80 ? '...' : '') : null,
+            });
+          }
           if (!isValidGoldenRunBanner(bannerLine)) {
+            console.warn('[Planning][Inject] Sterling banner missing or invalid', {
+              gotBanner: Boolean(bannerLine),
+              bannerLength: typeof bannerLine === 'string' ? bannerLine.length : 0,
+            });
             return res.status(503).json({
               error: 'Golden run requires valid Sterling server banner',
               detail:
@@ -1082,6 +1128,9 @@ export function createPlanningEndpoints(
             executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
           },
         });
+        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
+          recorder.recordExecutorBlocked(runId, 'executor_disabled');
+        }
         recorder.recordInjection(runId, {
           committed_ir_digest,
           schema_version,
@@ -1124,6 +1173,124 @@ export function createPlanningEndpoints(
           details: error instanceof Error ? error.message : String(error),
         });
       }
+    });
+
+    // Dev-only: run a real reduce then inject (registers digest in Sterling, then injects for expansion)
+    router.post('/api/dev/run-golden-reduce', async (req: Request, res: Response) => {
+      try {
+        if (process.env.NODE_ENV === 'production') {
+          return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
+        }
+        if (!deps?.sendLanguageIOReduce) {
+          return res.status(503).json({
+            error: 'run-golden-reduce requires sendLanguageIOReduce (Sterling client not wired)',
+          });
+        }
+
+        const envelope = buildMinimalReduceEnvelope();
+        const reduceOut = await deps.sendLanguageIOReduce(envelope, 15000);
+        if (!reduceOut.success) {
+          return res.status(502).json({
+            error: 'Sterling reduce failed',
+            reduce_error: reduceOut.error,
+          });
+        }
+
+        const { committed_ir_digest, schema_version, source_envelope_id } = reduceOut.result;
+        const runIdRaw =
+          typeof req.body?.run_id === 'string' && req.body.run_id.trim().length > 0
+            ? req.body.run_id.trim()
+            : crypto.randomUUID();
+        const runId = sanitizeRunId(runIdRaw);
+        const recorder = getGoldenRunRecorder();
+
+        if (deps?.getServerBanner) {
+          const bannerLine = await deps.getServerBanner(8000);
+          if (!isValidGoldenRunBanner(bannerLine)) {
+            return res.status(503).json({
+              error: 'Golden run requires valid Sterling server banner',
+              detail: !bannerLine?.trim()
+                ? 'Could not fetch server banner'
+                : 'Banner missing supports_expand_by_digest_v1_versioned_key=true',
+            });
+          }
+          recorder.recordServerBanner(runId, bannerLine!);
+        }
+
+        const loopStartedRunReduce = Boolean((globalThis as any).__planningExecutorState?.running);
+        recorder.recordRuntime(runId, {
+          executor: {
+            enabled: process.env.ENABLE_PLANNING_EXECUTOR === '1',
+            mode: (process.env.EXECUTOR_MODE || 'shadow').toLowerCase(),
+            loop_started: loopStartedRunReduce,
+            enable_planning_executor_env: process.env.ENABLE_PLANNING_EXECUTOR,
+          },
+        });
+        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
+          recorder.recordExecutorBlocked(runId, 'executor_disabled');
+        }
+        recorder.recordInjection(runId, {
+          committed_ir_digest,
+          schema_version,
+          envelope_id: source_envelope_id ?? null,
+          request_id: `run_golden_reduce_${runId}`,
+          source: 'dev_run_golden_reduce',
+        });
+
+        const task = await planningSystem.goalFormulation.addTask({
+          id: `sterling-ir-${runId}`,
+          title: `Golden reduce ${runId.slice(0, 8)}`,
+          description: `Reduce then inject; digest ${committed_ir_digest}`,
+          type: 'sterling_ir',
+          source: 'manual',
+          metadata: {
+            tags: ['golden-run', 'dev-run-golden-reduce'],
+            category: 'sterling_ir',
+            sterling: {
+              committedIrDigest: committed_ir_digest,
+              schemaVersion: schema_version,
+              envelopeId: source_envelope_id ?? null,
+            },
+            goldenRun: { runId, requestedAt: Date.now(), source: 'dev_run_golden_reduce' },
+          },
+        });
+
+        return res.json({
+          success: true,
+          reduce: {
+            committed_ir_digest,
+            schema_version,
+            source_envelope_id,
+            has_committed_propositions: reduceOut.result.has_committed_propositions ?? true,
+          },
+          inject: { run_id: runId, task_id: task?.id ?? null },
+        });
+      } catch (error) {
+        console.error('[dev run-golden-reduce] Failed:', error);
+        return res.status(500).json({
+          error: 'run-golden-reduce failed',
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+
+    router.get('/api/dev/golden-run-artifact/:runId', async (req: Request, res: Response) => {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
+      }
+      const runId = (req.params.runId ?? '').trim();
+      if (!runId) {
+        return res.status(400).json({ error: 'runId required' });
+      }
+      const recorder = getGoldenRunRecorder();
+      let report = recorder.getReport(runId);
+      if (!report) {
+        report = await recorder.getReportFromDisk(runId);
+      }
+      if (!report) {
+        return res.status(404).json({ error: 'Golden run artifact not found', run_id: runId });
+      }
+      return res.json(report);
     });
   }
 

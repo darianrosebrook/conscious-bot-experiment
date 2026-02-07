@@ -126,6 +126,11 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  /** Option B bridge: accept any args so executor can record shadow dispatch. Not for semantic use. */
+  task_type_craft: {
+    leafName: 'task_type_craft',
+    validate: () => null,
+  },
 };
 
 /** Canonical set of leaves the executor may run. Unknown leaves are rejected in strict mode. */

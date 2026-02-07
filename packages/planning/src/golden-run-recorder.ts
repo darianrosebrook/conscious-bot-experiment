@@ -74,6 +74,14 @@ export type GoldenRunReport = {
       observed_at?: number;
     }>;
     verification?: GoldenRunVerification;
+    /** When dispatch did not occur, one of: executor_disabled | unknown_leaf | invalid_args | tool_unavailable | rate_limited | rig_g_blocked */
+    executor_blocked_reason?: string;
+    /** Optional payload when blocked (e.g. leaf/args for unknown_leaf or invalid_args). */
+    executor_blocked_payload?: {
+      leaf?: string;
+      args?: Record<string, unknown>;
+      validation_error?: string;
+    };
   };
 };
 
@@ -239,6 +247,8 @@ export class GoldenRunRecorder {
     this.update(runId, {
       execution: {
         dispatched_steps: [data],
+        executor_blocked_reason: undefined,
+        executor_blocked_payload: undefined,
       },
     });
   }
@@ -248,6 +258,8 @@ export class GoldenRunRecorder {
     this.update(runId, {
       execution: {
         shadow_steps: [data],
+        executor_blocked_reason: undefined,
+        executor_blocked_payload: undefined,
       },
     });
   }
@@ -259,6 +271,45 @@ export class GoldenRunRecorder {
         verification: data,
       },
     });
+  }
+
+  /**
+   * Record why executor did not dispatch (so the artifact explains empty dispatched_steps).
+   * Reasons: executor_disabled | unknown_leaf | invalid_args | tool_unavailable | rate_limited | rig_g_blocked
+   */
+  recordExecutorBlocked(
+    runId: string,
+    reason: string,
+    payload?: { leaf?: string; args?: Record<string, unknown>; validation_error?: string }
+  ): void {
+    if (!runId) return;
+    this.update(runId, {
+      execution: {
+        executor_blocked_reason: reason,
+        ...(payload && Object.keys(payload).length > 0
+          ? { executor_blocked_payload: payload }
+          : {}),
+      },
+    });
+  }
+
+  /** Return report from in-memory cache, or null if not found. */
+  getReport(runId: string): GoldenRunReport | null {
+    const safeRunId = sanitizeRunId(runId);
+    return this.runs.get(safeRunId) ?? null;
+  }
+
+  /** Read report from disk (for dev artifact fetch). Returns null if file missing or invalid. */
+  async getReportFromDisk(runId: string): Promise<GoldenRunReport | null> {
+    const safeRunId = sanitizeRunId(runId);
+    const filePath = path.join(this.baseDir, `golden-${safeRunId}.json`);
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      const report = JSON.parse(raw) as GoldenRunReport;
+      return report?.schema_version === 'golden_run_report_v1' ? report : null;
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -8,6 +8,11 @@ Prove end-to-end routing and execution for `sterling_ir` tasks with a durable ar
 - `STERLING_IR_ROUTING=1` (default)
 - `STERLING_WS_URL=ws://localhost:8766`
 
+For executor shadow proof (golden run without Minecraft):
+- `ENABLE_PLANNING_EXECUTOR=1`
+- `ENABLE_TASK_TYPE_BRIDGE=1` (allows `task_type_craft` etc.; dev/golden only)
+- `EXECUTOR_SKIP_READINESS=1` (dev/golden only: start executor without minecraft/memory/dashboard; skip bot/health checks in shadow mode so shadow steps are recorded)
+
 Stage 2 only:
 - `STERLING_IDLE_EPISODES_ENABLED=true`
 - `STERLING_IDLE_EPISODES_COOLDOWN_MS=300000` (optional)
@@ -55,6 +60,49 @@ Example schema (committed, non-runtime):
 - `docs/planning/examples/golden-run-report.example.v1.json`
 
 Note: `artifacts/golden-run/**` is runtime output and gitignored.
+
+Fetch artifact via API (dev only):
+
+```bash
+curl -s "http://localhost:PORT/api/dev/golden-run-artifact/<run_id>" | jq
+```
+
+## Run golden reduce (single-shot proof)
+
+1. Start Sterling (e.g. port 8766). Start planning with env above (including `EXECUTOR_SKIP_READINESS=1` if proving executor without Minecraft).
+2. Trigger reduce + inject:
+
+```bash
+curl -s -X POST http://localhost:PORT/api/dev/run-golden-reduce \
+  -H 'Content-Type: application/json' -d '{}' | jq
+```
+
+3. Wait at least one executor poll (default 10s; use `EXECUTOR_POLL_MS` to tune). Then fetch artifact by `inject.run_id`:
+
+```bash
+curl -s "http://localhost:PORT/api/dev/golden-run-artifact/<run_id>" | jq
+```
+
+Success: `expansion.status === "ok"` and `execution.shadow_steps.length >= 1` (or `execution.executor_blocked_reason` set). `runtime.executor.loop_started === true` when the executor loop is running.
+
+**Copy-paste (planning on 3005):**
+
+```bash
+# 1) Start planning (Sterling already on 8766):
+ENABLE_DEV_ENDPOINTS=true ENABLE_PLANNING_EXECUTOR=1 ENABLE_TASK_TYPE_BRIDGE=1 \
+EXECUTOR_SKIP_READINESS=1 STERLING_WS_URL=ws://localhost:8766 PORT=3005 pnpm run dev
+
+# 2) In another terminal, trigger golden run and capture run_id:
+curl -s -X POST http://localhost:3005/api/dev/run-golden-reduce \
+  -H "Content-Type: application/json" -d '{}' | jq '.inject.run_id'
+
+# 3) Wait 15–20s for at least one executor cycle, then fetch artifact (replace <run_id>):
+curl -s "http://localhost:3005/api/dev/golden-run-artifact/<run_id>" | jq
+
+# 4) Check: expansion.status === "ok", execution.shadow_steps.length >= 1, runtime.executor.loop_started === true
+```
+
+**If the artifact API returns 404:** the process on that port may be an older build. You can read the artifact from disk (same run_id): `packages/planning/artifacts/golden-run/golden-<run_id>.json`. Ensure no other process is using the chosen PORT before starting planning so the new code (with artifact GET route and executor/bridge env) is the one that runs.
 
 ## Stage 2: Source Proof (idle → Sterling → task)
 
