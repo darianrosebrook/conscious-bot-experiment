@@ -10,6 +10,7 @@
 
 import { Pool, Client } from 'pg';
 import { z } from 'zod';
+import { getMemoryRuntimeConfig } from './config/memory-runtime-config';
 
 // ============================================================================
 // Enhanced Types and Schemas
@@ -340,13 +341,9 @@ export class EnhancedVectorDatabase {
       );
 
       if (result.rowCount === 0) {
-        console.log(
-          `Creating per-seed database: ${this.seedDatabase}`
-        );
+        console.log(`Creating per-seed database: ${this.seedDatabase}`);
         await tempClient.query(`CREATE DATABASE ${this.seedDatabase}`);
-        console.log(
-          `Per-seed database created: ${this.seedDatabase}`
-        );
+        console.log(`Per-seed database created: ${this.seedDatabase}`);
       }
     } finally {
       await tempClient.end();
@@ -469,10 +466,13 @@ export class EnhancedVectorDatabase {
           WHERE metadata->>'dedupeKey' IS NOT NULL
         `);
       } catch (indexErr: any) {
-        if (indexErr?.code === '23505' || indexErr?.message?.includes('duplicate key')) {
-          // Guard duplicate cleanup behind explicit env flag to prevent accidental data loss.
+        if (
+          indexErr?.code === '23505' ||
+          indexErr?.message?.includes('duplicate key')
+        ) {
+          // Guard duplicate cleanup behind explicit config flag to prevent accidental data loss.
           // Only enable this in controlled migration scenarios.
-          const allowCleanup = process.env.MEMORY_ALLOW_DEDUPE_CLEANUP === 'true';
+          const allowCleanup = getMemoryRuntimeConfig().allowDedupeCleanup;
           if (!allowCleanup) {
             // Provide actionable diagnostic: show duplicate counts
             // Wrapped defensively — the GROUP BY query can be expensive on large tables
@@ -495,11 +495,14 @@ export class EnhancedVectorDatabase {
                   `   Sample duplicates (up to 10):`
               );
               for (const row of dupQuery.rows) {
-                console.error(`     "${row.dedupe_key}": ${row.count} copies (oldest: ${row.oldest}, newest: ${row.newest})`);
+                console.error(
+                  `     "${row.dedupe_key}": ${row.count} copies (oldest: ${row.oldest}, newest: ${row.newest})`
+                );
               }
-              console.error(`\n   To inspect all duplicates manually:\n` +
-                `   SELECT metadata->>'dedupeKey', COUNT(*) FROM ${this.config.tableName}\n` +
-                `   WHERE metadata->>'dedupeKey' IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;`
+              console.error(
+                `\n   To inspect all duplicates manually:\n` +
+                  `   SELECT metadata->>'dedupeKey', COUNT(*) FROM ${this.config.tableName}\n` +
+                  `   WHERE metadata->>'dedupeKey' IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;`
               );
             } catch (diagErr) {
               // Diagnostic query failed (possibly large table, timeout, etc.) — still report the index error
@@ -1258,7 +1261,9 @@ export class EnhancedVectorDatabase {
    * Find a chunk by metadata dedupeKey. Returns the first match or null.
    * Used for idempotent reflection/lesson/checkpoint persistence.
    */
-  async findByDedupeKey(dedupeKey: string): Promise<EnhancedMemoryChunk | null> {
+  async findByDedupeKey(
+    dedupeKey: string
+  ): Promise<EnhancedMemoryChunk | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1408,11 +1413,13 @@ export class EnhancedVectorDatabase {
         if (!text) return [];
         // pgvector format: "[0.1,0.2,0.3,...]"
         const cleaned = text.replace(/^\[|\]$/g, '');
-        return cleaned.split(',').map(v => parseFloat(v.trim()));
+        return cleaned.split(',').map((v) => parseFloat(v.trim()));
       };
 
       return {
-        embeddings: result.rows.map((r: any) => parseVectorText(r.embedding_text)),
+        embeddings: result.rows.map((r: any) =>
+          parseVectorText(r.embedding_text)
+        ),
         ids: result.rows.map((r: any) => r.id),
         metadata: result.rows.map((r: any) => ({
           type: r.type || 'unknown',

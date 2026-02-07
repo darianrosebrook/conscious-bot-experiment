@@ -1,0 +1,49 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "c2cf466a-3bbd-4fbf-91eb-16d526530772",
+  "created_at": 1770432125130,
+  "updated_at": 1770432125177,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=53e7885d supports_expand_by_digest_v1_versioned_key=true",
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "shadow",
+      "loop_started": false,
+      "enable_planning_executor_env": "1"
+    }
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "schema_version": "1.1.0",
+    "envelope_id": "30d9f063983539ee",
+    "request_id": "run_golden_reduce_c2cf466a-3bbd-4fbf-91eb-16d526530772",
+    "source": "dev_run_golden_reduce"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770432125131_cbopfa",
+    "status": "ok",
+    "plan_bundle_digest": "babdef828a154afe23813f668ee50a96ac2dfd182de50b5e22892cfc6286c175",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "order": 1,
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-c2cf466a-3bbd-4fbf-91eb-16d526530772",
+    "dedupe_key": "1.1.0:ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "status": "pending"
+  }
+}

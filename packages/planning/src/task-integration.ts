@@ -83,6 +83,10 @@ import {
   partitionSelfHoldEffects,
   applySelfHoldEffects,
 } from './goals/effect-partitioning';
+import {
+  normalizeTaskStepsToOptionA,
+  type TaskWithSteps,
+} from './modules/step-option-a-normalizer';
 
 const PLANNING_INGEST_DEBUG_400 =
   process.env.PLANNING_INGEST_DEBUG_400 === '1';
@@ -1396,6 +1400,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     task: Task,
     blockedSentinel: boolean
   ): Promise<Task> {
+    // ── Option A step normalization (single choke point) ──
+    // Ensures steps have meta.args so executor sees explicit; or sets planningIncomplete.
+    if (task.steps && task.steps.length > 0) {
+      normalizeTaskStepsToOptionA(task as TaskWithSteps);
+    }
+
     // ── Executability check ──
     // If no step has a leaf / executable flag, the task cannot make progress
     // without manual intervention. Skip when blockedSentinel already set an
@@ -4064,6 +4074,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       ...newSteps.map((s, i) => ({ ...s, order: doneCount + i + 1 })),
     ];
     task.steps = updatedSteps;
+    normalizeTaskStepsToOptionA(task as TaskWithSteps);
     this.taskStore.setTask(task);
 
     return { success: true, stepsDigest: digest, steps: updatedSteps };

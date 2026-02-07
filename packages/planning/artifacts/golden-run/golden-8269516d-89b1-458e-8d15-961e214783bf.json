@@ -1,0 +1,25 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "8269516d-89b1-458e-8d15-961e214783bf",
+  "created_at": 1770432785589,
+  "updated_at": 1770432785589,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=53e7885d supports_expand_by_digest_v1_versioned_key=true",
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "shadow",
+      "loop_started": false,
+      "enable_planning_executor_env": "1"
+    }
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "schema_version": "1.1.0",
+    "envelope_id": "30d9f063983539ee",
+    "request_id": "run_golden_reduce_8269516d-89b1-458e-8d15-961e214783bf",
+    "source": "dev_run_golden_reduce"
+  }
+}

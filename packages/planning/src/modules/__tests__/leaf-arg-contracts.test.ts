@@ -1,29 +1,47 @@
 import { describe, it, expect } from 'vitest';
-import { validateLeafArgs, normalizeLeafArgs, requirementToLeafMeta, requirementToFallbackPlan, KNOWN_LEAVES } from '../leaf-arg-contracts';
+import {
+  validateLeafArgs,
+  normalizeLeafArgs,
+  requirementToLeafMeta,
+  requirementToFallbackPlan,
+  KNOWN_LEAVES,
+} from '../leaf-arg-contracts';
 
 describe('validateLeafArgs', () => {
   it('accepts valid dig_block args with blockType', () => {
-    expect(validateLeafArgs('dig_block', { blockType: 'oak_log', count: 1 })).toBeNull();
+    expect(
+      validateLeafArgs('dig_block', { blockType: 'oak_log', count: 1 })
+    ).toBeNull();
   });
 
   it('accepts valid dig_block args with pos', () => {
-    expect(validateLeafArgs('dig_block', { pos: { x: 1, y: 2, z: 3 } })).toBeNull();
+    expect(
+      validateLeafArgs('dig_block', { pos: { x: 1, y: 2, z: 3 } })
+    ).toBeNull();
   });
 
   it('rejects dig_block with neither blockType nor pos', () => {
-    expect(validateLeafArgs('dig_block', {})).toBe('dig_block requires blockType or pos');
+    expect(validateLeafArgs('dig_block', {})).toBe(
+      'dig_block requires blockType or pos'
+    );
   });
 
   it('accepts valid craft_recipe args', () => {
-    expect(validateLeafArgs('craft_recipe', { recipe: 'wooden_pickaxe', qty: 1 })).toBeNull();
+    expect(
+      validateLeafArgs('craft_recipe', { recipe: 'wooden_pickaxe', qty: 1 })
+    ).toBeNull();
   });
 
   it('rejects craft_recipe without recipe', () => {
-    expect(validateLeafArgs('craft_recipe', {})).toBe('craft_recipe requires recipe (string)');
+    expect(validateLeafArgs('craft_recipe', {})).toBe(
+      'craft_recipe requires recipe (string)'
+    );
   });
 
   it('rejects craft_recipe with non-string recipe', () => {
-    expect(validateLeafArgs('craft_recipe', { recipe: 42 })).toBe('craft_recipe requires recipe (string)');
+    expect(validateLeafArgs('craft_recipe', { recipe: 42 })).toBe(
+      'craft_recipe requires recipe (string)'
+    );
   });
 
   it('accepts valid smelt args', () => {
@@ -35,45 +53,63 @@ describe('validateLeafArgs', () => {
   });
 
   it('rejects smelt with item instead of input (pre-normalization)', () => {
-    expect(validateLeafArgs('smelt', { item: 'iron_ore' })).toBe('smelt requires input (string)');
-  });
-
-  it('accepts valid place_block args', () => {
-    expect(validateLeafArgs('place_block', { item: 'crafting_table' })).toBeNull();
-  });
-
-  it('rejects place_block without item', () => {
-    expect(validateLeafArgs('place_block', {})).toBe('place_block requires item (string)');
-  });
-
-  it('accepts valid place_workstation args', () => {
-    expect(validateLeafArgs('place_workstation', { workstation: 'crafting_table' })).toBeNull();
-  });
-
-  it('accepts place_workstation with furnace', () => {
-    expect(validateLeafArgs('place_workstation', { workstation: 'furnace' })).toBeNull();
-  });
-
-  it('accepts place_workstation with blast_furnace', () => {
-    expect(validateLeafArgs('place_workstation', { workstation: 'blast_furnace' })).toBeNull();
-  });
-
-  it('rejects place_workstation without workstation', () => {
-    expect(validateLeafArgs('place_workstation', {})).toBe('place_workstation requires workstation (string)');
-  });
-
-  it('rejects place_workstation with unknown workstation', () => {
-    expect(validateLeafArgs('place_workstation', { workstation: 'diamond_block' })).toBe(
-      "place_workstation: unknown workstation 'diamond_block'"
+    expect(validateLeafArgs('smelt', { item: 'iron_ore' })).toBe(
+      'smelt requires input (string)'
     );
   });
 
+  it('accepts valid place_block args', () => {
+    expect(
+      validateLeafArgs('place_block', { item: 'crafting_table' })
+    ).toBeNull();
+  });
+
+  it('rejects place_block without item', () => {
+    expect(validateLeafArgs('place_block', {})).toBe(
+      'place_block requires item (string)'
+    );
+  });
+
+  it('accepts valid place_workstation args', () => {
+    expect(
+      validateLeafArgs('place_workstation', { workstation: 'crafting_table' })
+    ).toBeNull();
+  });
+
+  it('accepts place_workstation with furnace', () => {
+    expect(
+      validateLeafArgs('place_workstation', { workstation: 'furnace' })
+    ).toBeNull();
+  });
+
+  it('accepts place_workstation with blast_furnace', () => {
+    expect(
+      validateLeafArgs('place_workstation', { workstation: 'blast_furnace' })
+    ).toBeNull();
+  });
+
+  it('rejects place_workstation without workstation', () => {
+    expect(validateLeafArgs('place_workstation', {})).toBe(
+      'place_workstation requires workstation (string)'
+    );
+  });
+
+  it('rejects place_workstation with unknown workstation', () => {
+    expect(
+      validateLeafArgs('place_workstation', { workstation: 'diamond_block' })
+    ).toBe("place_workstation: unknown workstation 'diamond_block'");
+  });
+
   it('accepts valid build_module args', () => {
-    expect(validateLeafArgs('build_module', { moduleId: 'basic_shelter_5x5' })).toBeNull();
+    expect(
+      validateLeafArgs('build_module', { moduleId: 'basic_shelter_5x5' })
+    ).toBeNull();
   });
 
   it('rejects build_module without moduleId', () => {
-    expect(validateLeafArgs('build_module', {})).toBe('build_module requires moduleId (string)');
+    expect(validateLeafArgs('build_module', {})).toBe(
+      'build_module requires moduleId (string)'
+    );
   });
 
   it('passes through unknown leaf names in non-strict mode (default)', () => {
@@ -88,55 +124,81 @@ describe('validateLeafArgs', () => {
   });
 
   it('accepts valid acquire_material args', () => {
-    expect(validateLeafArgs('acquire_material', { item: 'oak_log' })).toBeNull();
+    expect(
+      validateLeafArgs('acquire_material', { item: 'oak_log' })
+    ).toBeNull();
   });
 
   it('rejects acquire_material without item', () => {
-    expect(validateLeafArgs('acquire_material', {})).toBe('acquire_material requires item (string)');
+    expect(validateLeafArgs('acquire_material', {})).toBe(
+      'acquire_material requires item (string)'
+    );
   });
 
   it('accepts valid replan_building args', () => {
-    expect(validateLeafArgs('replan_building', { templateId: 'basic_shelter' })).toBeNull();
+    expect(
+      validateLeafArgs('replan_building', { templateId: 'basic_shelter' })
+    ).toBeNull();
   });
 
   it('rejects replan_building without templateId', () => {
-    expect(validateLeafArgs('replan_building', {})).toBe('replan_building requires templateId (string)');
+    expect(validateLeafArgs('replan_building', {})).toBe(
+      'replan_building requires templateId (string)'
+    );
   });
 
   it('accepts valid replan_exhausted args', () => {
-    expect(validateLeafArgs('replan_exhausted', { templateId: 'basic_shelter' })).toBeNull();
+    expect(
+      validateLeafArgs('replan_exhausted', { templateId: 'basic_shelter' })
+    ).toBeNull();
   });
 
   it('rejects replan_exhausted without templateId', () => {
-    expect(validateLeafArgs('replan_exhausted', {})).toBe('replan_exhausted requires templateId (string)');
+    expect(validateLeafArgs('replan_exhausted', {})).toBe(
+      'replan_exhausted requires templateId (string)'
+    );
   });
 
   it('accepts valid prepare_site args', () => {
-    expect(validateLeafArgs('prepare_site', { moduleId: 'basic_shelter_5x5' })).toBeNull();
+    expect(
+      validateLeafArgs('prepare_site', { moduleId: 'basic_shelter_5x5' })
+    ).toBeNull();
   });
 
   it('rejects prepare_site without moduleId', () => {
-    expect(validateLeafArgs('prepare_site', {})).toBe('prepare_site requires moduleId (string)');
+    expect(validateLeafArgs('prepare_site', {})).toBe(
+      'prepare_site requires moduleId (string)'
+    );
   });
 
   it('accepts valid place_feature args', () => {
-    expect(validateLeafArgs('place_feature', { moduleId: 'door_oak' })).toBeNull();
+    expect(
+      validateLeafArgs('place_feature', { moduleId: 'door_oak' })
+    ).toBeNull();
   });
 
   it('rejects place_feature without moduleId', () => {
-    expect(validateLeafArgs('place_feature', {})).toBe('place_feature requires moduleId (string)');
+    expect(validateLeafArgs('place_feature', {})).toBe(
+      'place_feature requires moduleId (string)'
+    );
   });
 
   it('accepts valid building_step args', () => {
-    expect(validateLeafArgs('building_step', { moduleId: 'custom_step' })).toBeNull();
+    expect(
+      validateLeafArgs('building_step', { moduleId: 'custom_step' })
+    ).toBeNull();
   });
 
   it('rejects building_step without moduleId', () => {
-    expect(validateLeafArgs('building_step', {})).toBe('building_step requires moduleId (string)');
+    expect(validateLeafArgs('building_step', {})).toBe(
+      'building_step requires moduleId (string)'
+    );
   });
 
   it('accepts valid collect_items args with itemName', () => {
-    expect(validateLeafArgs('collect_items', { itemName: 'oak_log', radius: 8 })).toBeNull();
+    expect(
+      validateLeafArgs('collect_items', { itemName: 'oak_log', radius: 8 })
+    ).toBeNull();
   });
 
   it('accepts collect_items with no args (all optional)', () => {
@@ -158,7 +220,10 @@ describe('normalizeLeafArgs', () => {
   });
 
   it('does not overwrite existing smelt { input }', () => {
-    const args: Record<string, unknown> = { input: 'iron_ore', item: 'gold_ore' };
+    const args: Record<string, unknown> = {
+      input: 'iron_ore',
+      item: 'gold_ore',
+    };
     normalizeLeafArgs('smelt', args);
     expect(args.input).toBe('iron_ore');
   });
@@ -184,27 +249,57 @@ describe('normalizeLeafArgs', () => {
 
 describe('requirementToLeafMeta', () => {
   it('maps collect requirement to acquire_material', () => {
-    const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'oak_log', count: 8 } });
+    const result = requirementToLeafMeta({
+      kind: 'collect',
+      patterns: ['oak_log'],
+      quantity: 8,
+    });
+    expect(result).toEqual({
+      leaf: 'acquire_material',
+      args: { item: 'oak_log', count: 8 },
+    });
   });
 
   it('maps mine requirement to acquire_material', () => {
-    const result = requirementToLeafMeta({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'iron_ore', count: 3 } });
+    const result = requirementToLeafMeta({
+      kind: 'mine',
+      patterns: ['iron_ore'],
+      quantity: 3,
+    });
+    expect(result).toEqual({
+      leaf: 'acquire_material',
+      args: { item: 'iron_ore', count: 3 },
+    });
   });
 
   it('maps craft requirement to craft_recipe', () => {
-    const result = requirementToLeafMeta({ kind: 'craft', outputPattern: 'wooden_pickaxe', quantity: 1 });
-    expect(result).toEqual({ leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe', qty: 1 } });
+    const result = requirementToLeafMeta({
+      kind: 'craft',
+      outputPattern: 'wooden_pickaxe',
+      quantity: 1,
+    });
+    expect(result).toEqual({
+      leaf: 'craft_recipe',
+      args: { recipe: 'wooden_pickaxe', qty: 1 },
+    });
   });
 
   it('maps build requirement to build_module', () => {
-    const result = requirementToLeafMeta({ kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 });
-    expect(result).toEqual({ leaf: 'build_module', args: { moduleId: 'basic_shelter_5x5' } });
+    const result = requirementToLeafMeta({
+      kind: 'build',
+      structure: 'basic_shelter_5x5',
+      quantity: 1,
+    });
+    expect(result).toEqual({
+      leaf: 'build_module',
+      args: { moduleId: 'basic_shelter_5x5' },
+    });
   });
 
   it('returns null for collect with empty patterns', () => {
-    expect(requirementToLeafMeta({ kind: 'collect', patterns: [], quantity: 1 })).toBeNull();
+    expect(
+      requirementToLeafMeta({ kind: 'collect', patterns: [], quantity: 1 })
+    ).toBeNull();
   });
 
   it('returns null for craft without outputPattern', () => {
@@ -220,20 +315,38 @@ describe('requirementToLeafMeta', () => {
   });
 
   it('defaults quantity to 1 when not provided', () => {
-    const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'] });
-    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'oak_log', count: 1 } });
+    const result = requirementToLeafMeta({
+      kind: 'collect',
+      patterns: ['oak_log'],
+    });
+    expect(result).toEqual({
+      leaf: 'acquire_material',
+      args: { item: 'oak_log', count: 1 },
+    });
   });
 });
 
 describe('KNOWN_LEAVES', () => {
-  it('contains all 15 expected leaf names', () => {
+  it('contains all expected leaf names (including Option B bridge task_type_craft)', () => {
     const expected = [
-      'dig_block', 'craft_recipe', 'smelt', 'place_block', 'place_workstation',
-      'build_module', 'acquire_material', 'replan_building', 'replan_exhausted',
-      'prepare_site', 'place_feature', 'building_step', 'collect_items',
-      'interact_with_entity', 'open_container',
+      'dig_block',
+      'craft_recipe',
+      'smelt',
+      'place_block',
+      'place_workstation',
+      'build_module',
+      'acquire_material',
+      'replan_building',
+      'replan_exhausted',
+      'prepare_site',
+      'place_feature',
+      'building_step',
+      'collect_items',
+      'interact_with_entity',
+      'open_container',
+      'task_type_craft',
     ];
-    expect(KNOWN_LEAVES.size).toBe(15);
+    expect(KNOWN_LEAVES.size).toBe(16);
     for (const leaf of expected) {
       expect(KNOWN_LEAVES.has(leaf)).toBe(true);
     }
@@ -242,7 +355,11 @@ describe('KNOWN_LEAVES', () => {
 
 describe('requirementToFallbackPlan', () => {
   it('maps collect requirement to acquire_material steps', () => {
-    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
+    const result = requirementToFallbackPlan({
+      kind: 'collect',
+      patterns: ['oak_log'],
+      quantity: 8,
+    });
     expect(result).toHaveLength(8);
     expect(result![0]).toEqual({
       leaf: 'acquire_material',
@@ -257,7 +374,11 @@ describe('requirementToFallbackPlan', () => {
   });
 
   it('maps mine requirement to acquire_material steps', () => {
-    const result = requirementToFallbackPlan({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
+    const result = requirementToFallbackPlan({
+      kind: 'mine',
+      patterns: ['iron_ore'],
+      quantity: 3,
+    });
     expect(result).toHaveLength(3);
     expect(result![0]).toEqual({
       leaf: 'acquire_material',
@@ -272,9 +393,13 @@ describe('requirementToFallbackPlan', () => {
   });
 
   it('emits only acquire_material leaves for collect plans', () => {
-    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 3 });
+    const result = requirementToFallbackPlan({
+      kind: 'collect',
+      patterns: ['oak_log'],
+      quantity: 3,
+    });
     expect(result).toHaveLength(3);
-    const leafSequence = result!.map(s => s.leaf);
+    const leafSequence = result!.map((s) => s.leaf);
     expect(leafSequence).toEqual([
       'acquire_material',
       'acquire_material',
@@ -283,25 +408,43 @@ describe('requirementToFallbackPlan', () => {
   });
 
   it('maps craft requirement to 1-step craft plan (prereq injection handles materials)', () => {
-    const result = requirementToFallbackPlan({ kind: 'craft', outputPattern: 'wooden_pickaxe' });
+    const result = requirementToFallbackPlan({
+      kind: 'craft',
+      outputPattern: 'wooden_pickaxe',
+    });
     expect(result).toHaveLength(1);
     expect(result![0]).toEqual({
-      leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe', qty: 1 }, label: 'Craft wooden_pickaxe',
+      leaf: 'craft_recipe',
+      args: { recipe: 'wooden_pickaxe', qty: 1 },
+      label: 'Craft wooden_pickaxe',
     });
   });
 
   it('maps craft with quantity to 1-step craft plan', () => {
-    const result = requirementToFallbackPlan({ kind: 'craft', outputPattern: 'crafting_table', quantity: 2 });
+    const result = requirementToFallbackPlan({
+      kind: 'craft',
+      outputPattern: 'crafting_table',
+      quantity: 2,
+    });
     expect(result).toHaveLength(1);
     expect(result![0]).toEqual({
-      leaf: 'craft_recipe', args: { recipe: 'crafting_table', qty: 2 }, label: 'Craft crafting_table',
+      leaf: 'craft_recipe',
+      args: { recipe: 'crafting_table', qty: 2 },
+      label: 'Craft crafting_table',
     });
   });
 
   it('maps build requirement to 1-step build_module plan', () => {
-    const result = requirementToFallbackPlan({ kind: 'build', structure: 'basic_shelter_5x5' });
+    const result = requirementToFallbackPlan({
+      kind: 'build',
+      structure: 'basic_shelter_5x5',
+    });
     expect(result).toEqual([
-      { leaf: 'build_module', args: { moduleId: 'basic_shelter_5x5' }, label: 'Build basic_shelter_5x5' },
+      {
+        leaf: 'build_module',
+        args: { moduleId: 'basic_shelter_5x5' },
+        label: 'Build basic_shelter_5x5',
+      },
     ]);
   });
 
@@ -310,7 +453,9 @@ describe('requirementToFallbackPlan', () => {
   });
 
   it('returns null for collect with empty patterns', () => {
-    expect(requirementToFallbackPlan({ kind: 'collect', patterns: [], quantity: 1 })).toBeNull();
+    expect(
+      requirementToFallbackPlan({ kind: 'collect', patterns: [], quantity: 1 })
+    ).toBeNull();
   });
 
   it('returns null for craft without outputPattern', () => {
@@ -322,9 +467,16 @@ describe('requirementToFallbackPlan', () => {
   });
 
   it('defaults quantity to 1 when not provided', () => {
-    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'] });
+    const result = requirementToFallbackPlan({
+      kind: 'collect',
+      patterns: ['oak_log'],
+    });
     expect(result).toEqual([
-      { leaf: 'acquire_material', args: { item: 'oak_log', count: 1 }, label: 'Gather oak_log' },
+      {
+        leaf: 'acquire_material',
+        args: { item: 'oak_log', count: 1 },
+        label: 'Gather oak_log',
+      },
     ]);
   });
 });

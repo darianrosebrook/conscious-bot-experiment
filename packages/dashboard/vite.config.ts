@@ -54,7 +54,8 @@ export default defineConfig({
       '/api/memory-updates': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/memory-updates/, '/memory-updates'),
+        rewrite: (path) =>
+          path.replace(/^\/api\/memory-updates/, '/memory-updates'),
       },
 
       // =====================================================================
@@ -68,7 +69,8 @@ export default defineConfig({
       '/api/task-updates': {
         target: 'http://localhost:3002',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/task-updates/, '/task-updates'),
+        rewrite: (path) =>
+          path.replace(/^\/api\/task-updates/, '/task-updates'),
       },
       '/api/goals': {
         target: 'http://localhost:3002',
@@ -93,20 +95,22 @@ export default defineConfig({
       '/api/ws/cognitive-stream': {
         target: 'http://localhost:3003',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ws\/cognitive-stream/, '/api/cognitive-stream'),
+        rewrite: (path) =>
+          path.replace(/^\/api\/ws\/cognitive-stream/, '/api/cognitive-stream'),
       },
       '/api/stream': {
         target: 'http://localhost:3003',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/stream/, '/stream'),
       },
+      // Events and notes served by memory service (same source as memory-updates SSE)
       '/api/events': {
-        target: 'http://localhost:3003',
+        target: 'http://localhost:3001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/events/, '/events'),
       },
       '/api/notes': {
-        target: 'http://localhost:3003',
+        target: 'http://localhost:3001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/notes/, '/notes'),
       },
@@ -147,12 +151,14 @@ export default defineConfig({
       '/api/viewer/status': {
         target: 'http://localhost:3005',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/viewer\/status/, '/viewer-status'),
+        rewrite: (path) =>
+          path.replace(/^\/api\/viewer\/status/, '/viewer-status'),
       },
       '/api/viewer/start': {
         target: 'http://localhost:3005',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/viewer\/start/, '/start-viewer'),
+        rewrite: (path) =>
+          path.replace(/^\/api\/viewer\/start/, '/start-viewer'),
       },
       '/api/viewer/stop': {
         target: 'http://localhost:3005',

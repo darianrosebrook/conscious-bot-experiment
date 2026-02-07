@@ -157,6 +157,9 @@ If the artifact API returns 404, the process on that port may be an older build.
 
 ## 5. What to Do Next
 
+we have captured an artifact with run_id b46d4658-e2b8-4987-8677-5d74334f17e3 showing both expansion.status === "ok" and execution.shadow_steps.length >= 1, and points to docs/planning/PATTERN_A_IMPLEMENTATION_HANDOFF.md for the full excerpt, commands, and verification.
+Evidence list: Successful dispatch-acceptance run (b46d4658…), earlier expand-only artifacts, and the bridge tripwire test.
+
 Ordered by leverage (aligned with overview Section 2 and 12.5).
 
 1. **Leaf vocabulary:** Decide Option A (map Sterling to executor-native leaves and args) vs Option B timebox. Option A is the intended ABI; Option B is quarantined and for evidence only. See overview Section 3 and 11.

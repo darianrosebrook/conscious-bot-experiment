@@ -20,7 +20,11 @@ export interface MinecraftActionWithNav {
  * Merges with existing __nav to preserve holder/priority if already set.
  */
 export function withNavLeaseScope<
-  A extends { type: string; parameters?: Record<string, any>; timeout?: number } | null,
+  A extends {
+    type: string;
+    parameters?: Record<string, any>;
+    timeout?: number;
+  } | null,
 >(action: A, taskId: string): A {
   if (!action) return action;
   const existingNav = action.parameters?.__nav as NavLeaseNav | undefined;
@@ -198,10 +202,17 @@ export function mapTaskTypeToMinecraftAction(task: any) {
   }
 }
 
+export type MapBTActionOptions = {
+  /** When true, unmapped tools return null instead of a generic action (fail-closed for executor). */
+  strict?: boolean;
+};
+
 export function mapBTActionToMinecraft(
   tool: string,
-  args: Record<string, any>
-) {
+  args: Record<string, any>,
+  options?: MapBTActionOptions
+): { type: string; parameters: Record<string, any>; debug?: unknown } | null {
+  const strict = options?.strict === true;
   // Strip "minecraft." prefix if present to normalize the action name
   const normalizedTool = tool.replace(/^minecraft\./, '');
 
@@ -257,6 +268,17 @@ export function mapBTActionToMinecraft(
         parameters: {
           item: args.item || args.blockType || 'oak_log', // Support both item and blockType
           radius: args.radius || 10,
+          exploreOnFail: true,
+          maxSearchTime: 30000,
+        },
+      };
+    case 'acquire_material':
+      return {
+        type: 'collect_items_enhanced',
+        parameters: {
+          item: args.item || args.blockType || 'oak_log',
+          radius: args.radius || 10,
+          quantity: args.count ?? args.quantity ?? 1,
           exploreOnFail: true,
           maxSearchTime: 30000,
         },
@@ -342,7 +364,7 @@ export function mapBTActionToMinecraft(
       return {
         type: 'smelt',
         parameters: {
-          item: args.item || args.recipe,
+          item: args.item || args.recipe || args.input,
           quantity: args.qty || args.quantity || 1,
           fuel: args.fuel || 'coal',
         },
@@ -415,6 +437,7 @@ export function mapBTActionToMinecraft(
         },
       };
     default:
+      if (strict) return null;
       return { type: normalizedTool, parameters: args, debug: debugInfo };
   }
 }

@@ -1,0 +1,34 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "run-1",
+  "created_at": 1770429629565,
+  "updated_at": 1770429629612,
+  "execution": {
+    "dispatched_steps": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=53e7885d supports_expand_by_digest_v1_versioned_key=true",
+  "runtime": {
+    "executor": {
+      "enabled": false,
+      "mode": "shadow",
+      "loop_started": false
+    }
+  },
+  "injection": {
+    "committed_ir_digest": "test-digest",
+    "schema_version": "v1",
+    "envelope_id": "env-1",
+    "request_id": "inject_run-1",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770429629566_0cg1k5",
+    "status": "blocked",
+    "blocked_reason": "blocked_digest_unknown"
+  },
+  "task": {
+    "task_id": "sterling-ir-run-1",
+    "dedupe_key": "v1:test-digest",
+    "status": "pending_planning"
+  }
+}

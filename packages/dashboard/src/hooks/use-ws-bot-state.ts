@@ -42,12 +42,7 @@ export interface BotConnection {
 
 export function useWsBotState() {
   const { config } = useDashboardContext();
-  const {
-    hud,
-    setHud,
-    addThought,
-    setInventory,
-  } = useDashboardStore();
+  const { hud, setHud, addThought, setInventory } = useDashboardStore();
 
   const [botState, setBotState] = useState<BotState | null>(null);
   const [botConnections, setBotConnections] = useState<BotConnection[]>([
@@ -68,14 +63,17 @@ export function useWsBotState() {
       switch (message.type) {
         case 'initial_state': {
           const initialState = message.data;
-          setBotConnections([
-            {
-              name: 'minecraft-bot',
-              connected: initialState.connected,
-              viewerActive: false,
-              viewerUrl: 'http://localhost:3006',
-            },
-          ]);
+          setBotConnections((prev) => {
+            const existing = prev.find((c) => c.name === 'minecraft-bot');
+            return [
+              {
+                name: 'minecraft-bot',
+                connected: initialState.connected,
+                viewerActive: existing?.viewerActive ?? false,
+                viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+              },
+            ];
+          });
           break;
         }
 
@@ -188,15 +186,18 @@ export function useWsBotState() {
         case 'connected':
         case 'disconnected':
         case 'spawned':
-          setBotConnections([
-            {
-              name: 'minecraft-bot',
-              connected:
-                message.type === 'connected' || message.type === 'spawned',
-              viewerActive: false,
-              viewerUrl: 'http://localhost:3006',
-            },
-          ]);
+          setBotConnections((prev) => {
+            const existing = prev.find((c) => c.name === 'minecraft-bot');
+            return [
+              {
+                name: 'minecraft-bot',
+                connected:
+                  message.type === 'connected' || message.type === 'spawned',
+                viewerActive: existing?.viewerActive ?? false,
+                viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+              },
+            ];
+          });
           break;
 
         case 'warning': {
@@ -315,7 +316,7 @@ export function useWsBotState() {
           debugLog('Unhandled WebSocket message type:', message.type);
       }
     },
-    [setHud, setInventory, addThought, hud],
+    [setHud, setInventory, addThought, hud]
   );
 
   const handleWebSocketError = useCallback((error: Event) => {
@@ -429,16 +430,19 @@ export function useWsBotState() {
         food: d.vitals?.hunger ?? d.vitals?.food,
         inventory: normalizedInventory,
       });
-      setBotConnections([
-        {
-          name: 'minecraft-bot',
-          connected: d.connected ?? false,
-          viewerActive: false,
-          viewerUrl: 'http://localhost:3006',
-        },
-      ]);
+      setBotConnections((prev) => {
+        const existing = prev.find((c) => c.name === 'minecraft-bot');
+        return [
+          {
+            name: 'minecraft-bot',
+            connected: d.connected ?? false,
+            viewerActive: existing?.viewerActive ?? false,
+            viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+          },
+        ];
+      });
     },
-    [setHud, setInventory],
+    [setHud, setInventory]
   );
 
   useBotStateSSE({

@@ -88,6 +88,7 @@ import type { Task } from '../../types/task';
 import type { RigGMetadata } from '../../constraints/execution-advisor';
 import type { RigGSignals } from '../../constraints/partial-order-plan';
 import { createMockSterlingService } from '../../sterling/__tests__/mock-sterling-service';
+import * as stepOptionANormalizer from '../../modules/step-option-a-normalizer';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -378,6 +379,39 @@ describe('Sterling IR routing', () => {
     expect(created.status).toBe('pending_planning');
     expect(created.metadata.blockedReason).toBe('blocked_executor_error');
     expect((created.metadata as any).sterling?.exec?.state).toBe('error');
+  });
+
+  describe('Option A normalizer choke-point invariant', () => {
+    it('finalizeNewTask path calls normalizeTaskStepsToOptionA when task has steps', async () => {
+      const normalizeSpy = vi.spyOn(
+        stepOptionANormalizer,
+        'normalizeTaskStepsToOptionA'
+      );
+      try {
+        const expandByDigest = vi.fn().mockResolvedValue({
+          status: 'ok',
+          plan_bundle_digest: 'bundle_1',
+          steps: [{ leaf: 'dig_block', args: { blockType: 'oak_log' } }],
+          schema_version: 'v1',
+        });
+        const service = createMockSterlingService({
+          overrides: { expandByDigest },
+        });
+        ti.setSterlingExecutorService(service as any);
+
+        const created = await ti.addTask(makeSterlingTask());
+
+        expect(created.steps.length).toBeGreaterThan(0);
+        expect(normalizeSpy).toHaveBeenCalledTimes(1);
+        const taskArg = normalizeSpy.mock.calls[0][0];
+        expect(taskArg).toMatchObject({ steps: expect.any(Array) });
+        expect((taskArg as { steps: unknown[] }).steps.length).toBeGreaterThan(
+          0
+        );
+      } finally {
+        normalizeSpy.mockRestore();
+      }
+    });
   });
 });
 

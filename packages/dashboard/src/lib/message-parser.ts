@@ -88,7 +88,7 @@ export function parsePlannerAction(
   if (Object.keys(parameters).length > 0) {
     try {
       const paramDescriptions = Object.entries(parameters)
-        .filter(([_, value]) => value !== null && value !== undefined)
+        .filter(([, value]) => value !== null && value !== undefined)
         .map(([key, value]) => {
           // Format parameter values more intelligently
           if (typeof value === 'string') {

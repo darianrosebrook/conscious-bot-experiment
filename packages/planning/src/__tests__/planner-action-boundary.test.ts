@@ -168,6 +168,45 @@ describe('planner -> /action boundary conformance', () => {
     }
   });
 
+  /**
+   * Live Option A intake gate: no TS semantic translation.
+   * Planning must dispatch craft_recipe with executor-native args (recipe).
+   * No codepath may derive recipe from predicate_lemma / proposition metadata.
+   */
+  describe('no TS semantic translation for craft_recipe (Live Option A)', () => {
+    it('craft_recipe passes args.recipe through to parameters.item verbatim', () => {
+      const mapped = mapBTActionToMinecraft('craft_recipe', {
+        recipe: 'oak_planks',
+        qty: 1,
+      });
+      expect(mapped.type).toBe('craft');
+      expect(mapped.parameters?.item).toBe('oak_planks');
+    });
+
+    it('craft_recipe uses args.recipe, NOT predicate_lemma or proposition', () => {
+      const mapped = mapBTActionToMinecraft('craft_recipe', {
+        recipe: 'wooden_pickaxe',
+        predicate_lemma: 'craft_wooden_pickaxe',
+        proposition: { type: 'craft', output: 'stick' },
+      });
+      expect(mapped.parameters?.item).toBe('wooden_pickaxe');
+      expect(mapped.parameters?.predicate_lemma).toBeUndefined();
+      expect(mapped.parameters?.proposition).toBeUndefined();
+    });
+
+    it('craft_recipe accepts args.item as fallback (alias) but prefers args.recipe', () => {
+      const withRecipe = mapBTActionToMinecraft('craft_recipe', {
+        recipe: 'oak_planks',
+      });
+      expect(withRecipe.parameters?.item).toBe('oak_planks');
+
+      const withItem = mapBTActionToMinecraft('craft_recipe', {
+        item: 'torch',
+      });
+      expect(withItem.parameters?.item).toBe('torch');
+    });
+  });
+
   describe('mapTaskTypeToMinecraftAction round-trip', () => {
     const taskTypes = [
       { type: 'social', title: 'Say hello', description: 'greet' },
@@ -234,7 +273,29 @@ describe('planner -> /action boundary conformance', () => {
       // Default returns { type: tool, parameters: args }
       // which means the raw leaf name becomes the action type.
       // This is fine as long as executors check for "Unknown action type".
-      expect(mapped.type).toBe('unknown_custom_leaf');
+      expect(mapped?.type).toBe('unknown_custom_leaf');
+    });
+  });
+
+  describe('strict mode (fail-closed for executor)', () => {
+    it('returns null for unmapped tool when strict is true', () => {
+      const mapped = mapBTActionToMinecraft(
+        'minecraft.unknown_custom_leaf',
+        { foo: 'bar' },
+        { strict: true }
+      );
+      expect(mapped).toBeNull();
+    });
+
+    it('returns mapped action for known tool when strict is true', () => {
+      const mapped = mapBTActionToMinecraft(
+        'minecraft.craft_recipe',
+        { recipe: 'oak_planks', qty: 1 },
+        { strict: true }
+      );
+      expect(mapped).not.toBeNull();
+      expect(mapped!.type).toBe('craft');
+      expect(mapped!.parameters?.item).toBe('oak_planks');
     });
   });
 });

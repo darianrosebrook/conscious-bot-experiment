@@ -284,14 +284,17 @@ export default function Dashboard() {
                 weather: undefined,
               });
 
-              setBotConnections([
-                {
-                  name: 'minecraft-bot',
-                  connected: botStateData.connected,
-                  viewerActive: false,
-                  viewerUrl: 'http://localhost:3006',
-                },
-              ]);
+              setBotConnections((prev) => {
+                const existing = prev.find((c) => c.name === 'minecraft-bot');
+                return [
+                  {
+                    name: 'minecraft-bot',
+                    connected: botStateData.connected,
+                    viewerActive: existing?.viewerActive ?? false,
+                    viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+                  },
+                ];
+              });
             }
           }
         } catch (error) {
@@ -893,7 +896,9 @@ export default function Dashboard() {
                       </div>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Nearby</span>
-                        <div>{environment.nearbyEntities?.join(', ') || 'None'}</div>
+                        <div>
+                          {environment.nearbyEntities?.join(', ') || 'None'}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1348,9 +1353,8 @@ export default function Dashboard() {
                     </Button>
                   </div>
                   <div className={styles.intrusiveHint}>
-                    Try: "craft a wooden pickaxe", "mine some
-                    stone", "explore the area", "build a
-                    house"
+                    Try: "craft a wooden pickaxe", "mine some stone", "explore
+                    the area", "build a house"
                   </div>
                 </div>
               </aside>

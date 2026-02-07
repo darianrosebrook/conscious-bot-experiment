@@ -35,8 +35,8 @@ export interface BotStateSSEMessage {
 
 export interface UseBotStateSSEOptions {
   enabled: boolean;
-  onMessage: (message: BotStateSSEMessage) => void;
-  onError?: (err: Event) => void;
+  onMessage: (_message: BotStateSSEMessage) => void;
+  onError?: (_err: Event) => void;
 }
 
 /**

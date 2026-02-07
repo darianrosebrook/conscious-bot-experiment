@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:b028cdba21a314f8",
-  "bundleHash": "b028cdba21a314f8",
-  "timestamp": 1770077373230,
+  "bundleId": "minecraft.tool_progression:c4005f5255b7c7b5",
+  "bundleHash": "c4005f5255b7c7b5",
+  "timestamp": 1770448094346,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -21,26 +21,26 @@
     "objectiveWeightsSource": "default"
   },
   "output": {
-    "planId": "47a3d2a1caea7eaf",
+    "planId": "860681a3f219c562",
     "solved": true,
     "stepsDigest": "270c723b6b0c141e",
     "searchStats": {
-      "totalNodes": 98,
-      "durationMs": 15,
+      "totalNodes": 130,
+      "durationMs": 18,
       "solutionPathLength": 8
     },
     "searchHealth": {
-      "nodesExpanded": 50,
-      "frontierPeak": 48,
+      "nodesExpanded": 66,
+      "frontierPeak": 64,
       "hMin": 0,
       "hMax": 1,
-      "hMean": 0.98,
-      "hVariance": 0.0196,
+      "hMean": 0.9848484848484849,
+      "hVariance": 0.01492194674012856,
       "fMin": 1,
       "fMax": 13.5,
-      "pctSameH": 0.98,
+      "pctSameH": 0.9848484848484849,
       "terminationReason": "goal_found",
-      "branchingEstimate": 3,
+      "branchingEstimate": 2.8636363636363638,
       "searchHealthVersion": 1
     },
     "rationale": {
@@ -54,9 +54,9 @@
         "objectiveWeightsSource": "default"
       },
       "searchEffort": {
-        "nodesExpanded": 50,
-        "frontierPeak": 48,
-        "branchingEstimate": 3
+        "nodesExpanded": 66,
+        "frontierPeak": 64,
+        "branchingEstimate": 2.8636363636363638
       },
       "searchTermination": {
         "terminationReason": "goal_found",
@@ -72,16 +72,28 @@
       }
     },
     "sterlingIdentity": {
-      "traceBundleHash": "44c479b788cc0737c86f64859b70234e34c747fe3e9be9734ef6724407833eec",
-      "engineCommitment": "fd8ed7e62e04c50aab0eaa14597d5411d34f7b3bae29f95926d61ee6de2d7828",
+      "traceBundleHash": "c338bd3ac26ac476c437412e9a28e92c81a1ca4d09a9a42f1f06670e2718d519",
+      "engineCommitment": "5e20861e8f05702c664f9abad307cc3046f25c1b694d435487da67236a276f8c",
       "operatorRegistryHash": "d6590a986f022faf77acda6bdb0f89508e021abfecae03141d87d0abcb5398a1",
-      "bindingHash": "5c155ed230c8cb00"
+      "completenessDeclaration": {
+        "completenessVersion": 1,
+        "kind": "structural",
+        "edgesComplete": true,
+        "deltasComplete": true,
+        "goalWitnessPresent": true,
+        "isProofReady": false,
+        "proofMissingReasons": [
+          "no_operator_witnesses_emitted",
+          "no_decision_witnesses"
+        ]
+      },
+      "bindingHash": "121f5f23f2345ffb"
     }
   },
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1770077373206,
+    "checkedAt": 1770448094319,
     "definitionCount": 6
   }
 }

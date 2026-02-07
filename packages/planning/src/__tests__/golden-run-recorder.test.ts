@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { GoldenRunRecorder } from '../golden-run-recorder';
+import { GoldenRunRecorder, toDispatchResult } from '../golden-run-recorder';
 
 async function readJson(filePath: string) {
   const data = await fs.readFile(filePath, 'utf8');
@@ -82,7 +82,10 @@ describe('GoldenRunRecorder', () => {
     const recorder = new GoldenRunRecorder(baseDir);
     const runId = 'blocked-run-1';
 
-    recorder.recordInjection(runId, { committed_ir_digest: 'd1', schema_version: '1.0' });
+    recorder.recordInjection(runId, {
+      committed_ir_digest: 'd1',
+      schema_version: '1.0',
+    });
     recorder.recordExecutorBlocked(runId, 'unknown_leaf', {
       leaf: 'task_type_craft',
       args: { target: 'plank' },
@@ -100,7 +103,158 @@ describe('GoldenRunRecorder', () => {
 
     const report = await readJson(reportPath);
     expect(report.execution?.executor_blocked_reason).toBe('unknown_leaf');
-    expect(report.execution?.executor_blocked_payload?.leaf).toBe('task_type_craft');
-    expect(report.execution?.executor_blocked_payload?.args).toEqual({ target: 'plank' });
+    expect(report.execution?.executor_blocked_payload?.leaf).toBe(
+      'task_type_craft'
+    );
+    expect(report.execution?.executor_blocked_payload?.args).toEqual({
+      target: 'plank',
+    });
+  });
+
+  it('throttles duplicate recordExecutorBlocked (same runId, reason, leaf) within window', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'golden-run-'));
+    const recorder = new GoldenRunRecorder(baseDir);
+    const runId = 'throttle-run-1';
+
+    recorder.recordExecutorBlocked(runId, 'rate_limited', {
+      leaf: 'craft_recipe',
+    });
+    recorder.recordExecutorBlocked(runId, 'rate_limited', {
+      leaf: 'craft_recipe',
+    });
+
+    const report = recorder.getReport(runId);
+    expect(report).not.toBeNull();
+    expect(report!.execution?.executor_blocked_reason).toBe('rate_limited');
+    expect(report!.execution?.executor_blocked_payload?.leaf).toBe(
+      'craft_recipe'
+    );
+  });
+
+  it('derives loop_started true when dispatch or shadow_steps exist (written artifact)', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'golden-run-'));
+    const recorder = new GoldenRunRecorder(baseDir);
+    const runId = 'loop-derived-1';
+
+    recorder.recordRuntime(runId, {
+      executor: { enabled: true, mode: 'shadow', loop_started: false },
+    });
+    recorder.recordShadowDispatch(runId, {
+      step_id: 's1',
+      leaf: 'task_type_craft',
+      args: {},
+      observed_at: Date.now(),
+    });
+
+    const reportPath = path.join(baseDir, `golden-${runId}.json`);
+    for (let i = 0; i < 10; i += 1) {
+      try {
+        await fs.access(reportPath);
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+
+    const report = await readJson(reportPath);
+    expect(report.execution?.shadow_steps?.length).toBe(1);
+    expect(report.runtime?.executor?.loop_started).toBe(true);
+  });
+
+  it('records shadow dispatch once per (run_id, step_id); duplicate step_id is ignored', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'golden-run-'));
+    const recorder = new GoldenRunRecorder(baseDir);
+    const runId = 'idem-run-1';
+    const stepId = 'step-abc';
+    const t = Date.now();
+
+    recorder.recordShadowDispatch(runId, {
+      step_id: stepId,
+      leaf: 'task_type_craft',
+      args: {},
+      observed_at: t,
+    });
+    recorder.recordShadowDispatch(runId, {
+      step_id: stepId,
+      leaf: 'task_type_craft',
+      args: {},
+      observed_at: t + 100,
+    });
+
+    const reportPath = path.join(baseDir, `golden-${runId}.json`);
+    for (let i = 0; i < 10; i += 1) {
+      try {
+        await fs.access(reportPath);
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+
+    const report = await readJson(reportPath);
+    expect(report.execution?.shadow_steps?.length).toBe(1);
+  });
+
+  it('derives certifiable false when bridge_enabled is true', () => {
+    const recorder = new GoldenRunRecorder('/tmp/golden-cert');
+    recorder.recordPlanningBanner(
+      'cert-run-1',
+      'PLANNING_SERVER_BANNER file=planning run_mode=dev capabilities=task_type_bridge config_digest=abc',
+      'abc',
+      true
+    );
+    const report = recorder.getReport('cert-run-1');
+    expect(report?.runtime?.bridge_enabled).toBe(true);
+    expect(report?.runtime?.certifiable).toBe(false);
+  });
+
+  it('derives certifiable true when bridge_enabled is false', () => {
+    const recorder = new GoldenRunRecorder('/tmp/golden-cert2');
+    recorder.recordPlanningBanner(
+      'cert-run-2',
+      'PLANNING_SERVER_BANNER file=planning run_mode=dev config_digest=def',
+      'def',
+      false
+    );
+    const report = recorder.getReport('cert-run-2');
+    expect(report?.runtime?.bridge_enabled).toBe(false);
+    expect(report?.runtime?.certifiable).toBe(true);
+  });
+
+  it('records dispatch with result for live proof (tool attempt recorded)', async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'golden-run-'));
+    const recorder = new GoldenRunRecorder(baseDir);
+    const runId = 'live-proof-1';
+
+    recorder.recordDispatch(runId, {
+      step_id: 'step-1',
+      leaf: 'craft_recipe',
+      args: { recipe: 'oak_planks' },
+      dispatched_at: Date.now(),
+      result: toDispatchResult({ ok: true }),
+    });
+
+    const report = recorder.getReport(runId);
+    expect(report?.execution?.dispatched_steps?.length).toBe(1);
+    expect(report?.execution?.dispatched_steps?.[0]?.result).toEqual({
+      status: 'ok',
+    });
+  });
+
+  it('toDispatchResult converts error outcome to result shape', () => {
+    expect(toDispatchResult({ ok: false, error: 'Bot not connected' })).toEqual(
+      {
+        status: 'error',
+        error: 'Bot not connected',
+        failureCode: undefined,
+      }
+    );
+  });
+
+  it('toDispatchResult converts shadow-blocked outcome to result shape', () => {
+    expect(toDispatchResult({ ok: false, shadowBlocked: true })).toEqual({
+      status: 'blocked',
+      reason: 'shadow',
+    });
   });
 });

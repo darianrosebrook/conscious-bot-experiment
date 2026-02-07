@@ -358,7 +358,61 @@ node_modules/prismarine-viewer/
 
 ---
 
-## 10. Decision Matrix
+## 10. Personal / Custom Skin Loading (Diagnosis)
+
+When the in-browser Prismarine viewer shows the bot, the **player** entity uses a texture path defined in prismarine-viewer’s `entities.json`: `textures/entity/steve`. The client resolves that to:
+
+- **Request**: `GET /mc-assets/entity/{version}/entity/steve.png`  
+  (from `Entity.js` → `resolveEntityTexturePath()` → `globalThis.__ASSET_SERVER_URL` + `/mc-assets/entity/${version}/${normalized}.png`).
+
+The **asset server** (`asset-server.ts`) serves entity textures under `GET /mc-assets/entity/:version/*`. For `steve.png` it:
+
+1. Tries **generated** paths under the pipeline’s `rawAssetsPath` (e.g. `entity/steve.png`, or `entity/player/wide/steve.png` / `entity/player/slim/steve.png` via `playerSkinCandidates`).
+2. Falls back to **bundled** assets from prismarine-viewer’s `public` dir:  
+   `pvPublicDir/textures/{version}/entity/...` (same flat path and `player/wide|slim/steve.png` candidates).
+
+So the custom skin is only used if a **steve.png** (or `player/wide/steve.png` / `player/slim/steve.png`) file exists in either the generated output or prismarine-viewer’s `public/textures/{version}/entity/...`.
+
+**How the skin gets there**
+
+- Script: `packages/minecraft-interface/scripts/inject-entity-textures.cjs`
+- It copies your PNG to prismarine-viewer’s `public/textures/{version}/entity/player/wide/steve.png` and `.../slim/steve.png`, and to fallback versions (e.g. 1.16.4) when those dirs exist.
+- **Postinstall** (`rebuild-prismarine-viewer.cjs`) runs this script in the **background** and only passes `--custom-skin` if `~/Downloads/createdSkin.png` **already exists** at install time. If the file was added later, or postinstall stderr was discarded (`2>/dev/null`), the custom skin is never injected.
+
+**Why your personal texture might not load**
+
+1. **Skin not injected** – `createdSkin.png` was not present (or not at `~/Downloads/createdSkin.png`) when you ran `pnpm install`, so the inject never ran with `--custom-skin`.
+2. **Inject ran in background** – Postinstall runs the inject detached with `stdio: 'ignore'`, so it may fail or run after the process exits; you don’t see errors.
+3. **Wrong prismarine-viewer copy (pnpm)** – Inject uses `require.resolve('prismarine-viewer/package.json')`; the app may resolve a different copy, so the skin is written to a different `public/` than the one the server uses.
+
+**Fix: run the inject script manually**
+
+From repo root (or `packages/minecraft-interface`):
+
+```bash
+cd packages/minecraft-interface
+node scripts/inject-entity-textures.cjs 1.21.9 --custom-skin /Users/darianrosebrook/Downloads/createdSkin.png
+```
+
+Use the same Minecraft version as your bot (e.g. `MINECRAFT_VERSION` or default 1.21.9). Then restart the minecraft-interface server and reload the viewer. The asset server will serve the injected file from prismarine-viewer’s `public/textures/{version}/entity/player/wide/steve.png` (or slim) as **bundled** fallback.
+
+**Optional: use env for custom skin path**
+
+When running the rebuild (e.g. after adding the skin file), set `CUSTOM_SKIN_PATH` so the inject runs synchronously and uses your path:
+
+```bash
+CUSTOM_SKIN_PATH=/Users/darianrosebrook/Downloads/createdSkin.png node scripts/rebuild-prismarine-viewer.cjs
+```
+
+Or run the inject script directly (no rebuild needed if viewer is already built):
+
+```bash
+node scripts/inject-entity-textures.cjs 1.21.9 --custom-skin /Users/darianrosebrook/Downloads/createdSkin.png
+```
+
+---
+
+## 11. Decision Matrix
 
 | Scenario | Recommended Action |
 |----------|-------------------|

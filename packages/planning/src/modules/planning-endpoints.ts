@@ -17,6 +17,10 @@ import {
   sanitizeRunId,
   isValidGoldenRunBanner,
 } from '../golden-run-recorder';
+import {
+  getPlanningRuntimeConfig,
+  buildPlanningBanner,
+} from '../planning-runtime-config';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -60,8 +64,7 @@ const NON_GOAL_TASK_TYPES = new Set([
   'survival',
 ]);
 
-const PLANNING_INGEST_DEBUG_400 =
-  process.env.PLANNING_INGEST_DEBUG_400 === '1';
+const PLANNING_INGEST_DEBUG_400 = process.env.PLANNING_INGEST_DEBUG_400 === '1';
 
 type IngestShapeReport = {
   topLevelKeys: string[];
@@ -73,10 +76,15 @@ type IngestShapeReport = {
 
 function getRequestId(req: Request): string {
   const fromHeader = req.header('x-request-id');
-  return fromHeader && fromHeader.trim().length > 0 ? fromHeader : crypto.randomUUID();
+  return fromHeader && fromHeader.trim().length > 0
+    ? fromHeader
+    : crypto.randomUUID();
 }
 
-function inspectTaskPayload(taskData: any, contentType: string | null): IngestShapeReport {
+function inspectTaskPayload(
+  taskData: any,
+  contentType: string | null
+): IngestShapeReport {
   const topLevelKeys = Object.keys(taskData || {});
   const metadata = taskData?.metadata;
   const reduction = metadata?.reduction;
@@ -84,17 +92,23 @@ function inspectTaskPayload(taskData: any, contentType: string | null): IngestSh
 
   const keyPresence: Record<string, boolean> = {
     'task.id': typeof taskData?.id === 'string',
-    'task.title': typeof taskData?.title === 'string' && taskData.title.length > 0,
-    'task.description': typeof taskData?.description === 'string' && taskData.description.length > 0,
+    'task.title':
+      typeof taskData?.title === 'string' && taskData.title.length > 0,
+    'task.description':
+      typeof taskData?.description === 'string' &&
+      taskData.description.length > 0,
     'task.type': typeof taskData?.type === 'string' && taskData.type.length > 0,
     'task.priority': typeof taskData?.priority === 'number',
-    'task.source': typeof taskData?.source === 'string' && taskData.source.length > 0,
+    'task.source':
+      typeof taskData?.source === 'string' && taskData.source.length > 0,
     'task.steps': Array.isArray(taskData?.steps),
     'task.metadata': typeof metadata === 'object' && metadata !== null,
     'metadata.thoughtId': typeof metadata?.thoughtId === 'string',
-    'metadata.origin.thoughtId': typeof metadata?.origin?.thoughtId === 'string',
+    'metadata.origin.thoughtId':
+      typeof metadata?.origin?.thoughtId === 'string',
     'metadata.reduction': typeof reduction === 'object' && reduction !== null,
-    'reduction.sterlingProcessed': typeof reduction?.sterlingProcessed === 'boolean',
+    'reduction.sterlingProcessed':
+      typeof reduction?.sterlingProcessed === 'boolean',
     'reduction.isExecutable': typeof reduction?.isExecutable === 'boolean',
     'reduction.reducerResult.committed_ir_digest':
       typeof reducerResult?.committed_ir_digest === 'string' ||
@@ -104,16 +118,18 @@ function inspectTaskPayload(taskData: any, contentType: string | null): IngestSh
   const missingFields = Object.entries(keyPresence)
     .filter(([key, present]) => {
       // Only treat these as required for reporting purposes.
-      return [
-        'task.title',
-        'task.description',
-        'task.type',
-        'task.metadata',
-        'metadata.reduction',
-        'reduction.sterlingProcessed',
-        'reduction.isExecutable',
-        'reduction.reducerResult.committed_ir_digest',
-      ].includes(key) && !present;
+      return (
+        [
+          'task.title',
+          'task.description',
+          'task.type',
+          'task.metadata',
+          'metadata.reduction',
+          'reduction.sterlingProcessed',
+          'reduction.isExecutable',
+          'reduction.reducerResult.committed_ir_digest',
+        ].includes(key) && !present
+      );
     })
     .map(([key]) => key);
 
@@ -142,7 +158,11 @@ export function inferRequirementFromEndpointParams(
 
   // { recipe: string } → kind: 'craft'
   if (typeof params.recipe === 'string' && params.recipe) {
-    return { kind: 'craft', outputPattern: params.recipe, quantity: params.qty || params.quantity || 1 };
+    return {
+      kind: 'craft',
+      outputPattern: params.recipe,
+      quantity: params.qty || params.quantity || 1,
+    };
   }
 
   // { item: string } + type → infer kind from type
@@ -154,14 +174,22 @@ export function inferRequirementFromEndpointParams(
     };
     const kind = kindFromType[type];
     if (kind) {
-      return { kind, outputPattern: params.item, quantity: params.quantity || 1 };
+      return {
+        kind,
+        outputPattern: params.item,
+        quantity: params.quantity || 1,
+      };
     }
   }
 
   // { blockType: string } → mine or collect based on type
   if (typeof params.blockType === 'string' && params.blockType) {
     const kind = type === 'mining' ? 'mine' : 'collect';
-    return { kind, outputPattern: params.blockType, quantity: params.quantity || 1 };
+    return {
+      kind,
+      outputPattern: params.blockType,
+      quantity: params.quantity || 1,
+    };
   }
 
   // { resourceType: 'wood' } → collect any log type via suffix pattern
@@ -173,7 +201,11 @@ export function inferRequirementFromEndpointParams(
     };
     const outputPattern = resourceMap[params.resourceType.toLowerCase()];
     if (outputPattern) {
-      return { kind: 'collect', outputPattern, quantity: params.quantity || params.targetQuantity || 1 };
+      return {
+        kind: 'collect',
+        outputPattern,
+        quantity: params.quantity || params.targetQuantity || 1,
+      };
     }
   }
 
@@ -228,7 +260,11 @@ export function broadcastTaskUpdate(event: string, task: any): void {
 /** Minimal Language IO envelope for golden-run reduce (Sterling IntentReducerV1). */
 function buildMinimalReduceEnvelope(): Record<string, unknown> {
   const raw = '[GOAL: craft plank]';
-  const envelopeId = crypto.createHash('sha256').update(raw, 'utf8').digest('hex').slice(0, 16);
+  const envelopeId = crypto
+    .createHash('sha256')
+    .update(raw, 'utf8')
+    .digest('hex')
+    .slice(0, 16);
   return {
     schema_id: 'sterling.language_io_envelope.v1',
     schema_version: '1.0.0',
@@ -242,6 +278,13 @@ function buildMinimalReduceEnvelope(): Record<string, unknown> {
     envelope_id: envelopeId,
     timestamp_ms: Date.now(),
   };
+}
+
+export interface TaskInventoryResult {
+  counts: Record<string, number>;
+  total: number;
+  /** Count of tasks visible to executor (active + pending). */
+  visibleToExecutor: number;
 }
 
 export interface PlanningEndpointsDeps {
@@ -263,6 +306,8 @@ export interface PlanningEndpointsDeps {
       }
     | { success: false; error: string }
   >;
+  /** Task inventory for diagnostics: counts by status, visible to executor. */
+  getTaskInventory?: () => TaskInventoryResult;
 }
 
 export function createPlanningEndpoints(
@@ -282,7 +327,9 @@ export function createPlanningEndpoints(
 
     // Add client to the set
     taskUpdateClients.add(res);
-    console.log(`[SSE] Client connected to task-updates (${taskUpdateClients.size} total)`);
+    console.log(
+      `[SSE] Client connected to task-updates (${taskUpdateClients.size} total)`
+    );
 
     // Send initial task state
     const currentTasks = planningSystem.goalFormulation.getCurrentTasks();
@@ -307,7 +354,9 @@ export function createPlanningEndpoints(
     req.on('close', () => {
       clearInterval(keepaliveInterval);
       taskUpdateClients.delete(res);
-      console.log(`[SSE] Client disconnected from task-updates (${taskUpdateClients.size} remaining)`);
+      console.log(
+        `[SSE] Client disconnected from task-updates (${taskUpdateClients.size} remaining)`
+      );
     });
   });
 
@@ -320,7 +369,9 @@ export function createPlanningEndpoints(
     res.flushHeaders();
 
     valuationUpdateClients.add(res);
-    console.log(`[SSE] Client connected to valuation-updates (${valuationUpdateClients.size} total)`);
+    console.log(
+      `[SSE] Client connected to valuation-updates (${valuationUpdateClients.size} total)`
+    );
 
     // Send keepalive every 30 seconds
     const keepaliveInterval = setInterval(() => {
@@ -335,7 +386,9 @@ export function createPlanningEndpoints(
     req.on('close', () => {
       clearInterval(keepaliveInterval);
       valuationUpdateClients.delete(res);
-      console.log(`[SSE] Client disconnected from valuation-updates (${valuationUpdateClients.size} remaining)`);
+      console.log(
+        `[SSE] Client disconnected from valuation-updates (${valuationUpdateClients.size} remaining)`
+      );
     });
   });
 
@@ -733,7 +786,8 @@ export function createPlanningEndpoints(
             }
             return res.status(400).json({
               success: false,
-              error: 'strict mode: requirementCandidate required; could not infer from provided parameters',
+              error:
+                'strict mode: requirementCandidate required; could not infer from provided parameters',
               hint: 'Provide parameters.requirementCandidate with { kind, outputPattern, quantity }',
               requestId,
               ...(PLANNING_INGEST_DEBUG_400 && debugReport
@@ -1056,242 +1110,367 @@ export function createPlanningEndpoints(
     }
   });
 
-  // Dev-only: inject a sterling_ir task for golden-run sink proof
+  // Dev-only: effective runtime config (redacted; no secrets). Answer "what is this server actually doing?"
   if (process.env.ENABLE_DEV_ENDPOINTS === 'true') {
-    router.post('/api/dev/inject-sterling-ir', async (req: Request, res: Response) => {
-      try {
-        if (process.env.NODE_ENV === 'production') {
-          return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
-        }
-        const {
-          committed_ir_digest,
-          schema_version,
-          envelope_id,
-          run_id,
-        } = req.body ?? {};
-
-        if (!committed_ir_digest || typeof committed_ir_digest !== 'string') {
-          return res.status(400).json({ error: 'committed_ir_digest required' });
-        }
-        if (!schema_version || typeof schema_version !== 'string') {
-          return res.status(400).json({ error: 'schema_version required' });
-        }
-        const digestOk = /^[a-zA-Z0-9:._-]{6,256}$/.test(committed_ir_digest);
-        const schemaOk = /^[a-zA-Z0-9._-]{1,64}$/.test(schema_version);
-        if (!digestOk) {
-          return res.status(400).json({ error: 'committed_ir_digest format invalid' });
-        }
-        if (!schemaOk) {
-          return res.status(400).json({ error: 'schema_version format invalid' });
-        }
-
-        const runIdRaw = typeof run_id === 'string' && run_id.trim().length > 0
-          ? run_id.trim()
-          : crypto.randomUUID();
-        const runId = sanitizeRunId(runIdRaw);
-
-        const recorder = getGoldenRunRecorder();
-
-        if (deps?.getServerBanner) {
-          const bannerLine = await deps.getServerBanner(8000);
-          if (process.env.DEBUG_STERLING_BANNER === '1') {
-            console.log('[Planning][Inject] DEBUG_STERLING_BANNER: getServerBanner result', {
-              gotBanner: Boolean(bannerLine),
-              length: typeof bannerLine === 'string' ? bannerLine.length : 0,
-              preview: typeof bannerLine === 'string' ? bannerLine.slice(0, 80) + (bannerLine.length > 80 ? '...' : '') : null,
-            });
-          }
-          if (!isValidGoldenRunBanner(bannerLine)) {
-            console.warn('[Planning][Inject] Sterling banner missing or invalid', {
-              gotBanner: Boolean(bannerLine),
-              bannerLength: typeof bannerLine === 'string' ? bannerLine.length : 0,
-            });
-            return res.status(503).json({
-              error: 'Golden run requires valid Sterling server banner',
-              detail:
-                !bannerLine || bannerLine.trim().length === 0
-                  ? 'Could not fetch server banner (Sterling unreachable or server_info_v1 not supported)'
-                  : 'Banner missing required marker: supports_expand_by_digest_v1_versioned_key=true',
-            });
-          }
-          recorder.recordServerBanner(runId, bannerLine!);
-        }
-
-        // Evidence hygiene: include executor mode/enablement so "no dispatch" isn't ambiguous.
-        const loopStarted = Boolean((globalThis as any).__planningExecutorState?.running);
-        recorder.recordRuntime(runId, {
-          executor: {
-            enabled: process.env.ENABLE_PLANNING_EXECUTOR === '1',
-            mode: (process.env.EXECUTOR_MODE || 'shadow').toLowerCase(),
-            loop_started: loopStarted,
-            enable_planning_executor_env: process.env.ENABLE_PLANNING_EXECUTOR,
-            executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
-          },
-        });
-        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
-          recorder.recordExecutorBlocked(runId, 'executor_disabled');
-        }
-        recorder.recordInjection(runId, {
-          committed_ir_digest,
-          schema_version,
-          envelope_id: envelope_id ?? null,
-          request_id: `inject_${runId}`,
-          source: 'dev_injection',
-        });
-
-        const task = await planningSystem.goalFormulation.addTask({
-          id: `sterling-ir-${runId}`,
-          title: `Sterling IR injection ${runId.slice(0, 8)}`,
-          description: `Golden run injection ${runId}`,
-          type: 'sterling_ir',
-          source: 'manual',
-          metadata: {
-            tags: ['golden-run', 'dev-injection'],
-            category: 'sterling_ir',
-            sterling: {
-              committedIrDigest: committed_ir_digest,
-              schemaVersion: schema_version,
-              envelopeId: envelope_id ?? null,
-            },
-            goldenRun: {
-              runId,
-              requestedAt: Date.now(),
-              source: 'dev_injection',
-            },
-          },
-        });
-
-        return res.json({
-          success: true,
-          run_id: runId,
-          task_id: task?.id ?? null,
-        });
-      } catch (error) {
-        console.error('[dev inject] Failed to inject sterling_ir task:', error);
-        return res.status(500).json({
-          error: 'Failed to inject sterling_ir task',
-          details: error instanceof Error ? error.message : String(error),
-        });
+    router.get('/api/dev/runtime-config', (_req: Request, res: Response) => {
+      if (process.env.NODE_ENV === 'production') {
+        return res
+          .status(403)
+          .json({ error: 'Dev endpoints are disabled in production' });
       }
+      const config = getPlanningRuntimeConfig();
+      const redacted = {
+        runMode: config.runMode,
+        executorMode: config.executorMode,
+        executorEnabled: config.executorEnabled,
+        capabilities: config.capabilities,
+        configDigest: config.configDigest,
+        capabilitiesList: config.capabilitiesList,
+      };
+      return res.json(redacted);
     });
 
-    // Dev-only: run a real reduce then inject (registers digest in Sterling, then injects for expansion)
-    router.post('/api/dev/run-golden-reduce', async (req: Request, res: Response) => {
-      try {
-        if (process.env.NODE_ENV === 'production') {
-          return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
-        }
-        if (!deps?.sendLanguageIOReduce) {
-          return res.status(503).json({
-            error: 'run-golden-reduce requires sendLanguageIOReduce (Sterling client not wired)',
-          });
-        }
+    router.get('/api/dev/task-inventory', (_req: Request, res: Response) => {
+      if (process.env.NODE_ENV === 'production') {
+        return res
+          .status(403)
+          .json({ error: 'Dev endpoints are disabled in production' });
+      }
+      if (!deps?.getTaskInventory) {
+        return res.status(503).json({
+          error: 'Task inventory not available',
+          detail: 'getTaskInventory dep not wired',
+        });
+      }
+      const inv = deps.getTaskInventory();
+      return res.json(inv);
+    });
 
-        const envelope = buildMinimalReduceEnvelope();
-        const reduceOut = await deps.sendLanguageIOReduce(envelope, 15000);
-        if (!reduceOut.success) {
-          return res.status(502).json({
-            error: 'Sterling reduce failed',
-            reduce_error: reduceOut.error,
-          });
-        }
-
-        const { committed_ir_digest, schema_version, source_envelope_id } = reduceOut.result;
-        const runIdRaw =
-          typeof req.body?.run_id === 'string' && req.body.run_id.trim().length > 0
-            ? req.body.run_id.trim()
-            : crypto.randomUUID();
-        const runId = sanitizeRunId(runIdRaw);
-        const recorder = getGoldenRunRecorder();
-
-        if (deps?.getServerBanner) {
-          const bannerLine = await deps.getServerBanner(8000);
-          if (!isValidGoldenRunBanner(bannerLine)) {
-            return res.status(503).json({
-              error: 'Golden run requires valid Sterling server banner',
-              detail: !bannerLine?.trim()
-                ? 'Could not fetch server banner'
-                : 'Banner missing supports_expand_by_digest_v1_versioned_key=true',
-            });
+    router.post(
+      '/api/dev/inject-sterling-ir',
+      async (req: Request, res: Response) => {
+        try {
+          if (process.env.NODE_ENV === 'production') {
+            return res
+              .status(403)
+              .json({ error: 'Dev endpoints are disabled in production' });
           }
-          recorder.recordServerBanner(runId, bannerLine!);
-        }
+          const { committed_ir_digest, schema_version, envelope_id, run_id } =
+            req.body ?? {};
 
-        const loopStartedRunReduce = Boolean((globalThis as any).__planningExecutorState?.running);
-        recorder.recordRuntime(runId, {
-          executor: {
-            enabled: process.env.ENABLE_PLANNING_EXECUTOR === '1',
-            mode: (process.env.EXECUTOR_MODE || 'shadow').toLowerCase(),
-            loop_started: loopStartedRunReduce,
-            enable_planning_executor_env: process.env.ENABLE_PLANNING_EXECUTOR,
-          },
-        });
-        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
-          recorder.recordExecutorBlocked(runId, 'executor_disabled');
-        }
-        recorder.recordInjection(runId, {
-          committed_ir_digest,
-          schema_version,
-          envelope_id: source_envelope_id ?? null,
-          request_id: `run_golden_reduce_${runId}`,
-          source: 'dev_run_golden_reduce',
-        });
+          if (!committed_ir_digest || typeof committed_ir_digest !== 'string') {
+            return res
+              .status(400)
+              .json({ error: 'committed_ir_digest required' });
+          }
+          if (!schema_version || typeof schema_version !== 'string') {
+            return res.status(400).json({ error: 'schema_version required' });
+          }
+          const digestOk = /^[a-zA-Z0-9:._-]{6,256}$/.test(committed_ir_digest);
+          const schemaOk = /^[a-zA-Z0-9._-]{1,64}$/.test(schema_version);
+          if (!digestOk) {
+            return res
+              .status(400)
+              .json({ error: 'committed_ir_digest format invalid' });
+          }
+          if (!schemaOk) {
+            return res
+              .status(400)
+              .json({ error: 'schema_version format invalid' });
+          }
 
-        const task = await planningSystem.goalFormulation.addTask({
-          id: `sterling-ir-${runId}`,
-          title: `Golden reduce ${runId.slice(0, 8)}`,
-          description: `Reduce then inject; digest ${committed_ir_digest}`,
-          type: 'sterling_ir',
-          source: 'manual',
-          metadata: {
-            tags: ['golden-run', 'dev-run-golden-reduce'],
-            category: 'sterling_ir',
-            sterling: {
-              committedIrDigest: committed_ir_digest,
-              schemaVersion: schema_version,
-              envelopeId: source_envelope_id ?? null,
+          const runIdRaw =
+            typeof run_id === 'string' && run_id.trim().length > 0
+              ? run_id.trim()
+              : crypto.randomUUID();
+          const runId = sanitizeRunId(runIdRaw);
+
+          const recorder = getGoldenRunRecorder();
+
+          if (deps?.getServerBanner) {
+            const bannerLine = await deps.getServerBanner(8000);
+            if (process.env.DEBUG_STERLING_BANNER === '1') {
+              console.log(
+                '[Planning][Inject] DEBUG_STERLING_BANNER: getServerBanner result',
+                {
+                  gotBanner: Boolean(bannerLine),
+                  length:
+                    typeof bannerLine === 'string' ? bannerLine.length : 0,
+                  preview:
+                    typeof bannerLine === 'string'
+                      ? bannerLine.slice(0, 80) +
+                        (bannerLine.length > 80 ? '...' : '')
+                      : null,
+                }
+              );
+            }
+            if (!isValidGoldenRunBanner(bannerLine)) {
+              console.warn(
+                '[Planning][Inject] Sterling banner missing or invalid',
+                {
+                  gotBanner: Boolean(bannerLine),
+                  bannerLength:
+                    typeof bannerLine === 'string' ? bannerLine.length : 0,
+                }
+              );
+              return res.status(503).json({
+                error: 'Golden run requires valid Sterling server banner',
+                detail:
+                  !bannerLine || bannerLine.trim().length === 0
+                    ? 'Could not fetch server banner (Sterling unreachable or server_info_v1 not supported)'
+                    : 'Banner missing required marker: supports_expand_by_digest_v1_versioned_key=true',
+              });
+            }
+            recorder.recordServerBanner(runId, bannerLine!);
+          }
+          const planningConfig = getPlanningRuntimeConfig();
+          recorder.recordPlanningBanner(
+            runId,
+            buildPlanningBanner(planningConfig),
+            planningConfig.configDigest,
+            planningConfig.capabilities.taskTypeBridge
+          );
+
+          // Evidence hygiene: include executor mode/enablement so "no dispatch" isn't ambiguous.
+          const loopStarted = Boolean(
+            (globalThis as any).__planningExecutorState?.running
+          );
+          recorder.recordRuntime(runId, {
+            executor: {
+              enabled: planningConfig.executorEnabled,
+              mode: planningConfig.executorMode,
+              loop_started: loopStarted,
+              enable_planning_executor_env:
+                process.env.ENABLE_PLANNING_EXECUTOR,
+              executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
             },
-            goldenRun: { runId, requestedAt: Date.now(), source: 'dev_run_golden_reduce' },
-          },
-        });
-
-        return res.json({
-          success: true,
-          reduce: {
+            bridge_enabled: planningConfig.capabilities.taskTypeBridge,
+          });
+          if (!planningConfig.executorEnabled) {
+            recorder.recordExecutorBlocked(runId, 'executor_disabled');
+          }
+          recorder.recordInjection(runId, {
             committed_ir_digest,
             schema_version,
-            source_envelope_id,
-            has_committed_propositions: reduceOut.result.has_committed_propositions ?? true,
-          },
-          inject: { run_id: runId, task_id: task?.id ?? null },
-        });
-      } catch (error) {
-        console.error('[dev run-golden-reduce] Failed:', error);
-        return res.status(500).json({
-          error: 'run-golden-reduce failed',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    });
+            envelope_id: envelope_id ?? null,
+            request_id: `inject_${runId}`,
+            source: 'dev_injection',
+          });
 
-    router.get('/api/dev/golden-run-artifact/:runId', async (req: Request, res: Response) => {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(403).json({ error: 'Dev endpoints are disabled in production' });
+          const requestedTaskId = `sterling-ir-${runId}`;
+          const task = await planningSystem.goalFormulation.addTask({
+            id: requestedTaskId,
+            title: `Sterling IR injection ${runId.slice(0, 8)}`,
+            description: `Golden run injection ${runId}`,
+            type: 'sterling_ir',
+            source: 'manual',
+            metadata: {
+              tags: ['golden-run', 'dev-injection'],
+              category: 'sterling_ir',
+              sterling: {
+                committedIrDigest: committed_ir_digest,
+                schemaVersion: schema_version,
+                envelopeId: envelope_id ?? null,
+              },
+              goldenRun: {
+                runId,
+                requestedAt: Date.now(),
+                source: 'dev_injection',
+              },
+            },
+          });
+
+          const dedupeHit = task != null && task.id !== requestedTaskId;
+          if (dedupeHit) {
+            recorder.recordTask(runId, {
+              task_id: task.id,
+              status: task.status,
+              dedupe_hit: true,
+              returned_task_id: task.id,
+              returned_task_golden_run_id:
+                (task.metadata as any)?.goldenRun?.runId ?? null,
+            });
+          }
+
+          return res.json({
+            success: true,
+            run_id: runId,
+            task_id: task?.id ?? null,
+          });
+        } catch (error) {
+          console.error(
+            '[dev inject] Failed to inject sterling_ir task:',
+            error
+          );
+          return res.status(500).json({
+            error: 'Failed to inject sterling_ir task',
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
-      const runId = (req.params.runId ?? '').trim();
-      if (!runId) {
-        return res.status(400).json({ error: 'runId required' });
+    );
+
+    // Dev-only: run a real reduce then inject (registers digest in Sterling, then injects for expansion)
+    router.post(
+      '/api/dev/run-golden-reduce',
+      async (req: Request, res: Response) => {
+        try {
+          if (process.env.NODE_ENV === 'production') {
+            return res
+              .status(403)
+              .json({ error: 'Dev endpoints are disabled in production' });
+          }
+          if (!deps?.sendLanguageIOReduce) {
+            return res.status(503).json({
+              error:
+                'run-golden-reduce requires sendLanguageIOReduce (Sterling client not wired)',
+            });
+          }
+
+          const envelope = buildMinimalReduceEnvelope();
+          const reduceOut = await deps.sendLanguageIOReduce(envelope, 15000);
+          if (!reduceOut.success) {
+            return res.status(502).json({
+              error: 'Sterling reduce failed',
+              reduce_error: reduceOut.error,
+            });
+          }
+
+          const { committed_ir_digest, schema_version, source_envelope_id } =
+            reduceOut.result;
+          const runIdRaw =
+            typeof req.body?.run_id === 'string' &&
+            req.body.run_id.trim().length > 0
+              ? req.body.run_id.trim()
+              : crypto.randomUUID();
+          const runId = sanitizeRunId(runIdRaw);
+          const recorder = getGoldenRunRecorder();
+
+          if (deps?.getServerBanner) {
+            const bannerLine = await deps.getServerBanner(8000);
+            if (!isValidGoldenRunBanner(bannerLine)) {
+              return res.status(503).json({
+                error: 'Golden run requires valid Sterling server banner',
+                detail: !bannerLine?.trim()
+                  ? 'Could not fetch server banner'
+                  : 'Banner missing supports_expand_by_digest_v1_versioned_key=true',
+              });
+            }
+            recorder.recordServerBanner(runId, bannerLine!);
+          }
+          const planningConfigReduce = getPlanningRuntimeConfig();
+          recorder.recordPlanningBanner(
+            runId,
+            buildPlanningBanner(planningConfigReduce),
+            planningConfigReduce.configDigest,
+            planningConfigReduce.capabilities.taskTypeBridge
+          );
+
+          const loopStartedRunReduce = Boolean(
+            (globalThis as any).__planningExecutorState?.running
+          );
+          recorder.recordRuntime(runId, {
+            executor: {
+              enabled: planningConfigReduce.executorEnabled,
+              mode: planningConfigReduce.executorMode,
+              loop_started: loopStartedRunReduce,
+              enable_planning_executor_env:
+                process.env.ENABLE_PLANNING_EXECUTOR,
+            },
+            bridge_enabled: planningConfigReduce.capabilities.taskTypeBridge,
+          });
+          if (!planningConfigReduce.executorEnabled) {
+            recorder.recordExecutorBlocked(runId, 'executor_disabled');
+          }
+          recorder.recordInjection(runId, {
+            committed_ir_digest,
+            schema_version,
+            envelope_id: source_envelope_id ?? null,
+            request_id: `run_golden_reduce_${runId}`,
+            source: 'dev_run_golden_reduce',
+          });
+
+          const requestedTaskId = `sterling-ir-${runId}`;
+          const task = await planningSystem.goalFormulation.addTask({
+            id: requestedTaskId,
+            title: `Golden reduce ${runId.slice(0, 8)}`,
+            description: `Reduce then inject; digest ${committed_ir_digest}`,
+            type: 'sterling_ir',
+            source: 'manual',
+            metadata: {
+              tags: ['golden-run', 'dev-run-golden-reduce'],
+              category: 'sterling_ir',
+              sterling: {
+                committedIrDigest: committed_ir_digest,
+                schemaVersion: schema_version,
+                envelopeId: source_envelope_id ?? null,
+              },
+              goldenRun: {
+                runId,
+                requestedAt: Date.now(),
+                source: 'dev_run_golden_reduce',
+              },
+            },
+          });
+
+          const dedupeHit = task != null && task.id !== requestedTaskId;
+          if (dedupeHit) {
+            recorder.recordTask(runId, {
+              task_id: task.id,
+              status: task.status,
+              dedupe_hit: true,
+              returned_task_id: task.id,
+              returned_task_golden_run_id:
+                (task.metadata as any)?.goldenRun?.runId ?? null,
+            });
+          }
+
+          return res.json({
+            success: true,
+            reduce: {
+              committed_ir_digest,
+              schema_version,
+              source_envelope_id,
+              has_committed_propositions:
+                reduceOut.result.has_committed_propositions ?? true,
+            },
+            inject: { run_id: runId, task_id: task?.id ?? null },
+          });
+        } catch (error) {
+          console.error('[dev run-golden-reduce] Failed:', error);
+          return res.status(500).json({
+            error: 'run-golden-reduce failed',
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
-      const recorder = getGoldenRunRecorder();
-      let report = recorder.getReport(runId);
-      if (!report) {
-        report = await recorder.getReportFromDisk(runId);
+    );
+
+    router.get(
+      '/api/dev/golden-run-artifact/:runId',
+      async (req: Request, res: Response) => {
+        if (process.env.NODE_ENV === 'production') {
+          return res
+            .status(403)
+            .json({ error: 'Dev endpoints are disabled in production' });
+        }
+        const runId = (req.params.runId ?? '').trim();
+        if (!runId) {
+          return res.status(400).json({ error: 'runId required' });
+        }
+        const recorder = getGoldenRunRecorder();
+        let report = recorder.getReport(runId);
+        if (!report) {
+          report = await recorder.getReportFromDisk(runId);
+        }
+        if (!report) {
+          return res
+            .status(404)
+            .json({ error: 'Golden run artifact not found', run_id: runId });
+        }
+        return res.json(report);
       }
-      if (!report) {
-        return res.status(404).json({ error: 'Golden run artifact not found', run_id: runId });
-      }
-      return res.json(report);
-    });
+    );
   }
 
   // Helper functions for task-to-action mapping

@@ -276,6 +276,7 @@ class ApiClient {
    * Get cognitive stream data
    */
   async getCognitiveStream(_limit?: number) {
+    void _limit; // reserved for future pagination
     const response = await this.makeRequest(
       this.config.endpoints.cognition.cognitiveStream.recent()
     );

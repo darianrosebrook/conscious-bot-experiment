@@ -29,9 +29,12 @@ import {
   createEnhancedMemorySystem,
   createDefaultMemoryConfig,
 } from './memory-system';
+import { getMemoryRuntimeConfig } from './config/memory-runtime-config';
+
+const memoryConfig = getMemoryRuntimeConfig();
 
 // Mutable world seed — can be updated at runtime via POST /enhanced/seed
-let currentWorldSeed: string = process.env.WORLD_SEED || '';
+let currentWorldSeed: string = memoryConfig.worldSeed;
 
 // Initialize enhanced memory system (lazy initialization)
 let enhancedMemorySystem: any = null;
@@ -47,7 +50,7 @@ async function getEnhancedMemorySystem() {
 }
 
 const app: express.Application = express();
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const port = memoryConfig.port;
 
 // Middleware
 app.use(cors());
@@ -182,9 +185,9 @@ const memorySystem = {
   },
 };
 
-let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
+let systemReady = memoryConfig.systemReadyOnBoot;
 let readyAt: string | null = systemReady ? new Date().toISOString() : null;
-let readySource: string | null = systemReady ? 'env' : null;
+let readySource: string | null = systemReady ? 'config' : null;
 
 // Track connected SSE clients for memory updates
 const memoryUpdateClients: Set<express.Response> = new Set();
@@ -304,6 +307,117 @@ app.get('/state', (req, res) => {
     res.json(state);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get memory state' });
+  }
+});
+
+// GET /memories — Dashboard-compatible list for use-periodic-refresh (proxy target)
+app.get('/memories', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+
+    let memories: Array<{
+      id: string;
+      timestamp: string;
+      type: string;
+      content: string;
+      tags?: string[];
+      score?: number;
+    }> = [];
+
+    try {
+      const searchResults = await enhancedMemorySystem.searchMemories({
+        query: '*',
+        limit: 50,
+      });
+
+      memories = (searchResults.results || []).map((r: any) => ({
+        id: r.id || r.chunk?.id || 'unknown',
+        timestamp: new Date(r.chunk?.createdAt ?? r.createdAt ?? Date.now()).toISOString(),
+        type: r.type || r.chunk?.decayProfile?.memoryType || 'episodic',
+        content: r.content || r.chunk?.content || '',
+        tags: r.chunk?.metadata?.tags,
+        score: r.importance ?? r.chunk?.decayProfile?.importance,
+      }));
+    } catch {
+      // Fallback to episodic experiences when enhanced system unavailable
+      const recent = memorySystem.episodic.eventLogger.getRecentExperiences(86400000);
+      memories = recent.map((m: any) => ({
+        id: m.id || `exp-${m.timestamp}`,
+        timestamp: new Date(m.timestamp).toISOString(),
+        type: m.type || 'episodic',
+        content: m.description || '',
+        tags: m.tags,
+        score: m.salienceScore,
+      }));
+    }
+
+    res.json({ memories });
+  } catch (error) {
+    console.error('Failed to list memories:', error);
+    res.json({ memories: [] });
+  }
+});
+
+// GET /events — Dashboard-compatible list from episodic event logger (proxy target)
+app.get('/events', (req, res) => {
+  try {
+    const recent = memorySystem.episodic.eventLogger.getRecentExperiences(86400000);
+    const events = recent.map((e: any) => ({
+      id: e.id || `event-${e.timestamp}`,
+      timestamp: new Date(e.timestamp).toISOString(),
+      type: e.type || 'episodic',
+      content: e.description || '',
+      payload: { description: e.description, metadata: e.metadata },
+    }));
+    res.json({ events });
+  } catch (error) {
+    console.error('Failed to list events:', error);
+    res.json({ events: [] });
+  }
+});
+
+// GET /notes — Dashboard-compatible list from reflections (proxy target)
+app.get('/notes', async (req, res) => {
+  try {
+    enhancedMemorySystem = await getEnhancedMemorySystem();
+
+    let notes: Array<{
+      id: string;
+      timestamp: string;
+      type: string;
+      title: string;
+      content: string;
+      source: string;
+      confidence: number;
+    }> = [];
+
+    try {
+      const reflectionResult = await enhancedMemorySystem.queryReflections({
+        subtypes: ['reflection', 'lesson', 'narrative_checkpoint'],
+        limit: 50,
+        page: 1,
+      });
+
+      notes = reflectionResult.items.map((r: any) => {
+        const meta = r.metadata || {};
+        return {
+          id: r.id,
+          timestamp: new Date(r.createdAt || meta.timestamp || Date.now()).toISOString(),
+          type: meta.reflectionType || meta.memorySubtype || 'reflection',
+          title: meta.title || '',
+          content: r.content || '',
+          source: meta.source || 'reflection',
+          confidence: meta.confidence ?? 0.5,
+        };
+      });
+    } catch {
+      // Database unavailable — return empty
+    }
+
+    res.json({ notes });
+  } catch (error) {
+    console.error('Failed to list notes:', error);
+    res.json({ notes: [] });
   }
 });
 
@@ -804,7 +918,7 @@ app.get('/enhanced/seed', (req, res) => {
           'WORLD_SEED is not set or is 0. Per-seed database isolation requires a valid world seed.',
       });
     }
-    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const baseName = memoryConfig.pg.database;
     const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     res.json({
       success: true,
@@ -835,7 +949,7 @@ app.post('/enhanced/seed', async (req, res) => {
 
     // No-op if seed hasn't changed
     if (newSeed === currentWorldSeed) {
-      const baseName = process.env.PG_DATABASE || 'conscious_bot';
+      const baseName = memoryConfig.pg.database;
       const sanitizedSeed = newSeed.replace('-', 'n');
       return res.json({
         success: true,
@@ -852,9 +966,8 @@ app.post('/enhanced/seed', async (req, res) => {
     }
 
     currentWorldSeed = newSeed;
-    process.env.WORLD_SEED = newSeed;
 
-    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const baseName = memoryConfig.pg.database;
     const sanitizedSeed = newSeed.replace('-', 'n');
     res.json({
       success: true,
@@ -882,10 +995,10 @@ app.get('/enhanced/database', async (req, res) => {
       success: true,
       databaseName,
       configuration: {
-        host: process.env.PG_HOST || 'localhost',
-        port: parseInt(process.env.PG_PORT || '5432'),
-        user: process.env.PG_USER || 'postgres',
-        database: process.env.PG_DATABASE || 'conscious_bot',
+        host: memoryConfig.pg.host,
+        port: memoryConfig.pg.port,
+        user: memoryConfig.pg.user,
+        database: memoryConfig.pg.database,
         worldSeed: currentWorldSeed,
       },
     });
@@ -909,7 +1022,7 @@ app.get('/enhanced/stats', async (req, res) => {
 
     // Always try to get status (works even without full DB init)
     const status = await enhancedMemorySystem.getStatus();
-    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const baseName = memoryConfig.pg.database;
     const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     const databaseName = status.database?.name || `${baseName}_seed_${sanitizedSeed}`;
 
@@ -941,7 +1054,7 @@ app.get('/enhanced/stats', async (req, res) => {
   } catch (error) {
     console.error('Failed to get enhanced stats:', error);
     // Even on error, return a minimal response so the UI doesn't break
-    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const baseName = memoryConfig.pg.database;
     const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     res.json({
       success: true,
@@ -1090,8 +1203,7 @@ app.get('/enhanced/embeddings-3d', async (req, res) => {
 
     // Call UMAP endpoint on MLX sidecar for dimensionality reduction
     // (UMAP is now consolidated into the MLX sidecar service on port 5002)
-    const umapHost = process.env.MLX_SIDECAR_HOST || process.env.UMAP_SERVICE_HOST || 'localhost';
-    const umapPort = process.env.MLX_SIDECAR_PORT || process.env.UMAP_SERVICE_PORT || '5002';
+    const { umapHost, umapPort } = memoryConfig;
 
     try {
       const umapResponse = await fetch(`http://${umapHost}:${umapPort}/reduce`, {
@@ -1164,7 +1276,7 @@ app.get('/enhanced/embedding-health', async (req, res) => {
 app.post('/enhanced/reset', async (req, res) => {
   try {
     const { confirm } = req.body;
-    const worldSeed = process.env.WORLD_SEED || '0';
+    const worldSeed = currentWorldSeed || '0';
 
     if (!confirm || confirm !== worldSeed) {
       return res.status(400).json({
@@ -1221,7 +1333,7 @@ app.post('/enhanced/reset', async (req, res) => {
 app.post('/enhanced/drop', async (req, res) => {
   try {
     const { confirm } = req.body;
-    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const baseName = memoryConfig.pg.database;
     const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     const expectedName = `${baseName}_seed_${sanitizedSeed}`;
 

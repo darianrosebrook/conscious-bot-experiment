@@ -15,7 +15,7 @@ const TYPE_COLORS: Record<string, string> = {
 export interface EmbeddingVizCanvasProps {
   points: EmbeddingPoint3D[];
   selectedId: string | null;
-  onSelect: (point: EmbeddingPoint3D | null) => void;
+  onSelect: (_point: EmbeddingPoint3D | null) => void;
   onCanvasClick: () => void;
 }
 

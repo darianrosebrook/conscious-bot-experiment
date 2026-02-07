@@ -15,28 +15,32 @@ const CONTRACTS: Record<string, LeafArgContract> = {
   dig_block: {
     leafName: 'dig_block',
     validate: (args) => {
-      if (!args.blockType && !args.pos) return 'dig_block requires blockType or pos';
+      if (!args.blockType && !args.pos)
+        return 'dig_block requires blockType or pos';
       return null;
     },
   },
   craft_recipe: {
     leafName: 'craft_recipe',
     validate: (args) => {
-      if (!args.recipe || typeof args.recipe !== 'string') return 'craft_recipe requires recipe (string)';
+      if (!args.recipe || typeof args.recipe !== 'string')
+        return 'craft_recipe requires recipe (string)';
       return null;
     },
   },
   smelt: {
     leafName: 'smelt',
     validate: (args) => {
-      if (!args.input || typeof args.input !== 'string') return 'smelt requires input (string)';
+      if (!args.input || typeof args.input !== 'string')
+        return 'smelt requires input (string)';
       return null;
     },
   },
   place_block: {
     leafName: 'place_block',
     validate: (args) => {
-      if (!args.item || typeof args.item !== 'string') return 'place_block requires item (string)';
+      if (!args.item || typeof args.item !== 'string')
+        return 'place_block requires item (string)';
       return null;
     },
   },
@@ -54,49 +58,56 @@ const CONTRACTS: Record<string, LeafArgContract> = {
   build_module: {
     leafName: 'build_module',
     validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string') return 'build_module requires moduleId (string)';
+      if (!args.moduleId || typeof args.moduleId !== 'string')
+        return 'build_module requires moduleId (string)';
       return null;
     },
   },
   acquire_material: {
     leafName: 'acquire_material',
     validate: (args) => {
-      if (!args.item || typeof args.item !== 'string') return 'acquire_material requires item (string)';
+      if (!args.item || typeof args.item !== 'string')
+        return 'acquire_material requires item (string)';
       return null;
     },
   },
   replan_building: {
     leafName: 'replan_building',
     validate: (args) => {
-      if (!args.templateId || typeof args.templateId !== 'string') return 'replan_building requires templateId (string)';
+      if (!args.templateId || typeof args.templateId !== 'string')
+        return 'replan_building requires templateId (string)';
       return null;
     },
   },
   replan_exhausted: {
     leafName: 'replan_exhausted',
     validate: (args) => {
-      if (!args.templateId || typeof args.templateId !== 'string') return 'replan_exhausted requires templateId (string)';
+      if (!args.templateId || typeof args.templateId !== 'string')
+        return 'replan_exhausted requires templateId (string)';
       return null;
     },
   },
   prepare_site: {
     leafName: 'prepare_site',
     validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string') return 'prepare_site requires moduleId (string)';
+      if (!args.moduleId || typeof args.moduleId !== 'string')
+        return 'prepare_site requires moduleId (string)';
       return null;
     },
   },
   place_feature: {
     leafName: 'place_feature',
     validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string') return 'place_feature requires moduleId (string)';
+      if (!args.moduleId || typeof args.moduleId !== 'string')
+        return 'place_feature requires moduleId (string)';
       return null;
     },
   },
   building_step: {
     leafName: 'building_step',
     validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string') return 'building_step requires moduleId (string)';
+      if (!args.moduleId || typeof args.moduleId !== 'string')
+        return 'building_step requires moduleId (string)';
       return null;
     },
   },
@@ -138,14 +149,21 @@ export const KNOWN_LEAVES = new Set(Object.keys(CONTRACTS));
 
 /** Normalize legacy arg shapes to canonical form before validation.
  *  Mutates the args object in place. Call before validateLeafArgs. */
-export function normalizeLeafArgs(leafName: string, args: Record<string, unknown>): void {
+export function normalizeLeafArgs(
+  leafName: string,
+  args: Record<string, unknown>
+): void {
   // smelt: item → input (legacy Sterling output)
   if (leafName === 'smelt' && !args.input && typeof args.item === 'string') {
     args.input = args.item;
     delete args.item;
   }
   // collect_items: item → itemName (aligns with action-contract-registry)
-  if (leafName === 'collect_items' && !args.itemName && typeof args.item === 'string') {
+  if (
+    leafName === 'collect_items' &&
+    !args.itemName &&
+    typeof args.item === 'string'
+  ) {
     args.itemName = args.item;
     delete args.item;
   }
@@ -160,15 +178,21 @@ export function validateLeafArgs(
 ): string | null {
   const contract = CONTRACTS[leafName];
   if (!contract) {
-    return strictMode ? `unknown leaf '${leafName}' — not in KNOWN_LEAVES allowlist` : null;
+    return strictMode
+      ? `unknown leaf '${leafName}' — not in KNOWN_LEAVES allowlist`
+      : null;
   }
   return contract.validate(args);
 }
 
 /** Maps requirement → validated leaf step metadata. Returns null if no valid mapping exists. */
-export function requirementToLeafMeta(
-  requirement: { kind: string; patterns?: string[]; outputPattern?: string; structure?: string; quantity?: number }
-): { leaf: string; args: Record<string, unknown> } | null {
+export function requirementToLeafMeta(requirement: {
+  kind: string;
+  patterns?: string[];
+  outputPattern?: string;
+  structure?: string;
+  quantity?: number;
+}): { leaf: string; args: Record<string, unknown> } | null {
   switch (requirement.kind) {
     case 'collect':
     case 'mine': {
@@ -201,10 +225,17 @@ export function requirementToLeafMeta(
  *  Collect/mine plans emit acquire_material steps (atomic dig + pickup).
  *  Craft plans are single-step (craft only); the executor's prereq injection
  *  handles missing materials via recipe introspection at execution time. */
-export function requirementToFallbackPlan(
-  requirement: { kind: string; patterns?: string[]; outputPattern?: string;
-    structure?: string; quantity?: number }
-): Array<{ leaf: string; args: Record<string, unknown>; label: string }> | null {
+export function requirementToFallbackPlan(requirement: {
+  kind: string;
+  patterns?: string[];
+  outputPattern?: string;
+  structure?: string;
+  quantity?: number;
+}): Array<{
+  leaf: string;
+  args: Record<string, unknown>;
+  label: string;
+}> | null {
   if (requirement.kind === 'collect' || requirement.kind === 'mine') {
     const blockType = requirement.patterns?.[0];
     if (!blockType) return null;
@@ -214,7 +245,11 @@ export function requirementToFallbackPlan(
     const acquireArgs = { item: blockType, count: 1 };
     if (validateLeafArgs('acquire_material', acquireArgs)) return null;
     const verb = requirement.kind === 'mine' ? 'Mine' : 'Gather';
-    const steps: Array<{ leaf: string; args: Record<string, unknown>; label: string }> = [];
+    const steps: Array<{
+      leaf: string;
+      args: Record<string, unknown>;
+      label: string;
+    }> = [];
     for (let idx = 0; idx < count; idx++) {
       const suffix = count > 1 ? ` (${idx + 1}/${count})` : '';
       steps.push({
@@ -231,8 +266,9 @@ export function requirementToFallbackPlan(
     if (!recipe) return null;
     const craftArgs = { recipe, qty: requirement.quantity || 1 };
     if (validateLeafArgs('craft_recipe', craftArgs)) return null;
-    return [{ leaf: 'craft_recipe', args: craftArgs,
-      label: `Craft ${recipe}` }];
+    return [
+      { leaf: 'craft_recipe', args: craftArgs, label: `Craft ${recipe}` },
+    ];
   }
 
   if (requirement.kind === 'build') {

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface UseSSEOptions {
   url: string;
-  onMessage?: (data: unknown) => void;
+  onMessage?: (_data: unknown) => void;
   onOpen?: () => void;
   onClose?: () => void;
-  onError?: (error: Event) => void;
+  onError?: (_error: Event) => void;
   /** Base reconnect interval in ms (default 2000). Grows exponentially. */
   reconnectInterval?: number;
   /** Max reconnect attempts before giving up (default 10). */
@@ -19,10 +19,10 @@ const connectionManager = new Map<
   string,
   {
     eventSource: EventSource;
-    subscribers: Set<(data: unknown) => void>;
+    subscribers: Set<(_data: unknown) => void>;
     onOpen: Set<() => void>;
     onClose: Set<() => void>;
-    onError: Set<(error: Event) => void>;
+    onError: Set<(_error: Event) => void>;
     isConnecting: boolean;
     reconnectTimer: ReturnType<typeof setTimeout> | null;
     reconnectAttempts: number;
@@ -94,8 +94,9 @@ export function useSSE({
           if (!conn || conn.reconnectAttempts >= maxReconnectAttempts) return;
 
           const delay = Math.min(
-            reconnectInterval * Math.pow(2, Math.min(conn.reconnectAttempts, 5)),
-            30000,
+            reconnectInterval *
+              Math.pow(2, Math.min(conn.reconnectAttempts, 5)),
+            30000
           );
           conn.reconnectAttempts++;
           conn.reconnectTimer = setTimeout(() => {

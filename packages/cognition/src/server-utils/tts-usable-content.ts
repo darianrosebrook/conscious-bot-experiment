@@ -45,7 +45,8 @@ function hasCodeLikeDensity(text: string): boolean {
   if (lines.length < 3) {
     const stripped = text.replace(/\s/g, '');
     if (stripped.length < 10) return false;
-    const symbolChars = (stripped.match(/[(){}\[\];=<>|&!^~+\-*/\\@#$%]/g) || []).length;
+    const symbolChars = (stripped.match(/[(){}[\];=<>|&!^~+\-*/\\@#$%]/g) || [])
+      .length;
     return symbolChars / stripped.length > 0.25;
   }
 
@@ -55,8 +56,13 @@ function hasCodeLikeDensity(text: string): boolean {
     const trimmed = line.trim();
     if (trimmed.length === 0) continue;
     // Code indicators: brackets, braces, semicolons, keywords
-    if (/[(){}\[\];]/.test(trimmed)) codeIndicators++;
-    if (/\b(const|let|var|function|import|export|class|interface|type)\b/.test(trimmed)) codeIndicators++;
+    if (/[(){}[\];]/.test(trimmed)) codeIndicators++;
+    if (
+      /\b(const|let|var|function|import|export|class|interface|type)\b/.test(
+        trimmed
+      )
+    )
+      codeIndicators++;
   }
 
   return codeIndicators / lines.length > 0.4;

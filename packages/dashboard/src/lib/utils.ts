@@ -100,9 +100,18 @@ export function getDurabilityColor(percentage: number): string {
 /**
  * Get indicator text color based on item state
  */
-export function getIndicatorColor(item: { durability?: number; maxDurability?: number }): string {
+export function getIndicatorColor(item: {
+  durability?: number;
+  maxDurability?: number;
+}): string {
   if (item.durability !== undefined && item.maxDurability) {
-    const percentage = Math.max(0, Math.min(100, ((item.maxDurability - item.durability) / item.maxDurability) * 100));
+    const percentage = Math.max(
+      0,
+      Math.min(
+        100,
+        ((item.maxDurability - item.durability) / item.maxDurability) * 100
+      )
+    );
     if (percentage >= 80) return hudColors.textGreen;
     if (percentage >= 50) return hudColors.textYellow;
     if (percentage >= 20) return hudColors.textOrange;
@@ -125,13 +134,13 @@ export function generateId(): string {
  * @param wait - Wait time in milliseconds
  * @returns Debounced function
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (..._args: unknown[]) => unknown>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): (..._args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
+  return (...a: Parameters<T>) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    timeout = setTimeout(() => func(...a), wait);
   };
 }

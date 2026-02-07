@@ -101,6 +101,8 @@ export {
   buildCraftingRules,
   inventoryToRecord,
   goalFromTaskRequirement,
+  parsePlaceAction,
+  WORKSTATION_TYPES,
 } from './sterling';
 export type {
   MinecraftCraftingRule,

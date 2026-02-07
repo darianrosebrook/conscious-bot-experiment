@@ -21,7 +21,7 @@ import {
 import {
   parsePlaceAction as planningParsePlaceAction,
   WORKSTATION_TYPES as planningWorkstationTypes,
-} from '@conscious-bot/planning/src/sterling/leaf-routing';
+} from '@conscious-bot/planning';
 
 /**
  * Canonical test vectors for parsePlaceAction. If you add a case here,
@@ -43,9 +43,9 @@ const PARSE_VECTORS: Array<[string | undefined, string | null]> = [
   ['', null],
   ['place', null],
   ['place:a:b', null],
-  ['Place:stone', null],       // case-sensitive prefix
-  [' place:stone', null],      // leading space
-  ['place: stone', ' stone'],  // space in item — parser preserves it (Minecraft has no such item)
+  ['Place:stone', null], // case-sensitive prefix
+  [' place:stone', null], // leading space
+  ['place: stone', ' stone'], // space in item — parser preserves it (Minecraft has no such item)
 ];
 
 describe('Cross-Package Conformance: parsePlaceAction', () => {
@@ -76,9 +76,17 @@ describe('Cross-Package Conformance: WORKSTATION_TYPES', () => {
   });
 
   it('membership agrees for all canonical types', () => {
-    const allTypes = ['crafting_table', 'furnace', 'blast_furnace', 'stone', 'diamond_block'];
+    const allTypes = [
+      'crafting_table',
+      'furnace',
+      'blast_furnace',
+      'stone',
+      'diamond_block',
+    ];
     for (const t of allTypes) {
-      expect(interfaceWorkstationTypes.has(t)).toBe(planningWorkstationTypes.has(t));
+      expect(interfaceWorkstationTypes.has(t)).toBe(
+        planningWorkstationTypes.has(t)
+      );
     }
   });
 });

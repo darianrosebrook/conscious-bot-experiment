@@ -3,7 +3,11 @@
  */
 
 // Solver ID constants (single source of truth)
-export { SOLVER_IDS, isValidSolverId, getAcquisitionStrategySolverId } from './solver-ids';
+export {
+  SOLVER_IDS,
+  isValidSolverId,
+  getAcquisitionStrategySolverId,
+} from './solver-ids';
 export type { SolverId } from './solver-ids';
 
 export { BaseDomainSolver } from './base-domain-solver';
@@ -17,7 +21,10 @@ export type {
 } from './sterling-reasoning-service';
 
 // Minecraft crafting domain
-export { MinecraftCraftingSolver, CRAFTING_DECLARATION } from './minecraft-crafting-solver';
+export {
+  MinecraftCraftingSolver,
+  CRAFTING_DECLARATION,
+} from './minecraft-crafting-solver';
 export {
   buildCraftingRules,
   inventoryToRecord,
@@ -33,7 +40,10 @@ export type {
 } from './minecraft-crafting-types';
 
 // Minecraft building domain
-export { MinecraftBuildingSolver, BUILDING_DECLARATION } from './minecraft-building-solver';
+export {
+  MinecraftBuildingSolver,
+  BUILDING_DECLARATION,
+} from './minecraft-building-solver';
 export {
   buildModulesWithFeasibility,
   inventoryForBuilding,
@@ -61,7 +71,12 @@ export type {
 
 // Minecraft furnace scheduling domain
 export { MinecraftFurnaceSolver } from './minecraft-furnace-solver';
-export { buildFurnaceRules, buildFurnaceGoal, checkSlotPrecondition, SMELTABLE_ITEMS } from './minecraft-furnace-rules';
+export {
+  buildFurnaceRules,
+  buildFurnaceGoal,
+  checkSlotPrecondition,
+  SMELTABLE_ITEMS,
+} from './minecraft-furnace-rules';
 export type {
   FurnaceSlotState,
   FurnaceSearchState,
@@ -74,7 +89,10 @@ export type {
 export { FURNACE_HASH_EXCLUDED_FIELDS } from './minecraft-furnace-types';
 
 // Minecraft tool progression domain
-export { MinecraftToolProgressionSolver, TOOL_PROGRESSION_DECLARATION } from './minecraft-tool-progression-solver';
+export {
+  MinecraftToolProgressionSolver,
+  TOOL_PROGRESSION_DECLARATION,
+} from './minecraft-tool-progression-solver';
 export {
   buildToolProgressionRules,
   detectCurrentTier,
@@ -104,8 +122,15 @@ export {
 } from './minecraft-tool-progression-types';
 
 // Minecraft acquisition domain (Rig D)
-export { MinecraftAcquisitionSolver, ACQUISITION_DECLARATION } from './minecraft-acquisition-solver';
-export { buildTradeRules, buildLootRules, buildSalvageRules } from './minecraft-acquisition-solver';
+export {
+  MinecraftAcquisitionSolver,
+  ACQUISITION_DECLARATION,
+} from './minecraft-acquisition-solver';
+export {
+  buildTradeRules,
+  buildLootRules,
+  buildSalvageRules,
+} from './minecraft-acquisition-solver';
 export {
   buildAcquisitionContext,
   buildAcquisitionStrategies,
@@ -135,7 +160,11 @@ export {
   PRIOR_MIN,
   PRIOR_MAX,
 } from './minecraft-acquisition-types';
-export { actionToAcquisitionLeaf } from './leaf-routing';
+export {
+  actionToAcquisitionLeaf,
+  parsePlaceAction,
+  WORKSTATION_TYPES,
+} from './leaf-routing';
 
 // Minecraft navigation domain
 export { MinecraftNavigationSolver } from './minecraft-navigation-solver';

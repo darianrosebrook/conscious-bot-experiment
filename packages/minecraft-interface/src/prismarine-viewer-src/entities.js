@@ -9,15 +9,15 @@
  * @module prismarine-viewer/lib/entities
  */
 
-const THREE = require('three')
-const TWEEN = require('@tweenjs/tween.js')
+const THREE = require('three');
+const TWEEN = require('@tweenjs/tween.js');
 
-const Entity = require('./entity/Entity')
-const { dispose3 } = require('./dispose')
-const { EquipmentManager } = require('./equipment-renderer')
-const { EntityExtrasManager } = require('./entity-extras')
+const Entity = require('./entity/Entity');
+const { dispose3 } = require('./dispose');
+const { EquipmentManager } = require('./equipment-renderer');
+const { EntityExtrasManager } = require('./entity-extras');
 
-const { createCanvas } = require('canvas')
+const { createCanvas } = require('canvas');
 
 // ============================================================================
 // SKELETAL ANIMATION SYSTEM
@@ -25,17 +25,48 @@ const { createCanvas } = require('canvas')
 
 // Entity categories for animation selection
 const BIPED_ENTITIES = [
-  'player', 'zombie', 'skeleton', 'creeper', 'enderman', 'witch',
-  'villager', 'pillager', 'vindicator', 'evoker', 'illusioner',
-  'zombie_villager', 'drowned', 'husk', 'stray', 'wither_skeleton',
-  'piglin', 'piglin_brute', 'zombified_piglin'
-]
+  'player',
+  'zombie',
+  'skeleton',
+  'creeper',
+  'enderman',
+  'witch',
+  'villager',
+  'pillager',
+  'vindicator',
+  'evoker',
+  'illusioner',
+  'zombie_villager',
+  'drowned',
+  'husk',
+  'stray',
+  'wither_skeleton',
+  'piglin',
+  'piglin_brute',
+  'zombified_piglin',
+];
 
 const QUADRUPED_ENTITIES = [
-  'pig', 'cow', 'sheep', 'chicken', 'wolf', 'cat', 'ocelot',
-  'horse', 'donkey', 'mule', 'fox', 'rabbit', 'goat', 'llama',
-  'polar_bear', 'panda', 'bee', 'spider', 'cave_spider'
-]
+  'pig',
+  'cow',
+  'sheep',
+  'chicken',
+  'wolf',
+  'cat',
+  'ocelot',
+  'horse',
+  'donkey',
+  'mule',
+  'fox',
+  'rabbit',
+  'goat',
+  'llama',
+  'polar_bear',
+  'panda',
+  'bee',
+  'spider',
+  'cave_spider',
+];
 
 // Standard bone names for bipeds
 const BIPED_BONES = {
@@ -44,8 +75,8 @@ const BIPED_BONES = {
   LEFT_ARM: 'leftArm',
   RIGHT_ARM: 'rightArm',
   LEFT_LEG: 'leftLeg',
-  RIGHT_LEG: 'rightLeg'
-}
+  RIGHT_LEG: 'rightLeg',
+};
 
 // Standard bone names for quadrupeds
 const QUADRUPED_BONES = {
@@ -54,198 +85,234 @@ const QUADRUPED_BONES = {
   LEG0: 'leg0', // front right
   LEG1: 'leg1', // front left
   LEG2: 'leg2', // back right
-  LEG3: 'leg3'  // back left
-}
+  LEG3: 'leg3', // back left
+};
 
 /**
  * Create a QuaternionKeyframeTrack for bone rotation animation
  */
-function createBoneRotationTrack (boneName, keyframes) {
-  const times = []
-  const values = []
+function createBoneRotationTrack(boneName, keyframes) {
+  const times = [];
+  const values = [];
 
   for (const kf of keyframes) {
-    times.push(kf.time)
+    times.push(kf.time);
     // Convert Euler to Quaternion for smooth interpolation
-    const euler = new THREE.Euler(kf.rotation.x, kf.rotation.y, kf.rotation.z, 'XYZ')
-    const quat = new THREE.Quaternion().setFromEuler(euler)
-    values.push(quat.x, quat.y, quat.z, quat.w)
+    const euler = new THREE.Euler(
+      kf.rotation.x,
+      kf.rotation.y,
+      kf.rotation.z,
+      'XYZ'
+    );
+    const quat = new THREE.Quaternion().setFromEuler(euler);
+    values.push(quat.x, quat.y, quat.z, quat.w);
   }
 
   return new THREE.QuaternionKeyframeTrack(
     boneName + '.quaternion',
     times,
     values
-  )
+  );
 }
 
 /**
  * Create walk animation clip for biped entities
  */
-function createBipedWalkClip () {
-  const tracks = []
-  const duration = 1.0 // 1 second per full cycle
-  const amplitude = 0.6 // Radians - leg swing amount
+function createBipedWalkClip() {
+  const tracks = [];
+  const duration = 1.0; // 1 second per full cycle
+  const amplitude = 0.6; // Radians - leg swing amount
 
   // Left leg - swings forward then back
-  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_LEG, [
-    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.LEFT_LEG, [
+      { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    ])
+  );
 
   // Right leg - opposite phase
-  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_LEG, [
-    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.RIGHT_LEG, [
+      { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    ])
+  );
 
   // Left arm - opposite to left leg (natural walking motion)
-  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
-    { time: 0.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
-    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
-    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
+      { time: 0.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
+      { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
+      { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
+    ])
+  );
 
   // Right arm - opposite to right leg
-  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
-    { time: 0.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
-    { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
-    { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
+      { time: 0.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
+      { time: 0.25, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: -amplitude * 0.5, y: 0, z: 0 } },
+      { time: 0.75, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: amplitude * 0.5, y: 0, z: 0 } },
+    ])
+  );
 
-  return new THREE.AnimationClip('walk', duration, tracks)
+  return new THREE.AnimationClip('walk', duration, tracks);
 }
 
 /**
  * Create idle animation clip for biped entities (subtle breathing/swaying)
  */
-function createBipedIdleClip () {
-  const tracks = []
-  const duration = 2.0 // Slower, more relaxed
-  const breathAmplitude = 0.02 // Very subtle
+function createBipedIdleClip() {
+  const tracks = [];
+  const duration = 2.0; // Slower, more relaxed
+  const breathAmplitude = 0.02; // Very subtle
 
   // Subtle body sway
-  tracks.push(createBoneRotationTrack(BIPED_BONES.BODY, [
-    { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: breathAmplitude, y: 0, z: 0 } },
-    { time: 2.0, rotation: { x: 0, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.BODY, [
+      { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: breathAmplitude, y: 0, z: 0 } },
+      { time: 2.0, rotation: { x: 0, y: 0, z: 0 } },
+    ])
+  );
 
   // Arms at rest with slight movement
-  tracks.push(createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
-    { time: 0.0, rotation: { x: 0, y: 0, z: 0.05 } },
-    { time: 1.0, rotation: { x: 0, y: 0, z: 0.08 } },
-    { time: 2.0, rotation: { x: 0, y: 0, z: 0.05 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.LEFT_ARM, [
+      { time: 0.0, rotation: { x: 0, y: 0, z: 0.05 } },
+      { time: 1.0, rotation: { x: 0, y: 0, z: 0.08 } },
+      { time: 2.0, rotation: { x: 0, y: 0, z: 0.05 } },
+    ])
+  );
 
-  tracks.push(createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
-    { time: 0.0, rotation: { x: 0, y: 0, z: -0.05 } },
-    { time: 1.0, rotation: { x: 0, y: 0, z: -0.08 } },
-    { time: 2.0, rotation: { x: 0, y: 0, z: -0.05 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(BIPED_BONES.RIGHT_ARM, [
+      { time: 0.0, rotation: { x: 0, y: 0, z: -0.05 } },
+      { time: 1.0, rotation: { x: 0, y: 0, z: -0.08 } },
+      { time: 2.0, rotation: { x: 0, y: 0, z: -0.05 } },
+    ])
+  );
 
-  return new THREE.AnimationClip('idle', duration, tracks)
+  return new THREE.AnimationClip('idle', duration, tracks);
 }
 
 /**
  * Create walk animation clip for quadruped entities
  */
-function createQuadrupedWalkClip () {
-  const tracks = []
-  const duration = 1.0
-  const amplitude = 0.5
+function createQuadrupedWalkClip() {
+  const tracks = [];
+  const duration = 1.0;
+  const amplitude = 0.5;
 
   // Diagonal pairs move together (like a trotting animal)
   // Front right + back left
-  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG0, [
-    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(QUADRUPED_BONES.LEG0, [
+      { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    ])
+  );
 
-  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG3, [
-    { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(QUADRUPED_BONES.LEG3, [
+      { time: 0.0, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: amplitude, y: 0, z: 0 } },
+    ])
+  );
 
   // Front left + back right (opposite phase)
-  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG1, [
-    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(QUADRUPED_BONES.LEG1, [
+      { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    ])
+  );
 
-  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.LEG2, [
-    { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
-    { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
-    { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(QUADRUPED_BONES.LEG2, [
+      { time: 0.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+      { time: 0.5, rotation: { x: amplitude, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: -amplitude, y: 0, z: 0 } },
+    ])
+  );
 
-  return new THREE.AnimationClip('walk', duration, tracks)
+  return new THREE.AnimationClip('walk', duration, tracks);
 }
 
 /**
  * Create idle animation for quadrupeds
  */
-function createQuadrupedIdleClip () {
-  const tracks = []
-  const duration = 3.0
+function createQuadrupedIdleClip() {
+  const tracks = [];
+  const duration = 3.0;
 
   // Subtle head movement
-  tracks.push(createBoneRotationTrack(QUADRUPED_BONES.HEAD, [
-    { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
-    { time: 1.5, rotation: { x: 0.05, y: 0.1, z: 0 } },
-    { time: 3.0, rotation: { x: 0, y: 0, z: 0 } }
-  ]))
+  tracks.push(
+    createBoneRotationTrack(QUADRUPED_BONES.HEAD, [
+      { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.5, rotation: { x: 0.05, y: 0.1, z: 0 } },
+      { time: 3.0, rotation: { x: 0, y: 0, z: 0 } },
+    ])
+  );
 
-  return new THREE.AnimationClip('idle', duration, tracks)
+  return new THREE.AnimationClip('idle', duration, tracks);
 }
 
 /**
  * Determine entity category for animation selection
  */
-function getEntityCategory (entityType) {
-  if (!entityType) return 'unknown'
-  const type = entityType.toLowerCase().replace('minecraft:', '')
-  if (BIPED_ENTITIES.includes(type)) return 'biped'
-  if (QUADRUPED_ENTITIES.includes(type)) return 'quadruped'
-  return 'unknown'
+function getEntityCategory(entityType) {
+  if (!entityType) return 'unknown';
+  const type = entityType.toLowerCase().replace('minecraft:', '');
+  if (BIPED_ENTITIES.includes(type)) return 'biped';
+  if (QUADRUPED_ENTITIES.includes(type)) return 'quadruped';
+  return 'unknown';
 }
 
 /**
  * Calculate animation speed based on movement velocity
  */
-function calculateAnimationSpeed (velocity) {
-  const horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
+function calculateAnimationSpeed(velocity) {
+  const horizontalSpeed = Math.sqrt(
+    velocity.x * velocity.x + velocity.z * velocity.z
+  );
   // Walking speed ~4.3 blocks/sec, running ~5.6
-  if (horizontalSpeed < 0.1) return 0 // Idle
-  if (horizontalSpeed < 4.5) return horizontalSpeed / 4.3 // Normal walk speed
-  return horizontalSpeed / 4.3 // Scale with speed
+  if (horizontalSpeed < 0.1) return 0; // Idle
+  if (horizontalSpeed < 4.5) return horizontalSpeed / 4.3; // Normal walk speed
+  return horizontalSpeed / 4.3; // Scale with speed
 }
 
 // ============================================================================
 // Entity Mesh Creation
 // ============================================================================
 
-function getEntityMesh (entity, scene) {
-  const rawName = entity.name
-  const normalizedName = rawName ? rawName.replace(/^minecraft:/, '') : null
-  const textureVersion = globalThis.__MC_VERSION || '1.21.9'
-  const loggedFallbacks = (globalThis.__ENTITY_FALLBACK_LOGGED ||= new Set())
-  const loggedFailures = (globalThis.__ENTITY_LOAD_FAIL ||= new Set())
-  if (loggedFailures.size > 500) loggedFailures.clear()
-  const failureKey = normalizedName ? `${textureVersion}:${normalizedName}` : `unknown:${textureVersion}`
+function getEntityMesh(entity, scene) {
+  // When name is missing (e.g. entity update with only id/pos from entityMoved), use 'player'
+  // so we render a proper mesh instead of a pink missing-texture cube
+  const rawName = entity.name;
+  const normalizedName =
+    (rawName ? rawName.replace(/^minecraft:/, '') : null) || 'player';
+  const textureVersion = globalThis.__MC_VERSION || '1.21.9';
+  const loggedFallbacks = (globalThis.__ENTITY_FALLBACK_LOGGED ||= new Set());
+  const loggedFailures = (globalThis.__ENTITY_LOAD_FAIL ||= new Set());
+  if (loggedFailures.size > 500) loggedFailures.clear();
+  const failureKey = normalizedName
+    ? `${textureVersion}:${normalizedName}`
+    : `unknown:${textureVersion}`;
   const fallbackMap = {
     glow_squid: 'squid',
     breeze: 'player',
@@ -256,71 +323,71 @@ function getEntityMesh (entity, scene) {
     allay: 'vex',
     warden: 'iron_golem',
     frog: 'slime',
-    tadpole: 'fish/cod'
-  }
-  const fallbackName = normalizedName ? fallbackMap[normalizedName] : null
+    tadpole: 'fish/cod',
+  };
+  const fallbackName = normalizedName ? fallbackMap[normalizedName] : null;
   if (normalizedName) {
     try {
-      const e = new Entity(textureVersion, normalizedName, scene)
+      const e = new Entity(textureVersion, normalizedName, scene);
       // Store entity info in userData for extras setup
-      e.mesh.userData.entityName = normalizedName
-      e.mesh.userData.entityNameRaw = rawName
-      e.mesh.userData.entityUsername = entity.username
-      e.mesh.userData.entityHeight = entity.height || 1.8
-      e.mesh.userData.entityWidth = entity.width || 0.6
-      return e.mesh
+      e.mesh.userData.entityName = normalizedName;
+      e.mesh.userData.entityNameRaw = rawName;
+      e.mesh.userData.entityUsername = entity.username;
+      e.mesh.userData.entityHeight = entity.height || 1.8;
+      e.mesh.userData.entityWidth = entity.width || 0.6;
+      return e.mesh;
     } catch (err) {
       if (fallbackName) {
         try {
-          const e = new Entity(textureVersion, fallbackName, scene)
-          e.mesh.userData.entityName = fallbackName
-          e.mesh.userData.entityNameRaw = rawName
-          e.mesh.userData.entityNameFallback = normalizedName
-          e.mesh.userData.entityUsername = entity.username
-          e.mesh.userData.entityHeight = entity.height || 1.8
-          e.mesh.userData.entityWidth = entity.width || 0.6
+          const e = new Entity(textureVersion, fallbackName, scene);
+          e.mesh.userData.entityName = fallbackName;
+          e.mesh.userData.entityNameRaw = rawName;
+          e.mesh.userData.entityNameFallback = normalizedName;
+          e.mesh.userData.entityUsername = entity.username;
+          e.mesh.userData.entityHeight = entity.height || 1.8;
+          e.mesh.userData.entityWidth = entity.width || 0.6;
           if (!loggedFallbacks.has(normalizedName)) {
-            loggedFallbacks.add(normalizedName)
+            loggedFallbacks.add(normalizedName);
             console.warn(
               `[viewer] Entity fallback: ${normalizedName} -> ${fallbackName}`
-            )
+            );
           }
-          return e.mesh
+          return e.mesh;
         } catch (fallbackErr) {
           if (!loggedFailures.has(failureKey)) {
-            loggedFailures.add(failureKey)
+            loggedFailures.add(failureKey);
             console.warn(
               `[viewer] Entity load failed: ${normalizedName} -> ${fallbackName} (${fallbackErr?.message || fallbackErr}) [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
-            )
+            );
           }
         }
       }
       if (!loggedFailures.has(failureKey)) {
-        loggedFailures.add(failureKey)
+        loggedFailures.add(failureKey);
         console.warn(
           `[viewer] Entity load failed: ${normalizedName} (${err?.message || err}) [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
-        )
+        );
       }
     }
   } else if (!loggedFailures.has(failureKey)) {
-    loggedFailures.add(failureKey)
+    loggedFailures.add(failureKey);
     console.warn(
       `[viewer] Entity load failed: missing name [version=${textureVersion}, raw=${rawName}] (check /mc-assets/entity/${textureVersion}/...)`
-    )
+    );
   }
 
   // Use defaults if entity dimensions are missing to prevent NaN geometry
-  const width = entity.width || 0.6
-  const height = entity.height || 1.8
-  const geometry = new THREE.BoxGeometry(width, height, width)
-  geometry.translate(0, height / 2, 0)
-  const material = new THREE.MeshBasicMaterial({ color: 0xff00ff })
-  const cube = new THREE.Mesh(geometry, material)
+  const width = entity.width || 0.6;
+  const height = entity.height || 1.8;
+  const geometry = new THREE.BoxGeometry(width, height, width);
+  geometry.translate(0, height / 2, 0);
+  const material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+  const cube = new THREE.Mesh(geometry, material);
   // Store entity info for fallback entities too
-  cube.userData.entityHeight = height
-  cube.userData.entityWidth = width
-  cube.userData.entityUsername = entity.username
-  return cube
+  cube.userData.entityHeight = height;
+  cube.userData.entityWidth = width;
+  cube.userData.entityUsername = entity.username;
+  return cube;
 }
 
 // ============================================================================
@@ -328,263 +395,278 @@ function getEntityMesh (entity, scene) {
 // ============================================================================
 
 class Entities {
-  constructor (scene, camera) {
-    this.scene = scene
-    this.camera = camera // Store camera reference for name tag updates
-    this.entities = {}
+  constructor(scene, camera) {
+    this.scene = scene;
+    this.camera = camera; // Store camera reference for name tag updates
+    this.entities = {};
     // Animation system
-    this.animationMixers = new Map() // entityId -> THREE.AnimationMixer
-    this.animationActions = new Map() // entityId -> { idle, walk }
-    this.entityStates = new Map() // entityId -> { lastPos, velocity, isMoving }
-    this.lastUpdateTime = performance.now()
+    this.animationMixers = new Map(); // entityId -> THREE.AnimationMixer
+    this.animationActions = new Map(); // entityId -> { idle, walk }
+    this.entityStates = new Map(); // entityId -> { lastPos, velocity, isMoving }
+    this.lastUpdateTime = performance.now();
     // Equipment rendering system
-    this.equipmentManagers = new Map() // entityId -> EquipmentManager
+    this.equipmentManagers = new Map(); // entityId -> EquipmentManager
     // Entity extras (name tags, capes, shadows)
-    this.extrasManagers = new Map() // entityId -> EntityExtrasManager
+    this.extrasManagers = new Map(); // entityId -> EntityExtrasManager
   }
 
   /**
    * Set camera reference (called from viewer after construction)
    */
-  setCamera (camera) {
-    this.camera = camera
+  setCamera(camera) {
+    this.camera = camera;
   }
 
-  clear () {
+  clear() {
     for (const mesh of Object.values(this.entities)) {
-      this.scene.remove(mesh)
-      dispose3(mesh)
+      this.scene.remove(mesh);
+      dispose3(mesh);
     }
-    this.entities = {}
+    this.entities = {};
     // Clear animation data
-    this.animationMixers.clear()
-    this.animationActions.clear()
-    this.entityStates.clear()
+    this.animationMixers.clear();
+    this.animationActions.clear();
+    this.entityStates.clear();
     // Clear equipment managers
     for (const manager of this.equipmentManagers.values()) {
-      manager.dispose()
+      manager.dispose();
     }
-    this.equipmentManagers.clear()
+    this.equipmentManagers.clear();
     // Clear extras managers
     for (const manager of this.extrasManagers.values()) {
-      manager.dispose()
+      manager.dispose();
     }
-    this.extrasManagers.clear()
+    this.extrasManagers.clear();
   }
 
   /**
    * Set up animation system for an entity
    */
-  setupEntityAnimation (entityId, mesh) {
-    const entityType = mesh.userData.entityType
-    const category = getEntityCategory(entityType)
+  setupEntityAnimation(entityId, mesh) {
+    const entityType = mesh.userData.entityType;
+    const category = getEntityCategory(entityType);
 
     if (category === 'unknown') {
-      return // No animation for unknown entities
+      return; // No animation for unknown entities
     }
 
     // Find the first skinned mesh with bones
-    let skinnedMesh = null
+    let skinnedMesh = null;
     mesh.traverse((child) => {
       if (child.isSkinnedMesh && child.userData.bonesByName) {
-        skinnedMesh = child
+        skinnedMesh = child;
       }
-    })
+    });
 
     if (!skinnedMesh || !skinnedMesh.userData.bonesByName) {
-      return // No bones to animate
+      return; // No bones to animate
     }
 
     // Create animation mixer for this entity
-    const mixer = new THREE.AnimationMixer(skinnedMesh)
-    this.animationMixers.set(entityId, mixer)
+    const mixer = new THREE.AnimationMixer(skinnedMesh);
+    this.animationMixers.set(entityId, mixer);
 
     // Create appropriate animation clips based on category
-    let idleClip, walkClip
+    let idleClip, walkClip;
     if (category === 'biped') {
-      idleClip = createBipedIdleClip()
-      walkClip = createBipedWalkClip()
+      idleClip = createBipedIdleClip();
+      walkClip = createBipedWalkClip();
     } else if (category === 'quadruped') {
-      idleClip = createQuadrupedIdleClip()
-      walkClip = createQuadrupedWalkClip()
+      idleClip = createQuadrupedIdleClip();
+      walkClip = createQuadrupedWalkClip();
     }
 
     if (idleClip && walkClip) {
-      const idleAction = mixer.clipAction(idleClip)
-      const walkAction = mixer.clipAction(walkClip)
+      const idleAction = mixer.clipAction(idleClip);
+      const walkAction = mixer.clipAction(walkClip);
 
       // Configure actions
-      idleAction.setLoop(THREE.LoopRepeat, Infinity)
-      walkAction.setLoop(THREE.LoopRepeat, Infinity)
+      idleAction.setLoop(THREE.LoopRepeat, Infinity);
+      walkAction.setLoop(THREE.LoopRepeat, Infinity);
 
       // Start with idle
-      idleAction.play()
+      idleAction.play();
 
       this.animationActions.set(entityId, {
         idle: idleAction,
         walk: walkAction,
-        current: 'idle'
-      })
+        current: 'idle',
+      });
     }
 
     // Initialize entity state
     this.entityStates.set(entityId, {
       lastPos: new THREE.Vector3(),
       velocity: new THREE.Vector3(),
-      isMoving: false
-    })
+      isMoving: false,
+    });
   }
 
   /**
    * Transition between animation states
    */
-  transitionAnimation (entityId, toState, speed = 1.0) {
-    const actions = this.animationActions.get(entityId)
-    if (!actions || actions.current === toState) return
+  transitionAnimation(entityId, toState, speed = 1.0) {
+    const actions = this.animationActions.get(entityId);
+    if (!actions || actions.current === toState) return;
 
-    const fromAction = actions[actions.current]
-    const toAction = actions[toState]
+    const fromAction = actions[actions.current];
+    const toAction = actions[toState];
 
-    if (!fromAction || !toAction) return
+    if (!fromAction || !toAction) return;
 
     // Crossfade duration
-    const fadeDuration = 0.2
+    const fadeDuration = 0.2;
 
     // Set the playback speed for walk animation
     if (toState === 'walk') {
-      toAction.setEffectiveTimeScale(Math.max(0.5, speed))
+      toAction.setEffectiveTimeScale(Math.max(0.5, speed));
     }
 
     // Crossfade
-    toAction.reset()
-    toAction.setEffectiveWeight(1)
-    toAction.play()
-    fromAction.crossFadeTo(toAction, fadeDuration, true)
+    toAction.reset();
+    toAction.setEffectiveWeight(1);
+    toAction.play();
+    fromAction.crossFadeTo(toAction, fadeDuration, true);
 
-    actions.current = toState
+    actions.current = toState;
   }
 
-  update (entity) {
+  update(entity) {
     if (!this.entities[entity.id]) {
-      const mesh = getEntityMesh(entity, this.scene)
-      if (!mesh) return
-      this.entities[entity.id] = mesh
-      this.scene.add(mesh)
+      const mesh = getEntityMesh(entity, this.scene);
+      if (!mesh) return;
+      this.entities[entity.id] = mesh;
+      this.scene.add(mesh);
 
       // Set up animation for new entity
-      this.setupEntityAnimation(entity.id, mesh)
+      this.setupEntityAnimation(entity.id, mesh);
 
       // Set up equipment manager for new entity
-      this.equipmentManagers.set(entity.id, new EquipmentManager())
+      this.equipmentManagers.set(entity.id, new EquipmentManager());
 
       // Set up entity extras (name tags, shadows, capes)
-      const extrasManager = new EntityExtrasManager()
-      const isPlayer = entity.name === 'player' || mesh.userData.entityName === 'player'
+      const extrasManager = new EntityExtrasManager();
+      const isPlayer =
+        entity.name === 'player' || mesh.userData.entityName === 'player';
       extrasManager.setup(mesh, {
         name: entity.username || mesh.userData.entityUsername,
         height: entity.height || mesh.userData.entityHeight || 1.8,
         width: entity.width || mesh.userData.entityWidth || 0.6,
         showCape: isPlayer, // Only players get capes for now
         capeColor: 0x2244aa,
-        showShadow: true
-      })
-      this.extrasManagers.set(entity.id, extrasManager)
+        showShadow: true,
+      });
+      this.extrasManagers.set(entity.id, extrasManager);
     }
 
-    const e = this.entities[entity.id]
+    const e = this.entities[entity.id];
 
     if (entity.delete) {
-      this.scene.remove(e)
-      dispose3(e)
-      delete this.entities[entity.id]
+      this.scene.remove(e);
+      dispose3(e);
+      delete this.entities[entity.id];
       // Clean up animation data
-      this.animationMixers.delete(entity.id)
-      this.animationActions.delete(entity.id)
-      this.entityStates.delete(entity.id)
+      this.animationMixers.delete(entity.id);
+      this.animationActions.delete(entity.id);
+      this.entityStates.delete(entity.id);
       // Clean up equipment manager
-      const equipmentManager = this.equipmentManagers.get(entity.id)
+      const equipmentManager = this.equipmentManagers.get(entity.id);
       if (equipmentManager) {
-        equipmentManager.dispose()
-        this.equipmentManagers.delete(entity.id)
+        equipmentManager.dispose();
+        this.equipmentManagers.delete(entity.id);
       }
       // Clean up extras manager
-      const extrasManager = this.extrasManagers.get(entity.id)
+      const extrasManager = this.extrasManagers.get(entity.id);
       if (extrasManager) {
-        extrasManager.dispose()
-        this.extrasManagers.delete(entity.id)
+        extrasManager.dispose();
+        this.extrasManagers.delete(entity.id);
       }
-      return
+      return;
     }
 
     // Update equipment if present
     if (entity.equipment) {
-      const equipmentManager = this.equipmentManagers.get(entity.id)
+      const equipmentManager = this.equipmentManagers.get(entity.id);
       if (equipmentManager && equipmentManager.hasChanged(entity.equipment)) {
-        equipmentManager.update(e, entity.equipment)
+        equipmentManager.update(e, entity.equipment);
       }
     }
 
     if (entity.pos) {
-      const newPos = new THREE.Vector3(entity.pos.x, entity.pos.y, entity.pos.z)
+      const newPos = new THREE.Vector3(
+        entity.pos.x,
+        entity.pos.y,
+        entity.pos.z
+      );
 
       // Calculate velocity for animation
-      const state = this.entityStates.get(entity.id)
+      const state = this.entityStates.get(entity.id);
       if (state) {
-        const deltaTime = 0.05 // 50ms update interval
-        state.velocity.subVectors(newPos, state.lastPos).divideScalar(deltaTime)
-        state.lastPos.copy(newPos)
+        const deltaTime = 0.05; // 50ms update interval
+        state.velocity
+          .subVectors(newPos, state.lastPos)
+          .divideScalar(deltaTime);
+        state.lastPos.copy(newPos);
 
         // Determine animation state based on movement
-        const speed = calculateAnimationSpeed(state.velocity)
-        const isMoving = speed > 0.1
+        const speed = calculateAnimationSpeed(state.velocity);
+        const isMoving = speed > 0.1;
 
         if (isMoving !== state.isMoving) {
-          state.isMoving = isMoving
-          this.transitionAnimation(entity.id, isMoving ? 'walk' : 'idle', speed)
+          state.isMoving = isMoving;
+          this.transitionAnimation(
+            entity.id,
+            isMoving ? 'walk' : 'idle',
+            speed
+          );
         } else if (isMoving) {
           // Update walk speed
-          const actions = this.animationActions.get(entity.id)
+          const actions = this.animationActions.get(entity.id);
           if (actions && actions.walk) {
-            actions.walk.setEffectiveTimeScale(Math.max(0.5, speed))
+            actions.walk.setEffectiveTimeScale(Math.max(0.5, speed));
           }
         }
       }
 
-      new TWEEN.Tween(e.position).to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 50).start()
+      new TWEEN.Tween(e.position)
+        .to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 50)
+        .start();
     }
     if (entity.yaw) {
-      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2)
-      const dy = 2 * da % (Math.PI * 2) - da
-      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start()
+      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2);
+      const dy = ((2 * da) % (Math.PI * 2)) - da;
+      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start();
     }
   }
 
   /**
    * Update all animation mixers - call this from the render loop
    */
-  updateAnimations (deltaTime) {
+  updateAnimations(deltaTime) {
     for (const mixer of this.animationMixers.values()) {
-      mixer.update(deltaTime)
+      mixer.update(deltaTime);
     }
 
     // Update entity extras (name tags, capes, shadows)
     if (this.camera) {
       for (const [entityId, extrasManager] of this.extrasManagers) {
-        const mesh = this.entities[entityId]
-        if (!mesh) continue
+        const mesh = this.entities[entityId];
+        if (!mesh) continue;
 
         // Get entity state for velocity
-        const state = this.entityStates.get(entityId)
-        const velocity = state ? calculateAnimationSpeed(state.velocity) / 5.0 : 0
+        const state = this.entityStates.get(entityId);
+        const velocity = state
+          ? calculateAnimationSpeed(state.velocity) / 5.0
+          : 0;
 
         // Get world position
-        const worldPos = new THREE.Vector3()
-        mesh.getWorldPosition(worldPos)
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos);
 
-        extrasManager.update(this.camera, worldPos, deltaTime, velocity)
+        extrasManager.update(this.camera, worldPos, deltaTime, velocity);
       }
     }
   }
 }
 
-module.exports = { Entities }
+module.exports = { Entities };

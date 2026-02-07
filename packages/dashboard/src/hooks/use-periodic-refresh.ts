@@ -90,7 +90,7 @@ export function usePeriodicRefresh({
         }
       }
     },
-    [addEvent, setNotes],
+    [addEvent, setNotes]
   );
 
   useSSE({ url: '/api/memory-updates', onMessage: handleMemorySSE });
@@ -100,7 +100,7 @@ export function usePeriodicRefresh({
     const mergeNewThoughts = async () => {
       try {
         const currentIds = new Set(
-          useDashboardStore.getState().thoughts.map((t) => t.id),
+          useDashboardStore.getState().thoughts.map((t) => t.id)
         );
         const res = await fetch('/api/ws/cognitive-stream/recent?limit=100', {
           signal: AbortSignal.timeout(5000),
@@ -162,9 +162,15 @@ export function usePeriodicRefresh({
 
         // Fetch memories, events, and notes periodically
         const [memoriesRes, eventsRes, notesRes] = await Promise.allSettled([
-          fetch(config.routes.memories(), { signal: AbortSignal.timeout(timeout) }),
-          fetch(config.routes.events(), { signal: AbortSignal.timeout(timeout) }),
-          fetch(config.routes.notes(), { signal: AbortSignal.timeout(timeout) }),
+          fetch(config.routes.memories(), {
+            signal: AbortSignal.timeout(timeout),
+          }),
+          fetch(config.routes.events(), {
+            signal: AbortSignal.timeout(timeout),
+          }),
+          fetch(config.routes.notes(), {
+            signal: AbortSignal.timeout(timeout),
+          }),
         ]);
 
         // Process memories
@@ -320,25 +326,31 @@ export function usePeriodicRefresh({
             await checkViewerStatus();
           }
         } else {
-          setBotConnections([
-            {
-              name: 'minecraft-bot',
-              connected: false,
-              viewerActive: false,
-              viewerUrl: 'http://localhost:3006',
-            },
-          ]);
+          setBotConnections((prev) => {
+            const existing = prev.find((c) => c.name === 'minecraft-bot');
+            return [
+              {
+                name: 'minecraft-bot',
+                connected: false,
+                viewerActive: existing?.viewerActive ?? false,
+                viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+              },
+            ];
+          });
         }
       } catch (error) {
         debugLog('Periodic refresh error:', error);
-        setBotConnections([
-          {
-            name: 'minecraft-bot',
-            connected: false,
-            viewerActive: false,
-            viewerUrl: 'http://localhost:3006',
-          },
-        ]);
+        setBotConnections((prev) => {
+          const existing = prev.find((c) => c.name === 'minecraft-bot');
+          return [
+            {
+              name: 'minecraft-bot',
+              connected: false,
+              viewerActive: existing?.viewerActive ?? false,
+              viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+            },
+          ];
+        });
       }
     };
 

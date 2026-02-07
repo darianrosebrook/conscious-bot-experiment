@@ -43,6 +43,10 @@ module.exports = {
     require: 'readonly',
     module: 'readonly',
 
+    // React (for packages that use JSX without importing React)
+    React: 'readonly',
+    ReactDOM: 'readonly',
+
     // Web APIs
     Response: 'readonly',
     Request: 'readonly',
@@ -86,7 +90,10 @@ module.exports = {
 
     // Type safety
     // '@typescript-eslint/no-explicit-any': 'warn',
-    // '@typescript-eslint/no-unused-vars': 'error',
+    'no-unused-vars': [
+      'error',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+    ],
   },
   ignorePatterns: [
     'dist/',

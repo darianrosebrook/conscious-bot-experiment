@@ -22,28 +22,28 @@ import type {
 
 interface DashboardStore extends DashboardState {
   // Actions
-  setIsLive: (isLive: boolean) => void;
-  setHud: (hud: HudData) => void;
-  addThought: (thought: Thought) => void;
-  setThoughts: (thoughts: Thought[]) => void;
+  setIsLive: (_isLive: boolean) => void;
+  setHud: (_hud: HudData) => void;
+  addThought: (_thought: Thought) => void;
+  setThoughts: (_thoughts: Thought[]) => void;
   clearThoughts: () => void;
   loadThoughtsFromServer: () => Promise<void>;
-  setTasks: (tasks: Task[]) => void;
-  setTasksFallback: (fallback: boolean) => void;
-  updateTask: (id: string, updates: Partial<Task>) => void;
-  addTask: (task: Task) => void;
-  addEvent: (event: Event) => void;
-  setEvents: (events: Event[]) => void;
-  setMemories: (memories: Memory[]) => void;
-  setNotes: (notes: Note[]) => void;
-  setEnvironment: (environment: Environment) => void;
-  setCurrentScreenshot: (screenshot: Screenshot) => void;
-  setCurrentSession: (sessionId: string) => void;
-  setInventory: (inventory: InventoryItem[]) => void;
-  setPlannerData: (plannerData: PlannerData) => void;
-  addValuationRecord: (record: ValuationDashboardRecord) => void;
-  setValuationRecords: (records: ValuationDashboardRecord[]) => void;
-  setTtsEnabled: (enabled: boolean) => void;
+  setTasks: (_tasks: Task[]) => void;
+  setTasksFallback: (_fallback: boolean) => void;
+  updateTask: (_id: string, _updates: Partial<Task>) => void;
+  addTask: (_task: Task) => void;
+  addEvent: (_event: Event) => void;
+  setEvents: (_events: Event[]) => void;
+  setMemories: (_memories: Memory[]) => void;
+  setNotes: (_notes: Note[]) => void;
+  setEnvironment: (_environment: Environment) => void;
+  setCurrentScreenshot: (_screenshot: Screenshot) => void;
+  setCurrentSession: (_sessionId: string) => void;
+  setInventory: (_inventory: InventoryItem[]) => void;
+  setPlannerData: (_plannerData: PlannerData) => void;
+  addValuationRecord: (_record: ValuationDashboardRecord) => void;
+  setValuationRecords: (_records: ValuationDashboardRecord[]) => void;
+  setTtsEnabled: (_enabled: boolean) => void;
   toggleTts: () => Promise<void>;
   loadTtsStatus: () => Promise<void>;
   reset: () => void;
@@ -68,7 +68,7 @@ const PERSIST_CONFIG = {
     // Persist valuation records WITHOUT the fullRecord blob (can be large).
     // fullRecord is kept in-memory only for the current session.
     valuationRecords: state.valuationRecords.map(
-      ({ fullRecord: _, ...rest }) => rest
+      ({ fullRecord: _dropped, ...rest }) => rest
     ),
     // Don't persist real-time data that should be fetched fresh
     // hud: state.hud,
@@ -325,10 +325,9 @@ export const useDashboardStore = create<DashboardStore>()(
               if (data.thoughts && Array.isArray(data.thoughts)) {
                 const serverThoughts = data.thoughts.map((thought: any) => {
                   const raw = thought.content;
-                  const display =
-                    cleanDisplayText(
-                      thought.displayContent || thought.content
-                    );
+                  const display = cleanDisplayText(
+                    thought.displayContent || thought.content
+                  );
                   return {
                     id: thought.id,
                     ts: new Date(thought.timestamp).toISOString(),

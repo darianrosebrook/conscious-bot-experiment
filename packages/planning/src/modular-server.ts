@@ -23,11 +23,11 @@ declare global {
  * The idle_reason allows cognition to treat different idle states appropriately.
  */
 export type IdleReason =
-  | 'no_tasks'           // True cognitive idle (no work exists)
-  | 'all_in_backoff'     // Tasks exist but are cooling down
+  | 'no_tasks' // True cognitive idle (no work exists)
+  | 'all_in_backoff' // Tasks exist but are cooling down
   | 'circuit_breaker_open' // Executor is in protection mode
-  | 'blocked_on_prereq'  // Tasks waiting on dependencies
-  | 'manual_pause';      // Tasks are manually paused
+  | 'blocked_on_prereq' // Tasks waiting on dependencies
+  | 'manual_pause'; // Tasks are manually paused
 
 /**
  * Determine the idle reason based on task and system state.
@@ -72,7 +72,7 @@ import {
   createKeepAliveIntegration,
   type KeepAliveIntegration,
 } from './modules/keep-alive-integration';
-import { getGoldenRunRecorder } from './golden-run-recorder';
+import { getGoldenRunRecorder, toDispatchResult } from './golden-run-recorder';
 // Dynamic import to avoid TypeScript path resolution issues
 // import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
 
@@ -205,6 +205,8 @@ import {
   normalizeStepExecutability,
   isExecutableStep,
 } from './modules/executable-step';
+import { stepToLeafExecution } from './modules/step-to-leaf-execution';
+import { executeSterlingStep } from './executor';
 import {
   buildTaskFromRequirement,
   computeSubtaskKey,
@@ -414,7 +416,8 @@ const KNOWN_LEAF_NAMES = new Set([
 /** Option B bridge: task_type_* leaves from Sterling expand-by-digest. Only allowlisted when ENABLE_TASK_TYPE_BRIDGE=1 (dev/golden only; forbidden in production). */
 const TASK_TYPE_BRIDGE_LEAF_NAMES = new Set<string>(['task_type_craft']);
 
-const ENABLE_TASK_TYPE_BRIDGE = String(process.env.ENABLE_TASK_TYPE_BRIDGE || '') === '1';
+const ENABLE_TASK_TYPE_BRIDGE =
+  String(process.env.ENABLE_TASK_TYPE_BRIDGE || '') === '1';
 
 // mc-fetch helpers are imported from modules/mc-client
 
@@ -487,7 +490,11 @@ const DASHBOARD_STREAM_URL = process.env.DASHBOARD_ENDPOINT
 
 const executorConfig: ExecutorConfig = (() => {
   const cfg = parseExecutorConfig();
-  cfg.leafAllowlist = buildLeafAllowlist(KNOWN_LEAF_NAMES, TASK_TYPE_BRIDGE_LEAF_NAMES, ENABLE_TASK_TYPE_BRIDGE);
+  cfg.leafAllowlist = buildLeafAllowlist(
+    KNOWN_LEAF_NAMES,
+    TASK_TYPE_BRIDGE_LEAF_NAMES,
+    ENABLE_TASK_TYPE_BRIDGE
+  );
   return cfg;
 })();
 
@@ -566,8 +573,10 @@ const toolExecutor = {
 
     const startTime = Date.now();
     try {
-      // Map BT actions to Minecraft actions
-      const mappedAction = mapBTActionToMinecraft(normalizedTool, args);
+      // Map BT actions to Minecraft actions (strict: unmapped tools return null for fail-closed executor)
+      const mappedAction = mapBTActionToMinecraft(normalizedTool, args, {
+        strict: true,
+      });
 
       if (!mappedAction) {
         return {
@@ -607,7 +616,11 @@ const toolExecutor = {
       // Pass taskId if available in mappedAction parameters for proper context
       const params = mappedAction.parameters as Record<string, any> | undefined;
       const taskId = params?.__nav?.scope as string | undefined;
-      const result = await executeActionWithBotCheck(mappedAction, taskId, signal);
+      const result = await executeActionWithBotCheck(
+        mappedAction,
+        taskId,
+        signal
+      );
       const duration = Date.now() - startTime;
 
       // Enhance result with metrics
@@ -1086,115 +1099,6 @@ function normalizeStepAuthority(step: any): void {
   }
 }
 
-/**
- * Extract executable leaf + args from a Sterling-generated task step's meta.
- * Returns null if the step has no machine-readable meta.
- */
-function stepToLeafExecution(
-  step: any
-): { leafName: string; args: Record<string, unknown> } | null {
-  const meta = step.meta;
-  if (!meta?.leaf) return null;
-
-  // If args were pre-derived at step-creation time, pass through directly
-  if (meta.args && typeof meta.args === 'object') {
-    return {
-      leafName: meta.leaf as string,
-      args: meta.args as Record<string, unknown>,
-    };
-  }
-
-  // Legacy fallback: derive args from produces/consumes
-  const leaf = meta.leaf as string;
-  const produces =
-    (meta.produces as Array<{ name: string; count: number }>) || [];
-  const consumes =
-    (meta.consumes as Array<{ name: string; count: number }>) || [];
-
-  switch (leaf) {
-    case 'dig_block': {
-      // Legacy: remap dig_block → acquire_material (atomic mine + collect)
-      const item = produces[0];
-      return {
-        leafName: 'acquire_material',
-        args: { item: item?.name || 'oak_log', count: item?.count || 1 },
-      };
-    }
-    case 'craft_recipe': {
-      const output = produces[0];
-      return {
-        leafName: 'craft_recipe',
-        args: { recipe: output?.name || 'unknown', qty: output?.count || 1 },
-      };
-    }
-    case 'smelt': {
-      // Smelt contract requires { input: string } — derive from consumes (input), not produces (output)
-      const consumed = consumes[0];
-      return {
-        leafName: 'smelt',
-        args: { input: consumed?.name || 'unknown' },
-      };
-    }
-    case 'place_workstation': {
-      const workstation = (meta.workstation as string) || 'crafting_table';
-      return {
-        leafName: 'place_workstation',
-        args: { workstation },
-      };
-    }
-    case 'place_block': {
-      const consumed = consumes[0];
-      return {
-        leafName: 'place_block',
-        args: { item: consumed?.name || 'crafting_table' },
-      };
-    }
-    case 'acquire_material': {
-      // Combined mine+collect. Item comes from meta.item (building domain),
-      // produces (Sterling crafting/tool-prog), or blockType (fallback plan).
-      const acquireItem =
-        (meta.item as string) ||
-        produces[0]?.name ||
-        (meta.blockType as string) ||
-        'oak_log';
-      const acquireCount = (meta.count as number) || produces[0]?.count || 1;
-      return {
-        leafName: 'acquire_material',
-        args: { item: acquireItem, count: acquireCount },
-      };
-    }
-    case 'prepare_site':
-    case 'build_module':
-    case 'place_feature':
-    case 'building_step': {
-      // Building domain — pass through meta fields
-      return {
-        leafName: leaf,
-        args: {
-          moduleId: meta.moduleId,
-          item: meta.item,
-          count: meta.count,
-          ...((meta as any).args || {}),
-        },
-      };
-    }
-    case 'sterling_navigate': {
-      // Navigation domain — pass through target and tolerance
-      return {
-        leafName: 'sterling_navigate',
-        args: {
-          target: meta.target || (meta as any).args?.target,
-          toleranceXZ: meta.toleranceXZ ?? (meta as any).args?.toleranceXZ ?? 1,
-          toleranceY: meta.toleranceY ?? (meta as any).args?.toleranceY ?? 0,
-          ...((meta as any).args || {}),
-        },
-      };
-    }
-    default:
-      return null;
-  }
-}
-
 function getStepBudgetState(task: any, stepId: string) {
   const meta = task.metadata || {};
   const budgets = meta.executionBudget || {};
@@ -1210,6 +1114,72 @@ function persistStepBudget(task: any, budgets: Record<string, any>) {
   // patch or immutable fields like `origin` and `goalBinding` will trigger
   // the protective guards in updateTaskMetadata.
   taskIntegration.updateTaskMetadata(task.id, { executionBudget: budgets });
+}
+
+function buildSterlingStepExecutorContext() {
+  return {
+    config: {
+      buildExecBudgetDisabled: BUILD_EXEC_BUDGET_DISABLED,
+      buildExecMaxAttempts: BUILD_EXEC_MAX_ATTEMPTS,
+      buildExecMinIntervalMs: BUILD_EXEC_MIN_INTERVAL_MS,
+      buildExecMaxElapsedMs: BUILD_EXEC_MAX_ELAPSED_MS,
+      buildingLeaves: BUILDING_LEAVES,
+      taskTypeBridgeLeafNames: TASK_TYPE_BRIDGE_LEAF_NAMES,
+      enableTaskTypeBridge: ENABLE_TASK_TYPE_BRIDGE,
+    },
+    leafAllowlist: executorConfig.leafAllowlist,
+    mode: executorConfig.mode,
+    updateTaskMetadata: (taskId: string, patch: Record<string, unknown>) =>
+      taskIntegration.updateTaskMetadata(taskId, patch),
+    startTaskStep: (
+      taskId: string,
+      stepId: string,
+      opts?: { dryRun?: boolean }
+    ) => taskIntegration.startTaskStep(taskId, stepId, opts),
+    completeTaskStep: (
+      taskId: string,
+      stepId: string,
+      opts?: Record<string, unknown>
+    ) => taskIntegration.completeTaskStep(taskId, stepId, opts),
+    emit: (event: string, payload: unknown) =>
+      taskIntegration.emit(event, payload),
+    executeTool: (
+      toolName: string,
+      args: Record<string, unknown>,
+      signal?: AbortSignal
+    ) => toolExecutor.execute(toolName, args, signal),
+    canExecuteStep: () => stepRateLimiter.canExecute(),
+    recordStepExecuted: () => stepRateLimiter.record(),
+    getAbortSignal: () => getExecutorAbortSignal(),
+    getGoldenRunRecorder: () => getGoldenRunRecorder(),
+    toDispatchResult: (r: Record<string, unknown> | null | undefined) =>
+      toDispatchResult(r),
+    introspectRecipe: (recipe: string) => introspectRecipe(recipe),
+    fetchInventorySnapshot: () => fetchInventorySnapshot(),
+    getCount: (inv: Array<{ type?: string }>, item: string) =>
+      getCount(inv, item),
+    injectDynamicPrereqForCraft: (task: unknown) =>
+      injectDynamicPrereqForCraft(task),
+    emitExecutorBudgetEvent: (
+      taskId: string,
+      stepId: string,
+      leafName: string,
+      reason: string,
+      extra?: Record<string, unknown>
+    ) => emitExecutorBudgetEvent(taskId, stepId, leafName, reason, extra),
+    getStepBudgetState: (task: unknown, stepId: string) =>
+      getStepBudgetState(task, stepId),
+    persistStepBudget: (task: unknown, budgets: Record<string, unknown>) =>
+      persistStepBudget(task, budgets),
+    updateTaskProgress: (taskId: string, progress: number, status: string) =>
+      taskIntegration.updateTaskProgress(taskId, progress, status),
+    recomputeProgressAndMaybeComplete: (task: unknown) =>
+      recomputeProgressAndMaybeComplete(task),
+    regenerateSteps: (
+      taskId: string,
+      failureContext: Record<string, unknown>
+    ) => taskIntegration.regenerateSteps(taskId, failureContext),
+  };
 }
 
 /**
@@ -1710,7 +1680,7 @@ async function autonomousTaskExecutor() {
       const cbState = getCircuitBreakerState();
       console.log(
         `[AUTONOMOUS EXECUTOR] Circuit breaker open (trips=${cbState.tripCount}), ` +
-        `skipping cycle. Resume at ${new Date(cbState.resumeAt!).toISOString()}`
+          `skipping cycle. Resume at ${new Date(cbState.resumeAt!).toISOString()}`
       );
       return;
     }
@@ -1806,7 +1776,11 @@ async function autonomousTaskExecutor() {
     // Auto-fail tasks that have been blocked for longer than the TTL.
     // Uses the TTL policy table (task-block-evaluator.ts) for per-reason exemptions.
     for (const t of activeTasks) {
-      const blockState = evaluateTaskBlockState(t, nowMs, DEFAULT_BLOCKED_TTL_MS);
+      const blockState = evaluateTaskBlockState(
+        t,
+        nowMs,
+        DEFAULT_BLOCKED_TTL_MS
+      );
       if (blockState.shouldFail) {
         taskIntegration.updateTaskProgress(t.id, t.progress || 0, 'failed');
         taskIntegration.updateTaskMetadata(t.id, {
@@ -1825,7 +1799,11 @@ async function autonomousTaskExecutor() {
     // IDLE-1: Eligibility-based idle detection
     // Determine idle reason based on task state, not just activeTasks.length === 0
     const circuitBreakerOpen = isCircuitBreakerOpen(nowMs);
-    const idleReason = determineIdleReason(activeTasks, eligibleTasks, circuitBreakerOpen);
+    const idleReason = determineIdleReason(
+      activeTasks,
+      eligibleTasks,
+      circuitBreakerOpen
+    );
 
     if (idleReason !== null) {
       // Only log once per minute to avoid spam
@@ -1851,7 +1829,7 @@ async function autonomousTaskExecutor() {
             type: 'idle_period',
             timestamp: now,
             data: {
-              idleReason,  // IDLE-1: Include reason for eligibility-based detection
+              idleReason, // IDLE-1: Include reason for eligibility-based detection
               durationMs: prevIdleAt ? now - prevIdleAt : 0,
               activeTaskCount: activeTasks.length,
               eligibleTaskCount: eligibleTasks.length,
@@ -1862,12 +1840,16 @@ async function autonomousTaskExecutor() {
 
       // Keep-alive integration: trigger intention check on true idle (LF-9)
       // This provides a non-injective pathway for goal emission
-      if (global.keepAliveIntegration?.isActive() && idleReason === 'no_tasks') {
+      if (
+        global.keepAliveIntegration?.isActive() &&
+        idleReason === 'no_tasks'
+      ) {
         try {
           // Get bot state for keep-alive context
           const botState = await getBotState().catch(() => ({}));
           const pendingPlanningSterlingIrCount = activeTasks.filter(
-            (task) => task.type === 'sterling_ir' && task.status === 'pending_planning'
+            (task) =>
+              task.type === 'sterling_ir' && task.status === 'pending_planning'
           ).length;
 
           const result = await global.keepAliveIntegration.onIdle(
@@ -1886,7 +1868,7 @@ async function autonomousTaskExecutor() {
           if (result?.ticked) {
             console.log(
               `[AUTONOMOUS EXECUTOR] Keep-alive tick: thought=${result.thought?.id?.slice(0, 8)}, ` +
-              `eligible=${result.thought?.eligibility.convertEligible}`
+                `eligible=${result.thought?.eligibility.convertEligible}`
             );
           }
         } catch (error) {
@@ -1984,9 +1966,24 @@ async function autonomousTaskExecutor() {
 
       if (!botConnection.ok) {
         const st = global.__planningExecutorState;
-        if (st.breaker === 'closed' && botConnection.failureKind !== 'timeout') {
+        if (
+          st.breaker === 'closed' &&
+          botConnection.failureKind !== 'timeout'
+        ) {
           st.breaker = 'open';
           console.warn('[Executor] Bot unavailable — opening circuit');
+        }
+        const runIdBot = (currentTask.metadata as any)?.goldenRun?.runId as
+          | string
+          | undefined;
+        if (runIdBot) {
+          getGoldenRunRecorder().recordExecutorBlocked(
+            runIdBot,
+            'bot_unavailable',
+            {
+              validation_error: `connection failed: ${botConnection.failureKind ?? 'unknown'}`,
+            }
+          );
         }
         return;
       }
@@ -2014,11 +2011,31 @@ async function autonomousTaskExecutor() {
             console.log(
               '[Executor] Bot reachable but not spawned — skipping cycle'
             );
+            const runIdSpawned = (currentTask.metadata as any)?.goldenRun
+              ?.runId as string | undefined;
+            if (runIdSpawned) {
+              getGoldenRunRecorder().recordExecutorBlocked(
+                runIdSpawned,
+                'bot_not_spawned',
+                {
+                  validation_error: `connectionState=${healthData.connectionState ?? 'undefined'}`,
+                }
+              );
+            }
             return;
           }
         }
       } catch {
         console.log('[Executor] Health re-check failed — skipping cycle');
+        const runIdHealth = (currentTask.metadata as any)?.goldenRun?.runId as
+          | string
+          | undefined;
+        if (runIdHealth) {
+          getGoldenRunRecorder().recordExecutorBlocked(
+            runIdHealth,
+            'bot_health_check_failed'
+          );
+        }
         return;
       }
     }
@@ -2034,8 +2051,15 @@ async function autonomousTaskExecutor() {
         console.log(
           '⏳ Waiting for crafting table prerequisite to be satisfied...'
         );
-        // Instead of returning, let the next iteration handle prerequisite tasks
-        // The prerequisite tasks should have higher priority and will be executed first
+        const runIdCraft = (currentTask.metadata as any)?.goldenRun?.runId as
+          | string
+          | undefined;
+        if (runIdCraft) {
+          getGoldenRunRecorder().recordExecutorBlocked(
+            runIdCraft,
+            'crafting_table_prerequisite'
+          );
+        }
         return;
       }
 
@@ -2178,368 +2202,10 @@ async function autonomousTaskExecutor() {
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
-          const stepId = String(nextStep.id || nextStep.order || 'unknown');
-          if (
-            !BUILD_EXEC_BUDGET_DISABLED &&
-            BUILDING_LEAVES.has(leafExec.leafName)
-          ) {
-            const now = Date.now();
-            const { budgets, state, created } = getStepBudgetState(
-              currentTask,
-              stepId
-            );
-            let budgetDirty = created;
-            const elapsed = now - (state.firstAt || now);
-            if (elapsed > BUILD_EXEC_MAX_ELAPSED_MS) {
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                blockedReason: `budget-exhausted:time:${leafExec.leafName}`,
-              });
-              emitExecutorBudgetEvent(
-                currentTask.id,
-                stepId,
-                leafExec.leafName,
-                'max_elapsed',
-                { elapsedMs: elapsed }
-              );
-              return;
-            }
-            if (state.attempts >= BUILD_EXEC_MAX_ATTEMPTS) {
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                blockedReason: `budget-exhausted:attempts:${leafExec.leafName}`,
-              });
-              emitExecutorBudgetEvent(
-                currentTask.id,
-                stepId,
-                leafExec.leafName,
-                'max_attempts',
-                { attempts: state.attempts }
-              );
-              return;
-            }
-            if (
-              state.lastAt &&
-              now - state.lastAt < BUILD_EXEC_MIN_INTERVAL_MS
-            ) {
-              const delay = BUILD_EXEC_MIN_INTERVAL_MS - (now - state.lastAt);
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                nextEligibleAt: now + delay,
-              });
-              emitExecutorBudgetEvent(
-                currentTask.id,
-                stepId,
-                leafExec.leafName,
-                'rate_limited',
-                { delayMs: delay }
-              );
-              return;
-            }
-            state.attempts = (state.attempts || 0) + 1;
-            state.lastAt = now;
-            budgetDirty = true;
-            if (budgetDirty) persistStepBudget(currentTask, budgets);
-          }
-
-          // Normalize legacy arg shapes before validation (e.g., smelt { item } → { input })
-          normalizeLeafArgs(leafExec.leafName, leafExec.args);
-          // Validate args before execution (strict mode: reject unknown leaves)
-          const validationError = validateLeafArgs(
-            leafExec.leafName,
-            leafExec.args,
-            true
-          );
-          if (validationError) {
-            console.warn(
-              `⚠️ [Executor] Invalid args for ${leafExec.leafName}: ${validationError}`
-            );
-            taskIntegration.updateTaskMetadata(currentTask.id, {
-              blockedReason: `invalid-args: ${validationError}`,
-            });
-            return;
-          }
-
-          // Pre-check: for craft steps, verify recipe inputs are available
-          if (leafExec.leafName === 'craft_recipe' && leafExec.args.recipe) {
-            const recipeInfo = await introspectRecipe(
-              leafExec.args.recipe as string
-            );
-            if (recipeInfo) {
-              const inv = await fetchInventorySnapshot();
-              for (const input of recipeInfo.inputs) {
-                const have = getCount(inv, input.item);
-                if (have < input.count) {
-                  console.log(
-                    `🪵 [Executor] Missing ${input.item} (have ${have}, need ${input.count}) for ${leafExec.args.recipe}. Injecting prerequisite.`
-                  );
-                  // Cap + increment handled inside injectDynamicPrereqForCraft
-                  const injected =
-                    await injectDynamicPrereqForCraft(currentTask);
-                  if (injected) return; // Execute prerequisite first
-                  break;
-                }
-              }
-            }
-          }
-
-          // --- Executor guards: leaf allowlist, shadow mode, rate limiter ---
-
-          // Canonical tool name used for allowlist check AND execution
-          const toolName = `minecraft.${leafExec.leafName}`;
-
-          // 1. Leaf allowlist (free check, valid in both shadow and live)
-          if (!executorConfig.leafAllowlist.has(toolName)) {
-            // Mark step as non-executable so selector skips it on re-selection
-            if (nextStep.meta) {
-              nextStep.meta.executable = false;
-              nextStep.meta.blocked = true;
-            }
-            taskIntegration.updateTaskMetadata(currentTask.id, {
-              blockedReason: `unknown-leaf:${leafExec.leafName}`,
-            });
-            taskIntegration.emit('taskLifecycleEvent', {
-              type: 'unknown_leaf_rejected',
-              taskId: currentTask.id,
-              leaf: leafExec.leafName,
-            });
-            const runIdUnknownLeaf = (currentTask.metadata as any)?.goldenRun
-              ?.runId as string | undefined;
-            if (runIdUnknownLeaf) {
-              getGoldenRunRecorder().recordExecutorBlocked(runIdUnknownLeaf, 'unknown_leaf', {
-                leaf: leafExec.leafName,
-                args: leafExec.args,
-              });
-            }
-            return;
-          }
-
-          // 2. Shadow mode: always observe, never throttle, never mutate
-          if (executorConfig.mode === 'shadow') {
-            console.log(
-              `[Executor:shadow] Would execute: ${toolName} ${JSON.stringify(leafExec.args)}`
-            );
-            const runId = (currentTask.metadata as any)?.goldenRun?.runId as
-              | string
-              | undefined;
-            if (runId) {
-              // Record "would execute" so a golden report can't be misread as "no dispatch".
-              getGoldenRunRecorder().recordShadowDispatch(runId, {
-                step_id: stepId,
-                leaf: leafExec.leafName,
-                args: leafExec.args,
-                observed_at: Date.now(),
-              });
-              getGoldenRunRecorder().recordVerification(runId, {
-                status: 'skipped',
-                kind: 'trace_only',
-                detail: { reason: 'shadow_mode', leaf: leafExec.leafName, step_id: stepId },
-              });
-            }
-            await taskIntegration.startTaskStep(currentTask.id, nextStep.id, {
-              dryRun: true,
-            });
-            return;
-          }
-
-          // --- Live mode execution ---
-
-          // 3. Rate limiter (live only — shadow must always observe)
-          if (!stepRateLimiter.canExecute()) {
-            return;
-          }
-
-          // 4. Rig G gate + snapshot capture (may block infeasible tasks)
-          const stepStarted = await taskIntegration.startTaskStep(
-            currentTask.id,
-            nextStep.id
-          );
-          if (!stepStarted) {
-            // Rig G blocked or other gate failure — do NOT consume rate budget
-            return;
-          }
-
-          // 5. Committed to execution — consume rate budget
-          stepRateLimiter.record();
-
-          const stepAuthority = nextStep.meta?.authority || 'unknown';
-          console.log(
-            `[Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
-          );
-          const runId = (currentTask.metadata as any)?.goldenRun?.runId as
-            | string
-            | undefined;
-          if (runId) {
-            getGoldenRunRecorder().recordDispatch(runId, {
-              step_id: stepId,
-              leaf: leafExec.leafName,
-              args: leafExec.args,
-              dispatched_at: Date.now(),
-            });
-          }
-          const actionResult = await toolExecutor.execute(
-            toolName,
-            leafExec.args,
-            getExecutorAbortSignal()
-          );
-          if (actionResult?.ok) {
-            const stepCompleted = await taskIntegration.completeTaskStep(
-              currentTask.id,
-              nextStep.id
-            );
-            if (stepCompleted) {
-              console.log(`✅ [Executor] Step ${nextStep.order} completed`);
-              // Reset verification failure count on success
-              if (currentTask.metadata?.verifyFailCount) {
-                taskIntegration.updateTaskMetadata(currentTask.id, {
-                  verifyFailCount: 0,
-                });
-              }
-            } else {
-              // Verification failed (e.g. inventory not updated yet); back off to avoid spin loop
-              const verifyFails =
-                ((currentTask.metadata?.verifyFailCount as number) || 0) + 1;
-              const maxVerifyFails = 5;
-              const backoffMs = Math.min(5000 * verifyFails, 30_000);
-              if (verifyFails >= maxVerifyFails) {
-                // Skip this step and move on — mark done despite verification failure
-                console.warn(
-                  `⚠️ [Executor] Step ${nextStep.order} verification failed ${verifyFails} times — skipping step`
-                );
-                await taskIntegration.completeTaskStep(
-                  currentTask.id,
-                  nextStep.id,
-                  { skipVerification: true } as any
-                );
-                taskIntegration.updateTaskMetadata(currentTask.id, {
-                  verifyFailCount: 0,
-                  lastSkippedStep: nextStep.id,
-                });
-              } else {
-                taskIntegration.updateTaskMetadata(currentTask.id, {
-                  verifyFailCount: verifyFails,
-                  nextEligibleAt: Date.now() + backoffMs,
-                });
-                console.warn(
-                  `⚠️ [Executor] Step ${nextStep.order} verification failed (${verifyFails}/${maxVerifyFails}); backing off ${backoffMs}ms`
-                );
-              }
-            }
-          } else if (isNavigatingError(actionResult?.error)) {
-            // Bot is mid-navigation — retry next cycle, don't count as failure
-            console.log(
-              `🚶 [Executor] Bot is navigating, will retry next cycle`
-            );
-          } else {
-            console.warn(
-              `⚠️ [Executor] Step ${nextStep.order} failed: ${actionResult?.error}`
-            );
-
-            // P1-1: Deterministic failure fast-path
-            // Mapping and contract failures are NOT retryable — fail immediately without
-            // consuming retries or scheduling backoff. This prevents "backoff hiding defects".
-            // Note: failureCode may come from normalizeActionResponse (via gateway) or
-            // from leaf-level error.code. We check both paths.
-            const failureCode = (actionResult as any)?.failureCode ?? (actionResult?.data?.error?.code as string | undefined);
-            if (isDeterministicFailure(failureCode)) {
-              console.error(
-                `🛑 [Executor] Deterministic failure (${failureCode}) — failing task immediately without retry`
-              );
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                blockedReason: `deterministic-failure:${failureCode}`,
-                failureCode,
-                failureError: actionResult?.error as any,
-              });
-              taskIntegration.updateTaskProgress(
-                currentTask.id,
-                currentTask.progress || 0,
-                'failed'
-              );
-              await recomputeProgressAndMaybeComplete(currentTask);
-              return; // Exit without retry/backoff
-            }
-
-            // For craft failures, try injecting prerequisite acquisition steps
-            // Cap + increment handled inside injectDynamicPrereqForCraft
-            if (leafExec.leafName === 'craft_recipe') {
-              const injected = await injectDynamicPrereqForCraft(currentTask);
-              if (injected) return; // Execute prerequisite first, then retry craft
-            }
-
-            const newRetryCount = (currentTask.metadata?.retryCount || 0) + 1;
-            const maxRetries = currentTask.metadata?.maxRetries || 3;
-            // Exponential backoff: 1s, 2s, 4s, ... capped at 30s
-            const backoffMs = Math.min(
-              1000 * Math.pow(2, newRetryCount),
-              30_000
-            );
-
-            if (newRetryCount >= maxRetries) {
-              // --- Sterling repair gate (Pivot 2) ---
-              // Before giving up, attempt Sterling re-solve with failure context.
-              const repairCount =
-                (currentTask.metadata as any)?.repairCount ?? 0;
-              const lastDigest = (currentTask.metadata as any)?.lastStepsDigest;
-              if (repairCount < 2) {
-                try {
-                  const failureContext = {
-                    failedLeaf: (nextStep?.meta?.leaf as string) || 'unknown',
-                    reasonClass: actionResult?.error || 'execution-failure',
-                    attemptCount: newRetryCount,
-                  };
-                  console.log(
-                    `[Repair] Attempting Sterling re-solve for task: ${currentTask.title} (repair #${repairCount + 1})`
-                  );
-                  const repairResult = await taskIntegration.regenerateSteps(
-                    currentTask.id,
-                    failureContext
-                  );
-                  if (repairResult.success && repairResult.stepsDigest) {
-                    // No-change detection (Pivot 2): identical digest = non-repair
-                    if (repairResult.stepsDigest !== lastDigest) {
-                      taskIntegration.updateTaskMetadata(currentTask.id, {
-                        retryCount: 0,
-                        repairCount: repairCount + 1,
-                        lastRepairAt: Date.now(),
-                        lastStepsDigest: repairResult.stepsDigest,
-                        nextEligibleAt: undefined,
-                      } as any);
-                      console.log(
-                        `[Repair] Sterling re-solve produced new plan (digest: ${repairResult.stepsDigest})`
-                      );
-                      return; // Re-execute on next cycle with fresh plan
-                    }
-                    console.log(
-                      `[Repair] Sterling re-solve returned identical plan — treating as non-repair`
-                    );
-                  }
-                } catch (repairErr) {
-                  console.warn(`[Repair] Sterling re-solve failed:`, repairErr);
-                }
-              }
-              // --- End repair gate ---
-
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                retryCount: newRetryCount,
-                blockedReason: 'max-retries-exceeded',
-              });
-              taskIntegration.updateTaskProgress(
-                currentTask.id,
-                currentTask.progress || 0,
-                'failed'
-              );
-              console.log(
-                `[Executor] Task failed after ${newRetryCount} retries: ${currentTask.title}`
-              );
-            } else {
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                retryCount: newRetryCount,
-                nextEligibleAt: Date.now() + backoffMs,
-              });
-              console.log(
-                `🔄 [Executor] Task in backoff for ${backoffMs}ms (retry ${newRetryCount}/${maxRetries})`
-              );
-            }
-          }
+          const sterlingCtx = buildSterlingStepExecutorContext();
+          await executeSterlingStep(currentTask, nextStep, sterlingCtx);
           await recomputeProgressAndMaybeComplete(currentTask);
-          return; // Executor handled this execution cycle
+          return;
         } else {
           const hasExecProvenance =
             !!nextStep.meta?.authority ||
@@ -2558,12 +2224,12 @@ async function autonomousTaskExecutor() {
               },
             });
             console.warn(
-              `⚠️ [Executor] Step ${nextStep.order} has no leaf binding — blocking task (no MCP fallback)`
+              `[Executor] Step ${nextStep.order} has no leaf binding — blocking task (no MCP fallback)`
             );
             return;
           }
           console.warn(
-            `⚠️ [Executor] Step ${nextStep.order} has no executable meta — falling through to MCP`
+            `[Executor] Step ${nextStep.order} has no executable meta — falling through to MCP`
           );
         }
       }
@@ -3225,16 +2891,22 @@ async function autonomousTaskExecutor() {
           console.log(`🔄 Executing task: ${currentTask.title}`);
 
           // Execute real Minecraft action (pass taskId explicitly for typed wrapper)
-          const actionResult = await executeActionWithBotCheck(scopedAction, currentTask.id);
+          const actionResult = await executeActionWithBotCheck(
+            scopedAction,
+            currentTask.id
+          );
 
           if (actionResult.outcome === 'shadow') {
             // Shadow mode: observation recorded. Task is blocked until mode changes.
             // NOT a failure — do not consume retries.
-            console.log(`[Shadow] Observed: ${currentTask.title} (${scopedAction.type})`);
+            console.log(
+              `[Shadow] Observed: ${currentTask.title} (${scopedAction.type})`
+            );
             taskIntegration.updateTaskMetadata(currentTask.id, {
               blockedReason: 'shadow_mode',
               blockedAt: Date.now(),
-              shadowObservationCount: (currentTask.metadata?.shadowObservationCount || 0) + 1,
+              shadowObservationCount:
+                (currentTask.metadata?.shadowObservationCount || 0) + 1,
             });
             // Task stays 'active' with blockedReason. Executor skips blocked tasks.
             // Auto-fail TTL (2 min) applies: if shadow mode persists, task will
@@ -3665,20 +3337,26 @@ serverConfig.addEndpoint('post', '/keep-alive/force-tick', async (req, res) => {
 
     res.json({
       success: true,
-      result: result ? {
-        ticked: result.ticked,
-        skipped: result.skipped,
-        skipReason: result.skipReason,
-        thought: result.thought ? {
-          id: result.thought.id,
-          content: result.thought.content?.slice(0, 200),
-          eligibility: result.thought.eligibility,
-          groundingResult: result.thought.groundingResult ? {
-            pass: result.thought.groundingResult.pass,
-            reason: result.thought.groundingResult.reason,
-          } : null,
-        } : null,
-      } : null,
+      result: result
+        ? {
+            ticked: result.ticked,
+            skipped: result.skipped,
+            skipReason: result.skipReason,
+            thought: result.thought
+              ? {
+                  id: result.thought.id,
+                  content: result.thought.content?.slice(0, 200),
+                  eligibility: result.thought.eligibility,
+                  groundingResult: result.thought.groundingResult
+                    ? {
+                        pass: result.thought.groundingResult.pass,
+                        reason: result.thought.groundingResult.reason,
+                      }
+                    : null,
+                }
+              : null,
+          }
+        : null,
     });
   } catch (error) {
     console.error('[Keep-alive force-tick] Error:', error);
@@ -3793,8 +3471,12 @@ async function startServer() {
     try {
       global.keepAliveIntegration = await createKeepAliveIntegration({
         enabled: process.env.KEEPALIVE_ENABLED !== 'false',
-        baseIntervalMs: parseInt(process.env.KEEPALIVE_INTERVAL_MS || '120000', 10),
-        cognitionServiceUrl: process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
+        baseIntervalMs: parseInt(
+          process.env.KEEPALIVE_INTERVAL_MS || '120000',
+          10
+        ),
+        cognitionServiceUrl:
+          process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
         enableSterlingIdleEpisodes:
           process.env.STERLING_IDLE_EPISODES_ENABLED === 'true',
         idleEpisodeCooldownMs: parseInt(
@@ -3808,10 +3490,7 @@ async function startServer() {
       });
       console.log('[Planning] Keep-alive integration initialized');
     } catch (error) {
-      console.warn(
-        '⚠️ Failed to initialize keep-alive integration:',
-        error
-      );
+      console.warn('⚠️ Failed to initialize keep-alive integration:', error);
     }
 
     // Initialize Sterling reasoning service (optional external dependency)
@@ -3971,6 +3650,21 @@ async function startServer() {
       sendLanguageIOReduce: (envelope, timeoutMs) =>
         sterlingService?.sendLanguageIOReduce(envelope, timeoutMs) ??
         Promise.resolve({ success: false, error: 'Sterling not available' }),
+      getTaskInventory: () => {
+        const all = taskIntegration.getTasks();
+        const counts: Record<string, number> = {};
+        let visibleToExecutor = 0;
+        for (const t of all) {
+          const s = t.status ?? 'unknown';
+          counts[s] = (counts[s] ?? 0) + 1;
+          if (s === 'active' || s === 'pending') visibleToExecutor++;
+        }
+        return {
+          counts,
+          total: all.length,
+          visibleToExecutor,
+        };
+      },
     });
     serverConfig.mountRouter('/', planningRouter);
 
@@ -4233,8 +3927,10 @@ async function startServer() {
         }
 
         // Summary log
-        const optionNames = defaultOptions.map(o => o.name).join(', ');
-        console.log(`[Planning] MCP options seeded: ${registered}/${defaultOptions.length} registered, ${promoted} promoted (${optionNames})`);
+        const optionNames = defaultOptions.map((o) => o.name).join(', ');
+        console.log(
+          `[Planning] MCP options seeded: ${registered}/${defaultOptions.length} registered, ${promoted} promoted (${optionNames})`
+        );
         if (failed.length > 0) {
           console.warn(`[Planning] MCP options failed: ${failed.join(', ')}`);
         }
@@ -4251,10 +3947,18 @@ async function startServer() {
     console.log('[Planning] Server started successfully');
 
     // --- Service readiness gate (never blocks boot) ---
-    // Golden run proof: skip minecraft requirement so executor can run in shadow and record dispatch.
-    // Forbidden in production; dev/golden only. See docs/planning/PATTERN_A_GOLDEN_RUN_SESSION_OVERVIEW.md.
-    const skipReadinessForExecutor =
-      String(process.env.EXECUTOR_SKIP_READINESS || '').toLowerCase() === '1';
+    // Centralized config validates EXECUTOR_SKIP_READINESS combinations; throws if invalid.
+    let planningConfig: import('./planning-runtime-config').PlanningRuntimeConfig;
+    try {
+      const { getPlanningRuntimeConfig, logTaskTypeBridgeWarning } =
+        await import('./planning-runtime-config');
+      planningConfig = getPlanningRuntimeConfig();
+      logTaskTypeBridgeWarning();
+    } catch (err) {
+      console.error('[Planning]', (err as Error).message);
+      process.exit(1);
+    }
+    const skipReadinessForExecutor = planningConfig.capabilities.skipReadiness;
     const readiness = new ReadinessMonitor({
       executionRequired: skipReadinessForExecutor ? [] : ['minecraft'],
     });

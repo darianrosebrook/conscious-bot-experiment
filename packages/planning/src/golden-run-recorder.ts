@@ -9,11 +9,19 @@ export type GoldenRunVerification = {
 
 export type GoldenRunReport = {
   schema_version: 'golden_run_report_v1';
+  /** Revision marker for downstream compatibility; additive features listed. */
+  schema_revision?: number;
+  /** Optional list of feature flags present in this artifact (e.g. original_leaf, blocked_throttle_v1). */
+  features?: string[];
   run_id: string;
   created_at: number;
   updated_at: number;
-  /** One-line server identity (e.g. STERLING_SERVER_BANNER file=... git=... supports_expand_by_digest_v1_versioned_key=true). Captured once per run for evidence. */
+  /** One-line Sterling server identity. Captured once per run for evidence. */
   server_banner?: string;
+  /** One-line planning server identity (run_mode, executor_mode, capabilities, config_digest). Makes artifact self-describing. */
+  planning_banner?: string;
+  /** Digest of planning runtime config for this run. Matches planning_banner config_digest= value. */
+  config_digest?: string;
   runtime?: {
     executor?: {
       enabled?: boolean;
@@ -22,6 +30,10 @@ export type GoldenRunReport = {
       enable_planning_executor_env?: string | undefined;
       executor_live_confirm_env?: string | undefined;
     };
+    /** True when Option B task_type_* bridge is enabled (golden harness only). */
+    bridge_enabled?: boolean;
+    /** False when bridge_enabled is true. Artifacts with bridge_enabled are non-certifiable by definition. */
+    certifiable?: boolean;
   };
   injection?: {
     committed_ir_digest?: string;
@@ -45,6 +57,12 @@ export type GoldenRunReport = {
     task_id?: string;
     dedupe_key?: string | null;
     status?: string;
+    /** True when addTask returned an existing task (sterling_ir dedupe). */
+    dedupe_hit?: boolean;
+    /** Task id returned (same as task_id when dedupe_hit). */
+    returned_task_id?: string;
+    /** Golden run id of the returned task (different from current runId when dedupe). */
+    returned_task_golden_run_id?: string | null;
   };
   expansion?: {
     request_id?: string;
@@ -66,6 +84,16 @@ export type GoldenRunReport = {
       leaf?: string;
       args?: Record<string, unknown>;
       dispatched_at?: number;
+      /** When step meta.leaf was rewritten (e.g. dig_block -> acquire_material). Preserved for evidence. */
+      original_leaf?: string;
+      /** Live proof: tool attempt result. Existence proves loop closed. */
+      result?: {
+        status: 'ok' | 'error' | 'blocked';
+        error?: string;
+        failureCode?: string;
+        attempts?: number;
+        reason?: string;
+      };
     }>;
     shadow_steps?: Array<{
       step_id?: string;
@@ -74,20 +102,73 @@ export type GoldenRunReport = {
       observed_at?: number;
     }>;
     verification?: GoldenRunVerification;
-    /** When dispatch did not occur, one of: executor_disabled | unknown_leaf | invalid_args | tool_unavailable | rate_limited | rig_g_blocked */
+    /** When dispatch did not occur: executor_disabled | unknown_leaf | invalid_args | tool_unavailable | rate_limited | rig_g_blocked | bot_unavailable | bot_not_spawned | bot_health_check_failed | crafting_table_prerequisite | budget_exhausted */
     executor_blocked_reason?: string;
     /** Optional payload when blocked (e.g. leaf/args for unknown_leaf or invalid_args). */
     executor_blocked_payload?: {
       leaf?: string;
       args?: Record<string, unknown>;
       validation_error?: string;
+      /** When step meta.leaf was rewritten (e.g. dig_block -> acquire_material). Preserved for evidence. */
+      original_leaf?: string;
     };
   };
 };
 
+/** Throttle window for recordExecutorBlocked: skip write if same (runId, reason, leaf) within this ms. */
+const BLOCKED_THROTTLE_MS = 5000;
+
+/** Evict throttle/shadow state for runs not updated in this long to avoid unbounded growth. */
+const RUN_STALE_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Keys omitted from payload fingerprint so timestamp noise does not defeat idempotency. */
+const FINGERPRINT_NOISE_KEYS = new Set([
+  'dispatched_at',
+  'observed_at',
+  'timestamp',
+  'updated_at',
+  'created_at',
+]);
+
 type GoldenRunDispatchedStep = NonNullable<
   NonNullable<GoldenRunReport['execution']>['dispatched_steps']
 >[number];
+
+/** Result shape for live proof: converts toolExecutor/gateway response to artifact format. */
+export type GoldenRunDispatchResult = NonNullable<
+  GoldenRunDispatchedStep['result']
+>;
+
+/**
+ * Convert toolExecutor.execute / gateway response to GoldenRunDispatchResult for artifact.
+ * Existence of result proves the loop closed (tool was attempted).
+ */
+export function toDispatchResult(
+  actionResult: Record<string, unknown> | null | undefined
+): GoldenRunDispatchResult | undefined {
+  if (!actionResult) return undefined;
+  if (actionResult.ok === true) {
+    return { status: 'ok' };
+  }
+  const meta = actionResult.metadata as Record<string, unknown> | undefined;
+  const reason = meta?.reason as string | undefined;
+  if (actionResult.shadowBlocked === true) {
+    return { status: 'blocked', reason: 'shadow' };
+  }
+  if (reason === 'mcp_only_disabled') {
+    return { status: 'blocked', reason: 'mcp_only' };
+  }
+  if (reason === 'no_mapped_action') {
+    return { status: 'blocked', reason: 'no_mapped_action' };
+  }
+  return {
+    status: 'error',
+    error: String(actionResult.error ?? ''),
+    failureCode: (actionResult.failureCode ?? meta?.failureCode) as
+      | string
+      | undefined,
+  };
+}
 
 type GoldenRunShadowStep = NonNullable<
   NonNullable<GoldenRunReport['execution']>['shadow_steps']
@@ -95,10 +176,38 @@ type GoldenRunShadowStep = NonNullable<
 
 const DEFAULT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'golden-run');
 
-/** Required marker in server banner for expand-by-digest golden runs. Missing/invalid banner = hard failure. */
-export const GOLDEN_RUN_REQUIRED_BANNER_MARKER = 'supports_expand_by_digest_v1_versioned_key=true';
+/**
+ * Derive runtime.executor.loop_started from evidence so the artifact cannot show
+ * "loop not started" while containing dispatch records. Authoritative rule:
+ * loop_started === true when (shadow_steps.length + dispatched_steps.length) > 0.
+ */
+function deriveLoopStarted(report: GoldenRunReport): GoldenRunReport {
+  const copy = { ...report };
+  const shadowLen = report.execution?.shadow_steps?.length ?? 0;
+  const dispatchedLen = report.execution?.dispatched_steps?.length ?? 0;
+  const hasDispatchEvidence = shadowLen + dispatchedLen > 0;
+  if (hasDispatchEvidence && copy.runtime?.executor) {
+    copy.runtime = {
+      ...copy.runtime,
+      executor: { ...copy.runtime.executor, loop_started: true },
+    };
+  }
+  if (copy.runtime) {
+    copy.runtime = {
+      ...copy.runtime,
+      certifiable: copy.runtime.bridge_enabled !== true,
+    };
+  }
+  return copy;
+}
 
-export function isValidGoldenRunBanner(bannerLine: string | null | undefined): boolean {
+/** Required marker in server banner for expand-by-digest golden runs. Missing/invalid banner = hard failure. */
+export const GOLDEN_RUN_REQUIRED_BANNER_MARKER =
+  'supports_expand_by_digest_v1_versioned_key=true';
+
+export function isValidGoldenRunBanner(
+  bannerLine: string | null | undefined
+): boolean {
   return (
     typeof bannerLine === 'string' &&
     bannerLine.trim().length > 0 &&
@@ -150,10 +259,47 @@ function mergeDeep<T extends Record<string, unknown>>(
   return target;
 }
 
+/** Stable key for blocked-event throttle/idempotency. */
+function blockedEventKey(
+  runId: string,
+  reason: string,
+  leaf: string | undefined
+): string {
+  return `${sanitizeRunId(runId)}:${reason}:${leaf ?? ''}`;
+}
+
+/** Stable deep fingerprint: sorted keys recursively, noise fields stripped. */
+function stablePayloadFingerprint(value: unknown): string {
+  if (value == null) return String(value);
+  if (typeof value !== 'object') return String(value);
+  if (Array.isArray(value)) {
+    return '[' + value.map(stablePayloadFingerprint).join(',') + ']';
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => !FINGERPRINT_NOISE_KEYS.has(k))
+    .sort();
+  const parts = keys.map((k) => JSON.stringify(k) + ':' + stablePayloadFingerprint(obj[k]));
+  return '{' + parts.join(',') + '}';
+}
+
+/** Fingerprint for blocked payload (idempotency: skip if same reason+leaf+payload). */
+function blockedPayloadFingerprint(payload: Record<string, unknown> | undefined): string {
+  if (!payload || Object.keys(payload).length === 0) return '';
+  return stablePayloadFingerprint(payload);
+}
+
 export class GoldenRunRecorder {
   private baseDir: string;
   private runs = new Map<string, GoldenRunReport>();
   private writeQueue = new Map<string, Promise<void>>();
+  /** Idempotency: (runId -> set of step keys already recorded for shadow). Prevents repeated shadow dispatch for same step. */
+  private shadowObservedStepKeys = new Map<string, Set<string>>();
+  /** Throttle + idempotency for recordExecutorBlocked: key -> { at, payloadFingerprint }. Skip write if same key within BLOCKED_THROTTLE_MS and same payload. */
+  private lastBlockedByKey = new Map<
+    string,
+    { at: number; payloadFingerprint: string }
+  >();
 
   constructor(baseDir: string = DEFAULT_BASE_DIR) {
     this.baseDir = baseDir;
@@ -165,6 +311,8 @@ export class GoldenRunRecorder {
     if (existing) return existing;
     const created: GoldenRunReport = {
       schema_version: 'golden_run_report_v1',
+      schema_revision: 1,
+      features: ['original_leaf', 'blocked_throttle_v1', 'strict_mapping_v1'],
       run_id: safeRunId,
       created_at: Date.now(),
       updated_at: Date.now(),
@@ -178,7 +326,8 @@ export class GoldenRunRecorder {
     await fs.mkdir(this.baseDir, { recursive: true });
     const filePath = path.join(this.baseDir, `golden-${report.run_id}.json`);
     const tmpPath = `${filePath}.tmp`;
-    const payload = JSON.stringify(report, null, 2);
+    const normalized = deriveLoopStarted(report);
+    const payload = JSON.stringify(normalized, null, 2);
     await fs.writeFile(tmpPath, payload, 'utf8');
     await fs.rename(tmpPath, filePath);
   }
@@ -195,6 +344,24 @@ export class GoldenRunRecorder {
     this.writeQueue.set(safeRunId, next);
   }
 
+  /** Evict throttle and shadow state for runs not updated in RUN_STALE_MS to avoid unbounded growth. */
+  private evictStaleThrottleState(): void {
+    const now = Date.now();
+    for (const key of this.lastBlockedByKey.keys()) {
+      const runId = key.split(':')[0];
+      const report = this.runs.get(runId);
+      if (!report || now - report.updated_at > RUN_STALE_MS) {
+        this.lastBlockedByKey.delete(key);
+      }
+    }
+    for (const runId of this.shadowObservedStepKeys.keys()) {
+      const report = this.runs.get(runId);
+      if (!report || now - report.updated_at > RUN_STALE_MS) {
+        this.shadowObservedStepKeys.delete(runId);
+      }
+    }
+  }
+
   private update(runId: string, patch: Record<string, unknown>): void {
     try {
       const report = this.ensureRun(runId);
@@ -203,6 +370,7 @@ export class GoldenRunRecorder {
       const safeRunId = sanitizeRunId(runId);
       this.runs.set(safeRunId, merged as GoldenRunReport);
       this.queueWrite(safeRunId, merged as GoldenRunReport);
+      this.evictStaleThrottleState();
     } catch (error) {
       console.warn('[GoldenRunRecorder] Failed to update report:', error);
     }
@@ -242,6 +410,21 @@ export class GoldenRunRecorder {
     this.update(runId, { server_banner: bannerLine.trim() });
   }
 
+  /** Store planning server banner and config digest so artifact is self-describing. */
+  recordPlanningBanner(
+    runId: string,
+    bannerLine: string,
+    configDigest: string,
+    bridgeEnabled: boolean
+  ): void {
+    if (!runId || !bannerLine?.trim()) return;
+    this.update(runId, {
+      planning_banner: bannerLine.trim(),
+      config_digest: configDigest,
+      runtime: { bridge_enabled: bridgeEnabled },
+    });
+  }
+
   recordDispatch(runId: string, data: GoldenRunDispatchedStep): void {
     if (!runId) return;
     this.update(runId, {
@@ -255,6 +438,18 @@ export class GoldenRunRecorder {
 
   recordShadowDispatch(runId: string, data: GoldenRunShadowStep): void {
     if (!runId) return;
+    const stepKey =
+      typeof data.step_id === 'string' && data.step_id.trim().length > 0
+        ? data.step_id
+        : `fallback:${data.leaf ?? 'unknown'}:${data.observed_at ?? Date.now()}`;
+    const safeRunId = sanitizeRunId(runId);
+    let set = this.shadowObservedStepKeys.get(safeRunId);
+    if (set?.has(stepKey)) return;
+    if (!set) {
+      set = new Set<string>();
+      this.shadowObservedStepKeys.set(safeRunId, set);
+    }
+    set.add(stepKey);
     this.update(runId, {
       execution: {
         shadow_steps: [data],
@@ -275,14 +470,32 @@ export class GoldenRunRecorder {
 
   /**
    * Record why executor did not dispatch (so the artifact explains empty dispatched_steps).
-   * Reasons: executor_disabled | unknown_leaf | invalid_args | tool_unavailable | rate_limited | rig_g_blocked
+   * Idempotency: if same (runId, reason, leaf) and equivalent payload within BLOCKED_THROTTLE_MS, skip write to avoid I/O storm.
    */
   recordExecutorBlocked(
     runId: string,
     reason: string,
-    payload?: { leaf?: string; args?: Record<string, unknown>; validation_error?: string }
+    payload?: {
+      leaf?: string;
+      args?: Record<string, unknown>;
+      validation_error?: string;
+      original_leaf?: string;
+      [k: string]: unknown;
+    }
   ): void {
     if (!runId) return;
+    const key = blockedEventKey(runId, reason, payload?.leaf);
+    const fingerprint = blockedPayloadFingerprint(payload);
+    const now = Date.now();
+    const last = this.lastBlockedByKey.get(key);
+    if (
+      last &&
+      now - last.at < BLOCKED_THROTTLE_MS &&
+      last.payloadFingerprint === fingerprint
+    ) {
+      return;
+    }
+    this.lastBlockedByKey.set(key, { at: now, payloadFingerprint: fingerprint });
     this.update(runId, {
       execution: {
         executor_blocked_reason: reason,
@@ -293,20 +506,22 @@ export class GoldenRunRecorder {
     });
   }
 
-  /** Return report from in-memory cache, or null if not found. */
+  /** Return report from in-memory cache (with loop_started derived from evidence), or null if not found. */
   getReport(runId: string): GoldenRunReport | null {
     const safeRunId = sanitizeRunId(runId);
-    return this.runs.get(safeRunId) ?? null;
+    const report = this.runs.get(safeRunId) ?? null;
+    return report ? deriveLoopStarted(report) : null;
   }
 
-  /** Read report from disk (for dev artifact fetch). Returns null if file missing or invalid. */
+  /** Read report from disk (for dev artifact fetch). Returns null if file missing or invalid. Applies loop_started derivation. */
   async getReportFromDisk(runId: string): Promise<GoldenRunReport | null> {
     const safeRunId = sanitizeRunId(runId);
     const filePath = path.join(this.baseDir, `golden-${safeRunId}.json`);
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       const report = JSON.parse(raw) as GoldenRunReport;
-      return report?.schema_version === 'golden_run_report_v1' ? report : null;
+      if (report?.schema_version !== 'golden_run_report_v1') return null;
+      return deriveLoopStarted(report);
     } catch {
       return null;
     }

@@ -153,14 +153,17 @@ export function useInitialDataFetch({
             weather: undefined,
           });
 
-          setBotConnections([
-            {
-              name: 'minecraft-bot',
-              connected: botStateData.data.connected,
-              viewerActive: false,
-              viewerUrl: 'http://localhost:3006',
-            },
-          ]);
+          setBotConnections((prev) => {
+            const existing = prev.find((c) => c.name === 'minecraft-bot');
+            return [
+              {
+                name: 'minecraft-bot',
+                connected: botStateData.data.connected,
+                viewerActive: existing?.viewerActive ?? false,
+                viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+              },
+            ];
+          });
         }
       }
 
@@ -216,14 +219,17 @@ export function useInitialDataFetch({
       }
     } catch (error) {
       debugLog('Initial data fetch error:', error);
-      setBotConnections([
-        {
-          name: 'minecraft-bot',
-          connected: false,
-          viewerActive: false,
-          viewerUrl: 'http://localhost:3006',
-        },
-      ]);
+      setBotConnections((prev) => {
+        const existing = prev.find((c) => c.name === 'minecraft-bot');
+        return [
+          {
+            name: 'minecraft-bot',
+            connected: false,
+            viewerActive: existing?.viewerActive ?? false,
+            viewerUrl: existing?.viewerUrl ?? 'http://localhost:3006',
+          },
+        ];
+      });
     }
   }, [
     config,

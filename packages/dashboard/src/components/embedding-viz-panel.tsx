@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  lazy,
+  Suspense,
+} from 'react';
 import { ScatterChart, RefreshCw, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,7 +34,9 @@ const PROGRESSIVE_STAGES = [
 
 // Lazy load Three.js canvas component for code splitting
 const EmbeddingVizCanvas = lazy(() =>
-  import('./embedding-viz-canvas').then((mod) => ({ default: mod.EmbeddingVizCanvas }))
+  import('./embedding-viz-canvas').then((mod) => ({
+    default: mod.EmbeddingVizCanvas,
+  }))
 );
 
 // Loading fallback component
@@ -158,7 +167,7 @@ export function EmbeddingVizPanel() {
     return () => {
       clearProgressiveTimers();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line -- deps intentionally empty (run on mount only)
   }, []); // Only run on mount
 
   return (

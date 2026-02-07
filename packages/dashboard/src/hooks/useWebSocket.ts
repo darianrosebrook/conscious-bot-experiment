@@ -18,10 +18,10 @@ interface WebSocketMessage {
 
 interface UseWebSocketOptions {
   url: string;
-  onMessage?: (message: WebSocketMessage) => void;
+  onMessage?: (_message: WebSocketMessage) => void;
   onOpen?: () => void;
   onClose?: () => void;
-  onError?: (error: Event) => void;
+  onError?: (_error: Event) => void;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
 }
@@ -30,7 +30,7 @@ interface UseWebSocketReturn {
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
-  sendMessage: (message: any) => void;
+  sendMessage: (_message: any) => void;
   reconnect: () => void;
 }
 

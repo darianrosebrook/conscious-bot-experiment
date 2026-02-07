@@ -29,28 +29,76 @@ const { spawn } = require('child_process');
 
 const FILE_MAPPINGS = [
   // Entry point - POV toggle, orbit controls, asset loading, sky/weather
-  { src: 'index.js', dest: ['lib/index.js'], description: 'Main entry point with POV toggle and custom assets' },
+  {
+    src: 'index.js',
+    dest: ['lib/index.js'],
+    description: 'Main entry point with POV toggle and custom assets',
+  },
 
   // Server-side integration
-  { src: 'mineflayer.js', dest: ['lib/mineflayer.js'], description: 'Server-side equipment/time events' },
+  {
+    src: 'mineflayer.js',
+    dest: ['lib/mineflayer.js'],
+    description: 'Server-side equipment/time events',
+  },
 
   // Core rendering fixes
-  { src: 'worldrenderer.js', dest: ['viewer/lib/worldrenderer.js'], description: 'Sync blockStates fix' },
-  { src: 'version.js', dest: ['viewer/lib/version.js'], description: 'Dynamic version support' },
+  {
+    src: 'worldrenderer.js',
+    dest: ['viewer/lib/worldrenderer.js'],
+    description: 'Sync blockStates fix',
+  },
+  {
+    src: 'version.js',
+    dest: ['viewer/lib/version.js'],
+    description: 'Dynamic version support',
+  },
 
   // Entity system
-  { src: 'entities.js', dest: ['viewer/lib/entities.js'], description: 'Skeletal animation manager' },
-  { src: 'Entity.js', dest: ['viewer/lib/entity/Entity.js'], description: 'Bone storage for animations' },
-  { src: 'equipment-renderer.js', dest: ['lib/equipment-renderer.js', 'viewer/lib/equipment-renderer.js'], description: 'Armor/item rendering' },
-  { src: 'entity-extras.js', dest: ['lib/entity-extras.js', 'viewer/lib/entity-extras.js'], description: 'Name tags, capes, shadows' },
+  {
+    src: 'entities.js',
+    dest: ['viewer/lib/entities.js'],
+    description: 'Skeletal animation manager',
+  },
+  {
+    src: 'Entity.js',
+    dest: ['viewer/lib/entity/Entity.js'],
+    description: 'Bone storage for animations',
+  },
+  {
+    src: 'equipment-renderer.js',
+    dest: ['lib/equipment-renderer.js', 'viewer/lib/equipment-renderer.js'],
+    description: 'Armor/item rendering',
+  },
+  {
+    src: 'entity-extras.js',
+    dest: ['lib/entity-extras.js', 'viewer/lib/entity-extras.js'],
+    description: 'Name tags, capes, shadows',
+  },
 
   // Visual enhancements
-  { src: 'animated-material-client.js', dest: ['lib/animated-material-client.js'], description: 'Water/lava/fire animation shader' },
-  { src: 'sky-renderer.js', dest: ['lib/sky-renderer.js'], description: 'Procedural sky dome' },
-  { src: 'weather-system.js', dest: ['lib/weather-system.js'], description: 'Rain/snow particles' },
+  {
+    src: 'animated-material-client.js',
+    dest: ['lib/animated-material-client.js'],
+    description: 'Water/lava/fire animation shader',
+  },
+  {
+    src: 'sky-renderer.js',
+    dest: ['lib/sky-renderer.js'],
+    description: 'Procedural sky dome',
+  },
+  {
+    src: 'weather-system.js',
+    dest: ['lib/weather-system.js'],
+    description: 'Rain/snow particles',
+  },
 
   // Build config override for worker bundle polyfills
-  { src: 'webpack.config.js', dest: ['webpack.config.js'], description: 'Webpack config with polyfills for worker build' },
+  {
+    src: 'webpack.config.js',
+    dest: ['webpack.config.js'],
+    description: 'Webpack config with polyfills for worker build',
+  },
 ];
 
 // ============================================================================
@@ -77,7 +125,9 @@ function run() {
       const srcPath = path.join(srcDir, mapping.src);
 
       if (!fs.existsSync(srcPath)) {
-        console.warn(`[rebuild-prismarine-viewer] Missing source: ${mapping.src}`);
+        console.warn(
+          `[rebuild-prismarine-viewer] Missing source: ${mapping.src}`
+        );
         skippedCount++;
         continue;
       }
@@ -95,10 +145,14 @@ function run() {
         copiedCount++;
       }
 
-      console.log(`[rebuild-prismarine-viewer] ✓ ${mapping.src} → ${mapping.dest.join(', ')}`);
+      console.log(
+        `[rebuild-prismarine-viewer] ✓ ${mapping.src} → ${mapping.dest.join(', ')}`
+      );
     }
 
-    console.log(`[rebuild-prismarine-viewer] Copied ${copiedCount} files, skipped ${skippedCount}`);
+    console.log(
+      `[rebuild-prismarine-viewer] Copied ${copiedCount} files, skipped ${skippedCount}`
+    );
 
     // ========================================================================
     // Background Processes
@@ -114,24 +168,67 @@ function run() {
         cwd: path.join(__dirname, '..'),
       });
       child.unref();
-      console.log('[rebuild-prismarine-viewer] Started background texture generation');
+      console.log(
+        '[rebuild-prismarine-viewer] Started background texture generation'
+      );
     }
 
     // Inject entity textures for versions not in minecraft-assets (1.21.9+)
-    const injectEntityTexturesPath = path.join(__dirname, 'inject-entity-textures.cjs');
-    const customSkinPath = path.join(process.env.HOME || '', 'Downloads', 'createdSkin.png');
+    // Custom skin: CUSTOM_SKIN_PATH env, or ~/Downloads/createdSkin.png if it exists
+    const injectEntityTexturesPath = path.join(
+      __dirname,
+      'inject-entity-textures.cjs'
+    );
+    const defaultSkinPath = path.join(
+      process.env.HOME || '',
+      'Downloads',
+      'createdSkin.png'
+    );
+    const customSkinPath = process.env.CUSTOM_SKIN_PATH
+      ? path.resolve(process.env.CUSTOM_SKIN_PATH)
+      : defaultSkinPath;
+    const hasCustomSkin = fs.existsSync(customSkinPath);
     if (fs.existsSync(injectEntityTexturesPath)) {
-      const injectArgs = ['1.21.9'];
-      if (fs.existsSync(customSkinPath)) {
+      const injectArgs = [process.env.MINECRAFT_VERSION || '1.21.9'];
+      if (hasCustomSkin) {
         injectArgs.push('--custom-skin', customSkinPath);
       }
-      const injectChild = spawn('node', [injectEntityTexturesPath, ...injectArgs], {
-        stdio: 'ignore',
-        detached: true,
-        cwd: path.join(__dirname, '..'),
-      });
-      injectChild.unref();
-      console.log('[rebuild-prismarine-viewer] Started background entity texture injection');
+      // When CUSTOM_SKIN_PATH is set, run inject synchronously so errors are visible
+      if (process.env.CUSTOM_SKIN_PATH) {
+        const { spawnSync } = require('child_process');
+        const result = spawnSync(
+          'node',
+          [injectEntityTexturesPath, ...injectArgs],
+          {
+            cwd: path.join(__dirname, '..'),
+            stdio: 'inherit',
+          }
+        );
+        if (result.status !== 0) {
+          console.warn(
+            '[rebuild-prismarine-viewer] Entity texture injection exited with code',
+            result.status
+          );
+        } else if (hasCustomSkin) {
+          console.log(
+            '[rebuild-prismarine-viewer] Custom skin injected successfully'
+          );
+        }
+      } else {
+        const injectChild = spawn(
+          'node',
+          [injectEntityTexturesPath, ...injectArgs],
+          {
+            stdio: 'ignore',
+            detached: true,
+            cwd: path.join(__dirname, '..'),
+          }
+        );
+        injectChild.unref();
+        console.log(
+          '[rebuild-prismarine-viewer] Started background entity texture injection'
+        );
+      }
     }
 
     // ========================================================================
@@ -140,7 +237,9 @@ function run() {
 
     const configPath = path.join(pvRoot, 'webpack.config.js');
     if (!fs.existsSync(configPath)) {
-      console.log('[rebuild-prismarine-viewer] No webpack.config.js found, skipping bundle');
+      console.log(
+        '[rebuild-prismarine-viewer] No webpack.config.js found, skipping bundle'
+      );
       return;
     }
 
@@ -158,8 +257,13 @@ function run() {
         console.warn('[rebuild-prismarine-viewer] webpack error:', err.message);
       } else if (stats && stats.hasErrors()) {
         const errors = stats.toJson().errors;
-        console.warn('[rebuild-prismarine-viewer] webpack build errors:', errors.length);
-        errors.slice(0, 3).forEach(e => console.warn('  -', e.message?.slice(0, 200)));
+        console.warn(
+          '[rebuild-prismarine-viewer] webpack build errors:',
+          errors.length
+        );
+        errors
+          .slice(0, 3)
+          .forEach((e) => console.warn('  -', e.message?.slice(0, 200)));
       } else {
         console.log('[rebuild-prismarine-viewer] ✓ Build complete!');
       }

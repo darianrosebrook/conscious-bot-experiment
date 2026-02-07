@@ -1,0 +1,3888 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "run_id": "b46d4658-e2b8-4987-8677-5d74334f17e3",
+  "created_at": 1770434325039,
+  "updated_at": 1770437802586,
+  "execution": {
+    "dispatched_steps": [],
+    "shadow_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434331878
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434341880
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434351879
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434361882
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434371881
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434381882
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434391885
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434401888
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434411887
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434421888
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434431887
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434441892
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434451889
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434461890
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434471891
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434481892
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434491893
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434501894
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434511897
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434521896
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434531898
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434541900
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434551899
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434561900
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434571906
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434581906
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434591901
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434601900
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434611898
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434621898
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434631901
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434641901
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434651900
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434661903
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434671903
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434681905
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434691909
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434701908
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434711913
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434721911
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434731914
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434741916
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434751919
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434761919
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434771920
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434781920
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434791921
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434801919
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434811922
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434821921
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434831923
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434841924
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434851927
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434861925
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434871925
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434881927
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434891929
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434901929
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434911929
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434921930
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434931931
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434941932
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434951935
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434961937
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434971935
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434981935
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770434991936
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435001938
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435011949
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435021942
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435031940
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435041945
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435051944
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435061943
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435071942
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435081942
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435091949
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435101943
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435111946
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435121946
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435131946
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435141948
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435151950
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435161949
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435171955
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435181951
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435191953
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435201953
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435211955
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435221956
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435231957
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435241958
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435251959
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435261961
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435271961
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435281961
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435291963
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435301963
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435311965
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435321966
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435331967
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435341967
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435351968
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435361968
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435371970
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435381969
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435391970
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435401978
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435411971
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435421978
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435431982
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435441980
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435452004
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435461983
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435471982
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435481986
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435491993
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435501987
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435511990
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435521990
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435531992
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435541992
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435551991
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435561992
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435571993
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435582004
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435592003
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435602003
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435612005
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435622007
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435632008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435642005
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435652004
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435662008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435672011
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435682006
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435692007
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435702006
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435712007
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435722005
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435732005
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435742007
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435752008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435762004
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435772008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435782005
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435792006
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435802007
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435812009
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435822008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435832008
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435842009
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435852024
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435862010
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435872011
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435882013
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435892016
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435902023
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435912027
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435922031
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435932032
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435942033
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435952034
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435962035
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435972036
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435982036
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770435992037
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436002038
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436012039
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436022040
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436032041
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436042042
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436052044
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436062043
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436072044
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436082047
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436092404
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436102300
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436112304
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436122304
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436132305
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436142306
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436152309
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436162310
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436172316
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436182325
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436192320
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436202321
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436212317
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436222317
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436232324
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436242326
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436252325
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436262328
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436272328
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436282329
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436292331
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436302332
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436312340
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436322339
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436332337
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436342338
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436352342
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436362345
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436372345
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436382346
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436392351
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436402351
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436412351
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436422353
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436432356
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436442357
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436452359
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436462359
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436472361
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436482363
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436492368
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436502366
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436512369
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436522370
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436532372
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436542375
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436552377
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436562375
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436572379
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436582382
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436592385
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436602385
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436612391
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436622393
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436632392
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436642393
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436652395
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436662398
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436672398
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436682404
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436692405
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436702403
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436712404
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436722404
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436732404
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436742407
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436752411
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436762411
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436772412
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436782410
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436792420
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436802415
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436812419
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436822421
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436832420
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436842421
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436852423
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436862425
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436872429
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436882429
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436892429
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436902432
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436912439
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436922439
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436932444
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436942444
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436952446
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436962446
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436972450
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436982452
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770436992454
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437002454
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437012460
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437022457
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437032458
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437042462
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437052465
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437062470
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437072468
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437082471
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437092474
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437102475
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437112477
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437122478
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437132484
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437142484
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437152489
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437162493
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437172497
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437182499
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437192497
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437202502
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437212502
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437222504
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437232506
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437242510
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437252508
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437262511
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437272512
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437282516
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437292518
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437302520
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437312522
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437322525
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437332528
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437342528
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437352529
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437362533
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437372536
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437382537
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437392536
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437402541
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437412538
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437422542
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437432542
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437442543
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437452543
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437462544
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437472554
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437482544
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437492546
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437502547
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437512550
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437522551
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437532552
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437542550
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437552550
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437562553
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437572552
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437582554
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437592553
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437602554
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437612555
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437622557
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437632558
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437642559
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437652561
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437662564
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437672561
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437682563
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437692565
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437702568
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437712564
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437722568
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437732567
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437742570
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437752570
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437762582
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437772585
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437782585
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437792585
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        },
+        "observed_at": 1770437802586
+      }
+    ],
+    "verification": {
+      "status": "skipped",
+      "kind": "trace_only",
+      "detail": {
+        "reason": "shadow_mode",
+        "leaf": "task_type_craft",
+        "step_id": "sterling-step-1"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=53e7885d supports_expand_by_digest_v1_versioned_key=true",
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "shadow",
+      "loop_started": false,
+      "enable_planning_executor_env": "1"
+    }
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "schema_version": "1.1.0",
+    "envelope_id": "30d9f063983539ee",
+    "request_id": "run_golden_reduce_b46d4658-e2b8-4987-8677-5d74334f17e3",
+    "source": "dev_run_golden_reduce"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770434325039_pahxka",
+    "status": "ok",
+    "plan_bundle_digest": "babdef828a154afe23813f668ee50a96ac2dfd182de50b5e22892cfc6286c175",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "order": 1,
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-b46d4658-e2b8-4987-8677-5d74334f17e3",
+    "dedupe_key": "1.1.0:ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "status": "pending"
+  }
+}

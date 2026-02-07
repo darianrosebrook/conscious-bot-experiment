@@ -14,18 +14,20 @@ describe('CI tripwire: no raw observation bypass', () => {
   it('setupEntityDetection is gated behind LEGACY_ENTITY_PROCESS in an if-else', () => {
     const source = readFileSync(botAdapterPath, 'utf-8');
 
-    // Find the gating block: must be `if (... LEGACY_ENTITY_PROCESS ...) { ... setupEntityDetection ... } else { ... setupBeliefIngestion ... }`
+    // Find the gating block: if (LEGACY_ENTITY_PROCESS) { setupEntityDetection } else { tryStartBeliefBus }
     const setupIdx = source.indexOf('this.setupEntityDetection()');
     expect(setupIdx).toBeGreaterThan(-1);
-    const setupContext = source.slice(Math.max(0, setupIdx - 300), setupIdx + 50);
+    const setupContext = source.slice(
+      Math.max(0, setupIdx - 300),
+      setupIdx + 50
+    );
     expect(setupContext).toContain('LEGACY_ENTITY_PROCESS');
 
-    // Verify the else-branch exists and uses the belief system
+    // Verify the else-branch exists and uses the belief system entry point
     const elseIdx = source.indexOf('} else {', setupIdx - 300);
     expect(elseIdx).toBeGreaterThan(-1);
     const elseBranch = source.slice(elseIdx, elseIdx + 200);
-    expect(elseBranch).toContain('setupBeliefIngestion');
-    expect(elseBranch).toContain('setupCognitionEmission');
+    expect(elseBranch).toContain('tryStartBeliefBus');
   });
 
   it('setupEntityDetection is called exactly once (only in the gated block)', () => {
@@ -50,10 +52,13 @@ describe('CI tripwire: no raw observation bypass', () => {
   });
 
   it('cognition server routes saliency_delta envelopes to applySaliencyEnvelope', () => {
-    const serverPath = resolve(__dirname, '../../../../cognition/src/server.ts');
-    const source = readFileSync(serverPath, 'utf-8');
+    const processRoutesPath = resolve(
+      __dirname,
+      '../../../../cognition/src/routes/process-routes.ts'
+    );
+    const source = readFileSync(processRoutesPath, 'utf-8');
 
-    // Verify the routing discriminator exists
+    // Verify the routing discriminator exists (lives in process-routes, not server.ts)
     expect(source).toContain("request_version === 'saliency_delta'");
     expect(source).toContain('applySaliencyEnvelope');
   });
