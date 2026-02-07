@@ -59,7 +59,8 @@ export interface SterlingRequest {
     | 'register_domain_declaration_v1'
     | 'get_domain_declaration_v1'
     | 'language_io.reduce'
-    | 'expand_by_digest_v1';
+    | 'expand_by_digest_v1'
+    | 'server_info_v1';
   domain?: SterlingDomain;
   [key: string]: unknown;
 }
@@ -256,6 +257,14 @@ export interface SterlingExpandByDigestResultMessage {
   retry_after_ms?: number;
 }
 
+/** Response from server_info_v1 command (evidence-grade server identity). */
+export interface SterlingServerInfoResultMessage {
+  type: 'server_info.result';
+  request_id?: string;
+  status: 'ok';
+  banner_line: string;
+}
+
 /** Discriminated union of all server-to-client message types */
 export type SterlingMessage =
   | SterlingDiscoverMessage
@@ -276,6 +285,7 @@ export type SterlingMessage =
   | SterlingDeclarationRetrievedMessage
   | SterlingDeclarationNotFoundMessage
   | SterlingExpandByDigestResultMessage
+  | SterlingServerInfoResultMessage
   | SterlingLanguageIOResultMessage;
 
 // ============================================================================

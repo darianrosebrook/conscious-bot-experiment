@@ -30,6 +30,7 @@ export const MOCK_SERVICE_REQUIRED_METHODS = [
   'isAvailable',
   'solve',
   'expandByDigest',
+  'getServerBanner',
   'getConnectionNonce',
   'registerDomainDeclaration',
   'initialize',
@@ -85,6 +86,9 @@ export function createMockSterlingService(
     isAvailable: vi.fn().mockReturnValue(true),
     solve: vi.fn().mockResolvedValue(opts?.solveResponse ?? DEFAULT_SOLVE_RESPONSE),
     expandByDigest: vi.fn().mockResolvedValue({ status: 'blocked', blocked_reason: 'blocked_executor_unavailable' }),
+    getServerBanner: vi.fn().mockResolvedValue(
+      'STERLING_SERVER_BANNER file=/mock/path git=abc1234 supports_expand_by_digest_v1_versioned_key=true',
+    ),
     getConnectionNonce: vi.fn().mockReturnValue(opts?.connectionNonce ?? 1),
     registerDomainDeclaration: vi.fn().mockResolvedValue(
       opts?.registrationResult ?? { success: true },

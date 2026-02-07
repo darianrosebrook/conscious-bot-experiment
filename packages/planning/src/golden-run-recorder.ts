@@ -12,6 +12,8 @@ export type GoldenRunReport = {
   run_id: string;
   created_at: number;
   updated_at: number;
+  /** One-line server identity (e.g. STERLING_SERVER_BANNER file=... git=... supports_expand_by_digest_v1_versioned_key=true). Captured once per run for evidence. */
+  server_banner?: string;
   runtime?: {
     executor?: {
       enabled?: boolean;
@@ -51,7 +53,12 @@ export type GoldenRunReport = {
     schema_version?: string;
     blocked_reason?: string;
     error?: string;
-    steps?: Array<{ leaf: string; id?: string; order?: number }>;
+    steps?: Array<{
+      leaf: string;
+      args?: Record<string, unknown>;
+      id?: string;
+      order?: number;
+    }>;
   };
   execution?: {
     dispatched_steps?: Array<{
@@ -78,11 +85,18 @@ type GoldenRunShadowStep = NonNullable<
   NonNullable<GoldenRunReport['execution']>['shadow_steps']
 >[number];
 
-const DEFAULT_BASE_DIR = path.join(
-  process.cwd(),
-  'artifacts',
-  'golden-run'
-);
+const DEFAULT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'golden-run');
+
+/** Required marker in server banner for expand-by-digest golden runs. Missing/invalid banner = hard failure. */
+export const GOLDEN_RUN_REQUIRED_BANNER_MARKER = 'supports_expand_by_digest_v1_versioned_key=true';
+
+export function isValidGoldenRunBanner(bannerLine: string | null | undefined): boolean {
+  return (
+    typeof bannerLine === 'string' &&
+    bannerLine.trim().length > 0 &&
+    bannerLine.includes(GOLDEN_RUN_REQUIRED_BANNER_MARKER)
+  );
+}
 
 export function sanitizeRunId(input: string): string {
   const raw = (input ?? '').trim();
@@ -196,7 +210,10 @@ export class GoldenRunRecorder {
     this.update(runId, { runtime: data ?? {} });
   }
 
-  recordIdleEpisode(runId: string, data: GoldenRunReport['idle_episode']): void {
+  recordIdleEpisode(
+    runId: string,
+    data: GoldenRunReport['idle_episode']
+  ): void {
     if (!runId) return;
     this.update(runId, { idle_episode: data ?? {} });
   }
@@ -209,6 +226,12 @@ export class GoldenRunRecorder {
   recordExpansion(runId: string, data: GoldenRunReport['expansion']): void {
     if (!runId) return;
     this.update(runId, { expansion: data ?? {} });
+  }
+
+  /** Store the Sterling server identity line once per run (evidence-grade). */
+  recordServerBanner(runId: string, bannerLine: string): void {
+    if (!runId || !bannerLine?.trim()) return;
+    this.update(runId, { server_banner: bannerLine.trim() });
   }
 
   recordDispatch(runId: string, data: GoldenRunDispatchedStep): void {

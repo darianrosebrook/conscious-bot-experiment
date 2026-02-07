@@ -834,6 +834,65 @@ export class SterlingClient extends EventEmitter {
     });
   }
 
+  /**
+   * Fetch the server identity banner (evidence-grade). Call after connect to
+   * record which Sterling binary is running; required for golden-run artifacts.
+   */
+  async getServerBanner(timeoutMs: number = 3000): Promise<string | null> {
+    if (this.isCircuitOpen()) {
+      return null;
+    }
+
+    if (this.connectionState !== 'connected') {
+      try {
+        await this.connect();
+      } catch {
+        return null;
+      }
+    }
+
+    const requestId = `server_info_${++this.requestIdCounter}_${Date.now()}`;
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, timeoutMs);
+
+      const handler = (msg: SterlingMessage) => {
+        if (
+          msg.type === 'server_info.result' &&
+          (msg.request_id === undefined || msg.request_id === requestId)
+        ) {
+          cleanup();
+          if (msg.status === 'ok' && typeof msg.banner_line === 'string' && msg.banner_line.length > 0) {
+            this.recordSuccess();
+            resolve(msg.banner_line);
+          } else {
+            resolve(null);
+          }
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'server_info_v1',
+          request_id: requestId,
+        });
+      } catch {
+        cleanup();
+        resolve(null);
+      }
+    });
+  }
+
   /** Whether the client is connected and the circuit breaker is closed */
   isAvailable(): boolean {
     return (

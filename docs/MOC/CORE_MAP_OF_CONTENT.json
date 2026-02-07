@@ -1,7 +1,7 @@
 {
-  "generated": "2026-02-06T13:06:02.602225",
+  "generated": "2026-02-06T17:39:04.662234",
   "author": "@darianrosebrook",
-  "total_modules": 215,
+  "total_modules": 319,
   "modules": [
     {
       "path": "cognition/src/constitutional-filter/index.ts",
@@ -8723,6 +8723,4309 @@
         "author": null,
         "has_main": false
       }
+    },
+    {
+      "path": "dashboard/src/components/sparkline-chart.tsx",
+      "name": "sparkline-chart.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "* Sparkline Chart * * Tiny reusable SVG sparkline for a single metric over time. * Filled area polygon + polyline stroke + current-value dot. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "SparklineChart"
+      ],
+      "imports": [
+        "react",
+        "./sparkline-chart.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:31:54.585531",
+        "modified": "2026-02-03T01:31:54.585602",
+        "modified_days_ago": 3,
+        "lines": 126,
+        "size_bytes": 3044,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/stress-hex-heatmap.tsx",
+      "name": "stress-hex-heatmap.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a hexagonal heatmap to visually display the bot's current stress levels, mapping each axis to Time, Situational, Health/Hunger, Resource, Protection, or Location via user-defined mapping. Uses a grid of hexagons where the center represents minimal stress and edges indicate increasing stress, with customizable axis labels and dynamic data binding. Offers interactive tooltips for detailed stress value and axis context.",
+      "classes": [],
+      "functions": [
+        "hexRing",
+        "hexSpiral",
+        "axialToPixel",
+        "hexPath",
+        "dominantAxisIndex",
+        "getHexKey",
+        "indexToKey",
+        "stressRangeForRing",
+        "sectorLabel",
+        "StressHexHeatmap"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "@radix-ui/react-tooltip",
+        "./stress-hex-heatmap.module.scss"
+      ],
+      "constants": [
+        "HEX_RADIUS",
+        "HEX_SIZE",
+        "SQ3",
+        "AXIS_LABELS",
+        "AXIS_KEYS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:33.008362",
+        "modified": "2026-02-03T01:05:33.008610",
+        "modified_days_ago": 3,
+        "lines": 338,
+        "size_bytes": 10183,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/button.tsx",
+      "name": "button.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "from the conscious-bot dashboard module, the Button component implements interactive controls using React and Radix UI, exposing styled and variant props via the buttonVariants type, enabling consistent button appearance and behavior across the viewer HUD. It forwards the button as a Slot when used as a child, allowing flexible layout composition. The interface ensures type safety for props and variants in the dashboard UI layer.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@radix-ui/react-slot",
+        "class-variance-authority",
+        "@/lib/utils",
+        "./button.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.002369",
+        "modified": "2026-02-03T00:58:18.002445",
+        "modified_days_ago": 3,
+        "lines": 51,
+        "size_bytes": 1297,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/card.tsx",
+      "name": "card.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a customizable React component for displaying structured dashboard information, using forwardRef for sub-components such as CardHeader, CardDescription, and CardContent, each styled and named appropriately for separation of concerns in the conscious-bot UI architecture.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "./card.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.000142",
+        "modified": "2026-02-03T00:58:18.000221",
+        "modified_days_ago": 3,
+        "lines": 74,
+        "size_bytes": 1768,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/progress.tsx",
+      "name": "progress.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Module implementation.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@radix-ui/react-progress",
+        "@/lib/utils",
+        "./progress.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.000369",
+        "modified": "2026-02-03T00:58:18.000440",
+        "modified_days_ago": 3,
+        "lines": 24,
+        "size_bytes": 728,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/scroll-area.tsx",
+      "name": "scroll-area.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a customizable scroll area component for the conscious-bot dashboard UI, rendering a ScrollAreaPrimitive.Root that contains the viewport for content and integrates ScrollBar and Corner visuals. Exposes React props for orientation and styling, enabling consistent HUD navigation elements in the viewer interface.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@radix-ui/react-scroll-area",
+        "@/lib/utils",
+        "./scroll-area.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.001544",
+        "modified": "2026-02-03T00:58:18.001625",
+        "modified_days_ago": 3,
+        "lines": 45,
+        "size_bytes": 1538,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/tabs.tsx",
+      "name": "tabs.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Component provides customizable tabs for the conscious-bot dashboard UI, managing list and content components for navigation and rendering. It integrates with React and Radix UI to enable tab switching and visual layout. Key elements are TabsList for tab headers, TabsContent for tab panels, andTabsTrigger for user interaction.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@radix-ui/react-tabs",
+        "@/lib/utils",
+        "./tabs.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:17.999912",
+        "modified": "2026-02-03T00:58:17.999993",
+        "modified_days_ago": 3,
+        "lines": 45,
+        "size_bytes": 1310,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/toast.tsx",
+      "name": "toast.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a customizable toast notification component for the conscious-bot dashboard UI, implementing variant styling via ClassVarianceAuthority and wrapping the React ToastPrimitives Root. Exposes props for variant selection and integrates with the dashboard's component system for consistent visual feedback. Enables declarative toast display with proper ref forwarding and type safety for the user interface.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react",
+        "@radix-ui/react-toast",
+        "class-variance-authority",
+        "lucide-react",
+        "@/lib/utils",
+        "./toast.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.003293",
+        "modified": "2026-02-03T00:58:18.003367",
+        "modified_days_ago": 3,
+        "lines": 117,
+        "size_bytes": 3278,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/toaster.tsx",
+      "name": "toaster.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "asts the user interface for the conscious-bot dashboard, rendering multiple toast notifications with titles, descriptions, and actions using the Toast component and event handlers. It manages the display of toasts and provides a close mechanism for each toast instance. The Toaster component integrates with the dashboard to offer real-time toast updates for the viewer HUD.",
+      "classes": [],
+      "functions": [
+        "Toaster"
+      ],
+      "imports": [
+        "@/hooks/use-toast",
+        "./toaster.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.000592",
+        "modified": "2026-02-03T00:58:18.000675",
+        "modified_days_ago": 3,
+        "lines": 34,
+        "size_bytes": 827,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/ui/tooltip.tsx",
+      "name": "tooltip.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a styled tooltip UI for the conscious-bot dashboard. Implements a provider and child components using Radix UI TooltipPrimitive. Displays concise agent information in a dark-themed title/subtext layout for better visibility.",
+      "classes": [],
+      "functions": [
+        "TooltipProvider",
+        "Tooltip",
+        "TooltipTrigger",
+        "TooltipContent"
+      ],
+      "imports": [
+        "react",
+        "@radix-ui/react-tooltip",
+        "@/lib/utils",
+        "./tooltip.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.002147",
+        "modified": "2026-02-03T00:58:18.002228",
+        "modified_days_ago": 3,
+        "lines": 53,
+        "size_bytes": 1290,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/valuation-panel.tsx",
+      "name": "valuation-panel.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "<br>Provides a UI for rendering real-time valuation decisions in the dashboard's observability layer.<br>Processes incoming SSE events and transforms them into ValuationDashboardRecord objects.<br>Displays key metrics, decision logs, and failure analysis in a collapsible panel.",
+      "classes": [],
+      "functions": [
+        "formatTime",
+        "truncateId",
+        "transformEvent",
+        "CollapsibleSection",
+        "ValuationPanel"
+      ],
+      "imports": [
+        "react",
+        "./section",
+        "./pill",
+        "./sparkline-chart",
+        "@/hooks/use-sse",
+        "@/stores/dashboard-store",
+        "@/lib/utils",
+        "./valuation-panel.module.scss",
+        "@/types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:55.345663",
+        "modified": "2026-02-03T01:05:55.345764",
+        "modified_days_ago": 3,
+        "lines": 568,
+        "size_bytes": 20672,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/components/viewer-hud-overlay.tsx",
+      "name": "viewer-hud-overlay.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "* Minecraft-style HUD overlay for the prismarine viewer.",
+      "classes": [],
+      "functions": [
+        "getHotbarItemSprite",
+        "getHotbarItemName",
+        "getHeartSprite",
+        "getFoodSprite",
+        "getArmorSprite",
+        "getAirSprite",
+        "ViewerHudOverlay"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "@/lib/minecraft-sprites",
+        "./viewer-hud-overlay.module.scss"
+      ],
+      "constants": [
+        "HEARTS_MAX",
+        "FOOD_MAX",
+        "ARMOR_MAX",
+        "BREATH_MAX"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:05:07.295799",
+        "modified": "2026-02-03T01:05:07.295941",
+        "modified_days_ago": 3,
+        "lines": 244,
+        "size_bytes": 7042,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/config.ts",
+      "name": "config.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides centralized configuration for the conscious-bot dashboard components. Defines service endpoints for Minecraft, cognition, memory, planning, and world modules. Enforces strict variable validation and environment settings for the viewer HUD and service discovery.",
+      "classes": [
+        "ServiceDiscovery"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:18:05.024870",
+        "modified": "2026-02-03T01:18:05.024998",
+        "modified_days_ago": 3,
+        "lines": 290,
+        "size_bytes": 8975,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/contexts/dashboard-context.tsx",
+      "name": "dashboard-context.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides shared context data for dashboard components by exposing access to service endpoints, world, and configuration state used across the viewer HUD and related UI layers.",
+      "classes": [
+        "ApiClient",
+        "ServiceDiscovery"
+      ],
+      "functions": [
+        "DashboardProvider",
+        "useDashboardContext"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:19:12.059432",
+        "modified": "2026-02-05T02:08:26.433970",
+        "modified_days_ago": 1,
+        "lines": 715,
+        "size_bytes": 20539,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-api.ts",
+      "name": "use-api.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides an API hook for dashboard components in the conscious-bot project, enabling HTTP requests with configurable methods, headers, and timeouts for the Next.js viewer HUD. Manages API calls using React memoization for performance and safety. Exposes a typed useApi function for robust and maintainable client-side data fetching.",
+      "classes": [],
+      "functions": [
+        "useApi"
+      ],
+      "imports": [
+        "react",
+        "@/contexts/dashboard-context"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.683947",
+        "modified": "2026-02-03T00:58:18.684149",
+        "modified_days_ago": 3,
+        "lines": 124,
+        "size_bytes": 3110,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-bot-state-sse.ts",
+      "name": "use-bot-state-sse.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a SSE-based hook to receive and filter bot state updates from the dashboard for the Minecraft HUD. Implements a fallback stream when the main WebSocket is disconnected, ensuring continuous display of bot status. Updates the UI with current connected status, inventory, position, and other vital or cognitive data from the dashboard.",
+      "classes": [],
+      "functions": [
+        "useBotStateSSE"
+      ],
+      "imports": [
+        "react",
+        "@/hooks/use-sse"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.684337",
+        "modified": "2026-02-03T00:58:18.684447",
+        "modified_days_ago": 3,
+        "lines": 72,
+        "size_bytes": 1946,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-cognitive-stream.ts",
+      "name": "use-cognitive-stream.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a real-time SSE interface to receive and emit cognitive stream messages from the conscious-bot's LLM integration, manages thought events, and offers hooks for sending intrusive thoughts with tags and strengths.",
+      "classes": [],
+      "functions": [
+        "mapThoughtType",
+        "mapAttribution",
+        "useCognitiveStream"
+      ],
+      "imports": [
+        "react",
+        "@/lib/utils",
+        "@/contexts/dashboard-context",
+        "@/hooks/use-api",
+        "@/stores/dashboard-store",
+        "@/types",
+        "@/lib/text-utils"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.684607",
+        "modified": "2026-02-05T19:34:23.801504",
+        "modified_days_ago": 0,
+        "lines": 337,
+        "size_bytes": 10967,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-initial-data-fetch.ts",
+      "name": "use-initial-data-fetch.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Data fetches on mount for the dashboard, retrieving tasks, planner data, and current world state from the bot's services. It initializes the UI with normalized tasks and bot context, ensuring consistent starting conditions. Calls to the server are managed via an abort signal to prevent timeouts.",
+      "classes": [],
+      "functions": [
+        "useInitialDataFetch"
+      ],
+      "imports": [
+        "react",
+        "@/stores/dashboard-store",
+        "@/contexts/dashboard-context",
+        "@/lib/utils",
+        "@/lib/task-normalize",
+        "@/hooks/use-ws-bot-state"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:36:31.812256",
+        "modified": "2026-02-05T02:46:25.254504",
+        "modified_days_ago": 1,
+        "lines": 245,
+        "size_bytes": 7705,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-periodic-refresh.ts",
+      "name": "use-periodic-refresh.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides periodic state updates for the conscious-bot's inventory, events, memories, and notes in the dashboard. Uses hooks to poll the bot's internal state and updates UI components with fresh data. Subscribes to memory updates via SSE for real-time synchronization.",
+      "classes": [],
+      "functions": [
+        "usePeriodicRefresh"
+      ],
+      "imports": [
+        "react",
+        "@/stores/dashboard-store",
+        "@/contexts/dashboard-context",
+        "@/hooks/use-sse",
+        "@/lib/utils",
+        "@/hooks/use-ws-bot-state"
+      ],
+      "constants": [
+        "THOUGHTS_POLL_MS",
+        "REFRESH_INTERVAL_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:26:04.647402",
+        "modified": "2026-02-05T19:34:23.863888",
+        "modified_days_ago": 0,
+        "lines": 360,
+        "size_bytes": 12255,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-sse.ts",
+      "name": "use-sse.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a robust Server-Sent Events (SSE) hook with exponential reconnection and global connection deduplication for real-time data streaming in the conscious-bot dashboard components. Manages connection lifecycle events via onMessage, onOpen, onClose, and onError. Ensures single-instance connections and graceful failure handling in Next.js environment.",
+      "classes": [],
+      "functions": [
+        "useSSE"
+      ],
+      "imports": [
+        "react"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.685757",
+        "modified": "2026-02-03T00:58:18.685867",
+        "modified_days_ago": 3,
+        "lines": 247,
+        "size_bytes": 7284,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-task-stream.ts",
+      "name": "use-task-stream.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides real-time task updates to the dashboard via SSE and handles fallback polling for missed events. Manages task state using setTasks and setTasksFallback hooks.",
+      "classes": [],
+      "functions": [
+        "useTaskStream"
+      ],
+      "imports": [
+        "react",
+        "@/stores/dashboard-store",
+        "@/hooks/use-sse",
+        "@/lib/task-utils",
+        "@/lib/task-normalize",
+        "@/types"
+      ],
+      "constants": [
+        "TASK_POLL_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.686017",
+        "modified": "2026-02-05T02:45:32.310431",
+        "modified_days_ago": 1,
+        "lines": 126,
+        "size_bytes": 3930,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-toast.ts",
+      "name": "use-toast.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Implements toast management for the Next.js dashboard UI by dispatching actions to add, update, dismiss, or remove toast notifications, maintaining a state of active toasts, and handling timed removals with a queue and Map.",
+      "classes": [],
+      "functions": [
+        "genId",
+        "dispatch",
+        "toast",
+        "useToast"
+      ],
+      "imports": [
+        "react"
+      ],
+      "constants": [
+        "TOAST_LIMIT",
+        "TOAST_REMOVE_DELAY"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.686266",
+        "modified": "2026-02-03T00:58:18.686356",
+        "modified_days_ago": 3,
+        "lines": 189,
+        "size_bytes": 3828,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-viewer.ts",
+      "name": "use-viewer.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides viewer state management for the dashboard component using React hooks. Manages viewer start/stop logic, status updates, and prevents unnecessary re-renders.",
+      "classes": [],
+      "functions": [
+        "useViewer"
+      ],
+      "imports": [
+        "react",
+        "@/contexts/dashboard-context",
+        "@/hooks/use-api"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.686512",
+        "modified": "2026-02-03T00:58:18.686625",
+        "modified_days_ago": 3,
+        "lines": 239,
+        "size_bytes": 6134,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/use-ws-bot-state.ts",
+      "name": "use-ws-bot-state.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides real-time bot state synchronization from the WebSocket and SSE sources for the dashboard. Manages and displays core state data including position, inventory, and connection status.",
+      "classes": [],
+      "functions": [
+        "useWsBotState"
+      ],
+      "imports": [
+        "react",
+        "@/stores/dashboard-store",
+        "@/contexts/dashboard-context",
+        "@/hooks/useWebSocket",
+        "@/hooks/use-bot-state-sse",
+        "@/components/stress-hex-heatmap",
+        "@/lib/utils",
+        "@/types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.686775",
+        "modified": "2026-02-03T00:58:18.687005",
+        "modified_days_ago": 3,
+        "lines": 457,
+        "size_bytes": 13885,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/hooks/useWebSocket.ts",
+      "name": "useWebSocket.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a real-time WebSocket connection for the dashboard to receive and display the bot's current Minecraft state updates. Handles reconnect logic with configurable intervals and attempts.",
+      "classes": [],
+      "functions": [
+        "useWebSocket"
+      ],
+      "imports": [
+        "react"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:18.687207",
+        "modified": "2026-02-03T00:58:18.687314",
+        "modified_days_ago": 3,
+        "lines": 225,
+        "size_bytes": 6232,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/message-parser.ts",
+      "name": "message-parser.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "typescript message parser in the dashboard that translates planner actions into user-friendly task descriptions for the viewer HUD",
+      "classes": [],
+      "functions": [
+        "parsePlannerAction",
+        "parseTaskDescription",
+        "parseStepDescription",
+        "parseGoalDescription",
+        "parseCurrentAction",
+        "formatTaskStatus",
+        "formatPriority"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.433872",
+        "modified": "2026-02-03T00:58:19.434079",
+        "modified_days_ago": 3,
+        "lines": 276,
+        "size_bytes": 7493,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/minecraft-assets.ts",
+      "name": "minecraft-assets.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides reliable Minecraft item sprite URLs for the dashboard rendering layer by prioritizing the Wiki data source and falling back to PrismarineJS JSON.",
+      "classes": [],
+      "functions": [
+        "getItemSpriteUrl",
+        "getWikiSpritePath",
+        "getItemDisplayName",
+        "getItemCategory",
+        "getFallbackSprite",
+        "getItemData",
+        "getMaxDurability"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.434271",
+        "modified": "2026-02-03T00:58:19.434389",
+        "modified_days_ago": 3,
+        "lines": 544,
+        "size_bytes": 22804,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/minecraft-sprites.ts",
+      "name": "minecraft-sprites.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides utility functions to retrieve Minecraft item sprite resources from the local file system, ensuring consistent visual representation for the dashboard viewer HUD.",
+      "classes": [],
+      "functions": [
+        "getItemSprite",
+        "getFallbackSprite"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.434523",
+        "modified": "2026-02-03T00:58:19.434614",
+        "modified_days_ago": 3,
+        "lines": 28,
+        "size_bytes": 781,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/mineflayer-item-mapping.ts",
+      "name": "mineflayer-item-mapping.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "* Mineflayer Item Mapping * * Maps Mineflayer item types to our sprite system. * Mineflayer uses different item IDs than the legacy mapping. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "getMineflayerItemSprite",
+        "getMineflayerItemDisplayName"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.434752",
+        "modified": "2026-02-03T00:58:19.434848",
+        "modified_days_ago": 3,
+        "lines": 848,
+        "size_bytes": 21891,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/resilient-fetch.ts",
+      "name": "resilient-fetch.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides a resilient HTTP client for dashboard fetches, retrying failed requests with exponential backoff and supporting hot-reloadability for external services. Manages transient errors such as ECONNREFUSED and ensures reliable data retrieval for the conscious-bot HUD.",
+      "classes": [],
+      "functions": [
+        "isTransientError",
+        "sleep",
+        "resilientFetch"
+      ],
+      "imports": [],
+      "constants": [
+        "TRANSIENT_CODES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.434983",
+        "modified": "2026-02-03T00:58:19.435074",
+        "modified_days_ago": 3,
+        "lines": 95,
+        "size_bytes": 2613,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/task-normalize.ts",
+      "name": "task-normalize.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "action normalizeTasksResponse processes and flattens task data from the dashboard interface, converting complex or nested responses into a coherent list of Task objects for the viewer HUD display",
+      "classes": [],
+      "functions": [
+        "normalizeTasksResponse"
+      ],
+      "imports": [
+        "@/types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-05T02:45:17.017161",
+        "modified": "2026-02-05T02:45:17.017462",
+        "modified_days_ago": 1,
+        "lines": 19,
+        "size_bytes": 604,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/task-utils.ts",
+      "name": "task-utils.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides utility functions to convert the bot's internal planning task representations into the dashboard's Task format. Maps planner, goal, and requirement types to the appropriate Task properties using a strict structure. Enables consistent rendering of task metadata and progress for the viewer HUD.",
+      "classes": [],
+      "functions": [
+        "mapPlanningTaskToDashboard"
+      ],
+      "imports": [
+        "@/types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.435425",
+        "modified": "2026-02-03T00:58:19.435511",
+        "modified_days_ago": 3,
+        "lines": 81,
+        "size_bytes": 2085,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/text-utils.ts",
+      "name": "text-utils.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides wrapper sentence detection and text cleaning utilities essential for rendering the dashboard's viewer HUD. Implements functions to strip planner-specific goal tags and normalize whitespace for display. Ensures user-facing text is free of extraneous tags and properly formatted for visual output.",
+      "classes": [],
+      "functions": [
+        "stripGoalTags",
+        "cleanDisplayText",
+        "parseGoalTags",
+        "goalToLabel"
+      ],
+      "imports": [],
+      "constants": [
+        "GOAL_TAG_RE"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:19.435654",
+        "modified": "2026-02-03T00:58:19.435744",
+        "modified_days_ago": 3,
+        "lines": 81,
+        "size_bytes": 2553,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/lib/utils.ts",
+      "name": "utils.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Only logs when VITE_DEBUG_DASHBOARD=1 to reduce browser console noise",
+      "classes": [
+        "string",
+        "for",
+        "based"
+      ],
+      "functions": [
+        "debugLog",
+        "cn",
+        "formatTime",
+        "formatRelativeTime",
+        "getHudColor",
+        "getDurabilityColor",
+        "getIndicatorColor",
+        "generateId"
+      ],
+      "imports": [
+        "clsx",
+        "@/styles/hud-colors.module.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T01:18:51.551283",
+        "modified": "2026-02-03T01:18:51.551406",
+        "modified_days_ago": 3,
+        "lines": 137,
+        "size_bytes": 3953,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/main.tsx",
+      "name": "main.tsx",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": ", the dashboard module provides a React-based user interface for visualizing and interacting with the conscious-bot's current state and planned actions. It renders the main component that displays the HUD, allowing users to monitor and control the bot's activities through the dashboard.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "react-dom/client",
+        "./App",
+        "./styles/globals.scss"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T00:58:01.832125",
+        "modified": "2026-02-03T00:58:01.832388",
+        "modified_days_ago": 3,
+        "lines": 5,
+        "size_bytes": 167,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/src/stores/dashboard-store.ts",
+      "name": "dashboard-store.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "DataStore for the dashboard component in the conscious-bot monorepo; manages state for live status, HUD data, thoughts, tasks, events, memories, notes, environment, screenshot, and session; provides methods to set, add, update, and retrieve these entities synchronously for the viewer HUD interface.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zustand",
+        "zustand/middleware",
+        "@/lib/utils",
+        "@/lib/text-utils"
+      ],
+      "constants": [
+        "GOAL_TAG_STRIP_RE",
+        "PERSIST_CONFIG"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:26:12.121715",
+        "modified": "2026-02-05T19:34:23.801612",
+        "modified_days_ago": 0,
+        "lines": 526,
+        "size_bytes": 17958,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "dashboard/vite.config.ts",
+      "name": "vite.config.ts",
+      "category": "Next.js dashboard, viewer HUD",
+      "status": "active",
+      "description": "Provides Vite configuration for the dashboard, mapping API routes to the conscious-bot's memory service for efficient data visualization and access.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "vite",
+        "@vitejs/plugin-react-swc",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T17:43:54.818103",
+        "modified": "2026-02-05T02:07:38.008167",
+        "modified_days_ago": 1,
+        "lines": 186,
+        "size_bytes": 6741,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/benchmarking/performance-benchmark-runner.ts",
+      "name": "performance-benchmark-runner.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "* Performance Benchmark Runner * * Comprehensive automated performance benchmarking system for the Conscious Bot. * Tests system performance across various dimensions including memory operations, * cognitive processing, planning, safety systems, and end-to-end scenarios. * * @author @darianrosebrook",
+      "classes": [
+        "PerformanceBenchmarkRunner"
+      ],
+      "functions": [],
+      "imports": [
+        "perf_hooks",
+        "../__tests__/memory-integration-setup",
+        "../__tests__/safety-integration-setup",
+        "../scenarios/scenario-manager",
+        "../metrics/performance-analyzer"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 400,
+            "content": "// TODO: Implement cognitive processing benchmarks",
+            "file_path": "packages/evaluation/src/benchmarking/performance-benchmark-runner.ts"
+          }
+        ]
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-26T08:48:01.739068",
+        "modified": "2025-10-01T20:29:43.740748",
+        "modified_days_ago": 127,
+        "lines": 637,
+        "size_bytes": 19125,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/benchmarking/performance-benchmarker.ts",
+      "name": "performance-benchmarker.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Implements a benchmarking suite to evaluate the performance of the conscious-bot across tasks, providing statistical analysis and regression detection to ensure consistent behavior. Exposes a configurable interface for defining test scenarios, execution parameters, and reporting options. Central to performance validation and quality assurance of the cognitive agent.",
+      "classes": [
+        "PerformanceBenchmarker",
+        "StatisticalAnalyzer",
+        "RegressionDetector"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "zod"
+      ],
+      "constants": [
+        "DEFAULT_BENCHMARK_CONFIGS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.092675",
+        "modified": "2025-09-21T22:07:27.092816",
+        "modified_days_ago": 137,
+        "lines": 966,
+        "size_bytes": 27537,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/benchmarking/run-benchmarks.ts",
+      "name": "run-benchmarks.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "* Performance Benchmark Runner Script * * Command-line script to run automated performance benchmarks for the Conscious Bot. * Can be integrated into CI/CD pipelines or run manually for performance monitoring. * * Usage: * pnpm run benchmarks * pnpm run benchmarks -- --quick * pnpm run benchmarks -- --memory-only * pnpm run benchmarks -- --output-format=json * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "parseArguments",
+        "main"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "./performance-benchmark-runner"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 132 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-26T08:48:30.392430",
+        "modified": "2025-09-26T08:51:46.704328",
+        "modified_days_ago": 132,
+        "lines": 213,
+        "size_bytes": 7136,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/curriculum/curriculum-builder.ts",
+      "name": "curriculum-builder.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "assessment kit generator for evaluating conscious-bot's skill acquisition progress",
+      "classes": [
+        "CurriculumBuilder"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.458559",
+        "modified": "2025-08-23T17:46:29.458724",
+        "modified_days_ago": 166,
+        "lines": 821,
+        "size_bytes": 21858,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/curriculum/curriculum-manager.ts",
+      "name": "curriculum-manager.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Implements CurriculumManager, orchestrates creation and modification of test curricula for the conscious-bot, tracks execution progress and generates comprehensive evaluation reports.",
+      "classes": [
+        "CurriculumManager"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.458785",
+        "modified": "2025-08-23T17:46:29.458946",
+        "modified_days_ago": 166,
+        "lines": 993,
+        "size_bytes": 28840,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/curriculum/regression-suite.ts",
+      "name": "regression-suite.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Implements regression test execution framework for the curriculum, orchestrating test scheduling and result aggregation across performance and quality gates. Manages test cases, computes pass/fail status, and evaluates criteria to ensure curriculum adherence and system integrity. Provides detailed reports and actionable recommendations for corrective measures.",
+      "classes": [
+        "RegressionSuiteManager"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.093198",
+        "modified": "2025-09-21T22:07:27.093323",
+        "modified_days_ago": 137,
+        "lines": 715,
+        "size_bytes": 20939,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/curriculum/types.ts",
+      "name": "types.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Provides type definitions for organizing and evaluating skills within the conscious-bot curriculum. Implements structured schema for learning objectives, assessment criteria, and skill dependencies. Enables consistent evaluation of both manual and automated tests across the curriculum framework.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.459395",
+        "modified": "2025-08-23T17:46:29.459578",
+        "modified_days_ago": 166,
+        "lines": 514,
+        "size_bytes": 11655,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/dashboard/evaluation-dashboard.ts",
+      "name": "evaluation-dashboard.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "output: Displays evaluation metrics in real-time using a customizable dashboard, supports selecting metrics and scenarios to monitor, and provides alerting for deviations in results",
+      "classes": [
+        "EvaluationDashboard"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "zod",
+        "../benchmarking/performance-benchmarker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 114 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.093441",
+        "modified": "2025-10-14T18:12:41.686918",
+        "modified_days_ago": 114,
+        "lines": 943,
+        "size_bytes": 24528,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/metrics/performance-analyzer.ts",
+      "name": "performance-analyzer.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "* Performance Analyzer * * Analyzes evaluation results across multiple dimensions to assess * the cognitive architecture's performance on complex reasoning tasks * * @author @darianrosebrook",
+      "classes": [
+        "PerformanceAnalyzer"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.459846",
+        "modified": "2025-08-23T17:46:29.459989",
+        "modified_days_ago": 166,
+        "lines": 915,
+        "size_bytes": 27139,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/regression/regression-monitor.ts",
+      "name": "regression-monitor.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Provides a comprehensive regression detection system for the conscious-bot, monitoring performance metrics over time and comparing them against baselines. Evaluates and identifies warning and critical degradation using configurable thresholds and statistical analysis.",
+      "classes": [
+        "RegressionMonitor"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "zod"
+      ],
+      "constants": [
+        "DEFAULT_REGRESSION_CONFIGS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T21:04:25.330408",
+        "modified": "2025-08-23T21:10:17.191467",
+        "modified_days_ago": 166,
+        "lines": 1042,
+        "size_bytes": 29081,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/scenarios/complex-reasoning-scenarios.ts",
+      "name": "complex-reasoning-scenarios.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Provides a set of navigation-based scenarios to evaluate the core spatial reasoning capabilities of the cognitive architecture within the conscious-bot system. Enforces multi-step problem-solving via maze navigation tasks that require planning and decision-making under simple spatial constraints.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.460057",
+        "modified": "2025-08-23T17:46:29.460198",
+        "modified_days_ago": 166,
+        "lines": 589,
+        "size_bytes": 16740,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/scenarios/minedojo-scenarios.ts",
+      "name": "minedojo-scenarios.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Implements a set of MineDojo-style survival scenarios for evaluating the conscious-bot's ability to collect wood in a forest biome. Provides structured initial states, constraints, and diverse success metrics to assess resource gathering performance. Enables benchmarking of embodied agent skills under tool-free and time-limited conditions.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [
+        "MINEDOJO_METADATA"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T21:01:01.752415",
+        "modified": "2025-08-23T21:10:10.983755",
+        "modified_days_ago": 166,
+        "lines": 886,
+        "size_bytes": 23921,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/scenarios/scenario-manager.ts",
+      "name": "scenario-manager.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "active",
+      "description": "Implements scenario execution by coordinating step-by-step reasoning and outcome validation within the evaluation framework. Manages the flow of input steps, tracks agent decisions, and compares results to expected outcomes using the integrated planning system.",
+      "classes": [
+        "ScenarioManager"
+      ],
+      "functions": [
+        "createIntegratedPlanningSystem"
+      ],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T14:39:58.771247",
+        "modified": "2026-01-31T14:39:58.771368",
+        "modified_days_ago": 5,
+        "lines": 924,
+        "size_bytes": 25616,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/testing/postgres-test-container.ts",
+      "name": "postgres-test-container.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "active",
+      "description": "Defines MockEmbeddingService and provides createMemoryFixture, createMemorySeed.",
+      "classes": [
+        "MockEmbeddingService"
+      ],
+      "functions": [
+        "createMemoryFixture",
+        "createMemorySeed"
+      ],
+      "imports": [
+        "crypto"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T22:49:02.261220",
+        "modified": "2026-01-28T22:49:02.261392",
+        "modified_days_ago": 8,
+        "lines": 180,
+        "size_bytes": 4632,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/thought-generator-test.ts",
+      "name": "thought-generator-test.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Implements test scenarios for the conscious-bot's thought generator by initializing an EnhancedThoughtGenerator with custom LLM configurations and simulating contextual task execution using a detailed test context object.",
+      "classes": [],
+      "functions": [
+        "testThoughtGenerator"
+      ],
+      "imports": [
+        "@conscious-bot/cognition"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.776907",
+        "modified": "2025-08-30T02:39:07.776999",
+        "modified_days_ago": 160,
+        "lines": 86,
+        "size_bytes": 2367,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "evaluation/src/types.ts",
+      "name": "types.ts",
+      "category": "Test scenarios and evaluation",
+      "status": "stable",
+      "description": "Provides type definitions for evaluating conscious-bot's reasoning capabilities. Defines structured scenarios with domain, complexity, and expected duration.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 160 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.777238",
+        "modified": "2025-08-30T02:39:07.777442",
+        "modified_days_ago": 160,
+        "lines": 323,
+        "size_bytes": 9087,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/capability-registry.ts",
+      "name": "capability-registry.ts",
+      "category": "Planning executor contracts",
+      "status": "active",
+      "description": "Provides a centralized capability registry that validates and exposes registered capabilities to the executor, ensuring type safety and version tracking for capability usage within the conscious-bot planning system.",
+      "classes": [
+        "CapabilityRegistry",
+        "CapabilityRegistryBuilder"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.094869",
+        "modified": "2026-02-01T03:03:40.438861",
+        "modified_days_ago": 5,
+        "lines": 357,
+        "size_bytes": 9855,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/leaf-factory.ts",
+      "name": "leaf-factory.ts",
+      "category": "Planning executor contracts",
+      "status": "stable",
+      "description": "Provides registration and instantiation of leaf implementations for the planning executor; ensures only valid and non-circular leaves are registered and accessible to the cognitive and interface layers.",
+      "classes": [
+        "LeafFactory"
+      ],
+      "functions": [
+        "createLeafFactory"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 133 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.095267",
+        "modified": "2025-09-25T20:38:08.545326",
+        "modified_days_ago": 133,
+        "lines": 229,
+        "size_bytes": 5516,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/leaf-interfaces.ts",
+      "name": "leaf-interfaces.ts",
+      "category": "Planning executor contracts",
+      "status": "stable",
+      "description": "Leaf implementations in the conscious-bot executor contracts define the required methods for executing tasks using a shared LeafImpl interface. The LeafContext provides runtime access to the bot, world state, and execution parameters such as timeouts and retry settings. This modular structure enables consistent integration of various leaf behaviors into the MCP-compliant planning system.",
+      "classes": [],
+      "functions": [
+        "createLeafContext",
+        "validateLeafImpl",
+        "createExecError",
+        "verifyPostconditions"
+      ],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 212,
+            "content": "// TODO: These enums are defined for future use",
+            "file_path": "packages/executor-contracts/src/leaf-interfaces.ts"
+          }
+        ]
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 133 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.095390",
+        "modified": "2025-09-25T20:38:08.550825",
+        "modified_days_ago": 133,
+        "lines": 275,
+        "size_bytes": 6783,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/pbi-enforcer.ts",
+      "name": "pbi-enforcer.ts",
+      "category": "Planning executor contracts",
+      "status": "active",
+      "description": "required. It verifies plan steps against the Plan-Body Interface (PBI), monitors execution for stuck conditions using detectors, and ensures that valid plans are executed by the appropriate executor in the conscious-bot planning pipeline.",
+      "classes": [
+        "PBIEnforcer",
+        "StuckDetector"
+      ],
+      "functions": [
+        "createPBIEnforcer",
+        "createCustomPBIEnforcer"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.095511",
+        "modified": "2026-02-01T03:03:40.619449",
+        "modified_days_ago": 5,
+        "lines": 501,
+        "size_bytes": 13941,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "executor-contracts/src/types.ts",
+      "name": "types.ts",
+      "category": "Planning executor contracts",
+      "status": "active",
+      "description": "Defines the PlanStep interface to structure executable actions and their associated preconditions, effects, costs, and safety levels for the conscious-bot's planning and execution system.",
+      "classes": [
+        "PBIError"
+      ],
+      "functions": [
+        "isIntent",
+        "isPlanStep",
+        "isActionResult",
+        "isPBIError"
+      ],
+      "imports": [
+        "zod"
+      ],
+      "constants": [
+        "CANONICAL_VERBS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T12:55:30.290408",
+        "modified": "2026-02-01T03:03:40.653271",
+        "modified_days_ago": 5,
+        "lines": 336,
+        "size_bytes": 9444,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "mcp-server/src/conscious-bot-mcp-server.ts",
+      "name": "conscious-bot-mcp-server.ts",
+      "category": "MCP server integration",
+      "status": "active",
+      "description": "Contextualizes tool schemas and resource definitions for the conscious-bot's MCP server integration, enforces permissions during method calls, and manages secure, typed interactions with the Minecraft client and external registries.",
+      "classes": [
+        "ConsciousBotMCPServer"
+      ],
+      "functions": [
+        "main"
+      ],
+      "imports": [
+        "@modelcontextprotocol/sdk/server/index.js",
+        "@modelcontextprotocol/sdk/server/stdio.js",
+        "ajv"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.096362",
+        "modified": "2026-02-01T03:03:40.652356",
+        "modified_days_ago": 5,
+        "lines": 1423,
+        "size_bytes": 42529,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "mcp-server/src/demo-mcp-server.ts",
+      "name": "demo-mcp-server.ts",
+      "category": "MCP server integration",
+      "status": "stable",
+      "description": "Provides a demo of the Conscious Bot MCP Server by initializing tools and resources, enabling users to observe how LLM-driven planning executes tasks using the leaves interface, and showcases integration with Minecraft through the dashboard and core dependencies.",
+      "classes": [],
+      "functions": [
+        "demoMCPServer"
+      ],
+      "imports": [
+        "@conscious-bot/executor-contracts"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.096638",
+        "modified": "2025-09-21T22:07:27.096733",
+        "modified_days_ago": 137,
+        "lines": 93,
+        "size_bytes": 3677,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/asset/asset-memory-store.ts",
+      "name": "asset-memory-store.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "Implements the bot's asset memory store using a vector-based chunk and type indexing system. Maintains an append-only ledger of evidence with hash-based chain of custody for claim verification. Enforces strict L0-L3 myelin promotion/demotion logic to manage memory trustworthiness.",
+      "classes": [
+        "ReferenceAssetMemoryStore"
+      ],
+      "functions": [
+        "sha16",
+        "chunkFromPos",
+        "dist",
+        "computeEvidenceDigest",
+        "isSuccessEvent"
+      ],
+      "imports": [
+        "node:crypto"
+      ],
+      "constants": [
+        "MYELIN_THRESHOLDS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T14:13:13.270791",
+        "modified": "2026-02-01T14:13:13.270906",
+        "modified_days_ago": 4,
+        "lines": 703,
+        "size_bytes": 21972,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/chunking-service.ts",
+      "name": "chunking-service.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements chunking of text into semantic fragments for efficient memory storage and retrieval in the conscious-bot architecture. Maintains rich metadata per chunk to track origin and relevance for different memory types. Ensures configurable overlap and token limits to balance granularity and search accuracy.",
+      "classes": [
+        "ChunkingService"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T13:06:40.807960",
+        "modified": "2025-10-02T00:21:31.893507",
+        "modified_days_ago": 127,
+        "lines": 620,
+        "size_bytes": 15842,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/cognitive-map-tracker.ts",
+      "name": "cognitive-map-tracker.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides a manifold-based memory tracking system that builds and updates cognitive maps using embeddings from the vector database and metadata from stored memories. Implements time-based evolution of memory patterns and enables clustering for similarity-driven organization. Supports dynamic reflection of learning progression by maintaining a structured map of memory chunks in the cognitive-bot framework.",
+      "classes": [
+        "CognitiveMapTracker"
+      ],
+      "functions": [],
+      "imports": [
+        "./vector-database",
+        "./embedding-service",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:40:37.386426",
+        "modified": "2025-10-01T23:34:22.870594",
+        "modified_days_ago": 127,
+        "lines": 730,
+        "size_bytes": 20553,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/cognitive-task-memory.ts",
+      "name": "cognitive-task-memory.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements CognitiveTaskMemory to store, track, and reflect on task execution history and learning for the conscious-bot's planning and reasoning capabilities.",
+      "classes": [
+        "CognitiveTaskMemoryManager"
+      ],
+      "functions": [],
+      "imports": [
+        "zod",
+        "./working/context-manager",
+        "./working/central-executive"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T13:38:05.642825",
+        "modified": "2025-09-21T15:18:55.255113",
+        "modified_days_ago": 137,
+        "lines": 842,
+        "size_bytes": 23588,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/cross-modal-entity-linker.ts",
+      "name": "cross-modal-entity-linker.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides cross-modal entity linking for the conscious-bot's memory system. Implements entity unification, deduplication, and relationship tracking between memory types. Supports confidence scoring and maintains up-to-date entity profiles across episodic and semantic storage.",
+      "classes": [
+        "CrossModalEntityLinker"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-10-02T00:05:08.615562",
+        "modified": "2025-10-02T00:11:37.985313",
+        "modified_days_ago": 127,
+        "lines": 730,
+        "size_bytes": 20472,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/embedding-service.ts",
+      "name": "embedding-service.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "* Enhanced Embedding Service * * Provides strategic text embedding generation with multiple model support, * quality-based confidence scoring, and performance monitoring. * Enhanced with obsidian-rag patterns for memory type optimization.",
+      "classes": [
+        "EmbeddingService"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T19:29:58.908175",
+        "modified": "2026-01-28T19:29:58.908383",
+        "modified_days_ago": 8,
+        "lines": 916,
+        "size_bytes": 25560,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/emotional-memory-manager.ts",
+      "name": "emotional-memory-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements conversion between raw emotional data and the AdvancedEmotionalState interface for the conscious-bot's memory system. Enables tracking of primary emotions, intensities, triggers, and associated context in reflection memory. Supports efficient storage and retrieval of emotional history using hybrid search.",
+      "classes": [
+        "EmotionalMemoryManager"
+      ],
+      "functions": [
+        "toAdvancedEmotionalState",
+        "toSimpleEmotionalState"
+      ],
+      "imports": [
+        "zod",
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T14:31:26.019890",
+        "modified": "2025-09-21T16:23:51.151558",
+        "modified_days_ago": 137,
+        "lines": 1140,
+        "size_bytes": 33021,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/entity-extraction-service.ts",
+      "name": "entity-extraction-service.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": ", the Entity Extraction Service identifies and structures entities from multi-modal inputs, scoring their confidence and inferring relationships for the bot's knowledge graph. It processes text, context, and metadata to extract entity IDs, semantic types, and supporting evidence. The service integrates with the cognition module for entity enrichment and ensures safe, accurate graph construction.",
+      "classes": [
+        "EntityExtractionService"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 114 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-10-01T22:50:56.470024",
+        "modified": "2025-10-14T10:08:24.329134",
+        "modified_days_ago": 114,
+        "lines": 1281,
+        "size_bytes": 36901,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/episodic-retrieval.ts",
+      "name": "episodic-retrieval.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides episodic memory retrieval using vector search and temporal filters within the conscious-bot architecture.",
+      "classes": [
+        "EpisodicRetrieval"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.461020",
+        "modified": "2025-09-21T16:15:05.344688",
+        "modified_days_ago": 137,
+        "lines": 796,
+        "size_bytes": 20739,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/event-logger.ts",
+      "name": "event-logger.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements event storage for the episodic memory in conscious-bot, capturing experiences with metadata and type classification, ensuring robust defaults and fail-fast guards for invalid entries.",
+      "classes": [
+        "EventLogger"
+      ],
+      "functions": [
+        "getDefaultEmotionalState"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.063328",
+        "modified": "2025-09-21T16:28:57.561087",
+        "modified_days_ago": 137,
+        "lines": 295,
+        "size_bytes": 8158,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/memory-consolidation.ts",
+      "name": "memory-consolidation.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Memory consolidation system for episodic memories. * * Integrates new episodic memories with existing knowledge and performs * sleep-like consolidation processes to strengthen important memories. * * @author @darianrosebrook",
+      "classes": [
+        "MemoryConsolidation"
+      ],
+      "functions": [],
+      "imports": [
+        "../types",
+        "./salience-scorer"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.462463",
+        "modified": "2025-08-23T17:46:29.462764",
+        "modified_days_ago": 166,
+        "lines": 529,
+        "size_bytes": 16083,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/narrative-generator.ts",
+      "name": "narrative-generator.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides narrative generation for episodic memories in the conscious-bot architecture. * * Analyzes experience sequences to construct coherent stories emphasizing temporal progression. * * Integrates style, theme, and memory retrieval for reflective self-narrative output.",
+      "classes": [
+        "NarrativeGenerator"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.462844",
+        "modified": "2025-08-23T17:46:29.463048",
+        "modified_days_ago": 166,
+        "lines": 1061,
+        "size_bytes": 31128,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/episodic/salience-scorer.ts",
+      "name": "salience-scorer.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements salience scoring for episodic memories by evaluating multiple factors such as novelty, emotional intensity, and goal relevance using configurable weights. Computes a memory's current salience with decay applied over time and optional boosts for high-scoring experiences. Returns prioritized memory scores to inform retention and retrieval in the cognition pipeline.",
+      "classes": [
+        "SalienceScorer"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 158 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.063759",
+        "modified": "2025-08-31T11:04:13.063892",
+        "modified_days_ago": 158,
+        "lines": 316,
+        "size_bytes": 9139,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/htn-memory.ts",
+      "name": "htn-memory.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "HTNMemoryManager stores and retrieves task execution effectiveness metrics for HTNTaskMemory entries, enabling planners to query and optimize methods and networks using structured memory access. It ensures valid HTNTaskMemory and HTNMethodMemory records and supports efficient retrieval for planning and learning.",
+      "classes": [
+        "HTNMemoryManager"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.096922",
+        "modified": "2025-09-21T22:07:27.097021",
+        "modified_days_ago": 137,
+        "lines": 246,
+        "size_bytes": 8191,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/hybrid-search-service.ts",
+      "name": "hybrid-search-service.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "a HybridSearchService that fuses vector search with structured graph RAG, enabling the bot to retrieve relevant data via both semantic and factual routes, track provenance, and rank results using decay-aware logic",
+      "classes": [
+        "HybridSearchService"
+      ],
+      "functions": [],
+      "imports": [
+        "./embedding-service",
+        "./knowledge-graph-core",
+        "./semantic/types",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:43:57.178986",
+        "modified": "2026-02-03T02:43:57.179133",
+        "modified_days_ago": 3,
+        "lines": 1019,
+        "size_bytes": 29437,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/identity-memory-guardian.ts",
+      "name": "identity-memory-guardian.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Identity Memory Guardian * * Protects and preserves key identity-related memories from excessive decay. * Ensures that memories crucial to the agent's sense of self are retained * and continue to influence behavior and self-conception. * * @author @darianrosebrook",
+      "classes": [
+        "IdentityMemoryGuardian"
+      ],
+      "functions": [],
+      "imports": [
+        "./types",
+        "./memory-decay-manager"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T16:12:37.529812",
+        "modified": "2025-09-21T16:17:31.420625",
+        "modified_days_ago": 137,
+        "lines": 699,
+        "size_bytes": 20675,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/integration-examples.ts",
+      "name": "integration-examples.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "Bot integration examples demonstrating how the memory system interfaces with cognition and planning modules using hybrid search and reflection, providing sample workflows for retrieving and contextualizing information via CognitiveTaskMemoryManager and AdvancedSignalProcessor.",
+      "classes": [
+        "AdvancedSignalProcessor",
+        "AdvancedNeedGenerator",
+        "CognitiveIntegration"
+      ],
+      "functions": [
+        "memorySignalIntegrationExample",
+        "cognitiveTaskMemoryExample",
+        "reflectionMemoryExample",
+        "completeIntegrationExample",
+        "memoryDrivenGoalFormulationExample",
+        "socialMemoryIntegrationExample",
+        "runAllExamples",
+        "runExample"
+      ],
+      "imports": [
+        "./memory-signal-generator",
+        "./cognitive-task-memory",
+        "./reflection-memory",
+        "./index",
+        "./working/context-manager",
+        "./working/central-executive"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-30T14:35:55.520845",
+        "modified": "2026-01-30T14:35:55.520946",
+        "modified_days_ago": 6,
+        "lines": 634,
+        "size_bytes": 20080,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/knowledge-graph-core.ts",
+      "name": "knowledge-graph-core.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "GraphCore integrates entities and relationships with a PostgreSQL-backed knowledge graph, supporting vector and text search for enhanced recall. It provides typed APIs for querying entities, filtering, and relationship extraction. Essential for hybrid memory and multi-hop reasoning in the conscious-bot architecture.",
+      "classes": [
+        "EnhancedKnowledgeGraphCore"
+      ],
+      "functions": [
+        "mapEntityType",
+        "mapRelationshipType",
+        "convertExtractedEntityToEnhancedEntity",
+        "convertExtractedRelationshipToEnhancedRelationship"
+      ],
+      "imports": [
+        "pg"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 114 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-10-14T10:26:57.497381",
+        "modified": "2025-10-14T17:34:16.688000",
+        "modified_days_ago": 114,
+        "lines": 1799,
+        "size_bytes": 53527,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/memory-decay-manager.ts",
+      "name": "memory-decay-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Memory Decay Manager * * Implements \"use it or lose it\" memory management that mimics human memory decay. * Tracks memory access patterns, calculates decay rates based on importance and * recency, and manages memory cleanup during reflection checkpoints. * * @author @darianrosebrook",
+      "classes": [
+        "MemoryDecayManager"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T13:45:21.298861",
+        "modified": "2025-09-21T22:54:14.177397",
+        "modified_days_ago": 137,
+        "lines": 725,
+        "size_bytes": 22344,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/memory-signal-generator.ts",
+      "name": "memory-signal-generator.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Memory Signal Generator * * Generates memory-based signals for the core signal processing system. * These signals represent memories that have become salient and need attention * for goal formulation and decision making. * * @author @darianrosebrook",
+      "classes": [
+        "MemorySignalGenerator"
+      ],
+      "functions": [],
+      "imports": [
+        "zod",
+        "./memory-system"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T13:36:43.304657",
+        "modified": "2025-09-21T15:19:02.814344",
+        "modified_days_ago": 137,
+        "lines": 451,
+        "size_bytes": 12258,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/memory-system-coordinator.ts",
+      "name": "memory-system-coordinator.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Memory System Coordinator * * Coordinates between different memory systems (emotional, episodic, semantic, etc.) * and manages milestones for self-narrative construction. Ensures that identity * memories are properly integrated and narrative milestones are triggered at * appropriate intervals (10-24 game days). * * @author @darianrosebrook",
+      "classes": [
+        "MemorySystemCoordinator"
+      ],
+      "functions": [],
+      "imports": [
+        "./types",
+        "./emotional-memory-manager",
+        "./memory-decay-manager",
+        "./identity-memory-guardian",
+        "./htn-memory"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.097266",
+        "modified": "2025-09-21T22:07:27.097383",
+        "modified_days_ago": 137,
+        "lines": 836,
+        "size_bytes": 26472,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/memory-system.ts",
+      "name": "memory-system.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "Storage and retrieval logic for the conscious-bot's memory system. Implements chunk management, integrates vector and graph-based search for enhanced recall. Enables hybrid search and reflection memory for context-aware learning in the bot's experience.",
+      "classes": [
+        "EnhancedMemorySystem"
+      ],
+      "functions": [
+        "createEnhancedMemorySystem",
+        "getRequiredWorldSeed",
+        "createDefaultMemoryConfig"
+      ],
+      "imports": [
+        "events",
+        "./embedding-service",
+        "./knowledge-graph-core",
+        "./memory-decay-manager",
+        "./tool-efficiency-memory",
+        "zod",
+        "./semantic/types"
+      ],
+      "constants": [
+        "DEV_DEFAULT_WORLD_SEED"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T23:59:10.903973",
+        "modified": "2026-02-02T23:59:10.904511",
+        "modified_days_ago": 3,
+        "lines": 2668,
+        "size_bytes": 78155,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/memory-versioning-manager.ts",
+      "name": "memory-versioning-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements memory versioning by managing namespaces tied to world seeds. Enforces isolation through per-seed memory contexts and tracks active namespaces.",
+      "classes": [
+        "MemoryVersioningManager"
+      ],
+      "functions": [],
+      "imports": [
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 165 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-24T12:08:25.883488",
+        "modified": "2025-08-24T12:08:26.610469",
+        "modified_days_ago": 165,
+        "lines": 240,
+        "size_bytes": 6565,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/neuroscience-consolidation-manager.ts",
+      "name": "neuroscience-consolidation-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "memory: Provides an adaptive neuroscience-inspired memory system that consolidates chunks using vector DB, cognitive map tracking, and scheduled decay for efficient learning and retention in the conscious-bot architecture.",
+      "classes": [
+        "NeuroscienceConsolidationManager"
+      ],
+      "functions": [],
+      "imports": [
+        "./vector-database",
+        "./embedding-service",
+        "./sharp-wave-ripple-manager",
+        "./cognitive-map-tracker",
+        "./memory-decay-manager",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:41:55.253284",
+        "modified": "2025-10-01T23:34:22.870506",
+        "modified_days_ago": 127,
+        "lines": 547,
+        "size_bytes": 16701,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/audit-trail.ts",
+      "name": "audit-trail.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements audit logging for decision actions within the conscious-bot framework, storing each decision in a structured trail for traceability and accountability. Manages indexed storage by action type, actor, and decision context using a Map-based system. Supports configurable retention and compression to manage storage efficiently.",
+      "classes": [
+        "AuditTrail"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.209955",
+        "modified": "2025-08-21T11:10:01.210096",
+        "modified_days_ago": 168,
+        "lines": 522,
+        "size_bytes": 13478,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/decision-tracker.ts",
+      "name": "decision-tracker.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Contextures decision records and stores them across memory layers using a domain and importance-based index. Manages decision lifecycle stages and tags for efficient retrieval and tracking. Enables robust, multi-faceted search via hybrid approach for decision retrieval in the conscious-bot agent.",
+      "classes": [
+        "DecisionTracker"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.210141",
+        "modified": "2025-08-21T11:10:01.210290",
+        "modified_days_ago": 168,
+        "lines": 750,
+        "size_bytes": 18200,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/evidence-manager.ts",
+      "name": "evidence-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements evidence storage with time-stamped entries, supports type-based and source-based querying, ensures deduplication and enforces configuration-driven retention settings for the conscious-bot's knowledge provenance.",
+      "classes": [
+        "EvidenceManager"
+      ],
+      "functions": [],
+      "imports": [
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.463816",
+        "modified": "2025-08-23T17:46:29.464010",
+        "modified_days_ago": 166,
+        "lines": 574,
+        "size_bytes": 14374,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/explanation-generator.ts",
+      "name": "explanation-generator.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Contextualizes decision-making by synthesizing decision records and retrieving supporting evidence using the configured ExplanationGenerator. Integrates with the decision tracker and evidence manager to produce clear, detailed explanations tailored to user preferences. Adapts explanation format and detail level via flexible configuration options.",
+      "classes": [
+        "ExplanationGenerator"
+      ],
+      "functions": [],
+      "imports": [
+        "./decision-tracker",
+        "./evidence-manager"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.210506",
+        "modified": "2025-08-21T11:10:01.210650",
+        "modified_days_ago": 168,
+        "lines": 775,
+        "size_bytes": 24925,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/provenance-system.ts",
+      "name": "provenance-system.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements a unified provenance system for the conscious-bot, capturing decision logs, evidence, audit entries, and explanations to ensure transparent, traceable, and explainable agent behavior.",
+      "classes": [
+        "ProvenanceSystem"
+      ],
+      "functions": [],
+      "imports": [
+        "./decision-tracker",
+        "./evidence-manager",
+        "./audit-trail"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.464150",
+        "modified": "2025-09-21T15:28:08.435860",
+        "modified_days_ago": 137,
+        "lines": 838,
+        "size_bytes": 18543,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/provenance/types.ts",
+      "name": "types.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Defines structured types for tracking decision provenance in the conscious-bot's memory system. Provides DecisionRecord and related enums to represent the lifecycle and attributes of each decision made by the bot. Enforces a clear and extensible schema for recording, evaluating, and learning from decision outcomes.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.211065",
+        "modified": "2025-08-21T11:10:01.211264",
+        "modified_days_ago": 168,
+        "lines": 456,
+        "size_bytes": 10107,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/reflection-memory.ts",
+      "name": "reflection-memory.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "* Reflection Memory System * * Manages self-reflection, lessons learned, narrative development, and * metacognitive processes. Supports the agent's ability to reflect on * experiences, learn from them, and develop a coherent sense of self. * * @author @darianrosebrook",
+      "classes": [
+        "ReflectionMemoryManager"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T21:03:17.441739",
+        "modified": "2026-02-02T21:03:17.441849",
+        "modified_days_ago": 3,
+        "lines": 1023,
+        "size_bytes": 30750,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/self-narrative-constructor.ts",
+      "name": "self-narrative-constructor.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Self-Narrative Constructor * * Generates coherent narrative summaries of the agent's experiences at * milestones (every 10-24 game days) to reinforce identity and values * over time. Integrates with emotional memories to create meaningful * self-stories that persist and evolve. * * @author @darianrosebrook",
+      "classes": [
+        "SelfNarrativeConstructor"
+      ],
+      "functions": [],
+      "imports": [
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T16:13:49.531982",
+        "modified": "2025-09-21T16:17:31.420644",
+        "modified_days_ago": 137,
+        "lines": 708,
+        "size_bytes": 20459,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/graph-rag.ts",
+      "name": "graph-rag.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements graph-enhanced retrieval for the conscious-bot's memory system. Processes user queries to extract entities and relationships, then performs knowledge graph lookups to augment language model responses. Returns structured results with entity/relationship matches and confidence scores for grounded outputs.",
+      "classes": [
+        "GraphRAG"
+      ],
+      "functions": [],
+      "imports": [
+        "./knowledge-graph-core"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.464410",
+        "modified": "2025-08-23T17:46:29.464578",
+        "modified_days_ago": 166,
+        "lines": 633,
+        "size_bytes": 15647,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/knowledge-graph-core.ts",
+      "name": "knowledge-graph-core.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "* Knowledge graph core implementation. * * Manages entities, relationships, and factual knowledge with efficient * graph operations and semantic reasoning capabilities. * * @author @darianrosebrook",
+      "classes": [
+        "KnowledgeGraphCore"
+      ],
+      "functions": [],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.064157",
+        "modified": "2025-10-02T02:19:49.035386",
+        "modified_days_ago": 127,
+        "lines": 1221,
+        "size_bytes": 33427,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/query-engine.ts",
+      "name": "query-engine.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides a semantic querying mechanism for the conscious-bot's memory. Integrates with the knowledge graph and GraphRAG for context-aware retrieval. Returns structured query results with entities, relationships, and confidence scores.",
+      "classes": [
+        "QueryEngine"
+      ],
+      "functions": [],
+      "imports": [
+        "./knowledge-graph-core",
+        "./graph-rag",
+        "./relationship-extractor"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.212058",
+        "modified": "2025-10-02T02:19:49.049499",
+        "modified_days_ago": 127,
+        "lines": 502,
+        "size_bytes": 12722,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/relationship-extractor.ts",
+      "name": "relationship-extractor.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides entity and relationship extraction to populate the bot's knowledge graph from text inputs for reflection memory.",
+      "classes": [
+        "RelationshipExtractor"
+      ],
+      "functions": [],
+      "imports": [
+        "./knowledge-graph-core",
+        "./graph-rag"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.212195",
+        "modified": "2025-08-21T11:10:01.212306",
+        "modified_days_ago": 168,
+        "lines": 582,
+        "size_bytes": 13950,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/semantic/types.ts",
+      "name": "types.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides type definitions for entities, relationships, and property values used in the conscious-bot's semantic memory. Defines enums for entity types and relationship metadata to support structured storage in the vector memory system. Enables accurate and type-safe representation of Minecraft knowledge for the semantic memory module.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 126 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.064351",
+        "modified": "2025-10-02T08:06:30.885009",
+        "modified_days_ago": 126,
+        "lines": 375,
+        "size_bytes": 8242,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/server.ts",
+      "name": "server.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "Provides a REST API for the enhanced memory system in the conscious-bot architecture. Manages episodic, semantic, working, and provenance memory stores through defined endpoints.",
+      "classes": [],
+      "functions": [
+        "getEnhancedMemorySystem",
+        "broadcastMemoryUpdate"
+      ],
+      "imports": [
+        "express",
+        "cors",
+        "./semantic",
+        "./working",
+        "./provenance",
+        "./skills",
+        "./memory-versioning-manager",
+        "./types",
+        "./utils/experience-normalizer"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:29:10.971782",
+        "modified": "2026-02-04T12:29:10.971925",
+        "modified_days_ago": 1,
+        "lines": 1544,
+        "size_bytes": 47173,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/sharp-wave-ripple-manager.ts",
+      "name": "sharp-wave-ripple-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": ", the SharpWaveRippleManager in conscious-bot uses sharp wave ripple events to trigger awake tagging of important memories before consolidation during sleep phase.",
+      "classes": [
+        "SharpWaveRippleManager"
+      ],
+      "functions": [],
+      "imports": [
+        "./vector-database",
+        "./embedding-service",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 127 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:38:30.146485",
+        "modified": "2025-10-01T23:34:22.870761",
+        "modified_days_ago": 127,
+        "lines": 730,
+        "size_bytes": 23257,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/skills/SkillRegistry.ts",
+      "name": "SkillRegistry.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "methods for registering, composing, and tracking reusable skills in the skill hierarchy, integrating pre/post conditions and metadata for safe execution and performance monitoring in the conscious-bot system",
+      "classes": [
+        "SkillRegistry"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:29:05.465291",
+        "modified": "2026-02-04T12:29:05.465670",
+        "modified_days_ago": 1,
+        "lines": 846,
+        "size_bytes": 25913,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/social/social-memory-demo.ts",
+      "name": "social-memory-demo.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements SocialMemory storage for the bot's recollection of player/villager encounters. Maintains entity facts with time-based decay and confidence scoring.",
+      "classes": [
+        "SocialMemoryDemo"
+      ],
+      "functions": [
+        "runSocialMemoryDemo"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-22T01:56:23.325405",
+        "modified": "2025-09-22T01:59:00.959503",
+        "modified_days_ago": 137,
+        "lines": 483,
+        "size_bytes": 15738,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/social/social-memory-manager.ts",
+      "name": "social-memory-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements memory management for social entities in the conscious-bot architecture. Maintains entity relationships, encodes interaction history, and applies redaction-based forgetting for realism. Provides APIs to update and retrieve social facts with confidence scoring.",
+      "classes": [
+        "SocialMemoryManager",
+        "as"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "../semantic/knowledge-graph-core"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 136 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-22T01:47:31.290865",
+        "modified": "2025-09-22T07:33:33.426047",
+        "modified_days_ago": 136,
+        "lines": 664,
+        "size_bytes": 20500,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/social-memory-manager.ts",
+      "name": "social-memory-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements social memory retrieval using a vector database and hybrid search. Manages and stores social interactions, relationships, and entity reputations for context-aware reasoning. Enables the conscious-bot to track and reflect on past social behaviors for improved decision-making.",
+      "classes": [
+        "SocialMemoryManager"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T14:29:01.430255",
+        "modified": "2025-09-21T15:19:01.453749",
+        "modified_days_ago": 137,
+        "lines": 667,
+        "size_bytes": 18279,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/spatial-memory-manager.ts",
+      "name": "spatial-memory-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements spatial path management for the conscious-bot by storing and querying connections between locations. Maintains directed paths using start and end location IDs with waypoint support. Enables navigation by leveraging spatial relationships and location metadata for efficient route planning.",
+      "classes": [
+        "SpatialMemoryManager"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T14:30:06.748166",
+        "modified": "2025-09-21T14:34:10.778681",
+        "modified_days_ago": 137,
+        "lines": 864,
+        "size_bytes": 24580,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
     }
   ],
   "categories": {
@@ -8904,17 +13207,77 @@
       "dashboard/src/components/intero-timeline-chart.tsx",
       "dashboard/src/components/inventory-display.tsx",
       "dashboard/src/components/pill.tsx",
-      "dashboard/src/components/section.tsx"
+      "dashboard/src/components/section.tsx",
+      "dashboard/src/components/sparkline-chart.tsx",
+      "dashboard/src/components/stress-hex-heatmap.tsx",
+      "dashboard/src/components/ui/button.tsx",
+      "dashboard/src/components/ui/card.tsx",
+      "dashboard/src/components/ui/progress.tsx",
+      "dashboard/src/components/ui/scroll-area.tsx",
+      "dashboard/src/components/ui/tabs.tsx",
+      "dashboard/src/components/ui/toast.tsx",
+      "dashboard/src/components/ui/toaster.tsx",
+      "dashboard/src/components/ui/tooltip.tsx",
+      "dashboard/src/components/valuation-panel.tsx",
+      "dashboard/src/components/viewer-hud-overlay.tsx",
+      "dashboard/src/config.ts",
+      "dashboard/src/contexts/dashboard-context.tsx",
+      "dashboard/src/hooks/use-api.ts",
+      "dashboard/src/hooks/use-bot-state-sse.ts",
+      "dashboard/src/hooks/use-cognitive-stream.ts",
+      "dashboard/src/hooks/use-initial-data-fetch.ts",
+      "dashboard/src/hooks/use-periodic-refresh.ts",
+      "dashboard/src/hooks/use-sse.ts",
+      "dashboard/src/hooks/use-task-stream.ts",
+      "dashboard/src/hooks/use-toast.ts",
+      "dashboard/src/hooks/use-viewer.ts",
+      "dashboard/src/hooks/use-ws-bot-state.ts",
+      "dashboard/src/hooks/useWebSocket.ts",
+      "dashboard/src/lib/message-parser.ts",
+      "dashboard/src/lib/minecraft-assets.ts",
+      "dashboard/src/lib/minecraft-sprites.ts",
+      "dashboard/src/lib/mineflayer-item-mapping.ts",
+      "dashboard/src/lib/resilient-fetch.ts",
+      "dashboard/src/lib/task-normalize.ts",
+      "dashboard/src/lib/task-utils.ts",
+      "dashboard/src/lib/text-utils.ts",
+      "dashboard/src/lib/utils.ts",
+      "dashboard/src/main.tsx",
+      "dashboard/src/stores/dashboard-store.ts",
+      "dashboard/vite.config.ts"
     ],
     "Test scenarios and evaluation": [
       "evaluation/src/curriculum/index.ts",
-      "evaluation/src/index.ts"
+      "evaluation/src/index.ts",
+      "evaluation/src/benchmarking/performance-benchmark-runner.ts",
+      "evaluation/src/benchmarking/performance-benchmarker.ts",
+      "evaluation/src/benchmarking/run-benchmarks.ts",
+      "evaluation/src/curriculum/curriculum-builder.ts",
+      "evaluation/src/curriculum/curriculum-manager.ts",
+      "evaluation/src/curriculum/regression-suite.ts",
+      "evaluation/src/curriculum/types.ts",
+      "evaluation/src/dashboard/evaluation-dashboard.ts",
+      "evaluation/src/metrics/performance-analyzer.ts",
+      "evaluation/src/regression/regression-monitor.ts",
+      "evaluation/src/scenarios/complex-reasoning-scenarios.ts",
+      "evaluation/src/scenarios/minedojo-scenarios.ts",
+      "evaluation/src/scenarios/scenario-manager.ts",
+      "evaluation/src/testing/postgres-test-container.ts",
+      "evaluation/src/thought-generator-test.ts",
+      "evaluation/src/types.ts"
     ],
     "Planning executor contracts": [
-      "executor-contracts/src/index.ts"
+      "executor-contracts/src/index.ts",
+      "executor-contracts/src/capability-registry.ts",
+      "executor-contracts/src/leaf-factory.ts",
+      "executor-contracts/src/leaf-interfaces.ts",
+      "executor-contracts/src/pbi-enforcer.ts",
+      "executor-contracts/src/types.ts"
     ],
     "MCP server integration": [
-      "mcp-server/src/index.ts"
+      "mcp-server/src/index.ts",
+      "mcp-server/src/conscious-bot-mcp-server.ts",
+      "mcp-server/src/demo-mcp-server.ts"
     ],
     "Vector DB, reflection memory, hybrid search": [
       "memory/src/episodic/index.ts",
@@ -8922,7 +13285,51 @@
       "memory/src/provenance/index.ts",
       "memory/src/semantic/index.ts",
       "memory/src/skills/index.ts",
-      "memory/src/working/index.ts"
+      "memory/src/working/index.ts",
+      "memory/src/asset/asset-memory-store.ts",
+      "memory/src/chunking-service.ts",
+      "memory/src/cognitive-map-tracker.ts",
+      "memory/src/cognitive-task-memory.ts",
+      "memory/src/cross-modal-entity-linker.ts",
+      "memory/src/embedding-service.ts",
+      "memory/src/emotional-memory-manager.ts",
+      "memory/src/entity-extraction-service.ts",
+      "memory/src/episodic/episodic-retrieval.ts",
+      "memory/src/episodic/event-logger.ts",
+      "memory/src/episodic/memory-consolidation.ts",
+      "memory/src/episodic/narrative-generator.ts",
+      "memory/src/episodic/salience-scorer.ts",
+      "memory/src/htn-memory.ts",
+      "memory/src/hybrid-search-service.ts",
+      "memory/src/identity-memory-guardian.ts",
+      "memory/src/integration-examples.ts",
+      "memory/src/knowledge-graph-core.ts",
+      "memory/src/memory-decay-manager.ts",
+      "memory/src/memory-signal-generator.ts",
+      "memory/src/memory-system-coordinator.ts",
+      "memory/src/memory-system.ts",
+      "memory/src/memory-versioning-manager.ts",
+      "memory/src/neuroscience-consolidation-manager.ts",
+      "memory/src/provenance/audit-trail.ts",
+      "memory/src/provenance/decision-tracker.ts",
+      "memory/src/provenance/evidence-manager.ts",
+      "memory/src/provenance/explanation-generator.ts",
+      "memory/src/provenance/provenance-system.ts",
+      "memory/src/provenance/types.ts",
+      "memory/src/reflection-memory.ts",
+      "memory/src/self-narrative-constructor.ts",
+      "memory/src/semantic/graph-rag.ts",
+      "memory/src/semantic/knowledge-graph-core.ts",
+      "memory/src/semantic/query-engine.ts",
+      "memory/src/semantic/relationship-extractor.ts",
+      "memory/src/semantic/types.ts",
+      "memory/src/server.ts",
+      "memory/src/sharp-wave-ripple-manager.ts",
+      "memory/src/skills/SkillRegistry.ts",
+      "memory/src/social/social-memory-demo.ts",
+      "memory/src/social/social-memory-manager.ts",
+      "memory/src/social-memory-manager.ts",
+      "memory/src/spatial-memory-manager.ts"
     ],
     "Minecraft client, leaves, interaction, navigation": [
       "minecraft-interface/src/asset-pipeline/index.ts",
@@ -8968,33 +13375,33 @@
   },
   "statistics": {
     "by_status": {
-      "stable": 81,
-      "active": 134
+      "stable": 134,
+      "active": 185
     },
     "by_category": {
       "LLM integration, thought processing, intent extraction, cognitive stream": 102,
       "Shared utilities, TTS, API clients, base types": 57,
-      "Next.js dashboard, viewer HUD": 15,
-      "Test scenarios and evaluation": 2,
-      "Planning executor contracts": 1,
-      "MCP server integration": 1,
-      "Vector DB, reflection memory, hybrid search": 6,
+      "Next.js dashboard, viewer HUD": 52,
+      "Test scenarios and evaluation": 18,
+      "Planning executor contracts": 6,
+      "MCP server integration": 3,
+      "Vector DB, reflection memory, hybrid search": 50,
       "Minecraft client, leaves, interaction, navigation": 5,
       "Task integration, Sterling solver, cognitive thought processor": 14,
       "Safety checks and guards": 4,
       "P03/P21 conformance suites": 3,
       "World state, observation queue": 5
     },
-    "total_lines": 81163,
-    "total_classes": 130,
-    "total_functions": 283,
+    "total_lines": 137875,
+    "total_classes": 199,
+    "total_functions": 409,
     "todos_by_priority": {
       "P0-GOV": 0,
       "P1-METRIC": 0,
       "P2-QUAL": 0,
       "P3-UX": 0,
-      "untagged": 9
+      "untagged": 11
     },
-    "total_todos": 9
+    "total_todos": 11
   }
 }

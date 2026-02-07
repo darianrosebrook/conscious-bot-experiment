@@ -104,7 +104,18 @@ components:
           enum: [blocked]
         blocked_reason:
           type: string
-          description: "blocked_missing_digest | blocked_missing_envelope_id | blocked_digest_unknown | blocked_executor_unavailable | blocked_contract_version_mismatch | blocked_invalid_steps_bundle"
+          enum:
+            - blocked_missing_digest
+            - blocked_missing_schema_version
+            - blocked_missing_envelope_id
+            - blocked_envelope_id_mismatch
+            - blocked_digest_unknown
+            - blocked_invalid_ir_bundle
+            - blocked_unimplemented
+            - blocked_executor_unavailable
+            - blocked_contract_version_mismatch
+            - blocked_invalid_steps_bundle
+          description: Reason expansion was blocked; server emits only these values.
         retry_after_ms:
           type: integer
     ExpandByDigestError:

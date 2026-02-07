@@ -205,6 +205,20 @@ export class SterlingReasoningService {
     }
   }
 
+  /**
+   * Fetch the server identity banner (evidence-grade). Used by golden-run path
+   * to record which Sterling binary is running; invalid/missing banner fails the run.
+   */
+  async getServerBanner(timeoutMs: number = 3000): Promise<string | null> {
+    if (!this.enabled) return null;
+    try {
+      await this.initialize();
+      return await this.client.getServerBanner(timeoutMs);
+    } catch {
+      return null;
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Reasoning Methods
   // --------------------------------------------------------------------------

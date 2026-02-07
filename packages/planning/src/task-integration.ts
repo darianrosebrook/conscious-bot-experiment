@@ -49,7 +49,10 @@ import {
 import { TaskStore } from './task-integration/task-store';
 import { SterlingPlanner } from './task-integration/sterling-planner';
 import { convertThoughtToTask } from './task-integration/thought-to-task-converter';
-import { getGoldenRunRecorder } from './golden-run-recorder';
+import {
+  getGoldenRunRecorder,
+  isValidGoldenRunBanner,
+} from './golden-run-recorder';
 import {
   TaskManagementHandler,
   type ManagementResult,
@@ -1920,7 +1923,25 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return { outcome: 'blocked', reason: 'blocked_executor_unavailable', requestId };
     }
 
-    if (runId) {
+    if (runId && recorder) {
+      const bannerLine = await this.sterlingExecutorService.getServerBanner(3000);
+      if (!isValidGoldenRunBanner(bannerLine)) {
+        const detail =
+          !bannerLine || bannerLine.trim().length === 0
+            ? 'Could not fetch server banner (Sterling unreachable or server_info_v1 not supported)'
+            : 'Banner missing required marker: supports_expand_by_digest_v1_versioned_key=true';
+        recordExpansion({
+          request_id: requestId,
+          status: 'error',
+          error: `Golden run requires valid Sterling server banner: ${detail}`,
+        });
+        return {
+          outcome: 'error',
+          error: `Golden run requires valid Sterling server banner: ${detail}`,
+          requestId,
+        };
+      }
+      recorder.recordServerBanner(runId, bannerLine!);
       console.log(
         `[GoldenRun] Expansion request run_id=${runId} request_id=${requestId} digest=${digest.slice(0, 12)}`
       );

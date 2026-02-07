@@ -12,7 +12,11 @@ import crypto from 'crypto';
 import { MinecraftExecutor } from '../reactive-executor/minecraft-executor';
 import { PlanStatus, PlanStepStatus, ActionType } from '../types';
 import { getSystemReadyState, markSystemReady } from '../startup-barrier';
-import { getGoldenRunRecorder, sanitizeRunId } from '../golden-run-recorder';
+import {
+  getGoldenRunRecorder,
+  sanitizeRunId,
+  isValidGoldenRunBanner,
+} from '../golden-run-recorder';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -221,8 +225,14 @@ export function broadcastTaskUpdate(event: string, task: any): void {
   }
 }
 
+export interface PlanningEndpointsDeps {
+  /** Fetch Sterling server banner for golden-run evidence. If provided, inject requires valid banner. */
+  getServerBanner?: () => Promise<string | null>;
+}
+
 export function createPlanningEndpoints(
-  planningSystem: PlanningSystem
+  planningSystem: PlanningSystem,
+  deps?: PlanningEndpointsDeps
 ): Router {
   const router = Router();
 
@@ -1046,6 +1056,21 @@ export function createPlanningEndpoints(
         const runId = sanitizeRunId(runIdRaw);
 
         const recorder = getGoldenRunRecorder();
+
+        if (deps?.getServerBanner) {
+          const bannerLine = await deps.getServerBanner();
+          if (!isValidGoldenRunBanner(bannerLine)) {
+            return res.status(503).json({
+              error: 'Golden run requires valid Sterling server banner',
+              detail:
+                !bannerLine || bannerLine.trim().length === 0
+                  ? 'Could not fetch server banner (Sterling unreachable or server_info_v1 not supported)'
+                  : 'Banner missing required marker: supports_expand_by_digest_v1_versioned_key=true',
+            });
+          }
+          recorder.recordServerBanner(runId, bannerLine!);
+        }
+
         // Evidence hygiene: include executor mode/enablement so "no dispatch" isn't ambiguous.
         const loopStarted = Boolean((globalThis as any).__planningExecutorState?.running);
         recorder.recordRuntime(runId, {

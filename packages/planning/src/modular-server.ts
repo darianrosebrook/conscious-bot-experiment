@@ -3937,8 +3937,10 @@ async function startServer() {
       console.warn('⚠️ Core leaf registration in planning failed:', e);
     }
 
-    // Mount planning endpoints
-    const planningRouter = createPlanningEndpoints(planningSystem);
+    // Mount planning endpoints (getServerBanner wires golden-run banner capture via WS server_info_v1)
+    const planningRouter = createPlanningEndpoints(planningSystem, {
+      getServerBanner: () => sterlingService?.getServerBanner() ?? Promise.resolve(null),
+    });
     serverConfig.mountRouter('/', planningRouter);
 
     // Navigation solve endpoint
