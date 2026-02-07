@@ -1,7 +1,7 @@
 {
-  "generated": "2026-02-06T17:39:04.662234",
+  "generated": "2026-02-06T19:23:54.299702",
   "author": "@darianrosebrook",
-  "total_modules": 319,
+  "total_modules": 359,
   "modules": [
     {
       "path": "cognition/src/constitutional-filter/index.ts",
@@ -13026,6 +13026,1737 @@
         "author": "@darianrosebrook",
         "has_main": false
       }
+    },
+    {
+      "path": "memory/src/tool-efficiency-examples.ts",
+      "name": "tool-efficiency-examples.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "* Tool Efficiency Memory System Examples * * Comprehensive examples showing how the tool efficiency memory system integrates * with behavior trees, cognitive processing, and planning systems to learn * optimal tool usage patterns and improve bot performance. * * @author @darianrosebrook",
+      "classes": [],
+      "functions": [
+        "toolUsageTrackingExample",
+        "cognitivePatternLearningExample",
+        "planningStrategyLearningExample",
+        "adaptiveToolSelectionExample",
+        "behaviorTreeEvolutionExample",
+        "runAllToolEfficiencyExamples"
+      ],
+      "imports": [
+        "./memory-system"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-28T23:01:13.980191",
+        "modified": "2026-01-28T23:01:13.980300",
+        "modified_days_ago": 8,
+        "lines": 685,
+        "size_bytes": 20521,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/tool-efficiency-memory.ts",
+      "name": "tool-efficiency-memory.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements a Tool Usage Memory storage interface within the conscious-bot's memory system. Stores and analyzes tool usage records for efficiency metrics and context awareness.",
+      "classes": [
+        "ToolEfficiencyMemoryManager"
+      ],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T14:01:17.101361",
+        "modified": "2025-09-21T15:19:00.127337",
+        "modified_days_ago": 137,
+        "lines": 919,
+        "size_bytes": 27515,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/types.ts",
+      "name": "types.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides typed definitions for Experience objects representing significant events stored in the conscious-bot's episodic memory system. Implements unique identifiers and structure for organizing experiences with key metadata. Enables consistent representation for experience records used across memory modules.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.097492",
+        "modified": "2025-09-21T22:07:27.097600",
+        "modified_days_ago": 137,
+        "lines": 739,
+        "size_bytes": 17831,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/utils/experience-normalizer.ts",
+      "name": "experience-normalizer.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides mapping from raw experience type strings to standardized ExperienceType values in the memory module, supporting natural language and enum-based normalization. Maintains original input as a note for traceability and context. Enables consistent interpretation for reflection and learning state tracking in the conscious-bot architecture.",
+      "classes": [],
+      "functions": [
+        "normalizeExperienceType"
+      ],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 158 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-31T11:04:13.064869",
+        "modified": "2025-08-31T11:04:13.064932",
+        "modified_days_ago": 158,
+        "lines": 83,
+        "size_bytes": 3538,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/vector-database.ts",
+      "name": "vector-database.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "active",
+      "description": "Provides an optimized PostgreSQL vector database using pgvector, supporting hybrid search and enhanced metadata with entity graphs. Integrates decay profiles and provenance tracking for memory management. Enables the cognitive modules of conscious-bot to efficiently query and retrieve relevant knowledge with contextual entity relationships.",
+      "classes": [
+        "EnhancedVectorDatabase"
+      ],
+      "functions": [],
+      "imports": [
+        "pg",
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T02:42:39.775616",
+        "modified": "2026-02-03T02:42:39.775787",
+        "modified_days_ago": 3,
+        "lines": 1435,
+        "size_bytes": 43014,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/attention-manager.ts",
+      "name": "attention-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Manages cognitive attention distribution across memory streams using strategies for load balancing and prioritization to maintain optimal performance and prevent overload in the conscious-bot's working memory.",
+      "classes": [
+        "AttentionManager"
+      ],
+      "functions": [],
+      "imports": [
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.465192",
+        "modified": "2025-08-23T17:46:29.465679",
+        "modified_days_ago": 166,
+        "lines": 714,
+        "size_bytes": 19227,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/central-executive.ts",
+      "name": "central-executive.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements a centralized working memory manager that dynamically allocates attention and resources across phonological, visuospatial, and episodic buffers. Coordinates real-time updates and enforces decay and rehearsal policies for memory retention.",
+      "classes": [
+        "CentralExecutive"
+      ],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.213063",
+        "modified": "2025-09-22T02:00:59.629878",
+        "modified_days_ago": 137,
+        "lines": 914,
+        "size_bytes": 24713,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/context-manager.ts",
+      "name": "context-manager.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "context manager for the bot's working memory, responsible for maintaining and updating active context frames including spatial awareness, ensuring efficient retrieval and prioritization of relevant memory for cognitive tasks.",
+      "classes": [
+        "ContextManager"
+      ],
+      "functions": [],
+      "imports": [
+        "./types",
+        "./central-executive"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.213229",
+        "modified": "2025-08-21T11:10:01.213338",
+        "modified_days_ago": 168,
+        "lines": 316,
+        "size_bytes": 7846,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/goal-tracker.ts",
+      "name": "goal-tracker.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements goal management in the working memory of conscious-bot by tracking descriptions, priorities, deadlines, subgoals, and dependencies for active goals. Maintains a list of current goals and supports prioritization and status queries. Allows the planner to retrieve and update goals efficiently using the central-executive state.",
+      "classes": [
+        "GoalTracker"
+      ],
+      "functions": [],
+      "imports": [
+        "./types",
+        "./central-executive"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.213370",
+        "modified": "2025-08-21T11:10:01.213536",
+        "modified_days_ago": 168,
+        "lines": 372,
+        "size_bytes": 9469,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/memory-integration.ts",
+      "name": "memory-integration.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Implements memory integration by linking working memory with episodic and semantic memories, using the CentralExecutive for insertion and managing associations. Facilitates coherent workspace by orchestrating retrieval and merging information from various memory stores. Provides a method to add episodic memory entries with customizable importance and association options.",
+      "classes": [
+        "MemoryIntegration"
+      ],
+      "functions": [],
+      "imports": [
+        "./central-executive",
+        "./context-manager",
+        "./goal-tracker"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.213692",
+        "modified": "2025-08-21T11:10:01.213785",
+        "modified_days_ago": 168,
+        "lines": 518,
+        "size_bytes": 12962,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/src/working/types.ts",
+      "name": "types.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides type definitions for the working memory system of conscious-bot, modeling states for attention, active goals, and their associated metadata used in cognitive processing and memory management.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "zod"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 168 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-21T11:10:01.213816",
+        "modified": "2025-08-21T11:10:01.213920",
+        "modified_days_ago": 168,
+        "lines": 318,
+        "size_bytes": 6943,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "memory/vitest.config.ts",
+      "name": "vitest.config.ts",
+      "category": "Vector DB, reflection memory, hybrid search",
+      "status": "stable",
+      "description": "Provides a lightweight in-memory test harness for the conscious-bot's memory module, enabling unit testing of vector DB operations and reflection memory usage without requiring actual external storage.",
+      "classes": [],
+      "functions": [],
+      "imports": [
+        "vitest/config",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 162 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-27T13:32:41.012219",
+        "modified": "2025-08-27T13:32:41.012309",
+        "modified_days_ago": 162,
+        "lines": 20,
+        "size_bytes": 496,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/bin/mc-sim.ts",
+      "name": "mc-sim.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "stable",
+      "description": "Provides a CLI to simulate Minecraft interactions and control the bot's actions within the conscious-bot's simulation stub, enabling testing of movement, chat, and block placement commands.",
+      "classes": [],
+      "functions": [
+        "showHelp",
+        "main",
+        "runAction",
+        "runDemo",
+        "main"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.466267",
+        "modified": "2025-08-23T19:49:49.910802",
+        "modified_days_ago": 166,
+        "lines": 269,
+        "size_bytes": 7940,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/bin/mc-simple.ts",
+      "name": "mc-simple.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "stable",
+      "description": "Provides a lightweight CLI interface for testing direct Minecraft connectivity within the conscious-bot system. Implements host, port, username, and action command parsing for simple bot integration. Enables manual control over the bot's connection and basic in-game actions via terminal arguments.",
+      "classes": [],
+      "functions": [
+        "parseArgs",
+        "printHelp",
+        "runAction",
+        "main"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 166 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.466465",
+        "modified": "2025-08-23T19:49:49.910816",
+        "modified_days_ago": 166,
+        "lines": 213,
+        "size_bytes": 5692,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/bin/mc-smoke.ts",
+      "name": "mc-smoke.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides a CLI interface for running Minecraft integration smoke tests on the conscious-bot agent, invoking navigation and resource scenarios by executing preconfigured planning logic with required signals and timeouts.",
+      "classes": [],
+      "functions": [
+        "main",
+        "runSingleTest",
+        "parseArgs",
+        "printHelp"
+      ],
+      "imports": [
+        "../src/index",
+        "../src/types"
+      ],
+      "constants": [
+        "SCENARIOS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-30T02:39:07.779441",
+        "modified": "2026-02-01T03:03:40.703817",
+        "modified_days_ago": 5,
+        "lines": 274,
+        "size_bytes": 7126,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/bin/mc-standalone.ts",
+      "name": "mc-standalone.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "stable",
+      "description": "Provides a lightweight CLI for directly controlling the Minecraft interface of the conscious-bot agent for component-level testing and manual interaction. Supports configuration for server host, port, and username with optional verbose logging. Enables real-time bot connection and execution without the full planning pipeline.",
+      "classes": [],
+      "functions": [
+        "parseArgs",
+        "printHelp",
+        "runBasicScenario",
+        "runNavigationScenario",
+        "runInventoryScenario",
+        "runCraftingScenario",
+        "main"
+      ],
+      "imports": [
+        "../src/types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 157 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.466824",
+        "modified": "2025-09-01T19:09:44.676945",
+        "modified_days_ago": 157,
+        "lines": 335,
+        "size_bytes": 8585,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/bin/mc-viewer.ts",
+      "name": "mc-viewer.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides a secure, entity-filtered viewer for the conscious-bot's Minecraft interaction layer, using Mineflayer for event handling and Prismarine-Viewer for rendering; integrates safety checks before processing game events and manages navigation via entity identification.",
+      "classes": [],
+      "functions": [
+        "createEntityFilter",
+        "filterEntity",
+        "main"
+      ],
+      "imports": [
+        "mineflayer",
+        "prismarine-viewer",
+        "path",
+        "../src/viewer-enhancements"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T03:31:36.196447",
+        "modified": "2026-02-03T03:31:36.196545",
+        "modified_days_ago": 3,
+        "lines": 325,
+        "size_bytes": 8371,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/scripts/mc-assets.ts",
+      "name": "mc-assets.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "version-specific assets-extractor: Provides tools to extract textures and blockStates from Minecraft JAR files, managing the asset generation cache for the cognitive asset pipeline. * * Integrates directly with the consciousness-bot's asset management to ensure accurate and up-to-date model inputs. * * Streamlines the workflow for the minecraft-interface by reducing reliance on external asset packages.",
+      "classes": [],
+      "functions": [
+        "printHelp",
+        "formatBytes",
+        "formatDate",
+        "main",
+        "runExtract",
+        "getStageEmoji",
+        "runList",
+        "runClean",
+        "runInject"
+      ],
+      "imports": [
+        "path",
+        "../src/asset-pipeline/pipeline.js"
+      ],
+      "constants": [
+        "COMMANDS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:31:52.727260",
+        "modified": "2026-02-03T04:31:52.727622",
+        "modified_days_ago": 3,
+        "lines": 266,
+        "size_bytes": 8597,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/action-contract-registry.ts",
+      "name": "action-contract-registry.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "handling mappings to dynamic leaf execution by enforcing required keys and routing logic for ActionContract lookups in the Minecraft-Interface.",
+      "classes": [],
+      "functions": [
+        "resolveLeafName",
+        "normalizeActionParams",
+        "buildActionTypeToLeafMap"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-01T22:24:10.033006",
+        "modified": "2026-02-01T22:24:10.033204",
+        "modified_days_ago": 4,
+        "lines": 222,
+        "size_bytes": 7790,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/action-executor.ts",
+      "name": "action-executor.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Implements execution of high-level plans by translating them into concrete Minecraft actions using the leaf operation system. Manages plan-to-action conversion and interacts with the bot to perform specified tasks.",
+      "classes": [
+        "ActionExecutor"
+      ],
+      "functions": [],
+      "imports": [
+        "mineflayer",
+        "@conscious-bot/core",
+        "./bot-adapter",
+        "@conscious-bot/core"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-25T17:05:21.536693",
+        "modified": "2026-02-02T19:27:56.325318",
+        "modified_days_ago": 3,
+        "lines": 319,
+        "size_bytes": 8543,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/action-translator-singleton.ts",
+      "name": "action-translator-singleton.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides a globally accessible ActionTranslator instance for the bot, ensuring consistent action interpretation and response across the entire cognition workflow. Centralizes translation logic to prevent state corruption when the bot reconnects. Must be used by PlanExecutor and SafetyMonitor for unified action handling.",
+      "classes": [],
+      "functions": [
+        "registerActionTranslator",
+        "getActionTranslator",
+        "getRegisteredBot",
+        "clearActionTranslator"
+      ],
+      "imports": [
+        "mineflayer",
+        "./action-translator"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T17:14:11.806530",
+        "modified": "2026-02-02T17:14:11.806623",
+        "modified_days_ago": 3,
+        "lines": 61,
+        "size_bytes": 1782,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/action-translator.ts",
+      "name": "action-translator.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides translation from cognitive PlanStep to concrete Minecraft actions using the mineflayer API. Implements heuristic, isEnd, hasChanged, and isValid methods for goal evaluation in the navigation context. Guards against invalid commands and handles timeouts for robust step execution.",
+      "classes": [
+        "SimpleGoalNear",
+        "SimpleGoalBlock",
+        "ActionTranslator"
+      ],
+      "functions": [
+        "getGoals",
+        "deriveNavLeaseContext",
+        "stripReservedMeta"
+      ],
+      "imports": [
+        "mineflayer",
+        "mineflayer-pathfinder",
+        "vec3",
+        "@conscious-bot/core",
+        "./navigation-lease-manager",
+        "./types",
+        "./navigation-bridge",
+        "./extensions/state-machine-wrapper"
+      ],
+      "constants": [
+        "LEGACY_ONLY",
+        "DIG_REACH"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:32:03.024523",
+        "modified": "2026-02-05T19:34:23.863799",
+        "modified_days_ago": 0,
+        "lines": 4201,
+        "size_bytes": 124394,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/animated-material.ts",
+      "name": "animated-material.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "and implements a custom THREE.ShaderMaterial for animating Minecraft textures using sprite-sheet based frame mapping. It decodes animation data from lookup textures and uses a uniform for day/night cycle interpolation in the shader. This enables fluid rendering of animated block textures within the conscious-bot Minecraft client.",
+      "classes": [],
+      "functions": [
+        "generateAnimationTextures",
+        "generateFrameSequenceMap",
+        "generateAnimationMap",
+        "generateAnimationMapFromLookup",
+        "buildAnimationLookup",
+        "extractAnimationsFromVariant",
+        "createAnimatedMaterial",
+        "updateAnimatedMaterial",
+        "updateDayNightCycle",
+        "worldTimeToDayProgress"
+      ],
+      "imports": [
+        "three"
+      ],
+      "constants": [
+        "DAY_AMBIENT_COLOR",
+        "NIGHT_AMBIENT_COLOR",
+        "TWILIGHT_AMBIENT_COLOR",
+        "DAY_DIRECTIONAL_COLOR",
+        "NIGHT_DIRECTIONAL_COLOR",
+        "TWILIGHT_DIRECTIONAL_COLOR",
+        "MAX_SEQUENCE_LENGTH",
+        "MAX_SEQUENCE_COUNT"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 300,
+            "content": "// TODO: In the future, we could encode sequence index in the animation map",
+            "file_path": "packages/minecraft-interface/src/asset-pipeline/animated-material.ts"
+          }
+        ]
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T08:08:50.691646",
+        "modified": "2026-02-04T08:08:50.691772",
+        "modified_days_ago": 1,
+        "lines": 930,
+        "size_bytes": 32281,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/asset-extractor.ts",
+      "name": "asset-extractor.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Extracts textures, blockstates, and models from Minecraft JAR files using yauzl for asynchronous ZIP handling. Processes predefined JAR paths and returns structured assets for the cognitive pipeline.",
+      "classes": [
+        "AssetExtractor"
+      ],
+      "functions": [
+        "getAssetExtractor"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "os",
+        "yauzl"
+      ],
+      "constants": [
+        "DEFAULT_CACHE_DIR",
+        "JAR_PATHS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.419118",
+        "modified": "2026-02-04T23:32:13.419305",
+        "modified_days_ago": 1,
+        "lines": 557,
+        "size_bytes": 18999,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/asset-server.ts",
+      "name": "asset-server.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "asset-server provides an Express middleware for caching and serving generated Minecraft texture atlases and blockstates to the client. It manages versioned asset retrieval, with fallback to bundled assets when generation is in progress. It supports GET routes for textures, block states, and status checks.",
+      "classes": [],
+      "functions": [
+        "createAssetServer",
+        "findPvPublicDir",
+        "createAssetMiddleware"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "module",
+        "express",
+        "express",
+        "./pipeline.js",
+        "./types.js"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.419407",
+        "modified": "2026-02-06T06:56:41.743429",
+        "modified_days_ago": 0,
+        "lines": 472,
+        "size_bytes": 16923,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/atlas-builder.ts",
+      "name": "atlas-builder.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides a missing texture generator for the Minecraft client, creating a magenta-black checkerboard placeholder on load, and integrates it into the asset pipeline for atlas generation.",
+      "classes": [
+        "AtlasBuilder"
+      ],
+      "functions": [
+        "nextPowerOfTwo",
+        "getAtlasBuilder"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "canvas"
+      ],
+      "constants": [
+        "DEFAULT_TILE_SIZE",
+        "DEFAULT_MAX_SIZE"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T18:21:20.160515",
+        "modified": "2026-02-03T18:21:20.160753",
+        "modified_days_ago": 2,
+        "lines": 328,
+        "size_bytes": 10777,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/blockstates-builder.ts",
+      "name": "blockstates-builder.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Implements block model and texture mapping for the renderer. Resolves model inheritance and texture UVs using provided definitions. Converts resolved block states into a format expected by the Minecraft viewer.",
+      "classes": [
+        "BlockStatesBuilder"
+      ],
+      "functions": [
+        "cleanupBlockName",
+        "buildBlockStates"
+      ],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:35:37.981529",
+        "modified": "2026-02-03T05:35:37.981742",
+        "modified_days_ago": 3,
+        "lines": 375,
+        "size_bytes": 11444,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/entity-animations.ts",
+      "name": "entity-animations.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Implements bone keyframe storage and playback for entity animations in the conscious-bot viewer. Handles mapping entity movement data to appropriate animation state transitions.",
+      "classes": [
+        "EntityAnimationManager"
+      ],
+      "functions": [
+        "createAnimationClip",
+        "getEntityCategory",
+        "determineAnimationState",
+        "calculateAnimationSpeed",
+        "getAnimationManager",
+        "resetAnimationManager"
+      ],
+      "imports": [
+        "three"
+      ],
+      "constants": [
+        "BIPED_BONES",
+        "QUADRUPED_BONES",
+        "BIPED_ENTITIES",
+        "QUADRUPED_ENTITIES"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T09:13:00.375041",
+        "modified": "2026-02-04T09:13:00.375171",
+        "modified_days_ago": 1,
+        "lines": 845,
+        "size_bytes": 26053,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/jar-downloader.ts",
+      "name": "jar-downloader.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Downloads, verifies (if enabled), and caches Minecraft client JAR files for the specified version using local paths and SHA1 checksum validation.",
+      "classes": [
+        "JarDownloader"
+      ],
+      "functions": [
+        "getJarDownloader"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "os",
+        "crypto",
+        "stream/promises",
+        "stream"
+      ],
+      "constants": [
+        "DEFAULT_CACHE_DIR"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:23:49.983699",
+        "modified": "2026-02-03T04:23:49.983808",
+        "modified_days_ago": 3,
+        "lines": 245,
+        "size_bytes": 6495,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/pipeline.ts",
+      "name": "pipeline.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides centralized orchestration of asset generation by coordinating version lookup, JAR download, extraction, atlas and blockstates creation for the conscious-bot Minecraft client modules.",
+      "classes": [
+        "AssetPipeline"
+      ],
+      "functions": [
+        "getAssetPipeline"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "os",
+        "./version-resolver.js",
+        "./jar-downloader.js",
+        "./asset-extractor.js",
+        "./atlas-builder.js",
+        "./blockstates-builder.js"
+      ],
+      "constants": [
+        "DEFAULT_CACHE_DIR"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T05:35:52.575408",
+        "modified": "2026-02-06T06:58:31.022837",
+        "modified_days_ago": 0,
+        "lines": 390,
+        "size_bytes": 13219,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/types.ts",
+      "name": "types.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides type definitions for extracting and validating Minecraft JAR assets within the asset pipeline module. Implements structured parsing of Mojang version manifest data to identify asset IDs, versions, and compliance levels. Enables the minecraft-interface to reliably retrieve textures and blockStates for each game version.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T23:32:13.419637",
+        "modified": "2026-02-04T23:32:13.419912",
+        "modified_days_ago": 1,
+        "lines": 470,
+        "size_bytes": 13407,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/version-resolver.ts",
+      "name": "version-resolver.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "* Version Resolver - Fetches and parses Mojang's version manifest. * * This module handles fetching the Minecraft version manifest from Mojang's servers, * parsing version metadata, and caching results to minimize API calls. * * @module asset-pipeline/version-resolver",
+      "classes": [
+        "VersionResolver"
+      ],
+      "functions": [
+        "getVersionResolver"
+      ],
+      "imports": [],
+      "constants": [
+        "MOJANG_MANIFEST_URL",
+        "DEFAULT_CACHE_TTL_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T04:23:22.390622",
+        "modified": "2026-02-03T04:23:22.390745",
+        "modified_days_ago": 3,
+        "lines": 227,
+        "size_bytes": 6623,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/asset-pipeline/viewer-integration.ts",
+      "name": "viewer-integration.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "with the viewer integration module providing a wrapper to seamlessly switch prismarine-viewer's MeshPhongMaterial to an animated ShaderMaterial using generateAnimationMap and updateAnimatedMaterial, it enables dynamic block rendering via synchronized animation logic and supports configuration through ViewerIntegrationOptions for texture and state loading. This ensures smooth, time-aware visual updates in the Minecraft interface.",
+      "classes": [],
+      "functions": [
+        "integrateAnimatedMaterial",
+        "generateEmptyAnimationMap",
+        "updateSceneMaterials",
+        "fetchJSON",
+        "hookRenderLoop",
+        "setupAnimatedViewer"
+      ],
+      "imports": [
+        "./viewer-integration",
+        "three"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-03T06:11:27.995373",
+        "modified": "2026-02-03T06:11:27.995530",
+        "modified_days_ago": 3,
+        "lines": 327,
+        "size_bytes": 8849,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/automatic-safety-monitor.ts",
+      "name": "automatic-safety-monitor.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "* Automatic Safety Monitor for Minecraft Bot * * Continuously monitors bot health and automatically responds to threats * * @author @darianrosebrook",
+      "classes": [
+        "AutomaticSafetyMonitor"
+      ],
+      "functions": [],
+      "imports": [
+        "events",
+        "mineflayer",
+        "vec3",
+        "./action-translator",
+        "./threat-perception-manager",
+        "./entity-belief/belief-bus",
+        "./reflex/reflex-safety",
+        "./reflex/reflex-arbitrator"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:37:39.516342",
+        "modified": "2026-02-04T12:37:39.516753",
+        "modified_days_ago": 1,
+        "lines": 1168,
+        "size_bytes": 36249,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/bot-adapter.ts",
+      "name": "bot-adapter.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Implements BotAdapter: Manages the mineflayer bot instance and its event streaming interface for the planning module. Tracks connection states and integrates with the belief bus for state updates and threat assessment. Provides a robust event emitter for safe, structured interaction with the Minecraft environment.",
+      "classes": [
+        "BotAdapter",
+        "instances"
+      ],
+      "functions": [],
+      "imports": [
+        "mineflayer",
+        "events",
+        "vec3",
+        "./types",
+        "./automatic-safety-monitor",
+        "@conscious-bot/core",
+        "./action-translator",
+        "minecraft-data",
+        "./reflex",
+        "./startup-barrier"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": [
+          {
+            "line_number": 1094,
+            "content": "// TODO(rig-I-primitive-21): Remove /process throttling when observation batching is implemented",
+            "file_path": "packages/minecraft-interface/src/bot-adapter.ts"
+          },
+          {
+            "line_number": 1103,
+            "content": "// TODO(rig-I-primitive-21): Replace with proper entity observation batching",
+            "file_path": "packages/minecraft-interface/src/bot-adapter.ts"
+          },
+          {
+            "line_number": 1153,
+            "content": "// TODO(rig-I-primitive-21): Replace with proper entity observation batching",
+            "file_path": "packages/minecraft-interface/src/bot-adapter.ts"
+          },
+          {
+            "line_number": 1475,
+            "content": "// TODO(rig-I-primitive-21): Replace with proper observation batching",
+            "file_path": "packages/minecraft-interface/src/bot-adapter.ts"
+          }
+        ]
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-04T12:35:11.533185",
+        "modified": "2026-02-05T19:34:23.863954",
+        "modified_days_ago": 0,
+        "lines": 1729,
+        "size_bytes": 54889,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/chat-processor.ts",
+      "name": "chat-processor.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Implements chat parsing, intent detection, and context-aware response generation for multi-player Minecraft interaction within the conscious-bot framework. Analyzes incoming messages to determine intent and social cues, and emits structured responses via events to the game client. Integrates configurable settings for response behavior and player relationship tracking.",
+      "classes": [
+        "ChatProcessor"
+      ],
+      "functions": [],
+      "imports": [
+        "@conscious-bot/core",
+        "events"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T18:28:54.768560",
+        "modified": "2026-02-01T03:03:40.651938",
+        "modified_days_ago": 5,
+        "lines": 621,
+        "size_bytes": 17043,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/debounce.ts",
+      "name": "debounce.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "stable",
+      "description": "Provides a debounce utility to smooth and limit frequent Minecraft interaction calls, preventing excessive API usage while ensuring timely input handling in the interface layer.",
+      "classes": [],
+      "functions": [],
+      "imports": [],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 137 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-09-21T22:07:27.098521",
+        "modified": "2025-09-21T22:07:27.098598",
+        "modified_days_ago": 137,
+        "lines": 18,
+        "size_bytes": 458,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/entity-belief/belief-bus.ts",
+      "name": "belief-bus.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "Provides saliency updates by ingesting EvidenceBatches and injecting TrackSet deltas into the pending buffer; ensures timely emission via forced and periodic snapshots for the entity's belief state.",
+      "classes": [
+        "BeliefBus"
+      ],
+      "functions": [],
+      "imports": [
+        "./track-set"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T21:41:55.976857",
+        "modified": "2026-01-31T21:41:55.977010",
+        "modified_days_ago": 5,
+        "lines": 143,
+        "size_bytes": 4225,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/entity-belief/evidence-builder.ts",
+      "name": "evidence-builder.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "List entity observations and convert them into standardized EvidenceItem entries with bucketed spatial and kind information for deterministic tracking. Assign each coordinate to integer buckets using fixed sizes to enable spatial sorting. Generate a canonical sort key to ensure consistent and reproducible ordering of evidence during processing.",
+      "classes": [],
+      "functions": [
+        "toPosBucket",
+        "toDistBucket",
+        "kindToEnum",
+        "evidenceSortKey",
+        "canonicalizeEvidence",
+        "buildEvidenceBatch"
+      ],
+      "imports": [],
+      "constants": [
+        "MAX_DETECTION_DISTANCE"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:25:35.477787",
+        "modified": "2026-01-31T20:25:35.477925",
+        "modified_days_ago": 5,
+        "lines": 135,
+        "size_bytes": 3795,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "minecraft-interface/src/entity-belief/telemetry.ts",
+      "name": "telemetry.ts",
+      "category": "Minecraft client, leaves, interaction, navigation",
+      "status": "active",
+      "description": "leaves entity telemetry counters and emits signals for threat detection metrics, allowing the cognitive module to monitor and report on entity activity, confidence levels, and hazard warnings without affecting learning processes.",
+      "classes": [
+        "BeliefTelemetry"
+      ],
+      "functions": [],
+      "imports": [
+        "./types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-01-31T20:33:53.894135",
+        "modified": "2026-01-31T20:33:53.894249",
+        "modified_days_ago": 5,
+        "lines": 78,
+        "size_bytes": 1833,
+        "author": null,
+        "has_main": false
+      }
     }
   ],
   "categories": {
@@ -13329,14 +15060,54 @@
       "memory/src/social/social-memory-demo.ts",
       "memory/src/social/social-memory-manager.ts",
       "memory/src/social-memory-manager.ts",
-      "memory/src/spatial-memory-manager.ts"
+      "memory/src/spatial-memory-manager.ts",
+      "memory/src/tool-efficiency-examples.ts",
+      "memory/src/tool-efficiency-memory.ts",
+      "memory/src/types.ts",
+      "memory/src/utils/experience-normalizer.ts",
+      "memory/src/vector-database.ts",
+      "memory/src/working/attention-manager.ts",
+      "memory/src/working/central-executive.ts",
+      "memory/src/working/context-manager.ts",
+      "memory/src/working/goal-tracker.ts",
+      "memory/src/working/memory-integration.ts",
+      "memory/src/working/types.ts",
+      "memory/vitest.config.ts"
     ],
     "Minecraft client, leaves, interaction, navigation": [
       "minecraft-interface/src/asset-pipeline/index.ts",
       "minecraft-interface/src/entity-belief/index.ts",
       "minecraft-interface/src/extensions/index.ts",
       "minecraft-interface/src/index.ts",
-      "minecraft-interface/src/reflex/index.ts"
+      "minecraft-interface/src/reflex/index.ts",
+      "minecraft-interface/bin/mc-sim.ts",
+      "minecraft-interface/bin/mc-simple.ts",
+      "minecraft-interface/bin/mc-smoke.ts",
+      "minecraft-interface/bin/mc-standalone.ts",
+      "minecraft-interface/bin/mc-viewer.ts",
+      "minecraft-interface/scripts/mc-assets.ts",
+      "minecraft-interface/src/action-contract-registry.ts",
+      "minecraft-interface/src/action-executor.ts",
+      "minecraft-interface/src/action-translator-singleton.ts",
+      "minecraft-interface/src/action-translator.ts",
+      "minecraft-interface/src/asset-pipeline/animated-material.ts",
+      "minecraft-interface/src/asset-pipeline/asset-extractor.ts",
+      "minecraft-interface/src/asset-pipeline/asset-server.ts",
+      "minecraft-interface/src/asset-pipeline/atlas-builder.ts",
+      "minecraft-interface/src/asset-pipeline/blockstates-builder.ts",
+      "minecraft-interface/src/asset-pipeline/entity-animations.ts",
+      "minecraft-interface/src/asset-pipeline/jar-downloader.ts",
+      "minecraft-interface/src/asset-pipeline/pipeline.ts",
+      "minecraft-interface/src/asset-pipeline/types.ts",
+      "minecraft-interface/src/asset-pipeline/version-resolver.ts",
+      "minecraft-interface/src/asset-pipeline/viewer-integration.ts",
+      "minecraft-interface/src/automatic-safety-monitor.ts",
+      "minecraft-interface/src/bot-adapter.ts",
+      "minecraft-interface/src/chat-processor.ts",
+      "minecraft-interface/src/debounce.ts",
+      "minecraft-interface/src/entity-belief/belief-bus.ts",
+      "minecraft-interface/src/entity-belief/evidence-builder.ts",
+      "minecraft-interface/src/entity-belief/telemetry.ts"
     ],
     "Task integration, Sterling solver, cognitive thought processor": [
       "planning/src/constraints/index.ts",
@@ -13375,8 +15146,8 @@
   },
   "statistics": {
     "by_status": {
-      "stable": 134,
-      "active": 185
+      "stable": 148,
+      "active": 211
     },
     "by_category": {
       "LLM integration, thought processing, intent extraction, cognitive stream": 102,
@@ -13385,23 +15156,23 @@
       "Test scenarios and evaluation": 18,
       "Planning executor contracts": 6,
       "MCP server integration": 3,
-      "Vector DB, reflection memory, hybrid search": 50,
-      "Minecraft client, leaves, interaction, navigation": 5,
+      "Vector DB, reflection memory, hybrid search": 62,
+      "Minecraft client, leaves, interaction, navigation": 33,
       "Task integration, Sterling solver, cognitive thought processor": 14,
       "Safety checks and guards": 4,
       "P03/P21 conformance suites": 3,
       "World state, observation queue": 5
     },
-    "total_lines": 137875,
-    "total_classes": 199,
-    "total_functions": 409,
+    "total_lines": 160451,
+    "total_classes": 223,
+    "total_functions": 497,
     "todos_by_priority": {
       "P0-GOV": 0,
       "P1-METRIC": 0,
       "P2-QUAL": 0,
       "P3-UX": 0,
-      "untagged": 11
+      "untagged": 16
     },
-    "total_todos": 11
+    "total_todos": 16
   }
 }

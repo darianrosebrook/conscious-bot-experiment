@@ -29,4 +29,6 @@ export type {
   SterlingHealthStatus,
   SterlingConnectionState,
   SterlingSolveStepCallback,
+  SterlingLanguageReducerResult,
+  SterlingLanguageIOResultMessage,
 } from './types';

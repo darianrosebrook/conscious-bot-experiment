@@ -15,6 +15,7 @@ import {
   type SterlingSolveResult,
   type SterlingHealthStatus,
   type SterlingSolveStepCallback,
+  type SterlingLanguageReducerResult,
 } from '@conscious-bot/core';
 import { computeDeclarationDigest, type DomainDeclarationV1 } from './domain-declaration';
 
@@ -216,6 +217,31 @@ export class SterlingReasoningService {
       return await this.client.getServerBanner(timeoutMs);
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Send a language_io.reduce command to Sterling. Registers the committed IR
+   * in Sterling's expansion registry so expandByDigest can resolve the digest.
+   */
+  async sendLanguageIOReduce(
+    envelope: Record<string, unknown>,
+    timeoutMs: number = 10000
+  ): Promise<
+    | { success: true; result: SterlingLanguageReducerResult }
+    | { success: false; error: string }
+  > {
+    if (!this.enabled) {
+      return { success: false, error: 'Sterling client not enabled' };
+    }
+    try {
+      await this.initialize();
+      return await this.client.sendLanguageIOReduce(envelope, timeoutMs);
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 

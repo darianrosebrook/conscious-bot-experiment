@@ -837,18 +837,37 @@ export class SterlingClient extends EventEmitter {
   /**
    * Fetch the server identity banner (evidence-grade). Call after connect to
    * record which Sterling binary is running; required for golden-run artifacts.
+   * Tries the shared connection first; if that times out or fails, opens a
+   * one-off WebSocket to the same URL and requests the banner (workaround for
+   * shared-connection listener ordering or message routing).
    */
   async getServerBanner(timeoutMs: number = 3000): Promise<string | null> {
+    const debug = process.env.DEBUG_STERLING_BANNER === '1';
+    const fromShared = await this.getServerBannerOverSharedConnection(timeoutMs);
+    if (fromShared !== null) return fromShared;
+    if (debug) console.warn('[SterlingClient] getServerBanner shared connection returned null, trying one-off WS');
+    return this.getServerBannerOneOff(timeoutMs);
+  }
+
+  /**
+   * Request banner over the existing WebSocket. Used first by getServerBanner.
+   */
+  private getServerBannerOverSharedConnection(timeoutMs: number): Promise<string | null> {
+    const debug = process.env.DEBUG_STERLING_BANNER === '1';
+
     if (this.isCircuitOpen()) {
-      return null;
+      if (debug) console.warn('[SterlingClient] getServerBanner skipped: circuit open');
+      return Promise.resolve(null);
     }
 
     if (this.connectionState !== 'connected') {
-      try {
-        await this.connect();
-      } catch {
-        return null;
-      }
+      return this.connect().then(
+        () => this.getServerBannerOverSharedConnection(timeoutMs),
+        (e) => {
+          if (debug) console.warn('[SterlingClient] getServerBanner connect failed', e);
+          return null;
+        }
+      );
     }
 
     const requestId = `server_info_${++this.requestIdCounter}_${Date.now()}`;
@@ -856,6 +875,7 @@ export class SterlingClient extends EventEmitter {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         cleanup();
+        if (debug) console.warn('[SterlingClient] getServerBanner shared timed out after', timeoutMs, 'ms');
         resolve(null);
       }, timeoutMs);
 
@@ -866,9 +886,11 @@ export class SterlingClient extends EventEmitter {
         ) {
           cleanup();
           if (msg.status === 'ok' && typeof msg.banner_line === 'string' && msg.banner_line.length > 0) {
+            if (debug) console.warn('[SterlingClient] getServerBanner received banner');
             this.recordSuccess();
             resolve(msg.banner_line);
           } else {
+            if (debug) console.warn('[SterlingClient] getServerBanner invalid result', msg.status, typeof msg.banner_line);
             resolve(null);
           }
         }
@@ -879,17 +901,101 @@ export class SterlingClient extends EventEmitter {
         this.removeListener('message', handler);
       };
 
-      this.on('message', handler);
+      this.prependListener('message', handler);
 
       try {
         this.send({
           command: 'server_info_v1',
           request_id: requestId,
         });
-      } catch {
+        if (debug) console.warn('[SterlingClient] getServerBanner sent server_info_v1', requestId);
+      } catch (e) {
+        if (debug) console.warn('[SterlingClient] getServerBanner send failed', e);
         cleanup();
         resolve(null);
       }
+    });
+  }
+
+  /**
+   * Open a one-off WebSocket, request server_info_v1, return banner or null.
+   * Used when the shared connection does not deliver server_info.result in time.
+   */
+  private getServerBannerOneOff(timeoutMs: number): Promise<string | null> {
+    const debug = process.env.DEBUG_STERLING_BANNER === '1';
+    const url = this.config.url;
+    const requestId = `server_info_oneoff_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      let ws: WebSocket | null = null;
+
+      const finish = (banner: string | null) => {
+        if (resolved) return;
+        resolved = true;
+        if (timeout) clearTimeout(timeout);
+        if (ws) {
+          try {
+            ws.removeAllListeners();
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+          } catch {
+            // ignore
+          }
+          ws = null;
+        }
+        resolve(banner);
+      };
+
+      timeout = setTimeout(() => {
+        if (debug) console.warn('[SterlingClient] getServerBanner one-off timed out after', timeoutMs, 'ms');
+        finish(null);
+      }, timeoutMs);
+
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        if (debug) console.warn('[SterlingClient] getServerBanner one-off WS create failed', e);
+        finish(null);
+        return;
+      }
+
+      ws.on('open', () => {
+        try {
+          ws!.send(
+            JSON.stringify({
+              command: 'server_info_v1',
+              request_id: requestId,
+            })
+          );
+          if (debug) console.warn('[SterlingClient] getServerBanner one-off sent server_info_v1');
+        } catch (e) {
+          if (debug) console.warn('[SterlingClient] getServerBanner one-off send failed', e);
+          finish(null);
+        }
+      });
+
+      ws.on('message', (data: WebSocket.Data) => {
+        try {
+          const msg = JSON.parse(data.toString()) as SterlingMessage;
+          if (msg.type === 'server_info.result' && (msg.request_id === undefined || msg.request_id === requestId)) {
+            if (msg.status === 'ok' && typeof msg.banner_line === 'string' && msg.banner_line.length > 0) {
+              if (debug) console.warn('[SterlingClient] getServerBanner one-off received banner');
+              this.recordSuccess();
+              finish(msg.banner_line);
+            } else {
+              finish(null);
+            }
+          }
+        } catch {
+          // ignore non-JSON or invalid
+        }
+      });
+
+      ws.on('error', () => finish(null));
+      ws.on('close', () => {
+        if (!resolved) finish(null);
+      });
     });
   }
 

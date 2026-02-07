@@ -256,6 +256,8 @@ export type {
   SterlingDomain,
   SterlingConnectionState,
   SterlingSolveStepCallback,
+  SterlingLanguageReducerResult,
+  SterlingLanguageIOResultMessage,
 } from './sterling';
 
 // Version info
