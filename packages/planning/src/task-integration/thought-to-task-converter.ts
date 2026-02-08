@@ -62,6 +62,9 @@ export interface ConvertThoughtToTaskDeps {
 const recentDigestHashes = new Map<string, number>();
 const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 
+/** Hard cap on digest dedup entries to prevent unbounded growth in long-running processes. */
+const MAX_DIGEST_DEDUP_ENTRIES = 200;
+
 function isDigestDuplicate(digestKey: string): boolean {
   const now = Date.now();
   const lastSeen = recentDigestHashes.get(digestKey);
@@ -69,9 +72,19 @@ function isDigestDuplicate(digestKey: string): boolean {
     return true;
   }
   recentDigestHashes.set(digestKey, now);
-  if (recentDigestHashes.size > 100) {
+  // Prune: TTL-expired entries first, then oldest if still over cap.
+  // Runs on every insert (not just > 100) to prevent stale accumulation.
+  if (recentDigestHashes.size > 50) {
     for (const [key, ts] of recentDigestHashes) {
       if (now - ts > DIGEST_DEDUP_WINDOW_MS) recentDigestHashes.delete(key);
+    }
+  }
+  // Hard size cap: if still too large after TTL prune, evict oldest entries.
+  if (recentDigestHashes.size > MAX_DIGEST_DEDUP_ENTRIES) {
+    const entries = [...recentDigestHashes.entries()].sort((a, b) => a[1] - b[1]);
+    const toEvict = entries.slice(0, entries.length - MAX_DIGEST_DEDUP_ENTRIES);
+    for (const [key] of toEvict) {
+      recentDigestHashes.delete(key);
     }
   }
   return false;
@@ -132,6 +145,15 @@ function extractSterlingManagementAction(reduction: ReductionProvenance | null |
   return out;
 }
 
+/**
+ * Required reduction shape for task conversion (contract for bot/Sterling -> cognition -> planning).
+ * thought.metadata.reduction must have:
+ * - sterlingProcessed: boolean (true)
+ * - isExecutable: boolean (true)
+ * - reducerResult.committed_ir_digest: non-empty string
+ * - reducerResult.schema_version: non-empty string
+ * Without these, resolveReduction returns dropped_* and no task is created.
+ */
 function resolveReduction(thought: CognitiveStreamThought): {
   ok: boolean;
   decision: TaskDecision;

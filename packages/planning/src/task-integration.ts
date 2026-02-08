@@ -20,7 +20,7 @@ import {
 } from './sterling/minecraft-tool-progression-types';
 import type {
   EpisodeLinkage,
-  EpisodeOutcomeClass,
+  // EpisodeOutcomeClass,
   EpisodeAck,
   SterlingReasoningService,
 } from './sterling';
@@ -88,9 +88,10 @@ import {
   type TaskWithSteps,
 } from './modules/step-option-a-normalizer';
 import { createHash } from 'node:crypto';
-import { isIntentLeaf } from './modules/leaf-arg-contracts';
+import { isIntentLeaf, isStepDispatchable } from './modules/leaf-arg-contracts';
 import { buildCraftingRules } from './sterling/minecraft-crafting-rules';
 import { canonicalize } from './sterling/solve-bundle';
+import { TRANSIENT_EXPANSION_REASONS, normalizeBlockedReason } from './task-lifecycle/task-block-evaluator';
 
 const PLANNING_INGEST_DEBUG_400 =
   process.env.PLANNING_INGEST_DEBUG_400 === '1';
@@ -1912,12 +1913,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           digest: string;
           resolvedCount: number;
           totalIntents: number;
+          resolutionContextDigest?: string;
         };
         schemaVersion?: string;
         requestId: string;
+        ingestRetry?: { count: number; delayMs: number; elapsedMs: number };
       }
-    | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
-    | { outcome: 'error'; error: string; requestId: string }
+    | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }> }
+    | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number } }
   > {
     const routingEnabled = process.env.STERLING_IR_ROUTING !== '0';
     const requestId = `sterling_exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1979,7 +1982,50 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       ? Number(expandTimeoutMsRaw)
       : 5000;
 
-    const response = await this.sterlingExecutorService.expandByDigest(
+    // Idempotence: if task already has sterling-expanded steps, skip expansion.
+    const existingSteps = (taskData as any).steps as TaskStep[] | undefined;
+    if (
+      Array.isArray(existingSteps) &&
+      existingSteps.length > 0 &&
+      existingSteps.every(
+        (s) =>
+          s.meta?.authority === 'sterling' ||
+          s.meta?.authority === 'sterling-expanded' ||
+          s.meta?.authority === 'dev-injected'
+      )
+    ) {
+      recordExpansion({
+        request_id: requestId,
+        status: 'ok',
+        skipped: 'idempotent — task already has authoritative steps',
+        existing_step_count: existingSteps.length,
+      });
+      const executorPlanDigest = createHash('sha256')
+        .update(canonicalize(existingSteps.map((s) => ({ leaf: s.meta?.leaf, args: s.meta?.args }))))
+        .digest('hex');
+      return {
+        outcome: 'ok',
+        steps: existingSteps,
+        executorPlanDigest,
+        requestId,
+      };
+    }
+
+    // ── Expand with ingest-time retry for digest propagation gap ──────────
+    // When reduce commits a digest and expand is called in the same request path,
+    // Sterling's backend may not have propagated the digest yet. Retry briefly
+    // on blocked_digest_unknown before giving up (avoids pending_planning churn).
+    // Configurable: STERLING_INGEST_RETRY_DELAYS_MS=500,1000 (comma-separated ms values)
+    const ingestRetryDelaysRaw = process.env.STERLING_INGEST_RETRY_DELAYS_MS;
+    const INGEST_RETRY_DELAYS_MS: number[] = ingestRetryDelaysRaw
+      ? ingestRetryDelaysRaw.split(',').map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      : [500, 1000]; // default: max 2 retries, 1.5s total
+    let response: Awaited<ReturnType<typeof this.sterlingExecutorService.expandByDigest>>;
+    let ingestRetryCount = 0;
+    let ingestRetryTotalMs = 0;
+    const ingestStartMs = Date.now();
+
+    response = await this.sterlingExecutorService.expandByDigest(
       {
         committed_ir_digest: digest,
         schema_version: schemaVersion,
@@ -1989,17 +2035,54 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       expandTimeoutMs,
     );
 
+    // Retry loop: only for blocked_digest_unknown (timing gap from reduce→expand)
+    while (
+      response.status === 'blocked' &&
+      (response as any).blocked_reason === 'blocked_digest_unknown' &&
+      ingestRetryCount < INGEST_RETRY_DELAYS_MS.length
+    ) {
+      const delayMs = INGEST_RETRY_DELAYS_MS[ingestRetryCount];
+      ingestRetryCount++;
+      ingestRetryTotalMs += delayMs;
+      recordExpansion({
+        request_id: requestId,
+        status: 'ingest_retry',
+        attempt: ingestRetryCount,
+        delay_ms: delayMs,
+        total_delay_ms: ingestRetryTotalMs,
+        reason: 'blocked_digest_unknown — digest may not have propagated yet',
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      response = await this.sterlingExecutorService.expandByDigest(
+        {
+          committed_ir_digest: digest,
+          schema_version: schemaVersion,
+          request_id: `${requestId}_retry${ingestRetryCount}`,
+          envelope_id: sterlingMeta?.envelopeId ?? undefined,
+        },
+        expandTimeoutMs,
+      );
+    }
+
+    const ingestRetry = ingestRetryCount > 0
+      ? { count: ingestRetryCount, delayMs: ingestRetryTotalMs, elapsedMs: Date.now() - ingestStartMs }
+      : undefined;
+
     if (response.status === 'blocked') {
       recordExpansion({
         request_id: requestId,
         status: 'blocked',
         blocked_reason: response.blocked_reason || 'blocked_executor_unavailable',
+        ingest_retries: ingestRetryCount,
+        ingest_retry_delay_ms: ingestRetry?.delayMs,
+        ingest_retry_elapsed_ms: ingestRetry?.elapsedMs,
       });
       return {
         outcome: 'blocked',
         reason: response.blocked_reason || 'blocked_executor_unavailable',
         retryAfterMs: response.retry_after_ms,
         requestId,
+        ingestRetry,
       };
     }
 
@@ -2008,11 +2091,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         request_id: requestId,
         status: 'error',
         error: response.error || 'Sterling executor error',
+        ingest_retries: ingestRetryCount,
+        ingest_retry_delay_ms: ingestRetry?.delayMs,
+        ingest_retry_elapsed_ms: ingestRetry?.elapsedMs,
       });
       return {
         outcome: 'error',
         error: response.error || 'Sterling executor error',
         requestId,
+        ingestRetry,
       };
     }
 
@@ -2021,146 +2108,264 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         request_id: requestId,
         status: 'blocked',
         blocked_reason: 'blocked_invalid_steps_bundle',
+        ingest_retries: ingestRetryCount,
+        ingest_retry_delay_ms: ingestRetry?.delayMs,
+        ingest_retry_elapsed_ms: ingestRetry?.elapsedMs,
       });
       return {
         outcome: 'blocked',
         reason: 'blocked_invalid_steps_bundle',
         requestId,
+        ingestRetry,
       };
     }
 
-    // ── Intent leaf resolution ──────────────────────────────────────────
+    // ── Intent leaf resolution (FAIL-CLOSED — P0-6) ──────────────────
     // Check if any expanded steps are intent leaves (e.g. task_type_craft).
     // If so, resolve them to executor-native leaves via Sterling's domain solver.
-    // Uses per-intent replacement mapping for deterministic splicing.
+    // INVARIANT: outcome 'ok' is returned ONLY when ALL steps would dispatch
+    // successfully in live mode. Any unresolvable intent → blocked.
     const hasIntentLeaves = response.steps.some((s) => isIntentLeaf(s.leaf));
     let finalSteps = response.steps;
     // expansionDigest: always the digest from expand_by_digest — never overwritten.
     const expansionDigest = response.plan_bundle_digest;
     // intentResolutionMeta: populated only when intent resolution runs.
-    let intentResolutionMeta: { digest: string; resolvedCount: number; totalIntents: number } | undefined;
+    let intentResolutionMeta: { digest: string; resolvedCount: number; totalIntents: number; resolutionContextDigest?: string } | undefined;
 
-    if (hasIntentLeaves && this.sterlingExecutorService && process.env.STERLING_INTENT_RESOLVE !== '0') {
+    if (hasIntentLeaves) {
       const intentSteps = response.steps.filter((s) => isIntentLeaf(s.leaf));
+
+      // ── Fail-closed gate: resolution disabled by config ──
+      if (process.env.STERLING_INTENT_RESOLVE === '0') {
+        console.log(
+          `[Sterling] Intent resolution disabled (STERLING_INTENT_RESOLVE=0) — blocking ${intentSteps.length} intent step(s)`
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_intent_resolution_disabled',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_intent_resolution_disabled',
+          requestId,
+          ingestRetry,
+        };
+      }
+
+      // ── Fail-closed gate: no executor service ──
+      if (!this.sterlingExecutorService) {
+        console.log(
+          `[Sterling] No executor service — blocking ${intentSteps.length} intent step(s)`
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_intent_resolution_unavailable',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_intent_resolution_unavailable',
+          requestId,
+          ingestRetry,
+        };
+      }
 
       // Guard: only attempt resolution when we have inputs the solver needs.
       // Without rules (requires requirement.item + mcData), Sterling will
-      // return "blocked: no_rules_provided" — skip the round-trip entirely.
+      // return "blocked: no_rules_provided" — fail-closed, let retryExpansion handle.
       const mcData = this.getMcData();
       const goalItem = (taskData.metadata as any)?.requirement?.item as string | undefined;
       const canResolve = !!(mcData && goalItem);
 
       if (!canResolve) {
         console.log(
-          `[Sterling] Skipping intent resolution: ${!mcData ? 'no mcData' : 'no requirement.item'} — keeping ${intentSteps.length} intent step(s) as-is`
+          `[Sterling] Cannot resolve intents: ${!mcData ? 'no mcData' : 'no requirement.item'} — blocking ${intentSteps.length} intent step(s)`
         );
-      } else {
-        try {
-          const botCtx = await this.fetchBotContext();
-          const inventory = this.buildInventoryIndex(botCtx.inventory);
-          const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
-            ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
-            : [];
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_intent_resolution_unavailable',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_intent_resolution_unavailable',
+          requestId,
+          ingestRetry,
+        };
+      }
 
-          const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+      // ── Single resolution attempt (no retry loop in request path) ──
+      try {
+        const botCtx = await this.fetchBotContext();
+        const inventory = this.buildInventoryIndex(botCtx.inventory);
+        const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
+          ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
+          : [];
 
-          const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
-            {
-              intent_steps: intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
-              world_state: { inventory, nearby_blocks: nearbyBlocks },
-              rules,
-              schema_version: schemaVersion,
-              request_id: `${requestId}_resolve`,
-            },
-            expandTimeoutMs,
-          );
+        const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
 
-          if (resolveResponse.status === 'ok') {
-            const replacements = resolveResponse.replacements;
+        const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
+          {
+            intent_steps: intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
+            world_state: { inventory, nearby_blocks: nearbyBlocks },
+            rules,
+            schema_version: schemaVersion,
+            request_id: `${requestId}_resolve`,
+          },
+          expandTimeoutMs,
+        );
 
-            // Build an index: intent_step_index → replacement steps.
-            // Use a separate seenIndices set to detect ALL duplicates
-            // (resolved or unresolved), not just resolved-only collisions.
-            const replacementMap = new Map<number, typeof response.steps>();
-            const seenIndices = new Set<number>();
-            let totalResolved = 0;
-            for (const r of replacements) {
-              if (seenIndices.has(r.intent_step_index)) {
-                console.warn(
-                  `[Sterling] Contract violation: duplicate intent_step_index=${r.intent_step_index} in replacements — keeping first`
-                );
-                continue;
-              }
-              seenIndices.add(r.intent_step_index);
-              if (r.resolved && r.steps && r.steps.length > 0) {
-                replacementMap.set(r.intent_step_index, r.steps);
-                totalResolved += r.steps.length;
-              }
-            }
+        if (resolveResponse.status === 'ok') {
+          const replacements = resolveResponse.replacements;
 
-            if (replacements.length !== intentSteps.length) {
+          // Build an index: intent_step_index → replacement steps.
+          const replacementMap = new Map<number, typeof response.steps>();
+          const seenIndices = new Set<number>();
+          let totalResolved = 0;
+          for (const r of replacements) {
+            if (seenIndices.has(r.intent_step_index)) {
               console.warn(
-                `[Sterling] Contract violation: replacements.length=${replacements.length} !== intentSteps.length=${intentSteps.length}`
+                `[Sterling] Contract violation: duplicate intent_step_index=${r.intent_step_index} in replacements — keeping first`
               );
+              continue;
             }
-
-            if (totalResolved > 0) {
-              // Deterministic splice: walk original steps in order. For each
-              // intent step, look up its replacement by index. Non-intent steps
-              // pass through unchanged. Unresolved intent steps stay as-is
-              // (executor handles them via shadow/blocked path).
-              let intentIdx = 0;
-              finalSteps = [];
-              for (const step of response.steps) {
-                if (isIntentLeaf(step.leaf)) {
-                  const replacement = replacementMap.get(intentIdx);
-                  if (replacement) {
-                    finalSteps.push(...replacement);
-                  } else {
-                    // Unresolved — keep original intent step
-                    finalSteps.push(step);
-                  }
-                  intentIdx++;
-                } else {
-                  finalSteps.push(step);
-                }
-              }
-
-              // Track intent resolution metadata for the caller to persist.
-              // Never overwrite the expansion digest — it covers the original
-              // expanded plan. The intent resolution digest covers only resolved
-              // replacement steps. The executor plan digest (computed below)
-              // covers the actual finalSteps being executed.
-              intentResolutionMeta = {
-                digest: resolveResponse.plan_bundle_digest,
-                resolvedCount: replacementMap.size,
-                totalIntents: intentSteps.length,
-              };
-              console.log(
-                `[Sterling] Resolved ${replacementMap.size}/${intentSteps.length} intent step(s) → ${totalResolved} executable step(s)`
-              );
-            } else {
-              console.log(
-                `[Sterling] Intent resolution returned ok but no steps resolved — keeping intent steps as-is`
-              );
+            seenIndices.add(r.intent_step_index);
+            if (r.resolved && r.steps && r.steps.length > 0) {
+              replacementMap.set(r.intent_step_index, r.steps);
+              totalResolved += r.steps.length;
             }
-          } else {
-            // Resolution failed/blocked — log but continue with intent steps
-            const reason = resolveResponse.status === 'blocked'
-              ? resolveResponse.blocked_reason
-              : resolveResponse.status === 'error'
-                ? resolveResponse.error
-                : 'unknown';
-            console.log(
-              `[Sterling] Intent resolution ${resolveResponse.status}: ${reason} — keeping ${intentSteps.length} intent step(s) as-is`
+          }
+
+          if (replacements.length !== intentSteps.length) {
+            console.warn(
+              `[Sterling] Contract violation: replacements.length=${replacements.length} !== intentSteps.length=${intentSteps.length}`
             );
           }
-        } catch (err) {
-          console.warn(
-            '[Sterling] Intent resolution error — keeping intent steps as-is:',
-            err instanceof Error ? err.message : String(err)
+
+          if (totalResolved > 0) {
+            // Deterministic splice: walk original steps in order.
+            let intentIdx = 0;
+            finalSteps = [];
+            for (const step of response.steps) {
+              if (isIntentLeaf(step.leaf)) {
+                const replacement = replacementMap.get(intentIdx);
+                if (replacement) {
+                  finalSteps.push(...replacement);
+                } else {
+                  // Unresolved — keep original intent step (will be caught below)
+                  finalSteps.push(step);
+                }
+                intentIdx++;
+              } else {
+                finalSteps.push(step);
+              }
+            }
+
+            // Track intent resolution metadata.
+            intentResolutionMeta = {
+              digest: resolveResponse.plan_bundle_digest,
+              resolvedCount: replacementMap.size,
+              totalIntents: intentSteps.length,
+              resolutionContextDigest: createHash('sha256')
+                .update(canonicalize({
+                  inventory: Object.fromEntries(
+                    Object.entries(inventory).sort(([a], [b]) => a.localeCompare(b))
+                  ),
+                  nearbyBlocks: [...nearbyBlocks].sort(),
+                  goalItem,
+                }))
+                .digest('hex'),
+            };
+            console.log(
+              `[Sterling] Resolved ${replacementMap.size}/${intentSteps.length} intent step(s) → ${totalResolved} executable step(s)`
+            );
+          } else {
+            // Resolution ok but 0 resolved → fail-closed
+            console.log(
+              `[Sterling] Intent resolution returned ok but no steps resolved — blocking`
+            );
+            recordExpansion({
+              request_id: requestId,
+              status: 'blocked',
+              blocked_reason: 'blocked_unresolved_intents',
+            });
+            return {
+              outcome: 'blocked',
+              reason: 'blocked_unresolved_intents',
+              requestId,
+              ingestRetry,
+            };
+          }
+        } else {
+          // Resolution failed/blocked → fail-closed
+          const reason = resolveResponse.status === 'blocked'
+            ? resolveResponse.blocked_reason
+            : resolveResponse.status === 'error'
+              ? resolveResponse.error
+              : 'unknown';
+          console.log(
+            `[Sterling] Intent resolution ${resolveResponse.status}: ${reason} — blocking ${intentSteps.length} intent step(s)`
           );
+          recordExpansion({
+            request_id: requestId,
+            status: 'blocked',
+            blocked_reason: 'blocked_intent_resolution_unavailable',
+          });
+          return {
+            outcome: 'blocked',
+            reason: 'blocked_intent_resolution_unavailable',
+            requestId,
+            ingestRetry,
+          };
         }
+      } catch (err) {
+        console.warn(
+          '[Sterling] Intent resolution error — blocking:',
+          err instanceof Error ? err.message : String(err)
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_intent_resolution_unavailable',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_intent_resolution_unavailable',
+          requestId,
+          ingestRetry,
+        };
+      }
+
+      // ── Post-resolution dispatch validation ──
+      // Validate every step against the executor's real dispatch contract.
+      // Catches: remaining unresolved intent leaves, unmapped leaves, invalid args.
+      const undispatchable: Array<{ leaf: string; reason: string }> = [];
+      for (const step of finalSteps) {
+        const check = isStepDispatchable(step.leaf, step.args ?? {});
+        if (!check.ok) {
+          undispatchable.push({ leaf: step.leaf, reason: check.reason });
+        }
+      }
+      if (undispatchable.length > 0) {
+        // Some steps still won't dispatch — fail-closed with precise list
+        const hasRemainingIntents = undispatchable.some((u) => isIntentLeaf(u.leaf));
+        const blockReason = hasRemainingIntents
+          ? 'blocked_unresolved_intents'
+          : 'blocked_undispatchable_steps';
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: blockReason,
+          undispatchable,
+        });
+        return {
+          outcome: 'blocked',
+          reason: blockReason,
+          requestId,
+          ingestRetry,
+          undispatchable,
+        };
       }
     }
 
@@ -2195,6 +2400,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       plan_bundle_digest: expansionDigest,
       executor_plan_digest: executorPlanDigest,
       intent_resolution_digest: intentResolutionMeta?.digest,
+      resolution_context_digest: intentResolutionMeta?.resolutionContextDigest,
       schema_version: response.schema_version ?? schemaVersion,
       steps: finalSteps.map((step, index) => ({
         id: step.id ?? `sterling-step-${index + 1}`,
@@ -2212,6 +2418,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       intentResolution: intentResolutionMeta,
       schemaVersion: response.schema_version ?? schemaVersion,
       requestId,
+      ingestRetry,
     };
   }
 
@@ -2266,9 +2473,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           intentResolution?: { digest: string; resolvedCount: number; totalIntents: number };
           schemaVersion?: string;
           requestId: string;
+          ingestRetry?: { count: number; delayMs: number; elapsedMs: number };
         }
-      | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
-      | { outcome: 'error'; error: string; requestId: string }
+      | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }> }
+      | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number } }
       | undefined;
 
     if (isAdvisory) {
@@ -2378,29 +2586,49 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // planBundleDigest: expansion digest from expand_by_digest (covers original expanded plan)
       // executorPlanDigest: SHA-256 of final spliced step list (covers what executor actually runs)
       // intentResolution: digest + counts from resolve_intent_steps (covers replacement steps only)
+      // Ingest retry metadata for at-a-glance debugging
+      const ingestRetryMeta = sterlingExpansion.ingestRetry
+        ? {
+            ingestRetryCount: sterlingExpansion.ingestRetry.count,
+            ingestRetryDelayMs: sterlingExpansion.ingestRetry.delayMs,
+            ingestRetryElapsedMs: sterlingExpansion.ingestRetry.elapsedMs,
+          }
+        : {};
       if (sterlingExpansion.outcome === 'ok') {
         (task.metadata.sterling as any).exec = {
           requestId: sterlingExpansion.requestId,
           status: 'ok',
           state: 'expanded',
+          expansionMode: 'ingest',
+          expandedAtMs: Date.now(),
           planBundleDigest: sterlingExpansion.planBundleDigest,
           executorPlanDigest: sterlingExpansion.executorPlanDigest,
+          stepsDigest: sterlingExpansion.executorPlanDigest,
           intentResolution: sterlingExpansion.intentResolution,
           schemaVersion: sterlingExpansion.schemaVersion,
+          ...ingestRetryMeta,
         };
       } else if (sterlingExpansion.outcome === 'blocked') {
         (task.metadata.sterling as any).exec = {
           requestId: sterlingExpansion.requestId,
           status: 'blocked',
           state: 'blocked',
+          expansionMode: 'ingest',
+          expandedAtMs: Date.now(),
           blockedReason: sterlingExpansion.reason,
+          expansionError: sterlingExpansion.reason,
+          ...ingestRetryMeta,
         };
       } else {
         (task.metadata.sterling as any).exec = {
           requestId: sterlingExpansion.requestId,
           status: 'error',
           state: 'error',
+          expansionMode: 'ingest',
+          expandedAtMs: Date.now(),
           error: sterlingExpansion.error,
+          expansionError: sterlingExpansion.error,
+          ...ingestRetryMeta,
         };
       }
       if (sterlingExpansion.outcome === 'blocked') {
@@ -2408,6 +2636,34 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           status: 'pending_planning',
           clearSteps: true,
         });
+        // ── P0-6 retry routing + backoff ──
+        // Every blocked reason MUST set nextEligibleAt to prevent per-tick retry churn
+        // in the autonomous executor loop (modular-server checks nextEligibleAt ?? 0).
+        //
+        // blocked_unresolved_intents: has steps but some are intent leaves → retryIntentResolution
+        // blocked_intent_resolution_unavailable: prerequisites missing → full re-materialize
+        // blocked_intent_resolution_disabled: config-disabled → no retry (TTL 60s → fail)
+        // blocked_undispatchable_steps: resolved steps invalid → no retry (TTL 30s → fail)
+        if (sterlingExpansion.reason === 'blocked_unresolved_intents') {
+          (task.metadata as any).unresolvedIntents = true;
+          const undispatchableCount = sterlingExpansion.undispatchable?.length ?? 0;
+          (task.metadata as any).unresolvedIntentCount = undispatchableCount;
+          task.metadata.nextEligibleAt = Date.now() + 60_000; // 60s initial backoff
+        } else if (sterlingExpansion.reason === 'blocked_intent_resolution_unavailable') {
+          // Transient: prerequisites may appear (mcData loads, Sterling reconnects).
+          // Route to full re-materialize (NOT retryIntentResolution — we have no steps).
+          // 60s backoff prevents hammering during startup when mcData isn't loaded yet.
+          task.metadata.nextEligibleAt = Date.now() + 60_000;
+        } else if (sterlingExpansion.reason === 'blocked_intent_resolution_disabled'
+                || sterlingExpansion.reason === 'blocked_undispatchable_steps') {
+          // Contract-broken: TTL will auto-fail, but set nextEligibleAt to avoid
+          // per-tick retry noise until the TTL evaluator catches it.
+          task.metadata.nextEligibleAt = Date.now() + 30_000;
+        }
+        // Persist undispatchable list for debugging
+        if (sterlingExpansion.undispatchable) {
+          (task.metadata as any).undispatchable = sterlingExpansion.undispatchable;
+        }
       } else if (sterlingExpansion.outcome === 'error') {
         applyTaskBlock(task, 'blocked_executor_error', {
           status: 'pending_planning',
@@ -2435,6 +2691,305 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       if (sterlingReserved && sterlingDedupeKey) {
         this.taskStore.releaseSterlingDedupeKey(sterlingDedupeKey);
       }
+    }
+  }
+
+  // ── Expansion retry infrastructure ──────────────────────────────────
+  // TRANSIENT_EXPANSION_REASONS is derived from BLOCKED_REASON_REGISTRY
+  // (single source of truth in task-block-evaluator.ts). Do NOT duplicate here.
+  private static readonly MAX_EXPANSION_RETRIES = 5;
+
+  /**
+   * Retry expansion for a pending_planning sterling_ir task.
+   *
+   * Uses nextEligibleAt as the single scheduling truth — no parallel backoff system.
+   * Classifies failures as transient (retry with exponential backoff) or
+   * contract-broken (fail immediately).
+   */
+  async retryExpansion(taskId: string): Promise<
+    | { outcome: 'ok'; steps: TaskStep[] }
+    | { outcome: 'blocked'; reason: string }
+    | { outcome: 'error'; error: string }
+    | { outcome: 'skipped'; reason: string }
+  > {
+    const task = this.taskStore.getTask(taskId);
+    if (!task) {
+      return { outcome: 'skipped', reason: 'task_not_found' };
+    }
+    if (task.status !== 'pending_planning') {
+      return { outcome: 'skipped', reason: 'wrong_status' };
+    }
+    if (task.type !== 'sterling_ir') {
+      return { outcome: 'skipped', reason: 'wrong_type' };
+    }
+
+    const meta = task.metadata as any;
+    const retryCount: number = meta.expansionRetryCount ?? 0;
+    const runId = meta.goldenRun?.runId as string | undefined;
+    const recorder = runId ? getGoldenRunRecorder() : null;
+    const recordRetry = (entry: { reason: string; classification: 'transient' | 'contract_broken' | 'success' | 'exhausted'; backoff_ms?: number; next_eligible_at?: number }) => {
+      if (!runId || !recorder) return;
+      recorder.recordExpansionRetry(runId, { attempt: retryCount + 1, ts: Date.now(), ...entry });
+    };
+
+    // Check if max retries exceeded
+    if (retryCount >= TaskIntegration.MAX_EXPANSION_RETRIES) {
+      recordRetry({ reason: 'expansion_retries_exhausted', classification: 'exhausted' });
+      this.updateTaskProgress(task.id, task.progress || 0, 'failed');
+      this.updateTaskMetadata(task.id, {
+        blockedReason: 'expansion_retries_exhausted',
+        blockedAt: Date.now(),
+      } as any);
+      return { outcome: 'error', error: 'expansion_retries_exhausted' };
+    }
+
+    // Handle intent re-resolution for tasks with unresolved intents
+    if (meta.unresolvedIntents === true) {
+      return this.retryIntentResolution(task, retryCount);
+    }
+
+    // Attempt re-expansion
+    const expansion = await this.materializeSterlingIrSteps(task);
+
+    if (expansion.outcome === 'ok') {
+      recordRetry({ reason: 'ok', classification: 'success' });
+      // Success: update task to pending with steps
+      task.steps = expansion.steps;
+      task.status = 'pending';
+      task.metadata.blockedReason = undefined;
+      task.metadata.blockedAt = undefined;
+      task.metadata.nextEligibleAt = undefined;
+      (task.metadata as any).expansionRetryCount = 0;
+
+      // Persist sterling execution metadata (three-digest model + provenance)
+      task.metadata.sterling ??= {};
+      (task.metadata.sterling as any).exec = {
+        requestId: expansion.requestId,
+        status: 'ok',
+        state: 'expanded',
+        expansionMode: 'retry',
+        expandedAtMs: Date.now(),
+        planBundleDigest: expansion.planBundleDigest,
+        executorPlanDigest: expansion.executorPlanDigest,
+        stepsDigest: expansion.executorPlanDigest,
+        intentResolution: expansion.intentResolution,
+        schemaVersion: expansion.schemaVersion,
+      };
+
+      // P0-6: materializeSterlingIrSteps now guarantees outcome 'ok' only
+      // when ALL steps are dispatchable. No need to re-check for intents here.
+
+      // Option A normalization
+      if (task.steps && task.steps.length > 0) {
+        normalizeTaskStepsToOptionA(task as TaskWithSteps);
+      }
+
+      this.taskStore.setTask(task);
+      return { outcome: 'ok', steps: expansion.steps };
+    }
+
+    // Failure: normalize unknown Sterling reasons, then classify
+    const rawReason = expansion.outcome === 'blocked' ? expansion.reason : 'blocked_executor_error';
+    const normalized = normalizeBlockedReason(rawReason);
+    const reason = normalized.reason;
+    const isTransient = TRANSIENT_EXPANSION_REASONS.has(reason);
+
+    // Preserve original Sterling reason for traceability when normalized
+    if (normalized.originalReason) {
+      (task.metadata as any).originalBlockedReason = normalized.originalReason;
+    }
+
+    if (!isTransient) {
+      // Contract-broken: fail the task immediately
+      recordRetry({ reason, classification: 'contract_broken' });
+      this.updateTaskProgress(task.id, task.progress || 0, 'failed');
+      this.updateTaskMetadata(task.id, {
+        blockedReason: reason,
+        blockedAt: Date.now(),
+      } as any);
+      return { outcome: expansion.outcome === 'blocked' ? 'blocked' : 'error', reason } as any;
+    }
+
+    // Transient: increment retry, set nextEligibleAt with exponential backoff
+    const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+    const nextEligibleAt = Date.now() + backoffMs;
+    recordRetry({ reason, classification: 'transient', backoff_ms: backoffMs, next_eligible_at: nextEligibleAt });
+    (task.metadata as any).expansionRetryCount = retryCount + 1;
+    task.metadata.nextEligibleAt = nextEligibleAt;
+    task.metadata.blockedReason = reason;
+    task.metadata.blockedAt ??= Date.now();
+
+    // Update sterling exec metadata
+    task.metadata.sterling ??= {};
+    (task.metadata.sterling as any).exec = {
+      requestId: expansion.outcome === 'blocked' ? expansion.requestId : (expansion as any).requestId,
+      status: expansion.outcome,
+      state: 'blocked',
+      blockedReason: reason,
+    };
+
+    this.taskStore.setTask(task);
+    return { outcome: 'blocked', reason };
+  }
+
+  /**
+   * Re-resolve intent steps for a task with unresolved intents.
+   * Called by retryExpansion when task has unresolvedIntents=true.
+   */
+  private async retryIntentResolution(task: Task, retryCount: number): Promise<
+    | { outcome: 'ok'; steps: TaskStep[] }
+    | { outcome: 'blocked'; reason: string }
+    | { outcome: 'error'; error: string }
+  > {
+    if (!this.sterlingExecutorService) {
+      const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+      (task.metadata as any).expansionRetryCount = retryCount + 1;
+      task.metadata.nextEligibleAt = Date.now() + backoffMs;
+      this.taskStore.setTask(task);
+      return { outcome: 'blocked', reason: 'blocked_executor_unavailable' };
+    }
+
+    const mcData = this.getMcData();
+    const goalItem = ((task.metadata as any)?.requirement?.item ??
+      (task.metadata as any)?.sterling?.goalItem) as string | undefined;
+
+    if (!mcData || !goalItem) {
+      const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+      (task.metadata as any).expansionRetryCount = retryCount + 1;
+      task.metadata.nextEligibleAt = Date.now() + backoffMs;
+      this.taskStore.setTask(task);
+      return { outcome: 'blocked', reason: 'unresolved_intents' };
+    }
+
+    try {
+      const botCtx = await this.fetchBotContext();
+      const inventory = this.buildInventoryIndex(botCtx.inventory);
+      const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
+        ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
+        : [];
+
+      // Find intent steps in current task steps
+      const intentSteps = task.steps.filter((s) => s.meta?.leaf && isIntentLeaf(s.meta.leaf as string));
+      if (intentSteps.length === 0) {
+        // All intents already resolved (shouldn't happen, but handle gracefully)
+        task.status = 'pending';
+        (task.metadata as any).unresolvedIntents = false;
+        task.metadata.blockedReason = undefined;
+        task.metadata.blockedAt = undefined;
+        task.metadata.nextEligibleAt = undefined;
+        this.taskStore.setTask(task);
+        return { outcome: 'ok', steps: task.steps };
+      }
+
+      const schemaVersion = (task.metadata as any)?.sterling?.schemaVersion as string | undefined;
+      const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+
+      const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
+        {
+          intent_steps: intentSteps.map((s) => ({ leaf: s.meta!.leaf as string, args: s.meta!.args as any })),
+          world_state: { inventory, nearby_blocks: nearbyBlocks },
+          rules,
+          schema_version: schemaVersion ?? '1',
+          request_id: `retry_resolve_${task.id}_${Date.now()}`,
+        },
+        Number(process.env.STERLING_EXPAND_TIMEOUT_MS ?? '5000'),
+      );
+
+      if (resolveResponse.status === 'ok') {
+        const replacementMap = new Map<number, any[]>();
+        const seenIndices = new Set<number>();
+        for (const r of resolveResponse.replacements) {
+          if (seenIndices.has(r.intent_step_index)) continue;
+          seenIndices.add(r.intent_step_index);
+          if (r.resolved && r.steps && r.steps.length > 0) {
+            replacementMap.set(r.intent_step_index, r.steps);
+          }
+        }
+
+        if (replacementMap.size > 0) {
+          // Splice resolved steps
+          let intentIdx = 0;
+          const newSteps: TaskStep[] = [];
+          for (const step of task.steps) {
+            if (step.meta?.leaf && isIntentLeaf(step.meta.leaf as string)) {
+              const replacement = replacementMap.get(intentIdx);
+              if (replacement) {
+                for (const [ri, rStep] of replacement.entries()) {
+                  newSteps.push({
+                    id: rStep.id ?? `resolved-${intentIdx}-${ri}`,
+                    label: `Leaf: ${rStep.leaf}`,
+                    done: false,
+                    order: newSteps.length + 1,
+                    meta: {
+                      leaf: rStep.leaf,
+                      args: rStep.args,
+                      executable: true,
+                      authority: 'sterling',
+                      source: 'sterling',
+                    },
+                  });
+                }
+              } else {
+                newSteps.push(step);
+              }
+              intentIdx++;
+            } else {
+              newSteps.push(step);
+            }
+          }
+
+          task.steps = newSteps;
+          const allResolved = !newSteps.some((s) => s.meta?.leaf && isIntentLeaf(s.meta.leaf as string));
+
+          if (allResolved) {
+            task.status = 'pending';
+            (task.metadata as any).unresolvedIntents = false;
+            task.metadata.blockedReason = undefined;
+            task.metadata.blockedAt = undefined;
+            task.metadata.nextEligibleAt = undefined;
+            (task.metadata as any).expansionRetryCount = 0;
+
+            // Recompute executor plan digest
+            const executorPlanDigest = createHash('sha256')
+              .update(canonicalize(newSteps.map((s) => ({ leaf: s.meta?.leaf, args: s.meta?.args }))))
+              .digest('hex');
+            if ((task.metadata.sterling as any)?.exec) {
+              (task.metadata.sterling as any).exec.executorPlanDigest = executorPlanDigest;
+            }
+
+            // Compute resolution context digest for traceability
+            const resolutionContextDigest = createHash('sha256')
+              .update(canonicalize({
+                inventory: Object.fromEntries(
+                  Object.entries(inventory).sort(([a], [b]) => a.localeCompare(b))
+                ),
+                nearbyBlocks: [...nearbyBlocks].sort(),
+                goalItem,
+              }))
+              .digest('hex');
+            if ((task.metadata.sterling as any)?.exec) {
+              (task.metadata.sterling as any).exec.resolutionContextDigest = resolutionContextDigest;
+            }
+
+            normalizeTaskStepsToOptionA(task as TaskWithSteps);
+            this.taskStore.setTask(task);
+            return { outcome: 'ok', steps: newSteps };
+          }
+        }
+      }
+
+      // Still unresolved — backoff
+      const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+      (task.metadata as any).expansionRetryCount = retryCount + 1;
+      task.metadata.nextEligibleAt = Date.now() + backoffMs;
+      this.taskStore.setTask(task);
+      return { outcome: 'blocked', reason: 'unresolved_intents' };
+    } catch (err) {
+      const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+      (task.metadata as any).expansionRetryCount = retryCount + 1;
+      task.metadata.nextEligibleAt = Date.now() + backoffMs;
+      this.taskStore.setTask(task);
+      return { outcome: 'error', error: err instanceof Error ? err.message : String(err) };
     }
   }
 

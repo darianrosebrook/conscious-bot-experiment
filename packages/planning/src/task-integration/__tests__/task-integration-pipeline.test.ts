@@ -369,6 +369,80 @@ describe('Sterling IR routing', () => {
     expect(findSimilarSpy).not.toHaveBeenCalled();
   });
 
+  it('retries blocked_digest_unknown at ingest and succeeds on second attempt', async () => {
+    const expandByDigest = vi.fn()
+      .mockResolvedValueOnce({
+        status: 'blocked',
+        blocked_reason: 'blocked_digest_unknown',
+      })
+      .mockResolvedValueOnce({
+        status: 'ok',
+        plan_bundle_digest: 'bundle_retry_ok',
+        steps: [{ leaf: 'chat', args: { message: 'hello' } }],
+        schema_version: 'v1',
+      });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask());
+
+    // Should have succeeded after ingest retry
+    expect(created.status).toBe('pending');
+    expect(created.steps.length).toBe(1);
+    expect(created.steps[0].meta?.leaf).toBe('chat');
+    expect(expandByDigest).toHaveBeenCalledTimes(2);
+    // Provenance should show ingest expansion mode + retry metadata
+    expect((created.metadata as any).sterling?.exec?.expansionMode).toBe('ingest');
+    expect((created.metadata as any).sterling?.exec?.expandedAtMs).toBeGreaterThan(0);
+    expect((created.metadata as any).sterling?.exec?.stepsDigest).toBeTruthy();
+    expect((created.metadata as any).sterling?.exec?.ingestRetryCount).toBe(1);
+    // delayMs = scheduled sleep time; elapsedMs = wall time (includes expand latency)
+    expect((created.metadata as any).sterling?.exec?.ingestRetryDelayMs).toBeGreaterThan(0);
+    expect((created.metadata as any).sterling?.exec?.ingestRetryElapsedMs).toBeGreaterThanOrEqual(
+      (created.metadata as any).sterling?.exec?.ingestRetryDelayMs,
+    );
+  }, 10_000);
+
+  it('exhausts ingest retries then falls through to pending_planning', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'blocked',
+      blocked_reason: 'blocked_digest_unknown',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask());
+
+    // All 3 attempts (1 initial + 2 retries) exhausted
+    expect(expandByDigest).toHaveBeenCalledTimes(3);
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_digest_unknown');
+    // Provenance records the failure with retry metadata
+    expect((created.metadata as any).sterling?.exec?.expansionMode).toBe('ingest');
+    expect((created.metadata as any).sterling?.exec?.blockedReason).toBe('blocked_digest_unknown');
+    expect((created.metadata as any).sterling?.exec?.ingestRetryCount).toBe(2);
+    expect((created.metadata as any).sterling?.exec?.ingestRetryDelayMs).toBeGreaterThan(0);
+    expect((created.metadata as any).sterling?.exec?.ingestRetryElapsedMs).toBeGreaterThanOrEqual(
+      (created.metadata as any).sterling?.exec?.ingestRetryDelayMs,
+    );
+  }, 10_000);
+
+  it('does not retry non-digest-unknown blocked reasons at ingest', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'blocked',
+      blocked_reason: 'blocked_executor_unavailable',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask());
+
+    // Only 1 call — no ingest retry for non-digest-unknown
+    expect(expandByDigest).toHaveBeenCalledTimes(1);
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_executor_unavailable');
+  });
+
   it('marks executor error with blocked_executor_error and exec state error', async () => {
     const expandByDigest = vi.fn().mockResolvedValue({
       status: 'error',
@@ -3499,5 +3573,317 @@ describe('intent resolution: splice ordering and digest semantics', () => {
     expect(intentResolutionMeta.resolvedCount).toBe(1);
     expect(intentResolutionMeta.totalIntents).toBe(2);
     expect(intentResolutionMeta.resolvedCount).toBeLessThan(intentResolutionMeta.totalIntents);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0-6: Fail-Closed Intent Resolution at Ingest
+// ---------------------------------------------------------------------------
+
+describe('P0-6: Fail-closed intent resolution', () => {
+  let ti: TaskIntegration;
+  const originalStrict = process.env.STRICT_REQUIREMENTS;
+  const originalIntentResolve = process.env.STERLING_INTENT_RESOLVE;
+
+  beforeEach(() => {
+    process.env.STRICT_REQUIREMENTS = 'false';
+    delete process.env.STERLING_INTENT_RESOLVE;
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    ti = new TaskIntegration({
+      enableRealTimeUpdates: false,
+      enableProgressTracking: false,
+      enableTaskStatistics: false,
+      enableTaskHistory: false,
+    });
+  });
+
+  afterEach(() => {
+    process.env.STRICT_REQUIREMENTS = originalStrict;
+    if (originalIntentResolve !== undefined) {
+      process.env.STERLING_INTENT_RESOLVE = originalIntentResolve;
+    } else {
+      delete process.env.STERLING_INTENT_RESOLVE;
+    }
+    vi.useRealTimers();
+  });
+
+  /**
+   * Helper: create a Sterling service that expands to intent leaves,
+   * with configurable resolve behavior.
+   */
+  function setupIntentService(opts: {
+    resolveResponse?: any;
+    resolveThrows?: Error;
+  }) {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_intents',
+      steps: [
+        { leaf: 'task_type_craft', args: { lemma: 'craft_wooden_pickaxe' } },
+      ],
+      schema_version: 'v1',
+    });
+    const resolveIntentSteps = opts.resolveThrows
+      ? vi.fn().mockRejectedValue(opts.resolveThrows)
+      : vi.fn().mockResolvedValue(opts.resolveResponse ?? { status: 'error', error: 'mock error' });
+    const service = createMockSterlingService({ overrides: { expandByDigest, resolveIntentSteps } as any });
+    ti.setSterlingExecutorService(service as any);
+
+    // Mock getMcData + fetchBotContext to provide resolution prerequisites.
+    // getMcData must pass isValidMcData (requires recipes, items, itemsByName).
+    vi.spyOn(ti as any, 'getMcData').mockReturnValue({
+      recipes: {}, items: {}, itemsByName: {},
+    });
+    vi.spyOn(ti as any, 'fetchBotContext').mockResolvedValue({
+      inventory: [{ name: 'oak_log', count: 3 }],
+      nearbyBlocks: ['oak_log', 'dirt'],
+    });
+
+    return { expandByDigest, resolveIntentSteps };
+  }
+
+  it('1. Intent resolution fails → blocked_intent_resolution_unavailable (single call, no retry loop)', async () => {
+    const { resolveIntentSteps } = setupIntentService({
+      resolveResponse: { status: 'error', error: 'solver crashed' },
+    });
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_1' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_unavailable');
+    // Single call — no retry loop in request path
+    expect(resolveIntentSteps).toHaveBeenCalledTimes(1);
+    // Backoff set to prevent per-tick retry churn
+    expect(created.metadata.nextEligibleAt).toBeGreaterThan(Date.now());
+  });
+
+  it('2. No mcData → blocked_intent_resolution_unavailable', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_intents',
+      steps: [{ leaf: 'task_type_craft', args: { lemma: 'craft_wooden_pickaxe' } }],
+      schema_version: 'v1',
+    });
+    const resolveIntentSteps = vi.fn();
+    const service = createMockSterlingService({ overrides: { expandByDigest, resolveIntentSteps } as any });
+    ti.setSterlingExecutorService(service as any);
+
+    // getMcData returns null → cannot resolve
+    vi.spyOn(ti as any, 'getMcData').mockReturnValue(null);
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_2' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_unavailable');
+    // resolveIntentSteps should NOT have been called (prerequisites missing)
+    expect(resolveIntentSteps).not.toHaveBeenCalled();
+    // Backoff prevents retry churn while mcData loads
+    expect(created.metadata.nextEligibleAt).toBeGreaterThan(Date.now());
+  });
+
+  it('3. Resolution disabled (STERLING_INTENT_RESOLVE=0) → blocked_intent_resolution_disabled', async () => {
+    process.env.STERLING_INTENT_RESOLVE = '0';
+
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_intents',
+      steps: [{ leaf: 'task_type_craft', args: { lemma: 'craft_wooden_pickaxe' } }],
+      schema_version: 'v1',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_3' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_disabled');
+    // Contract-broken but still has backoff to avoid per-tick noise before TTL fails it
+    expect(created.metadata.nextEligibleAt).toBeGreaterThan(Date.now());
+  });
+
+  it('4. Post-resolution validation: unknown leaf rejected → blocked_undispatchable_steps', async () => {
+    setupIntentService({
+      resolveResponse: {
+        status: 'ok',
+        plan_bundle_digest: 'resolve_digest',
+        replacements: [
+          {
+            intent_step_index: 0,
+            resolved: true,
+            steps: [{ leaf: 'invented_leaf_xyz', args: { foo: 'bar' } }],
+          },
+        ],
+      },
+    });
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_4' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_undispatchable_steps');
+    // Undispatchable list should be persisted for debugging
+    expect((created.metadata as any).undispatchable).toBeDefined();
+    expect((created.metadata as any).undispatchable).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ leaf: 'invented_leaf_xyz' }),
+      ])
+    );
+  });
+
+  it('5. Partial resolution (some unresolved) → blocked_unresolved_intents', async () => {
+    // Expand returns 2 intent leaves
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_intents_2',
+      steps: [
+        { leaf: 'task_type_craft', args: { lemma: 'craft_wooden_pickaxe' } },
+        { leaf: 'task_type_mine', args: { lemma: 'mine_oak_log' } },
+      ],
+      schema_version: 'v1',
+    });
+    // Resolve only the first intent, leave the second unresolved
+    const resolveIntentSteps = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'resolve_partial',
+      replacements: [
+        {
+          intent_step_index: 0,
+          resolved: true,
+          steps: [{ leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe' } }],
+        },
+        {
+          intent_step_index: 1,
+          resolved: false,
+          steps: [],
+        },
+      ],
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest, resolveIntentSteps } as any });
+    ti.setSterlingExecutorService(service as any);
+    vi.spyOn(ti as any, 'getMcData').mockReturnValue({
+      recipes: {}, items: {}, itemsByName: {},
+    });
+    vi.spyOn(ti as any, 'fetchBotContext').mockResolvedValue({
+      inventory: [{ name: 'oak_log', count: 3 }],
+      nearbyBlocks: ['oak_log'],
+    });
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_5' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    // The remaining task_type_mine intent leaf triggers blocked_unresolved_intents
+    expect(created.metadata.blockedReason).toBe('blocked_unresolved_intents');
+    expect((created.metadata as any).unresolvedIntents).toBe(true);
+  });
+
+  it('6. Full resolution → outcome ok, all steps pass dispatch check', async () => {
+    setupIntentService({
+      resolveResponse: {
+        status: 'ok',
+        plan_bundle_digest: 'resolve_full',
+        replacements: [
+          {
+            intent_step_index: 0,
+            resolved: true,
+            steps: [
+              { leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe' } },
+              { leaf: 'dig_block', args: { blockType: 'stone' } },
+            ],
+          },
+        ],
+      },
+    });
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_6' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    // Task should be fully resolved → pending (not pending_planning)
+    expect(created.status).toBe('pending');
+    expect(created.metadata.blockedReason).toBeUndefined();
+    // Steps should be the resolved leaves, not intent leaves
+    expect(created.steps.length).toBe(2);
+    expect(created.steps[0].meta?.leaf).toBe('craft_recipe');
+    expect(created.steps[1].meta?.leaf).toBe('dig_block');
+    // No intent leaves remain
+    const hasIntentLeaf = created.steps.some(
+      (s) => s.meta?.leaf && isIntentLeaf(s.meta.leaf as string)
+    );
+    expect(hasIntentLeaf).toBe(false);
+  });
+
+  it('7. Post-resolution validation: args validation caught → blocked_undispatchable_steps', async () => {
+    setupIntentService({
+      resolveResponse: {
+        status: 'ok',
+        plan_bundle_digest: 'resolve_bad_args',
+        replacements: [
+          {
+            intent_step_index: 0,
+            resolved: true,
+            // dig_block with empty args → fails validation (requires blockType or pos)
+            steps: [{ leaf: 'dig_block', args: {} }],
+          },
+        ],
+      },
+    });
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(), updatedAt: Date.now(), retryCount: 0,
+        maxRetries: 3, childTaskIds: [], tags: [], category: 'sterling_ir',
+        sterling: { committedIrDigest: 'deadbeef', schemaVersion: 'v1', envelopeId: 'env_7' },
+        requirement: { item: 'wooden_pickaxe' },
+      },
+    }));
+
+    expect(created.status).toBe('pending_planning');
+    expect(created.metadata.blockedReason).toBe('blocked_undispatchable_steps');
+    expect((created.metadata as any).undispatchable).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          leaf: 'dig_block',
+          reason: expect.stringContaining('blockType or pos'),
+        }),
+      ])
+    );
   });
 });

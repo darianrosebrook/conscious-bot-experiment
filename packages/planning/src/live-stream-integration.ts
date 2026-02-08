@@ -381,7 +381,10 @@ export class LiveStreamIntegration extends EventEmitter {
 
       return this.miniMapData;
     } catch (error) {
-      console.error('Failed to update mini-map data:', error);
+      const code = (error as any)?.cause?.code ?? (error as any)?.code;
+      if (code !== 'ECONNREFUSED') {
+        console.error('Failed to update mini-map data:', error);
+      }
       return null;
     }
   }
@@ -409,7 +412,10 @@ export class LiveStreamIntegration extends EventEmitter {
       const result = (await response.json()) as any;
       return result.url || null;
     } catch (error) {
-      console.error('Failed to capture screenshot:', error);
+      const code = (error as any)?.cause?.code ?? (error as any)?.code;
+      if (code !== 'ECONNREFUSED') {
+        console.error('Failed to capture screenshot:', error);
+      }
       return null;
     }
   }

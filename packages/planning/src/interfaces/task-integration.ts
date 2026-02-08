@@ -43,6 +43,12 @@ export interface ITaskIntegration {
   enableGoalResolver(resolver?: any): void;
   readonly isGoalResolverConfigured: boolean;
   getMcDataPublic(): any;
+  retryExpansion(taskId: string): Promise<
+    | { outcome: 'ok'; steps: any[] }
+    | { outcome: 'blocked'; reason: string }
+    | { outcome: 'error'; error: string }
+    | { outcome: 'skipped'; reason: string }
+  >;
   on(event: string, listener: (...args: any[]) => void): this;
   emit(event: string, ...args: any[]): boolean;
   readonly outbox: { enqueue: (url: string, payload: any) => void };

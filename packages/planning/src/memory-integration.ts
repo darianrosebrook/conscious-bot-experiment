@@ -125,7 +125,7 @@ export class MemoryIntegration extends EventEmitter {
     // Full retry logic is used when actually communicating with the discovered endpoint
     for (const endpoint of potentialEndpoints) {
       const response = await resilientFetch(
-        `${endpoint.replace(/\/$/, '')}/health`,
+        `${endpoint.replace(/\/$/, '')}/ready`,
         {
           method: 'GET',
           timeoutMs: 2000,
@@ -176,6 +176,18 @@ export class MemoryIntegration extends EventEmitter {
   private recordMemSuccess(): void {
     this.memFailureCount = 0;
     this.memCircuitOpenUntil = 0;
+  }
+
+  /**
+   * Check a parsed JSON response for degradation signals and emit event if present.
+   */
+  private checkDegradation(data: any): void {
+    if (data?._degraded) {
+      this.emit('memoryDegraded', {
+        reasons: data._degraded_reasons || [],
+        timestamp: Date.now(),
+      });
+    }
   }
 
   private async memFetch(
@@ -565,6 +577,7 @@ export class MemoryIntegration extends EventEmitter {
       }
 
       const data = (await response.json()) as any;
+      this.checkDegradation(data);
       const memoryEvents: MemoryEvent[] = [];
 
       if (data.events && Array.isArray(data.events)) {
@@ -606,6 +619,7 @@ export class MemoryIntegration extends EventEmitter {
       }
 
       const data = (await response.json()) as any;
+      this.checkDegradation(data);
       const memories: ReflectiveNote[] = [];
 
       // Convert episodic memories
@@ -710,6 +724,7 @@ export class MemoryIntegration extends EventEmitter {
       }
 
       const searchData = (await searchResponse.json()) as any;
+      this.checkDegradation(searchData);
       const memories: ReflectiveNote[] = [];
 
       // Convert search results to reflective notes
