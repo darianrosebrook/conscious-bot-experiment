@@ -286,8 +286,11 @@ export class ActionTranslator {
     priority: NavigationPriority,
     fn: () => Promise<{ success: boolean; error?: string }>,
     busyResult: { success: false; error: string },
+    preemptResult?: { success: false; error: string },
   ): Promise<{ success: boolean; error?: string }> {
-    return this.navLeaseManager.withLease(holder, priority, fn, busyResult);
+    return this.navLeaseManager.withLease(holder, priority, fn, busyResult, {
+      preemptResult,
+    });
   }
 
   /**
@@ -2267,6 +2270,7 @@ export class ActionTranslator {
             return { success: true };
           },
           { success: false, error: 'NAV_BUSY' },
+          { success: false, error: 'NAV_PREEMPTED' },
         );
         if (!gotoResult.success) {
           return { success: false, error: gotoResult.error, data: { shelterFound: false } };
@@ -2463,9 +2467,10 @@ export class ActionTranslator {
     const { holder: leaseHolder, priority: navPriority } = deriveNavLeaseContext(action.type, params);
     const release = this.acquireNavigationLease(leaseHolder, navPriority);
     if (!release) {
+      const preempted = this.navLeaseManager.lastPreemptReason;
       return {
         success: false,
-        error: 'NAV_BUSY',
+        error: preempted ? 'NAV_PREEMPTED' : 'NAV_BUSY',
         data: { targetReached: false },
       };
     }
@@ -2778,6 +2783,7 @@ export class ActionTranslator {
             return { success: true };
           },
           { success: false, error: 'NAV_BUSY' },
+          { success: false, error: 'NAV_PREEMPTED' },
         );
         if (!gotoResult.success) {
           return { success: false, error: 'Navigation busy — cannot reach crafting table' };
@@ -3282,6 +3288,7 @@ export class ActionTranslator {
               return { success: true };
             },
             { success: false, error: 'NAV_BUSY' },
+            { success: false, error: 'NAV_PREEMPTED' },
           );
           if (!gotoResult.success) {
             return { success: false, error: 'Navigation busy — cannot reach item' };
@@ -3371,6 +3378,7 @@ export class ActionTranslator {
               return { success: true };
             },
             { success: false, error: 'NAV_BUSY' },
+            { success: false, error: 'NAV_PREEMPTED' },
           );
           if (!gotoResult.success) {
             continue; // Skip this waypoint, try the next direction
@@ -4110,6 +4118,7 @@ export class ActionTranslator {
             return { success: true };
           },
           { success: false, error: 'NAV_BUSY' },
+          { success: false, error: 'NAV_PREEMPTED' },
         );
         if (!gotoResult.success) {
           return { success: false, error: 'Navigation busy — cannot reach target entity' };

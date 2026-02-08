@@ -9,4 +9,5 @@ export {
   ReflexArbitrator,
   type ReflexEvent,
   type ReflexEventHandler,
+  type ReflexSeverity,
 } from './reflex-arbitrator';

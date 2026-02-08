@@ -17,7 +17,15 @@ export interface ReflexEvent {
 
 export type ReflexEventHandler = (event: ReflexEvent) => void;
 
-const OVERRIDE_DURATION_TICKS = 10; // ~2s at 5Hz
+export type ReflexSeverity = 'critical' | 'high' | 'default';
+
+const OVERRIDE_DURATION_BY_SEVERITY: Record<ReflexSeverity, number> = {
+  critical: 15, // ~3s at 5Hz
+  high: 10,     // ~2s at 5Hz (backward compat with old constant)
+  default: 10,  // ~2s — matches original OVERRIDE_DURATION_TICKS
+};
+
+const OVERRIDE_DURATION_TICKS = 10; // ~2s at 5Hz (kept for reference)
 
 export class ReflexArbitrator {
   private overrideReason: string | null = null;
@@ -29,19 +37,20 @@ export class ReflexArbitrator {
    * Enter reflex override mode. The planner should be paused
    * until the override expires or is manually exited.
    */
-  enterReflexMode(reason: string, currentTick: number): void {
+  enterReflexMode(reason: string, currentTick: number, severity?: ReflexSeverity): void {
     const wasActive = this.isReflexActive(currentTick);
+    const duration = OVERRIDE_DURATION_BY_SEVERITY[severity ?? 'default'];
 
     this.overrideReason = reason;
     this.overrideStartTick = currentTick;
-    this.overrideEndTick = currentTick + OVERRIDE_DURATION_TICKS;
+    this.overrideEndTick = currentTick + duration;
 
     if (!wasActive) {
       this.emitEvent({
         type: 'reflex_enter',
         reason,
         tick: currentTick,
-        remainingTicks: OVERRIDE_DURATION_TICKS,
+        remainingTicks: duration,
       });
     }
   }
@@ -86,6 +95,23 @@ export class ReflexArbitrator {
    */
   isReflexActive(currentTick: number): boolean {
     return this.overrideReason !== null && currentTick < this.overrideEndTick;
+  }
+
+  /**
+   * Exit reflex mode early (e.g. when the threat resolves before the timer).
+   * No-op if no reflex is currently active.
+   */
+  exitReflexModeEarly(currentTick: number): void {
+    if (!this.overrideReason) return;
+    if (!this.isReflexActive(currentTick)) return;
+
+    this.emitEvent({
+      type: 'reflex_exit',
+      reason: this.overrideReason,
+      tick: currentTick,
+      remainingTicks: 0,
+    });
+    this.overrideReason = null;
   }
 
   /**

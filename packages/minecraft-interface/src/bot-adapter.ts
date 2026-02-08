@@ -292,6 +292,7 @@ export class BotAdapter extends EventEmitter {
 
       // Start automatic safety monitoring
       this.safetyMonitor.start();
+      this.safetyMonitor.setBeliefSystem(this.beliefBus, this.reflexArbitrator);
       // Safety monitoring enabled (verbose logging suppressed)
 
       // Set up safety monitor event handlers
@@ -1014,7 +1015,14 @@ export class BotAdapter extends EventEmitter {
           if (reflexAssessment.hasCriticalThreat) {
             this.reflexArbitrator.enterReflexMode(
               `critical_threat:${reflexAssessment.threats[0]?.classLabel}`,
-              this.beliefTickId
+              this.beliefTickId,
+              'critical'
+            );
+          } else if (reflexAssessment.threats.some(t => t.threatLevel === 'high')) {
+            this.reflexArbitrator.enterReflexMode(
+              `high_threat:${reflexAssessment.threats[0]?.classLabel}`,
+              this.beliefTickId,
+              'high'
             );
           }
 

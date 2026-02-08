@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ReflexArbitrator, ReflexEvent } from '../reflex-arbitrator';
+import { ReflexArbitrator, ReflexEvent, type ReflexSeverity } from '../reflex-arbitrator';
 
 describe('ReflexArbitrator', () => {
   let arbitrator: ReflexArbitrator;
@@ -148,6 +148,80 @@ describe('ReflexArbitrator', () => {
 
       // Second handler still receives event
       expect(events).toHaveLength(1);
+    });
+  });
+
+  describe('proportional severity duration', () => {
+    it('critical severity lasts 15 ticks', () => {
+      arbitrator.enterReflexMode('threat', 10, 'critical');
+      // Active at tick 24 (10 + 15 - 1)
+      expect(arbitrator.isReflexActive(24)).toBe(true);
+      // Expired at tick 25
+      expect(arbitrator.isReflexActive(25)).toBe(false);
+    });
+
+    it('high severity lasts 10 ticks', () => {
+      arbitrator.enterReflexMode('threat', 10, 'high');
+      expect(arbitrator.isReflexActive(19)).toBe(true);
+      expect(arbitrator.isReflexActive(20)).toBe(false);
+    });
+
+    it('default (no arg) lasts 10 ticks — backward compatible', () => {
+      arbitrator.enterReflexMode('threat', 10);
+      expect(arbitrator.isReflexActive(19)).toBe(true);
+      expect(arbitrator.isReflexActive(20)).toBe(false);
+    });
+
+    it('emits correct remainingTicks for critical severity', () => {
+      const events: ReflexEvent[] = [];
+      arbitrator.onEvent((e) => events.push(e));
+
+      arbitrator.enterReflexMode('creeper_close', 10, 'critical');
+      const enterEvent = events.find((e) => e.type === 'reflex_enter')!;
+      expect(enterEvent.remainingTicks).toBe(15);
+    });
+  });
+
+  describe('exitReflexModeEarly', () => {
+    it('cancels active override and emits reflex_exit', () => {
+      const events: ReflexEvent[] = [];
+      arbitrator.onEvent((e) => events.push(e));
+
+      arbitrator.enterReflexMode('threat', 10);
+      expect(arbitrator.isReflexActive(12)).toBe(true);
+
+      arbitrator.exitReflexModeEarly(12);
+      expect(arbitrator.isReflexActive(12)).toBe(false);
+      expect(arbitrator.isPlannerBlocked()).toBe(false);
+
+      const exitEvents = events.filter((e) => e.type === 'reflex_exit');
+      expect(exitEvents).toHaveLength(1);
+      expect(exitEvents[0].tick).toBe(12);
+      expect(exitEvents[0].remainingTicks).toBe(0);
+    });
+
+    it('is no-op when not active', () => {
+      const events: ReflexEvent[] = [];
+      arbitrator.onEvent((e) => events.push(e));
+
+      arbitrator.exitReflexModeEarly(5);
+      expect(events).toHaveLength(0);
+    });
+
+    it('is no-op when override already expired', () => {
+      const events: ReflexEvent[] = [];
+      arbitrator.onEvent((e) => events.push(e));
+
+      arbitrator.enterReflexMode('threat', 10);
+      // Tick past expiry
+      for (let t = 11; t <= 20; t++) {
+        arbitrator.tickUpdate(t);
+      }
+
+      const eventCount = events.length;
+      arbitrator.exitReflexModeEarly(25);
+      // No additional events emitted
+      expect(events.length).toBe(eventCount);
     });
   });
 });

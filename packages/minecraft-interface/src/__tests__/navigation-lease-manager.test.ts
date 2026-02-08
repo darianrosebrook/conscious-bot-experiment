@@ -235,4 +235,113 @@ describe('NavigationLeaseManager', () => {
     expect(preemptCalls).toEqual(['executor']);
     safetyRelease();
   });
+
+  // --- TTL auto-expiry ---
+
+  it('TTL auto-releases lease after expiry', () => {
+    vi.useFakeTimers();
+    try {
+      const release = manager.acquire('executor', 'normal', 5000)!;
+      expect(release).not.toBeNull();
+      expect(manager.isBusy).toBe(true);
+
+      vi.advanceTimersByTime(5001);
+      expect(manager.isBusy).toBe(false);
+      expect(manager.holder).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('TTL-expired lease allows new acquire', () => {
+    vi.useFakeTimers();
+    try {
+      manager.acquire('executor', 'normal', 3000);
+      vi.advanceTimersByTime(3001);
+
+      const release = manager.acquire('other', 'normal')!;
+      expect(release).not.toBeNull();
+      expect(manager.holder).toBe('other');
+      release();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('normal release before TTL works without warning', () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const release = manager.acquire('executor', 'normal', 10_000)!;
+      vi.advanceTimersByTime(2000);
+      release();
+      expect(manager.isBusy).toBe(false);
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('TTL expired'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  // --- Preempt reason tracking ---
+
+  it('lastPreemptReason is set on emergency preemption', () => {
+    manager.acquire('executor', 'normal');
+    manager.acquire('safety', 'emergency');
+    expect(manager.lastPreemptReason).toBe('emergency_preempt:executor');
+  });
+
+  it('lastPreemptReason is cleared on next non-emergency acquire', () => {
+    manager.acquire('executor', 'normal');
+    manager.acquire('safety', 'emergency');
+    expect(manager.lastPreemptReason).toBe('emergency_preempt:executor');
+
+    // Safety releases, then a normal caller acquires
+    manager.release('safety');
+    manager.acquire('new_caller', 'normal');
+    expect(manager.lastPreemptReason).toBeNull();
+  });
+
+  it('clearPreemptReason manually clears the flag', () => {
+    manager.acquire('executor', 'normal');
+    manager.acquire('safety', 'emergency');
+    expect(manager.lastPreemptReason).not.toBeNull();
+
+    manager.clearPreemptReason();
+    expect(manager.lastPreemptReason).toBeNull();
+  });
+
+  // --- withLease preemptResult ---
+
+  it('withLease returns preemptResult when preempted', async () => {
+    // Simulate: executor holds lease, safety preempts, then withLease caller tries
+    manager.acquire('executor', 'normal');
+    manager.acquire('safety', 'emergency');
+    // Safety still holds the lease
+
+    const result = await manager.withLease(
+      'planner',
+      'normal',
+      async () => ({ success: true }),
+      { success: false, error: 'NAV_BUSY' },
+      { preemptResult: { success: false, error: 'NAV_PREEMPTED' } },
+    );
+
+    expect(result).toEqual({ success: false, error: 'NAV_PREEMPTED' });
+  });
+
+  it('withLease returns busyResult when busy but not preempted', async () => {
+    manager.acquire('other');
+    const result = await manager.withLease(
+      'planner',
+      'normal',
+      async () => ({ success: true }),
+      { success: false, error: 'NAV_BUSY' },
+      { preemptResult: { success: false, error: 'NAV_PREEMPTED' } },
+    );
+
+    expect(result).toEqual({ success: false, error: 'NAV_BUSY' });
+  });
 });

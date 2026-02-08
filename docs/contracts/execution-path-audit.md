@@ -132,6 +132,8 @@ This fallback path in the autonomous executor sends tasks to the dead `/execute-
 
 **Mitigated:** Navigation lease (ref-counted, priority-based) enforced inside `executeNavigate()` and all 5 direct `pathfinder.goto()` call sites in `action-translator.ts` (via `withNavLease()`). Safety monitor propagates lease context (`navLeaseHolder`, `navigationPriority`) through action parameters instead of pre-acquiring — prevents self-blocking where emergency flee would NAV_BUSY itself.
 
+**Hardened (2026-02-08):** Lease now has passive TTL auto-expiry (default 60s) checked lazily on `acquire()` and `isBusy` — prevents deadlocks from unhandled rejections mid-navigation. Emergency preemption sets `lastPreemptReason` on the lease manager, enabling callers to distinguish `NAV_PREEMPTED` (safety emergency) from `NAV_BUSY` (simple contention). The step executor maps `NAV_PREEMPTED` to `SAFETY_PREEMPTED` block reason with 30s backoff instead of blind retry. BeliefBus is now wired to SafetyMonitor via `setBeliefSystem()`, eliminating duplicate entity scanning. Reflex overrides scale by threat severity: critical=15 ticks (~3s), high/default=10 ticks (~2s), and can be cancelled early via `exitReflexModeEarly()`.
+
 **Residual:** 3 `pathfinder.goto()` calls in `interaction-leaves.ts` are not yet lease-gated. These run inside `dispatchToLeaf()` during action execution, so they're serialized at the action level but don't hold the nav lease. A drift guard prevents new `pathfinder.goto()` calls from appearing in other files.
 
 ### RISK 2: Intrusive Thought Processor Bypasses Guards — **RESOLVED**

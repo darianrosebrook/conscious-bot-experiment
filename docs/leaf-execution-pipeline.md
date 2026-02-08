@@ -71,6 +71,8 @@ Solver     Planner
   3. Rate limiter
   4. Rig G (feasibility gate)
   5. Commit (execute)
+  6. Post-dispatch: NAV_PREEMPTED → SAFETY_PREEMPTED (30s backoff)
+  7. Post-dispatch: NAV_BUSY → NAVIGATING_IN_PROGRESS (no retry)
         |
 [toolExecutor.execute]  ...................  modular-server.ts:2020
         |
@@ -737,6 +739,9 @@ All have `permissions: ['sense']` to prevent accidental mutation.
 | MC action endpoint | `packages/minecraft-interface/src/server.ts` | POST `/action` (1581) |
 | Action contract registry | `packages/minecraft-interface/src/action-contract-registry.ts` | `ACTION_CONTRACTS`, `normalizeActionParams`, `resolveLeafName`, `buildActionTypeToLeafMap` |
 | Action dispatcher | `packages/minecraft-interface/src/action-translator.ts` | `executeAction` (949), `dispatchToLeaf`, `dispatchToLeafLegacy`, `_runLeaf` |
+| Navigation lease | `packages/minecraft-interface/src/navigation-lease-manager.ts` | `acquire` (TTL, preempt reason), `withLease` (preemptResult), `isBusy` (lazy TTL check) |
+| Reflex arbitrator | `packages/minecraft-interface/src/reflex/reflex-arbitrator.ts` | `enterReflexMode` (severity), `exitReflexModeEarly`, `isPlannerBlocked` |
+| Step executor | `packages/planning/src/executor/sterling-step-executor.ts` | `BLOCK_REASONS.SAFETY_PREEMPTED`, `isSafetyPreemptedError`, `isNavigatingError` |
 | Contract alignment tests | `packages/planning/src/modules/__tests__/contract-alignment.test.ts` | Cross-boundary normalization agreement (planning ↔ MC) |
 | Leaf registration | `packages/minecraft-interface/src/server.ts` | `registerCoreLeaves` (773) |
 | Movement leaves | `packages/minecraft-interface/src/leaves/movement-leaves.ts` | 3 leaves |
@@ -751,5 +756,5 @@ All have `permissions: ['sense']` to prevent accidental mutation.
 
 ---
 
-*Last updated: 2026-02-01*
+*Last updated: 2026-02-08*
 *Total leaves: 41 (37 real + 1 simplified + 3 P0 stubs)*

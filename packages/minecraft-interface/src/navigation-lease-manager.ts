@@ -25,10 +25,23 @@ export class NavigationLeaseManager {
   private _priority: NavigationPriority = 'normal';
   private _release: (() => void) | null = null;
   private _refCount = 0;
+  private _acquiredAt = 0;
+  private _ttlMs = 0; // 0 = no TTL
+  private _lastPreemptReason: string | null = null;
   private callbacks: NavigationLeaseCallbacks;
 
   constructor(callbacks: NavigationLeaseCallbacks = {}) {
     this.callbacks = callbacks;
+  }
+
+  /** Reason string from the most recent emergency preemption, or null. */
+  get lastPreemptReason(): string | null {
+    return this._lastPreemptReason;
+  }
+
+  /** Clear the preempt reason flag (consumed by callers after reading). */
+  clearPreemptReason(): void {
+    this._lastPreemptReason = null;
   }
 
   /**
@@ -43,10 +56,13 @@ export class NavigationLeaseManager {
   acquire(
     holder: string,
     priority: NavigationPriority = 'normal',
+    ttlMs?: number,
   ): (() => void) | null {
+    this._checkTtlExpiry();
+
     // No current holder — grant immediately
     if (!this._holder) {
-      return this._grantLease(holder, priority);
+      return this._grantLease(holder, priority, ttlMs);
     }
 
     // Emergency preempts anything
@@ -64,16 +80,17 @@ export class NavigationLeaseManager {
         }
       }
       // Force-clear the old lease (bypass ref-counting — holder is evicted)
+      this._lastPreemptReason = `emergency_preempt:${evicted}`;
       this._holder = null;
       this._priority = 'normal';
       this._release = null;
       this._refCount = 0;
-      return this._grantLease(holder, priority);
+      return this._grantLease(holder, priority, ttlMs);
     }
 
     // Same holder re-acquiring (idempotent)
     if (this._holder === holder) {
-      return this._grantLease(holder, priority);
+      return this._grantLease(holder, priority, ttlMs);
     }
 
     // Otherwise, lease is busy
@@ -106,9 +123,16 @@ export class NavigationLeaseManager {
     priority: NavigationPriority,
     fn: () => Promise<T>,
     busyResult: T,
+    opts?: { ttlMs?: number; preemptResult?: T },
   ): Promise<T> {
-    const releaseFn = this.acquire(holder, priority);
-    if (!releaseFn) return busyResult;
+    const releaseFn = this.acquire(holder, priority, opts?.ttlMs);
+    if (!releaseFn) {
+      // If the lease was preempted by an emergency, return the preempt result
+      if (opts?.preemptResult && this._lastPreemptReason) {
+        return opts.preemptResult;
+      }
+      return busyResult;
+    }
     try {
       return await fn();
     } finally {
@@ -118,6 +142,7 @@ export class NavigationLeaseManager {
 
   /** Whether navigation is currently leased. */
   get isBusy(): boolean {
+    this._checkTtlExpiry();
     return this._holder !== null;
   }
 
@@ -134,6 +159,7 @@ export class NavigationLeaseManager {
   private _grantLease(
     holder: string,
     priority: NavigationPriority,
+    ttlMs?: number,
   ): () => void {
     const isReacquire = this._holder === holder;
     this._holder = holder;
@@ -148,6 +174,14 @@ export class NavigationLeaseManager {
     } else {
       this._refCount = 1;
     }
+    this._acquiredAt = Date.now();
+    this._ttlMs = ttlMs ?? 60_000; // 60s default TTL
+
+    // Clear preempt reason when a non-emergency caller consumes the lease
+    if (priority !== 'emergency') {
+      this._lastPreemptReason = null;
+    }
+
     // One-shot release closure: warns on double-call instead of silently underflowing.
     let released = false;
     const release = () => {
@@ -160,5 +194,22 @@ export class NavigationLeaseManager {
     };
     this._release = release;
     return release;
+  }
+
+  /** Passive TTL check: if lease has expired, auto-release it. */
+  private _checkTtlExpiry(): void {
+    if (
+      this._holder &&
+      this._ttlMs > 0 &&
+      Date.now() - this._acquiredAt > this._ttlMs
+    ) {
+      console.warn(
+        `[NavLease] TTL expired for holder=${this._holder} after ${this._ttlMs}ms — auto-releasing`
+      );
+      this._holder = null;
+      this._priority = 'normal';
+      this._release = null;
+      this._refCount = 0;
+    }
   }
 }
