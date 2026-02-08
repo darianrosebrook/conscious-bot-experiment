@@ -20,9 +20,13 @@ import {
   createSolveBundle,
   parseSterlingIdentity,
   attachSterlingIdentity,
+  computeLeafRegistryDigest,
+  computeLeafContractDigest,
+  computeLeafContractRequiredDigest,
   INVENTORY_HASH_CAP,
 } from '../solve-bundle';
 import type { CompatReport, ObjectiveWeights, SearchHealthMetrics } from '../solve-bundle-types';
+import { getLeafContractEntries } from '../../modules/leaf-arg-contracts';
 import { DEFAULT_OBJECTIVE_WEIGHTS } from '../solve-bundle-types';
 
 // ============================================================================
@@ -801,5 +805,333 @@ describe('parseSterlingIdentity: completenessDeclaration contract', () => {
     });
     expect(identity).toBeDefined();
     expect(identity!.completenessDeclaration).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// computeLeafRegistryDigest
+// ============================================================================
+
+describe('computeLeafRegistryDigest', () => {
+  it('produces deterministic digest from leaf name set', () => {
+    const leaves = ['craft_recipe', 'acquire_material', 'smelt'];
+    const d1 = computeLeafRegistryDigest(leaves);
+    const d2 = computeLeafRegistryDigest(leaves);
+    expect(d1).toBe(d2);
+    expect(typeof d1).toBe('string');
+    expect(d1.length).toBe(16); // SHA-256 truncated to 16 hex
+  });
+
+  it('same leaves in different order produce same digest (sorted internally)', () => {
+    const d1 = computeLeafRegistryDigest(['smelt', 'craft_recipe', 'acquire_material']);
+    const d2 = computeLeafRegistryDigest(['acquire_material', 'craft_recipe', 'smelt']);
+    expect(d1).toBe(d2);
+  });
+
+  it('different leaf sets produce different digests', () => {
+    const d1 = computeLeafRegistryDigest(['craft_recipe', 'smelt']);
+    const d2 = computeLeafRegistryDigest(['craft_recipe', 'acquire_material']);
+    expect(d1).not.toBe(d2);
+  });
+
+  it('adding a leaf changes the digest', () => {
+    const d1 = computeLeafRegistryDigest(['craft_recipe']);
+    const d2 = computeLeafRegistryDigest(['craft_recipe', 'smelt']);
+    expect(d1).not.toBe(d2);
+  });
+
+  it('accepts Set (Iterable) input', () => {
+    const set = new Set(['craft_recipe', 'smelt']);
+    const array = ['craft_recipe', 'smelt'];
+    expect(computeLeafRegistryDigest(set)).toBe(computeLeafRegistryDigest(array));
+  });
+
+  it('empty registry produces a stable digest', () => {
+    const d1 = computeLeafRegistryDigest([]);
+    const d2 = computeLeafRegistryDigest([]);
+    expect(d1).toBe(d2);
+  });
+});
+
+describe('computeBundleInput with leafRegistry', () => {
+  const baseParams = {
+    solverId: 'test-solver',
+    contractVersion: 1,
+    definitions: [{ action: 'craft:oak_planks' }],
+    inventory: { oak_log: 4 },
+    goal: { oak_planks: 4 },
+    nearbyBlocks: ['oak_log'],
+  };
+
+  it('includes leafRegistryDigest when leafRegistry is provided', () => {
+    const input = computeBundleInput({
+      ...baseParams,
+      leafRegistry: ['craft_recipe', 'acquire_material'],
+    });
+    expect(input.leafRegistryDigest).toBeDefined();
+    expect(typeof input.leafRegistryDigest).toBe('string');
+    expect(input.leafRegistryDigest!.length).toBe(16);
+  });
+
+  it('leafRegistryDigest is undefined when leafRegistry is not provided', () => {
+    const input = computeBundleInput(baseParams);
+    expect(input.leafRegistryDigest).toBeUndefined();
+  });
+
+  it('leafRegistryDigest matches computeLeafRegistryDigest for same leaves', () => {
+    const leaves = ['craft_recipe', 'acquire_material', 'smelt'];
+    const input = computeBundleInput({ ...baseParams, leafRegistry: leaves });
+    expect(input.leafRegistryDigest).toBe(computeLeafRegistryDigest(leaves));
+  });
+
+  it('prefers leafContractEntries over leafRegistry when both provided', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+      ['smelt', ['input:string']],
+    ];
+    const input = computeBundleInput({
+      ...baseParams,
+      leafRegistry: ['craft_recipe', 'smelt'],
+      leafContractEntries: entries,
+    });
+    expect(input.leafRegistryDigest).toBe(computeLeafContractDigest(entries));
+    // Contract digest differs from names-only digest
+    expect(input.leafRegistryDigest).not.toBe(
+      computeLeafRegistryDigest(['craft_recipe', 'smelt'])
+    );
+  });
+
+  it('leafContractEntries produces digest when leafRegistry absent', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const input = computeBundleInput({
+      ...baseParams,
+      leafContractEntries: entries,
+    });
+    expect(input.leafRegistryDigest).toBeDefined();
+    expect(input.leafRegistryDigest).toBe(computeLeafContractDigest(entries));
+  });
+});
+
+// ============================================================================
+// computeLeafContractDigest
+// ============================================================================
+
+describe('computeLeafContractDigest', () => {
+  it('is deterministic for same entries', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+      ['smelt', ['input:string']],
+    ];
+    expect(computeLeafContractDigest(entries)).toBe(computeLeafContractDigest(entries));
+  });
+
+  it('is order-invariant for leaf entries', () => {
+    const a: [string, string[]][] = [
+      ['smelt', ['input:string']],
+      ['craft_recipe', ['recipe:string']],
+    ];
+    const b: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+      ['smelt', ['input:string']],
+    ];
+    expect(computeLeafContractDigest(a)).toBe(computeLeafContractDigest(b));
+  });
+
+  it('is order-invariant for fields within an entry', () => {
+    const a: [string, string[]][] = [
+      ['interact_with_entity', ['entityType:string', '?entityId:string']],
+    ];
+    const b: [string, string[]][] = [
+      ['interact_with_entity', ['?entityId:string', 'entityType:string']],
+    ];
+    expect(computeLeafContractDigest(a)).toBe(computeLeafContractDigest(b));
+  });
+
+  it('differs from names-only digest for same leaf set', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+      ['smelt', ['input:string']],
+    ];
+    const namesOnly = computeLeafRegistryDigest(['craft_recipe', 'smelt']);
+    expect(computeLeafContractDigest(entries)).not.toBe(namesOnly);
+  });
+
+  it('changes when a field is added to a contract', () => {
+    const before: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+    ];
+    const after: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', 'qty:number']],
+    ];
+    expect(computeLeafContractDigest(before)).not.toBe(computeLeafContractDigest(after));
+  });
+
+  it('changes when a field changes from optional to required', () => {
+    const optional: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const required: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', 'qty:number']],
+    ];
+    expect(computeLeafContractDigest(optional)).not.toBe(computeLeafContractDigest(required));
+  });
+
+  it('works with getLeafContractEntries from leaf-arg-contracts', () => {
+    const entries = getLeafContractEntries();
+    expect(entries.length).toBeGreaterThan(0);
+    const digest = computeLeafContractDigest(entries);
+    expect(typeof digest).toBe('string');
+    expect(digest.length).toBe(16);
+    // Deterministic
+    expect(computeLeafContractDigest(getLeafContractEntries())).toBe(digest);
+  });
+});
+
+// ============================================================================
+// computeLeafContractRequiredDigest
+// ============================================================================
+
+describe('computeLeafContractRequiredDigest', () => {
+  it('is deterministic', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    expect(computeLeafContractRequiredDigest(entries)).toBe(
+      computeLeafContractRequiredDigest(entries)
+    );
+  });
+
+  it('is insensitive to adding an optional field (backward-compatible change)', () => {
+    const before: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+    ];
+    const after: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    expect(computeLeafContractRequiredDigest(before)).toBe(
+      computeLeafContractRequiredDigest(after)
+    );
+  });
+
+  it('changes when a required field is added', () => {
+    const before: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+    ];
+    const after: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', 'qty:number']],
+    ];
+    expect(computeLeafContractRequiredDigest(before)).not.toBe(
+      computeLeafContractRequiredDigest(after)
+    );
+  });
+
+  it('changes when an optional field becomes required', () => {
+    const optional: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const required: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', 'qty:number']],
+    ];
+    expect(computeLeafContractRequiredDigest(optional)).not.toBe(
+      computeLeafContractRequiredDigest(required)
+    );
+  });
+
+  it('differs from full digest when optional fields exist', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    expect(computeLeafContractRequiredDigest(entries)).not.toBe(
+      computeLeafContractDigest(entries)
+    );
+  });
+
+  it('equals full digest when no optional fields exist', () => {
+    const entries: [string, string[]][] = [
+      ['smelt', ['input:string']],
+    ];
+    // Both filter to the same set: ['input:string']
+    // But the full digest includes ['input:string'] while required includes ['input:string']
+    // Structure is identical so digests should match
+    expect(computeLeafContractRequiredDigest(entries)).toBe(
+      computeLeafContractDigest(entries)
+    );
+  });
+
+  it('is order-invariant for entries and fields', () => {
+    const a: [string, string[]][] = [
+      ['smelt', ['input:string']],
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const b: [string, string[]][] = [
+      ['craft_recipe', ['?qty:number', 'recipe:string']],
+      ['smelt', ['input:string']],
+    ];
+    expect(computeLeafContractRequiredDigest(a)).toBe(
+      computeLeafContractRequiredDigest(b)
+    );
+  });
+});
+
+// ============================================================================
+// computeBundleInput with leafContractEntries: required vs full digests
+// ============================================================================
+
+describe('computeBundleInput required/full digest split', () => {
+  const baseParams = {
+    solverId: 'test-solver',
+    contractVersion: 1,
+    definitions: [{ action: 'craft:oak_planks' }],
+    inventory: { oak_log: 4 },
+    goal: { oak_planks: 4 },
+    nearbyBlocks: ['oak_log'],
+  };
+
+  it('populates both requiredDigest and fullDigest when leafContractEntries provided', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+      ['smelt', ['input:string']],
+    ];
+    const input = computeBundleInput({ ...baseParams, leafContractEntries: entries });
+    expect(input.leafContractRequiredDigest).toBeDefined();
+    expect(input.leafContractFullDigest).toBeDefined();
+    expect(typeof input.leafContractRequiredDigest).toBe('string');
+    expect(typeof input.leafContractFullDigest).toBe('string');
+  });
+
+  it('requiredDigest differs from fullDigest when optional fields exist', () => {
+    const entries: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const input = computeBundleInput({ ...baseParams, leafContractEntries: entries });
+    expect(input.leafContractRequiredDigest).not.toBe(input.leafContractFullDigest);
+  });
+
+  it('requiredDigest is stable when only optional fields are added', () => {
+    const before: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string']],
+    ];
+    const after: [string, string[]][] = [
+      ['craft_recipe', ['recipe:string', '?qty:number']],
+    ];
+    const inputBefore = computeBundleInput({ ...baseParams, leafContractEntries: before });
+    const inputAfter = computeBundleInput({ ...baseParams, leafContractEntries: after });
+    // Required digest unchanged (backward-compatible change)
+    expect(inputBefore.leafContractRequiredDigest).toBe(inputAfter.leafContractRequiredDigest);
+    // Full digest changed (contract surface grew)
+    expect(inputBefore.leafContractFullDigest).not.toBe(inputAfter.leafContractFullDigest);
+  });
+
+  it('neither digest is set when only leafRegistry (names-only) is provided', () => {
+    const input = computeBundleInput({
+      ...baseParams,
+      leafRegistry: ['craft_recipe', 'smelt'],
+    });
+    expect(input.leafContractRequiredDigest).toBeUndefined();
+    expect(input.leafContractFullDigest).toBeUndefined();
+    // But leafRegistryDigest is set
+    expect(input.leafRegistryDigest).toBeDefined();
   });
 });

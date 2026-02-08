@@ -28,6 +28,7 @@ import {
   attachSterlingIdentity,
 } from './solve-bundle';
 import type { SolveBundle, CompatReport } from './solve-bundle-types';
+import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { parseSearchHealth } from './search-health';
 import { extractSolveJoinKeys } from './episode-classification';
 import { P03ReferenceAdapter } from './primitives/p03/p03-reference-adapter';
@@ -102,6 +103,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
       inventory,
       goal,
       nearbyBlocks: [],
+      leafContractEntries: getLeafContractEntries(),
     });
 
     // Build payload

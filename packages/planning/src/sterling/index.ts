@@ -233,6 +233,9 @@ export {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  computeLeafRegistryDigest,
+  computeLeafContractDigest,
+  computeLeafContractRequiredDigest,
   INVENTORY_HASH_CAP,
 } from './solve-bundle';
 export { lintRules, lintGoal } from './compat-linter';

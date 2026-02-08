@@ -38,6 +38,7 @@ import {
   filterCapTokenItems,
 } from './minecraft-tool-progression-rules';
 import type { SolveBundle } from './solve-bundle-types';
+import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { lintRules } from './compat-linter';
 import {
   computeBundleInput,
@@ -265,6 +266,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         goal: tierGoalRecord,
         nearbyBlocks,
         tierMatrixVersion: TIER_MATRIX_VERSION,
+        leafContractEntries: getLeafContractEntries(),
       });
 
       // Solve this tier step.

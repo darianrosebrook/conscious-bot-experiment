@@ -200,6 +200,64 @@ export function hashSteps(steps: Array<{ action: string }>): ContentHash {
 }
 
 // ============================================================================
+// Leaf Registry Digest
+// ============================================================================
+
+/**
+ * Compute a content-addressed digest of the executor's available leaf names.
+ *
+ * Names-only variant — use computeLeafContractDigest for contract-aware digests.
+ *
+ * Usage:
+ * - Compute at executor startup from KNOWN_LEAVES
+ * - Attach to SolveBundleInput for audit trail
+ * - (Future) Send with solve/expand requests so Sterling can constrain
+ *   materialization to the available vocabulary
+ */
+export function computeLeafRegistryDigest(leafNames: Iterable<string>): ContentHash {
+  const sorted = [...leafNames].sort();
+  return contentHash(canonicalize(sorted));
+}
+
+/**
+ * Compute a content-addressed digest of the executor's leaf contracts.
+ *
+ * Unlike computeLeafRegistryDigest (names-only), this hashes both leaf names
+ * AND their field descriptors. Changing a contract's required fields changes
+ * the digest, enabling detection of arg-schema drift between TS and Sterling.
+ *
+ * Input: `[leafName, fields][]` from getLeafContractEntries().
+ */
+export function computeLeafContractDigest(
+  entries: Iterable<[string, string[]]>
+): ContentHash {
+  const sorted = [...entries].sort(([a], [b]) => a.localeCompare(b));
+  // Each entry becomes [leafName, sortedFields] for deterministic hashing
+  const canonical = sorted.map(([name, fields]) => [name, [...fields].sort()]);
+  return contentHash(canonicalize(canonical));
+}
+
+/**
+ * Compute a digest of required fields only (non-`?` prefixed).
+ *
+ * This is the "minimum safe ABI" digest — used for gating/compat decisions.
+ * Adding an optional field does NOT change this digest, preventing false
+ * breaking-change signals during backward-compatible contract evolution.
+ *
+ * Changing a required field (adding, removing, or changing type) DOES change it.
+ */
+export function computeLeafContractRequiredDigest(
+  entries: Iterable<[string, string[]]>
+): ContentHash {
+  const sorted = [...entries].sort(([a], [b]) => a.localeCompare(b));
+  const canonical = sorted.map(([name, fields]) => {
+    const required = fields.filter(f => !f.startsWith('?')).sort();
+    return [name, required];
+  });
+  return contentHash(canonicalize(canonical));
+}
+
+// ============================================================================
 // Bundle Computation
 // ============================================================================
 
@@ -213,10 +271,27 @@ export function computeBundleInput(params: {
   nearbyBlocks: string[];
   tierMatrixVersion?: string;
   objectiveWeights?: ObjectiveWeights;
+  /** Available executor leaf names for registry digest computation (names-only, legacy) */
+  leafRegistry?: Iterable<string>;
+  /** Leaf contract entries `[leafName, fields][]` for contract-aware digest (preferred) */
+  leafContractEntries?: Iterable<[string, string[]]>;
 }): SolveBundleInput {
   const objectiveWeightsProvided = params.objectiveWeights;
   const objectiveWeightsEffective = objectiveWeightsProvided ?? DEFAULT_OBJECTIVE_WEIGHTS;
   const objectiveWeightsSource: ObjectiveWeightsSource = objectiveWeightsProvided ? 'provided' : 'default';
+
+  // Prefer contract-aware digest over names-only
+  let leafRegistryDigest: ContentHash | undefined;
+  let leafContractRequiredDigest: ContentHash | undefined;
+  let leafContractFullDigest: ContentHash | undefined;
+  if (params.leafContractEntries) {
+    const entriesArr = [...params.leafContractEntries];
+    leafRegistryDigest = computeLeafContractDigest(entriesArr);
+    leafContractRequiredDigest = computeLeafContractRequiredDigest(entriesArr);
+    leafContractFullDigest = leafRegistryDigest; // full digest = all fields
+  } else if (params.leafRegistry) {
+    leafRegistryDigest = computeLeafRegistryDigest(params.leafRegistry);
+  }
 
   return {
     solverId: params.solverId,
@@ -232,6 +307,9 @@ export function computeBundleInput(params: {
     objectiveWeightsProvided,
     objectiveWeightsEffective,
     objectiveWeightsSource,
+    leafRegistryDigest,
+    leafContractRequiredDigest,
+    leafContractFullDigest,
   };
 }
 

@@ -22,6 +22,7 @@ import type {
   BuildingMaterialDeficit,
 } from './minecraft-building-types';
 import type { CompatReport } from './solve-bundle-types';
+import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import {
   computeBundleInput,
   computeBundleOutput,
@@ -146,6 +147,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       inventory,
       goal: goalRecord,
       nearbyBlocks: [],
+      leafContractEntries: getLeafContractEntries(),
     });
 
     // Call Sterling building domain

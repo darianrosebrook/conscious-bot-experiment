@@ -44,6 +44,18 @@ export interface SolveBundleInput {
   objectiveWeightsSource: ObjectiveWeightsSource;
   /** Context tokens injected into wire inventory (sorted). Acquisition solver only. */
   contextTokensInjected?: string[];
+  /** Content-addressed digest of the executor's leaf contracts.
+   *  When contract entries are provided, this is the contract-aware digest
+   *  (sensitive to both leaf names and field descriptors).
+   *  When only leaf names are provided, this is the names-only digest.
+   *  Enables capability handshake with Sterling. */
+  leafRegistryDigest?: ContentHash;
+  /** Digest of required fields only (non-? fields). Used for gating/compat:
+   *  a change here means the minimum safe ABI has changed. */
+  leafContractRequiredDigest?: ContentHash;
+  /** Digest of all fields (required + optional). Used for observability:
+   *  a change here means the contract surface grew (possibly backward-compatible). */
+  leafContractFullDigest?: ContentHash;
 }
 
 /** Output snapshot captured after a Sterling solve call */

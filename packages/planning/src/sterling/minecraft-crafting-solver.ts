@@ -16,6 +16,7 @@ import type {
   MinecraftSolveStep,
 } from './minecraft-crafting-types';
 import { buildCraftingRules, inventoryToRecord } from './minecraft-crafting-rules';
+import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { lintRules } from './compat-linter';
 import {
   computeBundleInput,
@@ -190,6 +191,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       inventory,
       goal,
       nearbyBlocks,
+      leafContractEntries: getLeafContractEntries(),
     });
     if (compatReport.issues.length > 0) {
       console.warn(

@@ -35,6 +35,7 @@ import {
   type NearbyEntity,
 } from './minecraft-acquisition-rules';
 import { isValidMcData, type McData } from './minecraft-crafting-rules';
+import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { StrategyPriorStore } from './minecraft-acquisition-priors';
 import { lintRules, type LintableRule } from './compat-linter';
 import {
@@ -266,6 +267,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       goal: { [item]: quantity },
       nearbyBlocks,
       objectiveWeights: options?.objectiveWeights,
+      leafContractEntries: getLeafContractEntries(),
     });
 
     // candidateCount = structurally enumerated strategies with a known domain path.
@@ -618,6 +620,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           goal,
           nearbyBlocks,
           objectiveWeights,
+          leafContractEntries: getLeafContractEntries(),
         }),
         contextTokensInjected: contextTokensInjected.length > 0 ? contextTokensInjected : undefined,
       };

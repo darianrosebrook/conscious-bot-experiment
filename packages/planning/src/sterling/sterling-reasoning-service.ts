@@ -16,6 +16,7 @@ import {
   type SterlingHealthStatus,
   type SterlingSolveStepCallback,
   type SterlingLanguageReducerResult,
+  type SterlingIntentReplacement,
 } from '@conscious-bot/core';
 import { computeDeclarationDigest, type DomainDeclarationV1 } from './domain-declaration';
 
@@ -198,6 +199,52 @@ export class SterlingReasoningService {
 
     try {
       return await this.client.expandByDigest(request, effectiveTimeoutMs);
+    } catch (err) {
+      return {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  /**
+   * Resolve abstract intent steps into executor-native steps via domain solvers.
+   *
+   * Sends intent steps + world state to Sterling's resolve_intent_steps command,
+   * which invokes the appropriate domain solver and maps output to executable leaves.
+   */
+  async resolveIntentSteps(
+    request: {
+      intent_steps: Array<{ leaf: string; args: Record<string, unknown> }>;
+      world_state: { inventory: Record<string, number>; nearby_blocks: string[] };
+      rules?: Array<Record<string, unknown>>;
+      schema_version?: string;
+      request_id?: string;
+    },
+    timeoutMs?: number,
+  ): Promise<
+    | {
+        status: 'ok';
+        replacements: SterlingIntentReplacement[];
+        plan_bundle_digest: string;
+        schema_version?: string;
+      }
+    | { status: 'blocked'; blocked_reason: string; replacements?: SterlingIntentReplacement[] }
+    | { status: 'error'; error: string }
+  > {
+    if (!this.enabled) {
+      return { status: 'blocked', blocked_reason: 'blocked_executor_unavailable' };
+    }
+
+    const resolveTimeoutMsRaw =
+      process.env.STERLING_RESOLVE_TIMEOUT_MS ?? process.env.STERLING_EXECUTOR_TIMEOUT_MS ?? '10000';
+    const resolveTimeoutMs = Number.isFinite(Number(resolveTimeoutMsRaw))
+      ? Number(resolveTimeoutMsRaw)
+      : 10000;
+    const effectiveTimeoutMs = typeof timeoutMs === 'number' ? timeoutMs : resolveTimeoutMs;
+
+    try {
+      return await this.client.resolveIntentSteps(request, effectiveTimeoutMs);
     } catch (err) {
       return {
         status: 'error',
