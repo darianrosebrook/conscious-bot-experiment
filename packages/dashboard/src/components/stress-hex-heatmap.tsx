@@ -59,6 +59,36 @@ const AXIS_KEYS = [
   'locationDistance',
 ] as const;
 
+/**
+ * Situational descriptions for tooltips: stress level (ring) x dominant axis (sector).
+ * Row = ring 0..4 (center = low stress, edge = high).
+ * Col = axis index: 0=Time, 1=Situational, 2=Health/Hunger, 3=Resource, 4=Protection, 5=Location.
+ *
+ * Vocabulary is derived from buildStressContext() in stress-axis-computer.ts,
+ * which provides the bot's first-person situational fragments for LLM prompts.
+ * Ring 0 = below all thresholds (calm). Rings 1-2 map to the mid-threshold
+ * phrases (>40-45). Rings 3-4 map to the high-threshold phrases (>60-70).
+ */
+const FEELING_BY_RING_AND_AXIS: Record<number, readonly [string, string, string, string, string, string]> = {
+  // Ring 0: all axes below threshold — no situational context generated
+  0: ['Settled', 'Settled', 'Settled', 'Settled', 'Settled', 'Settled'],
+  // Ring 1-2: mid-threshold — maps to buildStressContext >40-45 phrases
+  1: ['Could use a break', 'Staying alert', 'Could use food or healing', 'Could restock', 'Could use more protection', 'A ways from home'],
+  2: ['Been a while since a break', 'Area feels unsafe', 'Not in the best shape', 'Inventory needs restocking', 'Additional protection needed', 'Wandered far from home'],
+  // Ring 3-4: high-threshold — maps to buildStressContext >60-70 phrases
+  3: ['At this for a while without rest', 'On edge — something nearby', 'Need to address health or hunger', 'Running low on supplies', 'Quite exposed', 'Far from anywhere familiar'],
+  4: ['Exhausted — no rest in a long time', 'On edge — immediate danger', 'Health or hunger is critical', 'Critically low on supplies', 'Dangerously exposed', 'Far from anywhere safe'],
+};
+
+/** Ring-only description when axes not available (focus-based sectors). */
+const FEELING_BY_RING_ONLY: Record<number, string> = {
+  0: 'Settled',
+  1: 'Mildly uneasy',
+  2: 'Uneasy',
+  3: 'On edge',
+  4: 'Overwhelmed',
+};
+
 export interface StressAxes {
   time: number;
   situational: number;
@@ -192,6 +222,18 @@ function sectorLabel(ring: number, sector: number, hasAxes: boolean): string {
   return `focus ~${pctLo}-${pctHi}%`;
 }
 
+/** Feeling label for tooltip: stress ring + dominant axis -> first-person situational phrase. */
+function feelingLabel(ring: number, sector: number, hasAxes: boolean): string {
+  if (ring === 0) return FEELING_BY_RING_ONLY[0];
+  if (hasAxes) {
+    const numInRing = ring * 6;
+    const axisIdx = Math.round((sector / numInRing) * 6) % 6;
+    const row = FEELING_BY_RING_AND_AXIS[ring as keyof typeof FEELING_BY_RING_AND_AXIS];
+    return row ? row[axisIdx] : FEELING_BY_RING_ONLY[ring] ?? 'Stressed';
+  }
+  return FEELING_BY_RING_ONLY[ring] ?? 'Stressed';
+}
+
 interface StressHexHeatmapProps {
   intero: InteroState;
   dwellCounts: Record<string, number>;
@@ -294,7 +336,7 @@ export function StressHexHeatmap({
                   <TooltipContent side="top">
                     <div className={s.tooltipBody}>
                       <div className={s.tooltipTitle}>
-                        Ring {hex.ring}, sector {hex.sector}
+                        {feelingLabel(hex.ring, hex.sector, hasAxes)}
                         {isCurrent ? ' (current)' : ''}
                       </div>
                       <div className={s.tooltipDetail}>
