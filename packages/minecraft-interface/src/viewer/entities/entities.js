@@ -540,7 +540,7 @@ function getEntityMesh(entity, scene) {
   }
   if (normalizedName) {
     try {
-      const e = new Entity(textureVersion, normalizedName, scene);
+      const e = new Entity(textureVersion, normalizedName, scene, entity.skinUrl);
       // Store entity info in userData for extras setup
       e.mesh.userData.entityName = normalizedName;
       e.mesh.userData.entityNameRaw = rawName;
@@ -551,7 +551,7 @@ function getEntityMesh(entity, scene) {
     } catch (err) {
       if (fallbackName) {
         try {
-          const e = new Entity(textureVersion, fallbackName, scene);
+          const e = new Entity(textureVersion, fallbackName, scene, entity.skinUrl);
           e.mesh.userData.entityName = fallbackName;
           e.mesh.userData.entityNameRaw = rawName;
           e.mesh.userData.entityNameFallback = normalizedName;
@@ -859,11 +859,9 @@ class Entities {
         .start();
     }
     if (entity.yaw) {
-      // Bedrock models face -Z in local space, but Minecraft yaw 0 = south (+Z).
-      // Add PI so the model's front face (-Z) points toward the entity's
-      // actual facing direction.
-      const targetYaw = entity.yaw + Math.PI;
-      const da = (targetYaw - e.rotation.y) % (Math.PI * 2);
+      // Mineflayer yaw: 0=north(-Z), PI=south(+Z). Model face points -Z at rotation.y=0.
+      // Conventions match — apply yaw directly.
+      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2);
       const dy = ((2 * da) % (Math.PI * 2)) - da;
       new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start();
     }

@@ -8,6 +8,7 @@ function loadTexture (texture, cb) {
     return
   }
   const loader = new THREE.TextureLoader()
+  loader.setCrossOrigin('anonymous') // Enable CORS for external URLs (e.g. Mojang skin CDN)
   loader.load(texture, (tex) => {
     textureCache[texture] = tex
     cb(tex)

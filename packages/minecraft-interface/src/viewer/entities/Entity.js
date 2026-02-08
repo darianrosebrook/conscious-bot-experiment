@@ -147,7 +147,7 @@ function addCube (attr, boneId, bone, cube, texWidth = 64, texHeight = 64) {
   }
 }
 
-function getMesh (texture, jsonModel, entityType) {
+function getMesh (texture, jsonModel, entityType, skinUrl) {
   const bones = {}
   const bonesByName = {}
 
@@ -235,12 +235,17 @@ function getMesh (texture, jsonModel, entityType) {
   geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(geoData.skinWeights, 4))
   geometry.setIndex(geoData.indices)
 
-  let material = materialCache[texture]
+  // When a skin URL is provided (Mojang CDN), use it as the cache key and texture source
+  // so each player gets their own material. Otherwise use the generic entity texture path.
+  const cacheKey = skinUrl || texture
+  const textureSource = skinUrl || texture
+
+  let material = materialCache[cacheKey]
   if (!material) {
     material = new THREE.MeshLambertMaterial({ alphaTest: 0.1 })
     material.userData.isCached = true
-    materialCache[texture] = material
-    loadTexture(texture, tex => {
+    materialCache[cacheKey] = material
+    loadTexture(textureSource, tex => {
       tex.magFilter = THREE.NearestFilter
       tex.minFilter = THREE.NearestFilter
       tex.flipY = false
@@ -294,13 +299,14 @@ function resolveEntityTexturePath (version, texturePath) {
 let _debugEntityTextureLogged = false
 
 class Entity {
-  constructor (version, type, scene) {
+  constructor (version, type, scene, skinUrl) {
     const e = entities[type]
     if (!e) throw new Error(`Unknown entity ${type}`)
 
     this.mesh = new THREE.Object3D()
     this.mesh.userData.entityType = type
     this.mesh.userData.skinnedMeshes = []
+    this.mesh.userData.skinUrl = skinUrl || null
 
     for (const [name, jsonModel] of Object.entries(e.geometry)) {
       const texture = e.textures[name] || e.textures['default'] || Object.values(e.textures)[0]
@@ -315,7 +321,8 @@ class Entity {
             resolvedPath
         )
       }
-      const mesh = getMesh(resolvedPath, jsonModel, type)
+      // Pass skinUrl to getMesh so player entities use their Mojang skin
+      const mesh = getMesh(resolvedPath, jsonModel, type, skinUrl)
       this.mesh.add(mesh)
 
       if (mesh.isSkinnedMesh) {

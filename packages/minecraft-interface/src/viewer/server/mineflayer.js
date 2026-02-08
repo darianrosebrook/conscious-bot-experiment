@@ -64,6 +64,17 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
   }
 
   // ============================================================================
+  // ENHANCED: Player skin lookup
+  // ============================================================================
+
+  // Mineflayer v4+ populates bot.players[name].skinData from player_info packets.
+  // skinData = { url: 'http://textures.minecraft.net/texture/...', model: 'slim' | undefined }
+  function getPlayerSkin (username) {
+    if (!username) return undefined
+    return bot.players[username]?.skinData
+  }
+
+  // ============================================================================
   // ENHANCED: Equipment tracking
   // ============================================================================
 
@@ -188,10 +199,13 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
 
     socket.emit('version', bot.version)
 
-    // Emit bot info for name tag display
+    // Emit bot info for name tag display and skin
+    const botSkin = getPlayerSkin(bot.username)
     socket.emit('botInfo', {
       username: bot.username || 'Bot',
-      uuid: bot.player?.uuid
+      uuid: bot.player?.uuid,
+      skinUrl: botSkin?.url,
+      skinModel: botSkin?.model
     })
 
     sockets.push(socket)
@@ -229,6 +243,15 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
         username: entity.username
       }
 
+      // Look up skin from extracted player_info properties
+      if (entity.username) {
+        const skin = getPlayerSkin(entity.username)
+        if (skin) {
+          entityData.skinUrl = skin.url
+          entityData.skinModel = skin.model
+        }
+      }
+
       // Include equipment if present and changed
       if (entity.equipment && hasEquipmentChanged(entity.id, entity.equipment)) {
         entityData.equipment = serializeEquipment(entity.equipment)
@@ -237,16 +260,24 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
       socket.emit('entity', entityData)
     }
 
-    // Intercept entity events from worldView to add equipment
+    // Intercept entity events from worldView to add equipment and skin data
     const originalEmit = worldView.emitter.emit.bind(worldView.emitter)
     worldView.emitter.emit = function (event, data) {
       if (event === 'entity' && data && !data.delete) {
         // Find the full entity from bot.entities
         const fullEntity = bot.entities[data.id]
-        if (fullEntity && fullEntity.equipment) {
-          // Check if equipment changed and add it
-          if (hasEquipmentChanged(data.id, fullEntity.equipment)) {
+        if (fullEntity) {
+          // Add equipment if changed
+          if (fullEntity.equipment && hasEquipmentChanged(data.id, fullEntity.equipment)) {
             data.equipment = serializeEquipment(fullEntity.equipment)
+          }
+          // Add skin URL for player entities
+          if (fullEntity.username && !data.skinUrl) {
+            const skin = getPlayerSkin(fullEntity.username)
+            if (skin) {
+              data.skinUrl = skin.url
+              data.skinModel = skin.model
+            }
           }
         }
       }

@@ -149,11 +149,11 @@ class NameTagManager {
     // Create sprite
     this.nameTag = new THREE.Sprite(this.material)
 
-    // Set initial scale based on canvas aspect ratio.
-    // Scale converts canvas pixels to world units; aspect preserves proportions.
+    // Set initial scale based on canvas aspect ratio
+    // scale is in world units (blocks) — ~0.4 blocks tall looks similar to vanilla MC name tags
     const aspect = width / height
-    const baseHeight = 0.4 // World-unit height of the tag
-    this.nameTag.scale.set(baseHeight * aspect, baseHeight, 1)
+    const scale = 0.4 // Base height in blocks
+    this.nameTag.scale.set(aspect * scale, scale, 1)
 
     // Position above entity head
     this.nameTag.position.y = entityHeight + NAME_TAG_HEIGHT_OFFSET
@@ -177,13 +177,12 @@ class NameTagManager {
     // Calculate distance to camera
     const distance = camera.position.distanceTo(entityPosition)
 
-    // Grow slightly with distance so the tag stays readable from far away.
-    // At distance 0-8 blocks the tag is its base size; at 64+ it's 2× base.
+    // Scale based on distance so name tags remain readable at range (like vanilla MC)
     const baseScale = this.nameTag.userData.baseScale
-    const distGrowth = 1 + Math.min(1, Math.max(0, (distance - 8) / 56))
+    const scaleFactor = Math.max(0.5, Math.min(3.0, distance * 0.15))
     this.nameTag.scale.set(
-      baseScale.x * distGrowth,
-      baseScale.y * distGrowth,
+      baseScale.x * scaleFactor,
+      baseScale.y * scaleFactor,
       1
     )
 

@@ -61,6 +61,7 @@ let weatherSystem = null
 // ============================================================================
 let botExtrasManager = null
 let botUsername = 'Bot' // Will be updated from server
+let botSkinUrl = null // Will be updated from botInfo event
 
 // ============================================================================
 // Custom Asset Integration
@@ -239,6 +240,9 @@ socket.on('weather', (data) => {
   }
 })
 
+// 3rd person orbit pivots around the bot's head (Minecraft player eye height in blocks)
+const THIRD_PERSON_HEAD_OFFSET = 1.62
+
 let firstPositionUpdate = true
 let viewMode = 'first' // 'first' | 'third'
 let controls = null
@@ -272,8 +276,9 @@ function initOrbitControls () {
   if (controls) return
   controls = createOrbitControls()
   if (lastPos) {
-    controls.target.set(lastPos.x, lastPos.y, lastPos.z)
-    viewer.camera.position.set(lastPos.x, lastPos.y + 6, lastPos.z + 6)
+    const headY = lastPos.y + THIRD_PERSON_HEAD_OFFSET
+    controls.target.set(lastPos.x, headY, lastPos.z)
+    viewer.camera.position.set(lastPos.x, headY + 6, lastPos.z + 6)
     controls.update()
   }
 }
@@ -372,7 +377,8 @@ window.addEventListener('keydown', (e) => {
 socket.on('botInfo', (data) => {
   if (data && data.username) {
     botUsername = data.username
-    console.log(`[viewer] Bot username: ${botUsername}`)
+    botSkinUrl = data.skinUrl || null
+    console.log(`[viewer] Bot username: ${botUsername}, skin: ${botSkinUrl ? 'custom' : 'default'}`)
 
     // Update name tag if bot extras already exist
     if (botExtrasManager && botMesh) {
@@ -497,9 +503,10 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
 
   if (viewMode === 'third') {
     initOrbitControls()
-    controls.target.set(pos.x, pos.y, pos.z)
+    const headY = pos.y + THIRD_PERSON_HEAD_OFFSET
+    controls.target.set(pos.x, headY, pos.z)
     if (firstPositionUpdate && pos.y > 0) {
-      viewer.camera.position.set(pos.x, pos.y + 6, pos.z + 6)
+      viewer.camera.position.set(pos.x, headY + 6, pos.z + 6)
       controls.update()
       firstPositionUpdate = false
     }
@@ -511,7 +518,7 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
   if (addMesh) {
     if (!botMesh) {
       const textureVersion = globalThis.__MC_VERSION || '1.21.9'
-      botMesh = new Entity(textureVersion, 'player', viewer.scene).mesh
+      botMesh = new Entity(textureVersion, 'player', viewer.scene, botSkinUrl).mesh
       viewer.scene.add(botMesh)
 
       // Set up entity extras (name tag, cape, shadow) for bot mesh
@@ -536,9 +543,9 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
 
     new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
     if (yaw !== undefined) {
-      // Bedrock models face -Z; Minecraft yaw 0 = south (+Z). Offset by PI.
-      const targetYaw = yaw + Math.PI
-      const da = (targetYaw - botMesh.rotation.y) % (Math.PI * 2)
+      // Mineflayer yaw: 0=north(-Z), PI=south(+Z). Model face points -Z at rotation.y=0.
+      // Conventions match — apply yaw directly.
+      const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
       const dy = 2 * da % (Math.PI * 2) - da
       new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 50).start()
     }
