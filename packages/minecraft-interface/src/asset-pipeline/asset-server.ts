@@ -43,6 +43,11 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   // Track in-progress generations to avoid duplicates
   const generatingVersions = new Set<string>();
 
+  // Negative cache: version:path pairs where generation ran but the texture still didn't exist.
+  // Prevents re-triggering pipeline.generate() on every request for known-missing assets
+  // (e.g. snowball entity textures that live under items/, not entity/).
+  const missingAfterGenerate = new Set<string>();
+
   // Resolve custom skin path (check explicit option, env var, monorepo root, cwd, ~/Downloads)
   const resolvedCustomSkinPath = (() => {
     // Walk up from this file to find monorepo root (has pnpm-workspace.yaml)
@@ -400,8 +405,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         return fs.createReadStream(generatedFallbackPath).pipe(res);
       }
 
-      // 4. Auto-generate on demand
-      if (autoGenerate && !generatingVersions.has(version)) {
+      // 4. Auto-generate on demand (skip if we already know this texture doesn't exist after generation)
+      const negCacheKey = `${version}:${relativePath}`;
+      if (autoGenerate && !generatingVersions.has(version) && !missingAfterGenerate.has(negCacheKey)) {
         generatingVersions.add(version);
         console.log(`[asset-server] Auto-generating assets for ${version} (entity textures)...`);
 
@@ -415,6 +421,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
             res.setHeader('X-Asset-Source', 'generated');
             return fs.createReadStream(generatedPath).pipe(res);
           }
+          // Generation succeeded but this specific texture still doesn't exist —
+          // cache the miss so we don't re-trigger generation on every request.
+          missingAfterGenerate.add(negCacheKey);
         } catch (error) {
           generatingVersions.delete(version);
           console.error(`[asset-server] Failed to generate assets for ${version}:`, error);
@@ -497,6 +506,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         hasBundledFallback: !!pvPublicDir,
         cachedVersions: versionStatuses,
         generatingVersions: Array.from(generatingVersions),
+        missingAfterGenerate: Array.from(missingAfterGenerate),
         versionSupport,
         warnings,
       });
@@ -521,6 +531,11 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
     }
 
     generatingVersions.add(version);
+
+    // Clear negative cache for this version so re-generation can serve newly available textures
+    for (const key of missingAfterGenerate) {
+      if (key.startsWith(`${version}:`)) missingAfterGenerate.delete(key);
+    }
 
     try {
       const result = await pipeline.generate(version, { force });
