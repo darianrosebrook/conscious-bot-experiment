@@ -19,10 +19,7 @@ build/
 **/src/**/*.js.map
 **/src/**/*.d.ts.map
 
-# Exception: prismarine-viewer source customizations (authoritative JS, not compiled)
-!**/prismarine-viewer-src/**/*.js
-
-# Exception: internalized viewer module (authoritative CJS JS, not compiled from TS)
+# Exception: internalized viewer module (authoritative JS, not compiled from TS)
 !**/src/viewer/**/*.js
 
 # Viewer Vite build output and bundled assets (large; rebuilt on demand)

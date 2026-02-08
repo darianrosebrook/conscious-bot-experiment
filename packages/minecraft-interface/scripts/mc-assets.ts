@@ -11,15 +11,13 @@
  *   pnpm mc:assets list                # Show cached versions
  *   pnpm mc:assets clean               # Clear all cache
  *   pnpm mc:assets clean 1.21.9        # Clear specific version
- *   pnpm mc:assets inject 1.21.9       # Inject into prismarine-viewer
  *
  * @author @darianrosebrook
  */
 
-import * as path from 'path';
 import { AssetPipeline, PipelineProgress } from '../src/asset-pipeline/pipeline.js';
 
-const COMMANDS = ['extract', 'list', 'clean', 'inject', 'help'] as const;
+const COMMANDS = ['extract', 'list', 'clean', 'help'] as const;
 type Command = typeof COMMANDS[number];
 
 function printHelp(): void {
@@ -38,8 +36,6 @@ Commands:
 
   clean [version]      Clear cache for specific version or all
 
-  inject <version>     Inject generated assets into prismarine-viewer
-
   help                 Show this help message
 
 Examples:
@@ -48,7 +44,6 @@ Examples:
   pnpm mc:assets extract 1.21.9 --force
   pnpm mc:assets list
   pnpm mc:assets clean 1.21.8
-  pnpm mc:assets inject 1.21.9
 `);
 }
 
@@ -88,9 +83,6 @@ async function main(): Promise<void> {
       break;
     case 'clean':
       await runClean(pipeline, args.slice(1));
-      break;
-    case 'inject':
-      await runInject(pipeline, args.slice(1));
       break;
   }
 }
@@ -222,41 +214,6 @@ async function runClean(pipeline: AssetPipeline, args: string[]): Promise<void> 
     console.log('\n🗑️  Clearing all cached assets...');
     await pipeline.clearCache();
     console.log('✅ All cached assets cleared');
-  }
-}
-
-async function runInject(pipeline: AssetPipeline, args: string[]): Promise<void> {
-  const version = args.find((a) => !a.startsWith('-'));
-
-  if (!version) {
-    console.error('Error: Please specify a version to inject');
-    console.error('Usage: pnpm mc:assets inject <version>');
-    process.exit(1);
-  }
-
-  // Find prismarine-viewer's public directory using import.meta.resolve (ESM)
-  let pvPublicDir: string;
-  try {
-    // In ESM, we need to use import.meta.resolve or find the package manually
-    const { createRequire } = await import('module');
-    const require = createRequire(import.meta.url);
-    const pvPackagePath = require.resolve('prismarine-viewer/package.json');
-    pvPublicDir = path.join(path.dirname(pvPackagePath), 'public');
-  } catch {
-    console.error('Error: Could not find prismarine-viewer installation');
-    process.exit(1);
-  }
-
-  console.log(`\n💉 Injecting assets for ${version} into prismarine-viewer...`);
-
-  try {
-    await pipeline.injectIntoViewer(version, pvPublicDir);
-    console.log(`✅ Assets injected successfully`);
-    console.log(`   Texture:      ${path.join(pvPublicDir, 'textures', `${version}.png`)}`);
-    console.log(`   BlockStates:  ${path.join(pvPublicDir, 'blocksStates', `${version}.json`)}`);
-  } catch (error) {
-    console.error(`❌ Failed to inject assets: ${error instanceof Error ? error.message : error}`);
-    process.exit(1);
   }
 }
 

@@ -11,15 +11,11 @@
     "mc-simple": "dist/bin/mc-simple.js"
   },
   "scripts": {
-    "postinstall:legacy": "echo 'prismarine-viewer internalized — see src/viewer/'",
-    "generate-textures": "node scripts/generate-textures.cjs",
-    "generate-textures:force": "node scripts/generate-textures.cjs -f",
     "mc:assets": "npx tsx scripts/mc-assets.ts",
     "mc:assets:extract": "npx tsx scripts/mc-assets.ts extract",
     "mc:assets:list": "npx tsx scripts/mc-assets.ts list",
     "mc:assets:clean": "npx tsx scripts/mc-assets.ts clean",
-    "mc:assets:inject": "npx tsx scripts/mc-assets.ts inject",
-    "build": "tsc",
+    "build": "tsc && pnpm build:viewer",
     "build:viewer": "NODE_OPTIONS='--max-old-space-size=8192' vite build --config src/viewer/vite.config.js",
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",

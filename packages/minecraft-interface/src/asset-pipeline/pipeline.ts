@@ -321,31 +321,6 @@ export class AssetPipeline {
     }
   }
 
-  /**
-   * Injects generated assets into the viewer's public directory.
-   * This allows the viewer to use our generated assets.
-   *
-   * @param version - Version to inject
-   * @param pvPublicDir - Path to the viewer's public directory
-   */
-  async injectIntoViewer(version: string, pvPublicDir: string): Promise<void> {
-    if (!(await this.isGenerated(version))) {
-      throw new Error(`Assets not generated for version ${version}`);
-    }
-
-    const paths = this.getOutputPaths(version);
-
-    // Copy texture atlas
-    const texturesDest = path.join(pvPublicDir, 'textures', `${version}.png`);
-    await fs.promises.mkdir(path.dirname(texturesDest), { recursive: true });
-    await fs.promises.copyFile(paths.texturePath, texturesDest);
-
-    // Copy blockstates
-    const blockStatesDest = path.join(pvPublicDir, 'blocksStates', `${version}.json`);
-    await fs.promises.mkdir(path.dirname(blockStatesDest), { recursive: true });
-    await fs.promises.copyFile(paths.blockStatesPath, blockStatesDest);
-  }
-
   private async acquireGenerationLock(lockPath: string, timeoutMs: number = 60000): Promise<boolean> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
