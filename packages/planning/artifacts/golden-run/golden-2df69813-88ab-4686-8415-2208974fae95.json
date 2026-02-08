@@ -1,0 +1,62 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "2df69813-88ab-4686-8415-2208974fae95",
+  "created_at": 1770559364216,
+  "updated_at": 1770559364307,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": false,
+      "enable_planning_executor_env": "1"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "schema_version": "1.1.0",
+    "envelope_id": "30d9f063983539ee",
+    "request_id": "run_golden_reduce_2df69813-88ab-4686-8415-2208974fae95",
+    "source": "dev_run_golden_reduce"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770559364217_6svca2",
+    "status": "ok",
+    "plan_bundle_digest": "babdef828a154afe23813f668ee50a96ac2dfd182de50b5e22892cfc6286c175",
+    "executor_plan_digest": "babdef828a154afe23813f668ee50a96ac2dfd182de50b5e22892cfc6286c175",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "task_type_craft",
+        "order": 1,
+        "args": {
+          "proposition_id": "prop_4116481c6dc1a508",
+          "task_type": "CRAFT",
+          "predicate_lemma": "craft",
+          "routing_domain": "planning"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-2df69813-88ab-4686-8415-2208974fae95",
+    "dedupe_key": "1.1.0:ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "status": "pending_planning"
+  }
+}

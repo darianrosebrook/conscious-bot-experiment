@@ -1,0 +1,22 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1",
+    "task_id_index_v1"
+  ],
+  "run_id": "run-4",
+  "created_at": 1770505588247,
+  "updated_at": 1770505588247,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "task": {
+    "task_id": "task-4",
+    "status": "pending"
+  }
+}

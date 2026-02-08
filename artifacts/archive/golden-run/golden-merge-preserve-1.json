@@ -1,0 +1,32 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "merge-preserve-1",
+  "created_at": 1770544944148,
+  "updated_at": 1770544944148,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [
+      {
+        "leaf": "craft_recipe",
+        "reason": "planning_incomplete",
+        "ts": 1770544944148
+      }
+    ],
+    "executor_blocked_reason": "planning_incomplete",
+    "executor_blocked_payload": {
+      "leaf": "craft_recipe"
+    }
+  },
+  "task": {
+    "task_id": "task-merge-1",
+    "title": "Craft wooden pickaxe",
+    "status": "in_progress"
+  }
+}

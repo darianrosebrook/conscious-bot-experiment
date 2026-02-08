@@ -1,0 +1,32 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "merge-preserve-2",
+  "created_at": 1770544944148,
+  "updated_at": 1770544944148,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [
+      {
+        "leaf": "acquire_material",
+        "reason": "rate_limited",
+        "ts": 1770544944148
+      }
+    ],
+    "executor_blocked_reason": "rate_limited",
+    "executor_blocked_payload": {
+      "leaf": "acquire_material"
+    }
+  },
+  "task": {
+    "task_id": "task-no-erase",
+    "title": "Mine diamonds",
+    "status": "pending"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "e2e-native-dispatch-test",
+  "created_at": 1770559454971,
+  "updated_at": 1770559454972,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "expansion": {
+    "request_id": "sterling_exec_1770559454953_fj8o3h",
+    "status": "blocked",
+    "blocked_reason": "blocked_digest_unknown"
+  },
+  "task": {
+    "task_id": "task-1770559454972-bfn4pz7h3",
+    "dedupe_key": "1.1.0:e2e-test:native-leaf-dispatch",
+    "status": "pending_planning"
+  }
+}

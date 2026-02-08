@@ -1,0 +1,31 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "block-only-run",
+  "created_at": 1770510883183,
+  "updated_at": 1770510883183,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [
+      {
+        "leaf": "dig_block",
+        "reason": "unknown_leaf",
+        "ts": 1770510883183
+      }
+    ],
+    "executor_blocked_reason": "unknown_leaf",
+    "executor_blocked_payload": {
+      "leaf": "dig_block"
+    }
+  },
+  "task": {
+    "task_id": "task-block-only",
+    "status": "pending"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "bf2f7408-1b9e-4e76-a829-c49c7da01e68",
+  "created_at": 1770588190837,
+  "updated_at": 1770589103444,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": false,
+      "enable_planning_executor_env": "1"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "schema_version": "1.1.0",
+    "envelope_id": "30d9f063983539ee",
+    "request_id": "run_golden_reduce_bf2f7408-1b9e-4e76-a829-c49c7da01e68",
+    "source": "dev_run_golden_reduce"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770588793423_27k77s",
+    "status": "blocked",
+    "blocked_reason": "blocked_intent_resolution_unavailable"
+  },
+  "task": {
+    "task_id": "sterling-ir-bf2f7408-1b9e-4e76-a829-c49c7da01e68",
+    "dedupe_key": "1.1.0:ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770588313297,
+      "reason": "blocked_intent_resolution_unavailable",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770588343297
+    },
+    {
+      "attempt": 2,
+      "ts": 1770588353301,
+      "reason": "blocked_intent_resolution_unavailable",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770588413301
+    },
+    {
+      "attempt": 3,
+      "ts": 1770588413789,
+      "reason": "blocked_intent_resolution_unavailable",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770588533789
+    },
+    {
+      "attempt": 4,
+      "ts": 1770588543589,
+      "reason": "blocked_intent_resolution_unavailable",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770588783589
+    },
+    {
+      "attempt": 5,
+      "ts": 1770588793451,
+      "reason": "blocked_intent_resolution_unavailable",
+      "classification": "transient",
+      "backoff_ms": 300000,
+      "next_eligible_at": 1770589093451
+    },
+    {
+      "attempt": 6,
+      "ts": 1770589103444,
+      "reason": "expansion_retries_exhausted",
+      "classification": "exhausted"
+    }
+  ]
+}

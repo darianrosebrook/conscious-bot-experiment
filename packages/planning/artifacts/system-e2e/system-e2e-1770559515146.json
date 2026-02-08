@@ -1,0 +1,251 @@
+{
+  "meta": {
+    "runId": "system-e2e-1770559515146",
+    "timestamp": 1770559645345,
+    "memoryUrl": "http://localhost:3001",
+    "planningUrl": "http://localhost:3002",
+    "capabilities": {
+      "devEndpointsEnabled": true,
+      "executorEnabled": true,
+      "executorMode": "live",
+      "sterlingConnected": true
+    }
+  },
+  "scenarios": [
+    {
+      "name": "Scenario 0: Service readiness + capability detection",
+      "status": "pass",
+      "durationMs": 29,
+      "steps": [
+        {
+          "action": "GET /ready (memory)",
+          "endpoint": "http://localhost:3001/ready",
+          "statusCode": 200,
+          "durationMs": 21
+        },
+        {
+          "action": "GET /health (planning)",
+          "endpoint": "http://localhost:3002/health",
+          "statusCode": 200,
+          "durationMs": 3
+        },
+        {
+          "action": "GET /system/ready (planning)",
+          "endpoint": "http://localhost:3002/system/ready",
+          "statusCode": 200,
+          "durationMs": 2
+        },
+        {
+          "action": "GET /sterling/health",
+          "statusCode": 200,
+          "detail": {
+            "connected": true,
+            "lastPingMs": 1
+          }
+        },
+        {
+          "action": "detect dev endpoints + executor config",
+          "detail": {
+            "devEndpointsEnabled": true,
+            "executorEnabled": true,
+            "executorMode": "live",
+            "runtimeConfigStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scenario 1: Memory hybrid search",
+      "status": "fail",
+      "durationMs": 55,
+      "steps": [
+        {
+          "action": "POST /thought (memory)",
+          "endpoint": "http://localhost:3001/thought",
+          "statusCode": 500,
+          "durationMs": 54
+        },
+        {
+          "action": "assert",
+          "passed": false,
+          "detail": "expected 500 to be less than 300"
+        }
+      ]
+    },
+    {
+      "name": "Scenario 2: Sterling golden reduce → task creation",
+      "status": "pass",
+      "durationMs": 24,
+      "steps": [
+        {
+          "action": "POST /api/dev/run-golden-reduce",
+          "endpoint": "http://localhost:3002/api/dev/run-golden-reduce",
+          "statusCode": 200,
+          "durationMs": 23,
+          "detail": {
+            "success": true,
+            "reduce": {
+              "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+              "schema_version": "1.1.0",
+              "source_envelope_id": "30d9f063983539ee",
+              "has_committed_propositions": true
+            },
+            "inject": {
+              "run_id": "44e3b115-3631-4653-b0e2-21d841ac459d",
+              "task_id": "sterling-ir-2df69813-88ab-4686-8415-2208974fae95"
+            }
+          }
+        },
+        {
+          "action": "assert reduce fields",
+          "assertion": "committed_ir_digest and schema_version are non-empty strings",
+          "passed": true,
+          "detail": {
+            "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+            "schema_version": "1.1.0"
+          }
+        },
+        {
+          "action": "assert task injected",
+          "assertion": "task_id and run_id are non-null",
+          "passed": true,
+          "detail": {
+            "task_id": "sterling-ir-2df69813-88ab-4686-8415-2208974fae95",
+            "run_id": "44e3b115-3631-4653-b0e2-21d841ac459d"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scenario 3: Task expansion via Sterling",
+      "status": "pass",
+      "durationMs": 1,
+      "steps": [
+        {
+          "action": "poll /tasks for expansion",
+          "detail": {
+            "taskId": "sterling-ir-2df69813-88ab-4686-8415-2208974fae95",
+            "executorMode": "live"
+          }
+        },
+        {
+          "action": "assert task expanded",
+          "assertion": "task has steps array with entries",
+          "passed": true,
+          "detail": {
+            "taskId": "sterling-ir-2df69813-88ab-4686-8415-2208974fae95",
+            "status": "pending_planning",
+            "stepCount": 1,
+            "sampleStep": {
+              "leaf": "task_type_craft",
+              "hasArgs": true
+            }
+          }
+        },
+        {
+          "action": "assert step shapes valid",
+          "assertion": "all steps have leaf (string) and args (defined)",
+          "passed": true,
+          "detail": {
+            "leaves": [
+              "task_type_craft"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scenario 4: Golden run artifact + executor dispatch evidence",
+      "status": "fail",
+      "durationMs": 10006,
+      "steps": [
+        {
+          "action": "GET /api/dev/golden-run-artifact/44e3b115-3631-4653-b0e2-21d841ac459d",
+          "endpoint": "http://localhost:3002/api/dev/golden-run-artifact/44e3b115-3631-4653-b0e2-21d841ac459d",
+          "statusCode": 200,
+          "durationMs": 3
+        },
+        {
+          "action": "assert serverBanner present",
+          "assertion": "artifact contains serverBanner (Sterling reachable)",
+          "passed": true,
+          "detail": {
+            "serverBanner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py gi…"
+          }
+        },
+        {
+          "action": "assert injection present",
+          "assertion": "artifact contains injection with digest",
+          "passed": true,
+          "detail": {
+            "injection": {
+              "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+              "schema_version": "1.1.0"
+            }
+          }
+        },
+        {
+          "action": "assert planningBanner present",
+          "assertion": "artifact contains planningBanner with config digest",
+          "passed": true,
+          "detail": {
+            "hasConfigDigest": false
+          }
+        },
+        {
+          "action": "assert executor evidence",
+          "assertion": "executor dispatched or recorded shadow dispatches or recorded blocks",
+          "passed": false,
+          "detail": {
+            "executorEnabled": true,
+            "executorMode": "live",
+            "dispatchedCount": 0,
+            "shadowDispatchedCount": 0,
+            "decisionCount": 0,
+            "blockedReasons": [],
+            "sampleDispatch": null,
+            "sampleDecision": null
+          }
+        },
+        {
+          "action": "assert executor loop evidence",
+          "assertion": "golden run artifact contains executor activity (dispatches, blocks, or decisions)",
+          "passed": false,
+          "detail": {
+            "expansionRetries": 0
+          }
+        },
+        {
+          "action": "assert",
+          "passed": false,
+          "detail": "expected false to be true // Object.is equality"
+        }
+      ]
+    },
+    {
+      "name": "Scenario 5: Idle episode → task creation",
+      "status": "skip",
+      "durationMs": 120076,
+      "steps": [
+        {
+          "action": "check idle condition",
+          "detail": {
+            "totalCurrent": 2,
+            "activeTasks": 0
+          }
+        },
+        {
+          "action": "no idle task appeared within 120s",
+          "detail": "Keep-alive may be disabled or cycle too long"
+        }
+      ],
+      "gap": "No idle-triggered task appeared within 120s"
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "passed": 3,
+    "failed": 2,
+    "skipped": 1
+  }
+}

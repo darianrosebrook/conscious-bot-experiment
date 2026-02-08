@@ -1,0 +1,43 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1",
+    "task_id_index_v1"
+  ],
+  "run_id": "legacy-rewrite-run-1",
+  "created_at": 1770505588247,
+  "updated_at": 1770505588247,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "dispatched_at": 1770505588247,
+        "original_leaf": "dig_block"
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "reason": "dispatch",
+        "ts": 1770505588247
+      },
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "reason": "legacy_rewrite",
+        "ts": 1770505588247,
+        "original_leaf": "dig_block"
+      }
+    ]
+  }
+}

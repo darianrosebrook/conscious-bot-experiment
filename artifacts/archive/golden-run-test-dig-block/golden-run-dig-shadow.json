@@ -1,0 +1,49 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "run-dig-shadow",
+  "created_at": 1770544945154,
+  "updated_at": 1770544945155,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "reason": "shadow",
+        "ts": 1770544945154
+      },
+      {
+        "leaf": "acquire_material",
+        "reason": "rewrite_used",
+        "ts": 1770544945155
+      }
+    ],
+    "shadow_steps": [
+      {
+        "step_id": "step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1
+        },
+        "observed_at": 1770544945154
+      }
+    ],
+    "verification": {
+      "status": "skipped",
+      "kind": "trace_only",
+      "detail": {
+        "reason": "shadow_mode",
+        "leaf": "acquire_material",
+        "step_id": "step-1"
+      }
+    }
+  }
+}

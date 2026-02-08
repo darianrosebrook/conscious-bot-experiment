@@ -1,0 +1,103 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "executor-check-001",
+  "created_at": 1770588960443,
+  "updated_at": 1770589763506,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": false,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "test:executor-check",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "inject_executor-check-001",
+    "source": "dev_injection"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770589453477_wswfei",
+    "status": "blocked",
+    "attempt": 2,
+    "delay_ms": 1000,
+    "total_delay_ms": 1500,
+    "reason": "blocked_digest_unknown — digest may not have propagated yet",
+    "blocked_reason": "blocked_digest_unknown",
+    "ingest_retries": 2,
+    "ingest_retry_delay_ms": 1500,
+    "ingest_retry_elapsed_ms": 1504
+  },
+  "task": {
+    "task_id": "sterling-ir-executor-check-001",
+    "dedupe_key": "1.1.0:test:executor-check",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770588964962,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770588994962
+    },
+    {
+      "attempt": 2,
+      "ts": 1770589004965,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770589064965
+    },
+    {
+      "attempt": 3,
+      "ts": 1770589074966,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770589194966
+    },
+    {
+      "attempt": 4,
+      "ts": 1770589204977,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770589444977
+    },
+    {
+      "attempt": 5,
+      "ts": 1770589455004,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 300000,
+      "next_eligible_at": 1770589755004
+    },
+    {
+      "attempt": 6,
+      "ts": 1770589763506,
+      "reason": "expansion_retries_exhausted",
+      "classification": "exhausted"
+    }
+  ]
+}

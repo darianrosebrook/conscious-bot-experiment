@@ -1,0 +1,24 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "run-index-2",
+  "created_at": 1770544944148,
+  "updated_at": 1770544944148,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "task": {
+    "task_id": "task-index-1",
+    "status": "in_progress"
+  },
+  "injection": {
+    "committed_ir_digest": "d2"
+  }
+}

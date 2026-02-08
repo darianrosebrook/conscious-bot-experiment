@@ -1,0 +1,89 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "1be1978c-6362-4b45-86c8-716232b0d500",
+  "created_at": 1770589773512,
+  "updated_at": 1770590283617,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "idle_episode": {
+    "client_request_id": "idle_1be1978c-6362-4b45-86c8-716232b0d500",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "cdae04d6fefd8d72",
+    "duration_ms": 3
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "expansion": {
+    "request_id": "sterling_exec_1770590283579_0xijm5",
+    "status": "blocked",
+    "blocked_reason": "blocked_invalid_ir_bundle",
+    "ingest_retries": 0
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-1be1978c-6362-4b45-86c8-716232b0d500-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770589803529,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770589833529
+    },
+    {
+      "attempt": 2,
+      "ts": 1770589843536,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770589903536
+    },
+    {
+      "attempt": 3,
+      "ts": 1770589913540,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770590033540
+    },
+    {
+      "attempt": 4,
+      "ts": 1770590043564,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770590283564
+    },
+    {
+      "attempt": 5,
+      "ts": 1770590283617,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 300000,
+      "next_eligible_at": 1770590583617
+    }
+  ]
+}

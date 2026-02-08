@@ -1,0 +1,72 @@
+{
+    "success": true,
+    "tasks": {
+        "current": [
+            {
+                "id": "cognitive-task-idle-episode-7027bdb3-f5bc-421c-9e28-5a5db1af0306-ling_ir:d543",
+                "title": "Idle episode (sterling executable)",
+                "description": "Idle episode (sterling executable)",
+                "type": "sterling_ir",
+                "priority": 0.5,
+                "urgency": 0.3,
+                "progress": 0,
+                "status": "pending_planning",
+                "source": "autonomous",
+                "steps": [],
+                "parameters": {
+                    "thoughtContent": "Idle episode (sterling executable)",
+                    "thoughtId": "idle-episode-7027bdb3-f5bc-421c-9e28-5a5db1af0306",
+                    "thoughtType": "idle-episode",
+                    "confidence": null,
+                    "cognitiveSystem": null
+                },
+                "metadata": {
+                    "createdAt": 1770545576480,
+                    "updatedAt": 1770545576480,
+                    "retryCount": 0,
+                    "maxRetries": 3,
+                    "childTaskIds": [],
+                    "tags": [
+                        "cognitive",
+                        "autonomous",
+                        "idle-episode"
+                    ],
+                    "category": "sterling_ir",
+                    "requirement": null,
+                    "sterling": {
+                        "committedIrDigest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+                        "committedGoalPropId": null,
+                        "envelopeId": "3a4d2b5ae7d9180f",
+                        "schemaVersion": "1.1.0",
+                        "reducerVersion": "intent_reducer/v1.0.0",
+                        "dedupeNamespace": "1.1.0",
+                        "exec": {
+                            "requestId": "sterling_exec_1770545576534_2i3s7f",
+                            "status": "blocked",
+                            "state": "blocked",
+                            "blockedReason": "blocked_executor_error"
+                        }
+                    },
+                    "goldenRun": {
+                        "runId": "7027bdb3-f5bc-421c-9e28-5a5db1af0306",
+                        "requestedAt": 1770545556540,
+                        "source": "idle_episode"
+                    },
+                    "blockedReason": "blocked_executor_error",
+                    "blockedAt": 1770545576480,
+                    "origin": {
+                        "kind": "cognition",
+                        "name": "thought-to-task",
+                        "createdAt": 1770545576480
+                    },
+                    "originalBlockedReason": "blocked_invalid_ir_bundle",
+                    "expansionRetryCount": 1,
+                    "nextEligibleAt": 1770545606553
+                }
+            }
+        ],
+        "completed": [],
+        "total": 1
+    },
+    "timestamp": 1770545603528
+}

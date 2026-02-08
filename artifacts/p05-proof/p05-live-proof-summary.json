@@ -1,0 +1,51 @@
+{
+  "proof_run": "P0-5 Live Proof",
+  "timestamp": "2026-02-08T13:16:00Z",
+  "services_verified": {
+    "memory": { "status": "ready", "endpoint": "localhost:3001", "database_ok": true, "embeddings_ok": true },
+    "planning": { "status": "healthy", "endpoint": "localhost:3002", "dev_endpoints": true },
+    "sterling": { "status": "running", "endpoint": "ws://localhost:8766" }
+  },
+  "evidence": {
+    "golden_reduce_success": {
+      "committed_ir_digest": "ling_ir:6abd1be3c6b56a3e7dfa63c413619120",
+      "schema_version": "1.1.0",
+      "task_id": "sterling-ir-eacdff83-c2e9-4ed2-af13-58914bf63d9b"
+    },
+    "ingest_expansion_proven": {
+      "expansionMode": "ingest",
+      "status": "ok",
+      "state": "expanded",
+      "planBundleDigest": "babdef828a154afe23813f668ee50a96ac2dfd182de50b5e22892cfc6286c175",
+      "steps_returned": 1,
+      "step_leaf": "task_type_craft",
+      "step_authority": "sterling",
+      "ingestRetryTriggered": false,
+      "note": "Digest found on first attempt — no retry needed. Retry logic proven via unit tests (3 tests, all passing)."
+    },
+    "remaining_blocker_p06": {
+      "blockedReason": "unresolved_intents",
+      "unresolvedIntentCount": 1,
+      "planningIncompleteReasons": [{ "leaf": "task_type_craft", "reason": "intent_leaf_not_executable" }],
+      "note": "Task correctly blocked at intent leaf boundary — P0-6 will resolve these at ingest time."
+    },
+    "dedupe_guard_proven": {
+      "second_reduce_same_digest": true,
+      "returned_existing_task": true,
+      "note": "Re-running golden-reduce with same digest returns existing task (no duplicate)."
+    },
+    "golden_run_artifact": {
+      "server_banner": "STERLING_SERVER_BANNER file=sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+      "planning_banner": "PLANNING_SERVER_BANNER run_mode=dev executor_mode=shadow config_digest=5c2ac88c9bb1d45b"
+    }
+  },
+  "test_results": {
+    "planning_suite": "2596 passed, 54 skipped, 0 failed",
+    "retry_tests": [
+      "retries blocked_digest_unknown at ingest and succeeds on second attempt — PASS (502ms)",
+      "exhausts ingest retries then falls through to pending_planning — PASS (1503ms)",
+      "does not retry non-digest-unknown blocked reasons at ingest — PASS"
+    ]
+  },
+  "verdict": "P0-5 CLOSED. Ingest expansion works end-to-end. Retry logic proven via unit tests. Remaining stalls are semantic (intent leaves), not transport timing."
+}
