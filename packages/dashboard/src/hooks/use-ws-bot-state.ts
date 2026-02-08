@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -55,6 +55,12 @@ export function useWsBotState() {
   ]);
   const [dwellCounts, setDwellCounts] = useState<Record<string, number>>({});
 
+  // Use a ref for hud so the callback identity stays stable across renders.
+  // Without this, every health_changed event updates hud → recreates the callback →
+  // triggers WebSocket reconnection → causes the connect/disconnect spam.
+  const hudRef = useRef(hud);
+  hudRef.current = hud;
+
   // Memoized WebSocket callbacks
   const handleWebSocketMessage = useCallback(
     (message: any) => {
@@ -79,12 +85,13 @@ export function useWsBotState() {
 
         case 'health_changed': {
           const healthData = message.data;
+          const currentHud = hudRef.current;
           const healthIntero = {
             stress: 20,
             focus: 80,
             curiosity: 75,
-            ...(hud?.intero?.stressAxes
-              ? { stressAxes: hud.intero.stressAxes }
+            ...(currentHud?.intero?.stressAxes
+              ? { stressAxes: currentHud.intero.stressAxes }
               : {}),
           };
           setHud({
@@ -316,7 +323,10 @@ export function useWsBotState() {
           debugLog('Unhandled WebSocket message type:', message.type);
       }
     },
-    [setHud, setInventory, addThought, hud]
+    // hud is accessed via hudRef to avoid callback identity churn.
+    // setHud, setInventory, addThought are stable (from zustand store).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setHud, setInventory, addThought]
   );
 
   const handleWebSocketError = useCallback((error: Event) => {

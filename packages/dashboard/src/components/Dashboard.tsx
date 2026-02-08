@@ -182,6 +182,7 @@ export default function Dashboard() {
   } | null>(null);
   const thoughtsEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const viewerAutoStartRequested = useRef(false);
 
   // ── Viewer status check ─────────────────────────────────────────────────
   const checkViewerStatus = useCallback(async () => {
@@ -339,6 +340,86 @@ export default function Dashboard() {
     checkViewerStatus();
     return () => clearInterval(interval);
   }, [checkViewerStatus]);
+
+  // ── Startup burst: poll viewer status a few times so we catch readiness without refresh ──
+  useEffect(() => {
+    const t1 = setTimeout(checkViewerStatus, 1500);
+    const t2 = setTimeout(checkViewerStatus, 3000);
+    const t3 = setTimeout(checkViewerStatus, 6000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [checkViewerStatus]);
+
+  // ── Poll viewer status more often when bot connected but viewer not active ──
+  const minecraftBot = botConnections.find((c) => c.name === 'minecraft-bot');
+  const viewerActive = minecraftBot?.viewerActive ?? false;
+  const botConnected = minecraftBot?.connected ?? false;
+  useEffect(() => {
+    if (!botConnected || viewerActive) return;
+    const interval = setInterval(checkViewerStatus, 3000);
+    checkViewerStatus();
+    return () => clearInterval(interval);
+  }, [botConnected, viewerActive, checkViewerStatus]);
+
+  // ── Auto-start viewer when bot is connected and viewer can start ──────────
+  useEffect(() => {
+    if (
+      !botConnected ||
+      !viewerStatus?.canStart ||
+      viewerActive ||
+      viewerAutoStartRequested.current
+    ) {
+      return;
+    }
+    viewerAutoStartRequested.current = true;
+    (async () => {
+      try {
+        const response = await fetch(config.routes.startViewer(), {
+          method: 'POST',
+        });
+        const result = await response.json();
+        if (result.success) {
+          setBotConnections((prev) =>
+            prev.map((conn) =>
+              conn.name === 'minecraft-bot'
+                ? { ...conn, viewerActive: true }
+                : conn
+            )
+          );
+          await checkViewerStatus();
+          setViewerKey((prev) => prev + 1);
+        }
+      } catch (error) {
+        console.error('Error auto-starting viewer:', error);
+        viewerAutoStartRequested.current = false;
+      }
+    })();
+  }, [
+    botConnected,
+    viewerStatus?.canStart,
+    viewerActive,
+    config.routes,
+    checkViewerStatus,
+  ]);
+  // Reset auto-start ref when viewer is no longer active so we can start again later
+  useEffect(() => {
+    if (!viewerActive) viewerAutoStartRequested.current = false;
+  }, [viewerActive]);
+
+  // Sync botConnections when viewer-status reports viewer already active (e.g. from another tab)
+  useEffect(() => {
+    if (viewerStatus?.viewerActive && !viewerActive) {
+      setBotConnections((prev) =>
+        prev.map((conn) =>
+          conn.name === 'minecraft-bot' ? { ...conn, viewerActive: true } : conn
+        )
+      );
+      setViewerKey((prev) => prev + 1);
+    }
+  }, [viewerStatus?.viewerActive, viewerActive, setBotConnections]);
 
   // ── Submit intrusive thought ────────────────────────────────────────────
   const handleSubmitIntrusion = async () => {
@@ -990,15 +1071,6 @@ export default function Dashboard() {
                       ?.viewerActive ? (
                       <div className={styles.streamHeaderButtons}>
                         <button
-                          onClick={async () => {
-                            setViewerKey((prev) => prev + 1);
-                            await checkViewerStatus();
-                          }}
-                          className={styles.viewerBtn}
-                        >
-                          Refresh Viewer
-                        </button>
-                        <button
                           onClick={() => {
                             window.open(
                               botConnections.find(
@@ -1010,32 +1082,6 @@ export default function Dashboard() {
                           className={styles.viewerBtn}
                         >
                           Full Screen
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const response = await fetch(
-                                config.routes.stopViewer(),
-                                { method: 'POST' }
-                              );
-                              const result = await response.json();
-                              if (result.success) {
-                                setBotConnections((prev) =>
-                                  prev.map((conn) =>
-                                    conn.name === 'minecraft-bot'
-                                      ? { ...conn, viewerActive: false }
-                                      : conn
-                                  )
-                                );
-                                await checkViewerStatus();
-                              }
-                            } catch (error) {
-                              console.error('Error stopping viewer:', error);
-                            }
-                          }}
-                          className={styles.viewerBtnStop}
-                        >
-                          Stop Viewer
                         </button>
                       </div>
                     ) : null
@@ -1088,71 +1134,6 @@ export default function Dashboard() {
                                 ? 'Bot connected, starting viewer...'
                                 : 'Waiting for Minecraft bot to connect...'}
                             </p>
-                            {botConnections.find(
-                              (c) => c.name === 'minecraft-bot'
-                            )?.connected && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await checkViewerStatus();
-                                    if (!viewerStatus?.canStart) {
-                                      console.error(
-                                        'Cannot start viewer:',
-                                        viewerStatus?.reason
-                                      );
-                                      return;
-                                    }
-                                    const response = await fetch(
-                                      config.routes.startViewer(),
-                                      { method: 'POST' }
-                                    );
-                                    const result = await response.json();
-                                    if (result.success) {
-                                      setBotConnections((prev) =>
-                                        prev.map((conn) =>
-                                          conn.name === 'minecraft-bot'
-                                            ? { ...conn, viewerActive: true }
-                                            : conn
-                                        )
-                                      );
-                                      await checkViewerStatus();
-                                      setViewerKey((prev) => prev + 1);
-                                    } else {
-                                      console.error(
-                                        'Failed to start viewer:',
-                                        result.message
-                                      );
-                                      if (result.details) {
-                                        console.error(
-                                          'Details:',
-                                          result.details
-                                        );
-                                      }
-                                    }
-                                  } catch (error) {
-                                    console.error(
-                                      'Error starting viewer:',
-                                      error
-                                    );
-                                  }
-                                }}
-                                className={cn(
-                                  styles.startViewerBtn,
-                                  viewerStatus?.canStart
-                                    ? styles.startViewerReady
-                                    : styles.startViewerDisabled
-                                )}
-                                disabled={!viewerStatus?.canStart}
-                                title={
-                                  viewerStatus?.reason ||
-                                  'Start Minecraft viewer'
-                                }
-                              >
-                                {viewerStatus?.canStart
-                                  ? 'Start Viewer'
-                                  : 'Viewer Not Ready'}
-                              </button>
-                            )}
                             <div className={styles.botStatusInfo}>
                               {botState ? (
                                 <>

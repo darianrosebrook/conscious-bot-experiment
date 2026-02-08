@@ -56,6 +56,18 @@ export function useWebSocket({
   const lastConnectionTimeRef = useRef(0);
   const connectionStableRef = useRef(false);
 
+  // Store callbacks in refs so that identity changes don't trigger reconnections.
+  // The WebSocket is long-lived — we don't want to tear it down just because
+  // a callback was recreated due to upstream state changes.
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
   const connect = useCallback(() => {
     if (!isMountedRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
       // WebSocket: Skipping connection - already connected or unmounted
@@ -95,7 +107,7 @@ export function useWebSocket({
         reconnectAttemptsRef.current = 0;
         setError(null);
         connectionStableRef.current = true;
-        onOpen?.();
+        onOpenRef.current?.();
       };
 
       ws.onmessage = (event) => {
@@ -103,7 +115,7 @@ export function useWebSocket({
 
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          onMessage?.(message);
+          onMessageRef.current?.(message);
         } catch (parseError) {
           // Failed to parse WebSocket message: ${parseError}
         }
@@ -117,7 +129,7 @@ export function useWebSocket({
         setIsConnected(false);
         setIsConnecting(false);
         isConnectingRef.current = false;
-        onClose?.();
+        onCloseRef.current?.();
 
         // Only attempt to reconnect if not manually closed and component is still mounted
         if (
@@ -152,7 +164,7 @@ export function useWebSocket({
 
         // Don't set error immediately on connection error, let onclose handle it
         // WebSocket: Connection error occurred
-        onError?.(event);
+        onErrorRef.current?.(event);
       };
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -166,15 +178,11 @@ export function useWebSocket({
           : 'Failed to create WebSocket connection'
       );
     }
-  }, [
-    url,
-    onMessage,
-    onOpen,
-    onClose,
-    onError,
-    reconnectInterval,
-    maxReconnectAttempts,
-  ]);
+  // Only reconnect when the URL or reconnection settings change.
+  // Callback changes are handled via refs above — they should NOT
+  // cause the WebSocket to disconnect and reconnect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, reconnectInterval, maxReconnectAttempts]);
 
   const disconnect = useCallback(() => {
     shouldReconnectRef.current = false;
