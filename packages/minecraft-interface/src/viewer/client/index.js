@@ -536,7 +536,9 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
 
     new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
     if (yaw !== undefined) {
-      const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
+      // Bedrock models face -Z; Minecraft yaw 0 = south (+Z). Offset by PI.
+      const targetYaw = yaw + Math.PI
+      const da = (targetYaw - botMesh.rotation.y) % (Math.PI * 2)
       const dy = 2 * da % (Math.PI * 2) - da
       new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 50).start()
     }

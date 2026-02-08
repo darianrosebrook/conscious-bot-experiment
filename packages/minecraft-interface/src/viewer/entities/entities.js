@@ -859,7 +859,11 @@ class Entities {
         .start();
     }
     if (entity.yaw) {
-      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2);
+      // Bedrock models face -Z in local space, but Minecraft yaw 0 = south (+Z).
+      // Add PI so the model's front face (-Z) points toward the entity's
+      // actual facing direction.
+      const targetYaw = entity.yaw + Math.PI;
+      const da = (targetYaw - e.rotation.y) % (Math.PI * 2);
       const dy = ((2 * da) % (Math.PI * 2)) - da;
       new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start();
     }
