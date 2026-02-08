@@ -64,14 +64,53 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
   }
 
   // ============================================================================
-  // ENHANCED: Player skin lookup
+  // ENHANCED: Player skin & cape lookup
   // ============================================================================
 
-  // Mineflayer v4+ populates bot.players[name].skinData from player_info packets.
-  // skinData = { url: 'http://textures.minecraft.net/texture/...', model: 'slim' | undefined }
+  // Mineflayer v4+ populates bot.players[name].skinData from player_info packets,
+  // but only extracts SKIN url — not CAPE url. We intercept player_info ourselves
+  // to extract cape URLs from the same base64 textures property.
+  const playerCapeData = new Map() // username → { url: string }
+
+  function extractCapeFromProperties (properties) {
+    if (!properties) return undefined
+    const props = Object.fromEntries(properties.map(e => [e.name, e]))
+    if (!props.textures || !props.textures.value) return undefined
+    try {
+      const decoded = JSON.parse(Buffer.from(props.textures.value, 'base64').toString('utf8'))
+      const capeUrl = decoded?.textures?.CAPE?.url
+      return capeUrl ? { url: capeUrl } : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  // Listen for player_info packets to extract cape data
+  if (bot._client) {
+    bot._client.on('player_info', (packet) => {
+      // Handle both bitfield (1.19.3+) and legacy formats
+      const data = packet.data || []
+      for (const item of data) {
+        const properties = item?.player?.properties || item?.properties
+        const username = item?.player?.name || item?.name
+        if (username && properties) {
+          const cape = extractCapeFromProperties(properties)
+          if (cape) {
+            playerCapeData.set(username, cape)
+          }
+        }
+      }
+    })
+  }
+
   function getPlayerSkin (username) {
     if (!username) return undefined
     return bot.players[username]?.skinData
+  }
+
+  function getPlayerCape (username) {
+    if (!username) return undefined
+    return playerCapeData.get(username)
   }
 
   // ============================================================================
@@ -199,13 +238,15 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
 
     socket.emit('version', bot.version)
 
-    // Emit bot info for name tag display and skin
+    // Emit bot info for name tag display, skin, and cape
     const botSkin = getPlayerSkin(bot.username)
+    const botCape = getPlayerCape(bot.username)
     socket.emit('botInfo', {
       username: bot.username || 'Bot',
       uuid: bot.player?.uuid,
       skinUrl: botSkin?.url,
-      skinModel: botSkin?.model
+      skinModel: botSkin?.model,
+      capeUrl: botCape?.url
     })
 
     sockets.push(socket)
@@ -243,12 +284,16 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
         username: entity.username
       }
 
-      // Look up skin from extracted player_info properties
+      // Look up skin and cape from extracted player_info properties
       if (entity.username) {
         const skin = getPlayerSkin(entity.username)
         if (skin) {
           entityData.skinUrl = skin.url
           entityData.skinModel = skin.model
+        }
+        const cape = getPlayerCape(entity.username)
+        if (cape) {
+          entityData.capeUrl = cape.url
         }
       }
 
@@ -271,12 +316,20 @@ export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson =
           if (fullEntity.equipment && hasEquipmentChanged(data.id, fullEntity.equipment)) {
             data.equipment = serializeEquipment(fullEntity.equipment)
           }
-          // Add skin URL for player entities
-          if (fullEntity.username && !data.skinUrl) {
-            const skin = getPlayerSkin(fullEntity.username)
-            if (skin) {
-              data.skinUrl = skin.url
-              data.skinModel = skin.model
+          // Add skin and cape URLs for player entities
+          if (fullEntity.username) {
+            if (!data.skinUrl) {
+              const skin = getPlayerSkin(fullEntity.username)
+              if (skin) {
+                data.skinUrl = skin.url
+                data.skinModel = skin.model
+              }
+            }
+            if (!data.capeUrl) {
+              const cape = getPlayerCape(fullEntity.username)
+              if (cape) {
+                data.capeUrl = cape.url
+              }
             }
           }
         }

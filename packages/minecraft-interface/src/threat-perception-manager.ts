@@ -174,6 +174,13 @@ export class ThreatPerceptionManager {
         maxThreatLevel = Math.max(maxThreatLevel, healthThreat.threatLevel);
       }
 
+      // When low_health is the ONLY threat, don't let it trigger "critical" flee.
+      // The bot can't flee from its own HP — it should seek shelter/food instead.
+      const hasExternalThreats = threats.some(t => t.type !== 'low_health');
+      if (!hasExternalThreats && botHealth <= 6) {
+        maxThreatLevel = Math.min(maxThreatLevel, 60);
+      }
+
       // Determine overall level and action (per original logic, but refined)
       const overallThreatLevel = this.determineThreatLevel(maxThreatLevel);
       const recommendedAction = this.determineRecommendedAction(

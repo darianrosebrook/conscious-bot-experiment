@@ -267,21 +267,26 @@ function getMesh (texture, jsonModel, entityType, skinUrl) {
   mesh.userData.bonesByName = bonesByName
   mesh.userData.skeleton = skeleton
 
-  loadTexture(texture, tex => {
-    const img = tex.image
-    if (img && (img.width !== texWidth || img.height !== texHeight)) {
-      const uScale = texWidth / img.width
-      const vScale = texHeight / img.height
-      const uvAttr = geometry.getAttribute('uv')
-      if (uvAttr) {
-        for (let j = 0; j < uvAttr.count; j++) {
-          uvAttr.setX(j, uvAttr.getX(j) * uScale)
-          uvAttr.setY(j, uvAttr.getY(j) * vScale)
+  // Rescale UVs if the actual texture dimensions differ from the model's declared
+  // texturewidth/textureheight. Skip when texture is null (e.g. cape-only geometry
+  // where the URL-based texture is the sole source).
+  if (texture) {
+    loadTexture(texture, tex => {
+      const img = tex.image
+      if (img && (img.width !== texWidth || img.height !== texHeight)) {
+        const uScale = texWidth / img.width
+        const vScale = texHeight / img.height
+        const uvAttr = geometry.getAttribute('uv')
+        if (uvAttr) {
+          for (let j = 0; j < uvAttr.count; j++) {
+            uvAttr.setX(j, uvAttr.getX(j) * uScale)
+            uvAttr.setY(j, uvAttr.getY(j) * vScale)
+          }
+          uvAttr.needsUpdate = true
         }
-        uvAttr.needsUpdate = true
       }
-    }
-  })
+    })
+  }
 
   return mesh
 }
@@ -299,7 +304,7 @@ function resolveEntityTexturePath (version, texturePath) {
 let _debugEntityTextureLogged = false
 
 class Entity {
-  constructor (version, type, scene, skinUrl) {
+  constructor (version, type, scene, skinUrl, capeUrl) {
     const e = entities[type]
     if (!e) throw new Error(`Unknown entity ${type}`)
 
@@ -307,8 +312,22 @@ class Entity {
     this.mesh.userData.entityType = type
     this.mesh.userData.skinnedMeshes = []
     this.mesh.userData.skinUrl = skinUrl || null
+    this.mesh.userData.capeUrl = capeUrl || null
 
     for (const [name, jsonModel] of Object.entries(e.geometry)) {
+      // Cape geometry: skip entirely if no cape URL (most players don't have capes).
+      // When a cape URL exists, use it as the texture source instead of the skin.
+      if (name === 'cape') {
+        if (!capeUrl) continue // Hide cape bone — player has no cape
+        const mesh = getMesh(null, jsonModel, type, capeUrl)
+        mesh.userData.isCapeGeometry = true
+        this.mesh.add(mesh)
+        if (mesh.isSkinnedMesh) {
+          this.mesh.userData.skinnedMeshes.push(mesh)
+        }
+        continue
+      }
+
       const texture = e.textures[name] || e.textures['default'] || Object.values(e.textures)[0]
       if (!texture) continue
       const resolvedPath = resolveEntityTexturePath(version, texture)

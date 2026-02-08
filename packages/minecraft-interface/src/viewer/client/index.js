@@ -62,6 +62,7 @@ let weatherSystem = null
 let botExtrasManager = null
 let botUsername = 'Bot' // Will be updated from server
 let botSkinUrl = null // Will be updated from botInfo event
+let botCapeUrl = null // Will be updated from botInfo event
 
 // ============================================================================
 // Custom Asset Integration
@@ -378,7 +379,8 @@ socket.on('botInfo', (data) => {
   if (data && data.username) {
     botUsername = data.username
     botSkinUrl = data.skinUrl || null
-    console.log(`[viewer] Bot username: ${botUsername}, skin: ${botSkinUrl ? 'custom' : 'default'}`)
+    botCapeUrl = data.capeUrl || null
+    console.log(`[viewer] Bot username: ${botUsername}, skin: ${botSkinUrl ? 'custom' : 'default'}, cape: ${botCapeUrl ? 'yes' : 'none'}`)
 
     // Update name tag if bot extras already exist
     if (botExtrasManager && botMesh) {
@@ -389,8 +391,7 @@ socket.on('botInfo', (data) => {
         name: botUsername,
         height: 1.8,
         width: 0.6,
-        showCape: true,
-        capeColor: 0x2244aa,
+        showCape: false, // Model's built-in cape bone handles this when Mojang cape URL exists
         showShadow: true
       })
     }
@@ -518,7 +519,7 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
   if (addMesh) {
     if (!botMesh) {
       const textureVersion = globalThis.__MC_VERSION || '1.21.9'
-      botMesh = new Entity(textureVersion, 'player', viewer.scene, botSkinUrl).mesh
+      botMesh = new Entity(textureVersion, 'player', viewer.scene, botSkinUrl, botCapeUrl).mesh
       viewer.scene.add(botMesh)
 
       // Set up entity extras (name tag, cape, shadow) for bot mesh
@@ -527,8 +528,7 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
         name: botUsername,
         height: 1.8,
         width: 0.6,
-        showCape: true,
-        capeColor: 0x2244aa,
+        showCape: false, // Model's built-in cape bone handles this when Mojang cape URL exists
         showShadow: true
       })
       // Bot extras initialized

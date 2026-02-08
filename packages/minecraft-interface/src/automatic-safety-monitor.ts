@@ -55,6 +55,9 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private lastWaterStrategyLogAt = 0;
   private beliefBus: BeliefBus | null = null;
   private reflexArbitrator: ReflexArbitrator | null = null;
+  private fleeFailCount = 0;
+  private lastFleePos: Vec3 | null = null;
+  private fleeBackoffUntil = 0;
 
   constructor(
     bot: Bot,
@@ -209,6 +212,17 @@ export class AutomaticSafetyMonitor extends EventEmitter {
    * Perform periodic safety check
    */
   private async performSafetyCheck(): Promise<void> {
+    // Reset flee backoff if bot has moved significantly (e.g. player teleported, or
+    // the bot was moved by another system). This prevents stale backoffs.
+    if (this.lastFleePos && this.bot.entity) {
+      const distFromLastFlee = this.bot.entity.position.distanceTo(this.lastFleePos);
+      if (distFromLastFlee > 5) {
+        this.fleeFailCount = 0;
+        this.fleeBackoffUntil = 0;
+        this.lastFleePos = null;
+      }
+    }
+
     try {
       // Use belief snapshot when available (no duplicate entity scan)
       if (this.beliefBus) {
@@ -352,6 +366,8 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       navigationPriority: 'emergency',
     };
 
+    const startPos = this.bot.entity.position.clone();
+
     try {
       // Move away from current position
       const currentPos = this.bot.entity.position;
@@ -380,11 +396,41 @@ export class AutomaticSafetyMonitor extends EventEmitter {
         });
       }
 
-      if (this.shouldLog('flee-complete', this.logThrottleMs)) {
-        console.log('[SafetyMonitor] ✅ Flee action completed');
+      // Check if the bot actually moved meaningfully
+      const endPos = this.bot.entity.position;
+      const distanceMoved = startPos.distanceTo(endPos);
+
+      if (distanceMoved < 2) {
+        // Flee failed — bot didn't move. Apply escalating backoff.
+        this.fleeFailCount++;
+        const backoffMs = Math.min(30000, 1000 * Math.pow(4, this.fleeFailCount));
+        this.fleeBackoffUntil = Date.now() + backoffMs;
+        this.lastFleePos = startPos;
+        if (this.shouldLog('flee-stuck', this.logThrottleMs)) {
+          console.log(
+            `[SafetyMonitor] ⚠️ Flee failed (moved ${distanceMoved.toFixed(1)} blocks). ` +
+            `Backoff ${(backoffMs / 1000).toFixed(0)}s (attempt #${this.fleeFailCount})`
+          );
+        }
+      } else {
+        // Flee succeeded — reset backoff
+        this.fleeFailCount = 0;
+        this.fleeBackoffUntil = 0;
+        this.lastFleePos = null;
+        if (this.shouldLog('flee-complete', this.logThrottleMs)) {
+          console.log('[SafetyMonitor] ✅ Flee action completed');
+        }
       }
     } catch (error) {
-      console.error('Flee action failed:', error);
+      // Navigate threw — treat as a failed flee
+      this.fleeFailCount++;
+      const backoffMs = Math.min(30000, 1000 * Math.pow(4, this.fleeFailCount));
+      this.fleeBackoffUntil = Date.now() + backoffMs;
+      this.lastFleePos = startPos;
+      console.error(
+        `Flee action failed (backoff ${(backoffMs / 1000).toFixed(0)}s, attempt #${this.fleeFailCount}):`,
+        error
+      );
     }
   }
 
@@ -766,7 +812,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       return false;
     }
 
-    // Check if we're surrounded by walls above us
+    // Check if we're surrounded by solid walls above us
     let wallCount = 0;
     const checkDistance = 2;
 
@@ -780,16 +826,38 @@ export class AutomaticSafetyMonitor extends EventEmitter {
           const checkBlock = this.bot.blockAt(checkPos);
 
           if (checkBlock && checkBlock.type !== 0) {
-            // Not air
+            // Not air — but only count truly solid, impassable blocks.
+            // Skip transparent/passable blocks like leaves, logs, fences, etc.
+            // that commonly appear in forests and cause false pit detection.
+            if (checkBlock.boundingBox !== 'block') break;
+            const name = checkBlock.name;
+            if (
+              name.includes('leaves') ||
+              name.includes('log') ||
+              name.includes('wood') ||
+              name.includes('glass') ||
+              name.includes('fence') ||
+              name.includes('vine') ||
+              name.includes('flower') ||
+              name.includes('grass') ||
+              name.includes('sapling') ||
+              name.includes('torch') ||
+              name.includes('carpet') ||
+              name.includes('banner')
+            ) {
+              break;
+            }
             wallCount++;
-            break; // Found a wall at this horizontal position
+            break; // Found a solid wall at this horizontal position
           }
         }
       }
     }
 
-    // If we're surrounded by walls above us, we're likely in a pit
-    const pitThreshold = 8; // Number of walls needed to consider it a pit
+    // If we're surrounded by walls above us, we're likely in a pit.
+    // Threshold raised to 12 (50% of ~24 positions) to reduce false positives
+    // from natural terrain features like overhangs.
+    const pitThreshold = 12;
     const isPit = wallCount >= pitThreshold;
 
     if (isPit && this.shouldLog('pit-detected', this.logThrottleMs)) {
@@ -1085,10 +1153,16 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   }
 
   private shouldTriggerEmergency(reason: string, context: any): boolean {
+    const now = Date.now();
+
+    // If we're in a flee backoff period, suppress flee-related emergencies
+    if (now < this.fleeBackoffUntil) {
+      return false;
+    }
+
     const entity = context?.entity ?? context?.threats?.[0]?.type;
     const entityId = context?.entityId;
     const key = entityId ? `${reason}:${entityId}` : entity ? `${reason}:${entity}` : reason;
-    const now = Date.now();
     const last = this.lastEmergencyAt.get(key) ?? 0;
     if (now - last < this.emergencyCooldownMs) return false;
     this.lastEmergencyAt.set(key, now);

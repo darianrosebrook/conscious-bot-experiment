@@ -540,7 +540,7 @@ function getEntityMesh(entity, scene) {
   }
   if (normalizedName) {
     try {
-      const e = new Entity(textureVersion, normalizedName, scene, entity.skinUrl);
+      const e = new Entity(textureVersion, normalizedName, scene, entity.skinUrl, entity.capeUrl);
       // Store entity info in userData for extras setup
       e.mesh.userData.entityName = normalizedName;
       e.mesh.userData.entityNameRaw = rawName;
@@ -551,7 +551,7 @@ function getEntityMesh(entity, scene) {
     } catch (err) {
       if (fallbackName) {
         try {
-          const e = new Entity(textureVersion, fallbackName, scene, entity.skinUrl);
+          const e = new Entity(textureVersion, fallbackName, scene, entity.skinUrl, entity.capeUrl);
           e.mesh.userData.entityName = fallbackName;
           e.mesh.userData.entityNameRaw = rawName;
           e.mesh.userData.entityNameFallback = normalizedName;
@@ -774,12 +774,16 @@ class Entities {
       const extrasManager = new EntityExtrasManager();
       const isPlayer =
         entity.name === 'player' || mesh.userData.entityName === 'player';
+      // The model's built-in cape bone handles cape rendering when a Mojang cape
+      // URL is provided (Entity.js skips the cape geometry when no URL exists).
+      // Only show the shader-based CapeManager cape as a fallback for players
+      // without a Mojang cape — disabled for now since most bots don't have capes
+      // and the shader cape with a solid color looks worse than no cape.
       extrasManager.setup(mesh, {
         name: entity.username || mesh.userData.entityUsername,
         height: entity.height || mesh.userData.entityHeight || 1.8,
         width: entity.width || mesh.userData.entityWidth || 0.6,
-        showCape: isPlayer, // Only players get capes for now
-        capeColor: 0x2244aa,
+        showCape: false,
         showShadow: true,
       });
       this.extrasManagers.set(entity.id, extrasManager);
