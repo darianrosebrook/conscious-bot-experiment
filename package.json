@@ -107,9 +107,6 @@
       "node",
       "protobufjs",
       "ssh2"
-    ],
-    "patchedDependencies": {
-      "prismarine-viewer@1.33.0": "patches/prismarine-viewer@1.33.0.patch"
-    }
+    ]
   }
 }

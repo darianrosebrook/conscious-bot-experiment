@@ -29,16 +29,18 @@ services:
     environment:
       EULA: "TRUE"
       VERSION: "1.21.9"
-      # ONLINE_MODE=TRUE required for custom skins - authenticates via Mojang session servers
+      # ONLINE_MODE=FALSE for bot testing (custom skins require TRUE + Mojang auth)
       ONLINE_MODE: "TRUE"
       GAMEMODE: survival
-      DIFFICULTY: peaceful
+      DIFFICULTY: normal
       SPAWN_PROTECTION: "0"
       VIEW_DISTANCE: "10"
       MEMORY: 2G
-      ENABLE_COMMAND_BLOCK: "TRUE"
+      ENABLE_COMMAND_BLOCK: "false"
+      ALLOW_CHEATS: "true"
       EXISTING_OPS_FILE: SYNCHRONIZE
-      LEVEL_SEED: "12345"
+      SEED: "-5040105890"
+      LEVEL_TYPE: DEFAULT
     ports:
       - "25565:25565"
     volumes:

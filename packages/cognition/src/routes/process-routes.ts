@@ -555,8 +555,9 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
             taskSuggestion = `Address safety concern from ${sender}`;
           } else if (message.includes('?')) {
             shouldRespond = true;
-            shouldCreateTask = true;
-            taskSuggestion = `Answer question from ${sender}: "${message}"`;
+            // Chat questions are speech acts — the LLM response is the action.
+            // No planning task needed; the bot already answered.
+            shouldCreateTask = false;
             try {
               const llmResult = await deps.llmInterface.generateSocialResponse(
                 metadata?.message || message,
@@ -568,8 +569,8 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
             }
           } else if (message.includes('help') || message.includes('assist')) {
             shouldRespond = true;
-            shouldCreateTask = true;
-            taskSuggestion = `Provide assistance requested by ${sender}`;
+            // Help requests are handled by the LLM response — no planning task needed.
+            shouldCreateTask = false;
             try {
               const llmResult = await deps.llmInterface.generateSocialResponse(
                 metadata?.message || message,

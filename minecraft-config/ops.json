@@ -10,5 +10,11 @@
     "name": "Sterling",
     "level": 4,
     "bypassesPlayerLimit": true
+  },
+  {
+    "uuid": "f422b669-98bd-4d6e-a492-195f71f8efb2",
+    "name": "BotSterling",
+    "level": 4,
+    "bypassesPlayerLimit": false
   }
 ]

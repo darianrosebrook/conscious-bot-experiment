@@ -28,6 +28,18 @@ This document describes the logging modes, environment variables, and tiered log
 |------|-------------|
 | `--proceed-temporarily="reason"` | Continue startup even if some services fail (for debugging) |
 | `--skip-docker` | Skip Docker services (Postgres, Minecraft server) |
+| `--skip-install` | Skip `pnpm install` (use when dependencies unchanged) |
+| `--skip-build` | Skip `pnpm build` (use when source unchanged, for fast restarts) |
+
+### Startup Caching
+
+When `--skip-install` is not passed, the script skips `pnpm install` automatically if `node_modules` exists and `pnpm-lock.yaml` has not changed since the last install (compared to `node_modules/.pnpm/state.json`). Use `--skip-install` to force-skip even when the cache check would run install.
+
+When `--skip-build` is not passed, `pnpm build` always runs (Turbo uses its cache for incremental builds). Use `--skip-build` for fast restarts when you know the build output is up to date.
+
+For fastest restart when nothing has changed: `pnpm start --skip-install --skip-build`.
+
+The same flags work with `scripts/dev.js` and `scripts/dev.sh`.
 
 ## Environment Variables
 
@@ -47,6 +59,26 @@ This document describes the logging modes, environment variables, and tiered log
 | `MINECRAFT_VERSION` | Minecraft version (default: `1.21.4`) |
 | `STERLING_DIR` | Path to Sterling repo (default: `../sterling`) |
 | `STERLING_WS_URL` | Sterling WebSocket URL (default: `ws://127.0.0.1:8766`) |
+
+### Planning Executor
+
+| Variable | Values | Description |
+|----------|--------|-------------|
+| `ENABLE_DEV_ENDPOINTS` | `true` | Registers `/api/dev/*` routes (golden-reduce, runtime-config, task-inventory) |
+| `ENABLE_PLANNING_EXECUTOR` | `1` | Enables the autonomous executor loop (task expansion + step dispatch) |
+| `EXECUTOR_MODE` | `shadow` (default), `live` | `shadow` logs dispatches without executing; `live` dispatches to Minecraft interface |
+
+To run the full task→Sterling→execution pipeline for E2E testing:
+
+```bash
+ENABLE_DEV_ENDPOINTS=true ENABLE_PLANNING_EXECUTOR=1 pnpm start
+```
+
+To verify the pipeline end-to-end:
+
+```bash
+SYSTEM_E2E=1 npx vitest run packages/planning/src/__tests__/system-e2e.test.ts
+```
 
 ---
 
@@ -149,8 +181,8 @@ The startup script executes in this order:
 4. **Docker Services** - Start Postgres and Minecraft server containers
 5. **Cleanup** - Kill existing processes on service ports
 6. **Port Availability** - Verify all ports are free
-7. **Dependencies** - Run `pnpm install`
-8. **Build** - Run `pnpm build` (with summarized output in verbose mode)
+7. **Dependencies** - Run `pnpm install --prefer-offline` (skipped if up to date, or with `--skip-install`)
+8. **Build** - Run `pnpm build` (skipped with `--skip-build`, summarized output in verbose mode)
 9. **Service Startup** - Start services in priority order:
    - Priority 1: Core API
    - Priority 2: Memory, World, MLX-LM Sidecar, Sterling, UMAP Service
@@ -201,6 +233,11 @@ node scripts/start.js --proceed-temporarily="debugging minecraft-interface"
 ### Full Verbose Logging
 ```bash
 COGNITION_LOG_LEVEL=verbose node scripts/start.js --debug
+```
+
+### Fast Restart (skip install and build)
+```bash
+node scripts/start.js --skip-install --skip-build
 ```
 
 ### CI/Production

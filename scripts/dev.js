@@ -4,6 +4,12 @@
  * Conscious Bot Development Environment Startup Script
  * Starts all necessary services for the conscious bot system
  *
+ * Usage:
+ *   node scripts/dev.js                     # Full install + build
+ *   node scripts/dev.js --skip-install      # Skip pnpm install
+ *   node scripts/dev.js --skip-build        # Skip pnpm build
+ *   node scripts/dev.js --skip-install --skip-build  # Fast restart
+ *
  * @author @darianrosebrook
  */
 
@@ -11,6 +17,31 @@ import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.dirname(__dirname);
+const args = process.argv.slice(2);
+const SKIP_INSTALL = args.includes('--skip-install');
+const SKIP_BUILD = args.includes('--skip-build');
+
+function needsInstall(root) {
+  if (SKIP_INSTALL) return false;
+  const nodeModules = path.join(root, 'node_modules');
+  const lockfile = path.join(root, 'pnpm-lock.yaml');
+  const pnpmState = path.join(root, 'node_modules', '.pnpm', 'state.json');
+  if (!fs.existsSync(nodeModules)) return true;
+  if (!fs.existsSync(lockfile)) return true;
+  if (!fs.existsSync(pnpmState)) return true;
+  const lockMtime = fs.statSync(lockfile).mtimeMs;
+  const stateMtime = fs.statSync(pnpmState).mtimeMs;
+  return lockMtime > stateMtime;
+}
+
+function needsBuild(root) {
+  if (SKIP_BUILD) return false;
+  return true;
+}
 
 // Colors for output
 const colors = {
@@ -168,24 +199,32 @@ async function main() {
   log('');
 
   // Install dependencies if needed
-  log(' Installing dependencies...', colors.cyan);
-  try {
-    execSync('pnpm install', { stdio: 'inherit' });
-    log(' Dependencies installed', colors.green);
-  } catch (error) {
-    log(' Failed to install dependencies', colors.red);
-    process.exit(1);
+  if (needsInstall(projectRoot)) {
+    log(' Installing dependencies...', colors.cyan);
+    try {
+      execSync('pnpm install --prefer-offline', { stdio: 'inherit', cwd: projectRoot });
+      log(' Dependencies installed', colors.green);
+    } catch (error) {
+      log(' Failed to install dependencies', colors.red);
+      process.exit(1);
+    }
+  } else {
+    log(' Dependencies up to date (skipped)', colors.cyan);
   }
   log('');
 
   // Build packages if needed
-  log(' Building packages...', colors.cyan);
-  try {
-    execSync('pnpm build', { stdio: 'inherit' });
-    log(' Packages built', colors.green);
-  } catch (error) {
-    log(' Failed to build packages', colors.red);
-    process.exit(1);
+  if (needsBuild(projectRoot)) {
+    log(' Building packages...', colors.cyan);
+    try {
+      execSync('pnpm build', { stdio: 'inherit', cwd: projectRoot });
+      log(' Packages built', colors.green);
+    } catch (error) {
+      log(' Failed to build packages', colors.red);
+      process.exit(1);
+    }
+  } else {
+    log(' Build skipped (--skip-build)', colors.cyan);
   }
   log('');
 
@@ -203,7 +242,7 @@ async function main() {
       baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
     }
     if (service.name === 'Minecraft Bot' && !baseEnv.MINECRAFT_VERSION) {
-      baseEnv.MINECRAFT_VERSION = '1.21.4';
+      baseEnv.MINECRAFT_VERSION = '1.21.9';
     }
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',

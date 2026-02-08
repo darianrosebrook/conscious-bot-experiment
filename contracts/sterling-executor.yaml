@@ -1,7 +1,11 @@
 openapi: 3.0.3
 info:
-  title: Sterling Executor Contract (Digest Expansion)
-  version: 0.1.0
+  title: Sterling Executor Contract (Digest Expansion + Intent Resolution)
+  description: >
+    Schema contract for Sterling WebSocket commands used by the TS executor.
+    Paths represent WS command names (not HTTP endpoints); OpenAPI is used
+    here to define the request/response shapes for contract testing.
+  version: 0.2.0
 paths:
   /sterling/expand-by-digest:
     post:
@@ -20,6 +24,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExpandByDigestResponse'
+        '400':
+          description: Invalid request
+        '503':
+          description: Executor unavailable
+  /sterling/resolve-intent-steps:
+    post:
+      operationId: resolveIntentSteps
+      summary: >
+        WS command: resolve_intent_steps — resolve abstract intent steps
+        into executor-native steps via domain solvers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveIntentStepsRequest'
+      responses:
+        '200':
+          description: Intent resolution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveIntentStepsResponse'
         '400':
           description: Invalid request
         '503':
@@ -129,6 +156,122 @@ components:
           enum: [error]
         error:
           type: string
+    ResolveIntentStepsRequest:
+      type: object
+      required:
+        - intent_steps
+        - world_state
+      properties:
+        intent_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeafPlanStepV1'
+          description: Intent steps from expand_by_digest_v1 (task_type_* leaves)
+        world_state:
+          type: object
+          required:
+            - inventory
+            - nearby_blocks
+          properties:
+            inventory:
+              type: object
+              additionalProperties:
+                type: integer
+              description: Current bot inventory (item_name -> count)
+            nearby_blocks:
+              type: array
+              items:
+                type: string
+              description: Block types near the bot
+        rules:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: >
+            Crafting rules (same format as solve command). Optional; when
+            absent, CRAFT intents that require rules are returned as
+            unresolved with reason "no_rules_provided".
+        schema_version:
+          type: string
+        request_id:
+          type: string
+    ResolveIntentStepsResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ResolveIntentStepsOk'
+        - $ref: '#/components/schemas/ResolveIntentStepsBlocked'
+        - $ref: '#/components/schemas/ResolveIntentStepsError'
+    ResolveIntentStepsOk:
+      type: object
+      required:
+        - status
+        - replacements
+        - plan_bundle_digest
+        - schema_version
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        replacements:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntentReplacement'
+          description: Per-intent replacement mapping for deterministic splicing
+        plan_bundle_digest:
+          type: string
+        schema_version:
+          type: string
+    ResolveIntentStepsBlocked:
+      type: object
+      required:
+        - status
+        - blocked_reason
+      properties:
+        status:
+          type: string
+          enum: [blocked]
+        blocked_reason:
+          type: string
+          enum:
+            - no_solve_for_intent
+            - blocked_executor_unavailable
+          description: Reason intent resolution was blocked.
+        replacements:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntentReplacement'
+          description: Per-intent detail (all will have resolved=false)
+    ResolveIntentStepsError:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: string
+    IntentReplacement:
+      type: object
+      required:
+        - intent_step_index
+        - resolved
+      properties:
+        intent_step_index:
+          type: integer
+          description: Index of the intent step in the request's intent_steps array
+        resolved:
+          type: boolean
+          description: Whether this intent step was successfully resolved
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeafPlanStepV1'
+          description: Present when resolved=true; the executable replacement steps
+        unresolved_reason:
+          type: string
+          description: Present when resolved=false; why resolution failed
     LeafPlanStepV1:
       type: object
       required:

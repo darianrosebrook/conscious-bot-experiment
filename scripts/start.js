@@ -23,6 +23,9 @@
  *   node scripts/start.js --capture-logs=0 # Capture startup only to run.log
  *   node scripts/start.js --capture-logs=300  # Capture startup + 5min to run.log
  *   node scripts/start.js --proceed-temporarily="reason"  # Escape hatch for dev
+ *   node scripts/start.js --skip-install                  # Skip pnpm install
+ *   node scripts/start.js --skip-build                    # Skip pnpm build
+ *   node scripts/start.js --skip-install --skip-build     # Fast restart
  *
  * @author @darianrosebrook
  */
@@ -77,6 +80,35 @@ const CAPTURE_DURATION_SEC = (() => {
   // Default: 120 seconds (2 minutes) in verbose/debug mode, 0 (startup only) otherwise
   return OUTPUT_MODE === 'verbose' || OUTPUT_MODE === 'debug' ? 120 : 0;
 })();
+
+const SKIP_INSTALL = args.includes('--skip-install');
+const SKIP_BUILD = args.includes('--skip-build');
+
+/**
+ * Returns true if pnpm install should run.
+ * Skip when: --skip-install, or node_modules exists and lockfile hasn't changed.
+ */
+function needsInstall(root) {
+  if (SKIP_INSTALL) return false;
+  const nodeModules = path.join(root, 'node_modules');
+  const lockfile = path.join(root, 'pnpm-lock.yaml');
+  const pnpmState = path.join(root, 'node_modules', '.pnpm', 'state.json');
+  if (!fs.existsSync(nodeModules)) return true;
+  if (!fs.existsSync(lockfile)) return true;
+  if (!fs.existsSync(pnpmState)) return true;
+  const lockMtime = fs.statSync(lockfile).mtimeMs;
+  const stateMtime = fs.statSync(pnpmState).mtimeMs;
+  return lockMtime > stateMtime;
+}
+
+/**
+ * Returns true if pnpm build should run.
+ * Skip when: --skip-build (conservative: no marker-based skip initially).
+ */
+function needsBuild(root) {
+  if (SKIP_BUILD) return false;
+  return true;
+}
 
 // Log buffer for capturing to run.log
 const logBuffer = [];
@@ -205,7 +237,7 @@ let services = [
     command: 'pnpm',
     args: ['--filter', '@conscious-bot/memory', 'run', 'dev:server'],
     port: 3001,
-    healthUrl: 'http://localhost:3001/health',
+    healthUrl: 'http://localhost:3001/live',
     readyUrl: 'http://localhost:3001/system/ready',
     description: 'Memory storage and retrieval system',
     priority: 2, // Start after core
@@ -938,17 +970,19 @@ async function mainWithProgress() {
       },
       {
         title: 'Dependencies',
+        skip: () => (!needsInstall(projectRoot) ? 'Up to date (skipped)' : false),
         task: async (ctx, task) => {
           task.output = 'Installing Node.js packages...';
-          execSync('pnpm install', { stdio: 'pipe' });
+          execSync('pnpm install --prefer-offline', { stdio: 'pipe', cwd: projectRoot });
           task.title = 'Dependencies (Installed)';
         },
       },
       {
         title: 'Build',
+        skip: () => (!needsBuild(projectRoot) ? 'Skipped (--skip-build)' : false),
         task: async (ctx, task) => {
           task.output = 'Building packages...';
-          execSync('pnpm build', { stdio: 'pipe' });
+          execSync('pnpm build', { stdio: 'pipe', cwd: projectRoot });
           task.title = 'Build (Complete)';
         },
       },
@@ -969,7 +1003,13 @@ async function mainWithProgress() {
                   baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
                 }
                 if (service.name === 'Minecraft Interface' && !baseEnv.MINECRAFT_VERSION) {
-                  baseEnv.MINECRAFT_VERSION = '1.21.4';
+                  baseEnv.MINECRAFT_VERSION = '1.21.9';
+                }
+                if (service.name === 'Planning' && !baseEnv.STERLING_IDLE_EPISODES_ENABLED) {
+                  baseEnv.STERLING_IDLE_EPISODES_ENABLED = 'true';
+                }
+                if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
+                  baseEnv.ENABLE_PLANNING_EXECUTOR = '1';
                 }
 
                 const child = spawn(service.command, service.args, {
@@ -1270,91 +1310,100 @@ async function mainVerbose() {
   }
 
   // Step 6: Install dependencies
-  log('\nInstalling Node.js dependencies...', colors.cyan);
-  try {
-    const installStdio =
-      OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production'
-        ? 'pipe'
-        : 'inherit';
-    execSync('pnpm install', { stdio: installStdio });
-    log(' Node.js dependencies installed', colors.green);
-  } catch (error) {
-    log(' Failed to install Node.js dependencies', colors.red);
-    process.exit(1);
+  if (needsInstall(projectRoot)) {
+    log('\nInstalling Node.js dependencies...', colors.cyan);
+    try {
+      const installStdio =
+        OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production'
+          ? 'pipe'
+          : 'inherit';
+      execSync('pnpm install --prefer-offline', { stdio: installStdio, cwd: projectRoot });
+      log(' Node.js dependencies installed', colors.green);
+    } catch (error) {
+      log(' Failed to install Node.js dependencies', colors.red);
+      process.exit(1);
+    }
+  } else {
+    log('\nNode.js dependencies up to date (skipped)', colors.cyan);
   }
 
   // Step 7: Build packages
-  log('\nBuilding packages...', colors.cyan);
-  try {
-    if (OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production') {
-      // Silent mode - no output
-      execSync('pnpm build', { stdio: 'pipe' });
-      log(' Packages built successfully', colors.green);
-    } else if (OUTPUT_MODE === 'debug') {
-      // Debug mode - full output
-      execSync('pnpm build', { stdio: 'inherit' });
-      log(' Packages built successfully', colors.green);
-    } else {
-      // Verbose mode - summarized output
-      const buildOutput = execSync('pnpm build', {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large builds
-      });
-
-      // Parse turbo build output for summary
-      const lines = buildOutput.split('\n');
-      const buildResults = [];
-      let totalTime = null;
-      let cached = 0;
-      let total = 0;
-
-      for (const line of lines) {
-        // Match package build lines: "@conscious-bot/core:build: cache hit" or "cache miss"
-        const buildMatch = line.match(/@conscious-bot\/([^:]+):build:\s*(cache hit|cache miss)/);
-        if (buildMatch) {
-          const pkg = buildMatch[1];
-          const cacheStatus = buildMatch[2] === 'cache hit' ? 'cached' : 'built';
-          buildResults.push({ pkg, cacheStatus });
-          if (cacheStatus === 'cached') cached++;
-          total++;
-        }
-
-        // Match total time line: "  Time:    16.012s"
-        const timeMatch = line.match(/Time:\s+([\d.]+)s/);
-        if (timeMatch) {
-          totalTime = timeMatch[1];
-        }
-      }
-
-      // Print summarized build results
-      if (buildResults.length > 0) {
-        const cachedPkgs = buildResults.filter(r => r.cacheStatus === 'cached').map(r => r.pkg);
-        const builtPkgs = buildResults.filter(r => r.cacheStatus === 'built').map(r => r.pkg);
-
-        if (cachedPkgs.length > 0) {
-          log(`  ${colors.cyan}cached${colors.reset}: ${cachedPkgs.join(', ')}`, colors.reset);
-        }
-        if (builtPkgs.length > 0) {
-          log(`  ${colors.green}built${colors.reset}:  ${builtPkgs.join(', ')}`, colors.reset);
-        }
-
-        const timeStr = totalTime ? ` in ${totalTime}s` : '';
-        log(` ${colors.green}✓${colors.reset} ${total} packages (${cached} cached)${timeStr}`, colors.green);
-      } else {
+  if (needsBuild(projectRoot)) {
+    log('\nBuilding packages...', colors.cyan);
+    try {
+      if (OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production') {
+        // Silent mode - no output
+        execSync('pnpm build', { stdio: 'pipe', cwd: projectRoot });
         log(' Packages built successfully', colors.green);
+      } else if (OUTPUT_MODE === 'debug') {
+        // Debug mode - full output
+        execSync('pnpm build', { stdio: 'inherit', cwd: projectRoot });
+        log(' Packages built successfully', colors.green);
+      } else {
+        // Verbose mode - summarized output
+        const buildOutput = execSync('pnpm build', {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large builds
+          cwd: projectRoot,
+        });
+
+        // Parse turbo build output for summary
+        const lines = buildOutput.split('\n');
+        const buildResults = [];
+        let totalTime = null;
+        let cached = 0;
+        let total = 0;
+
+        for (const line of lines) {
+          // Match package build lines: "@conscious-bot/core:build: cache hit" or "cache miss"
+          const buildMatch = line.match(/@conscious-bot\/([^:]+):build:\s*(cache hit|cache miss)/);
+          if (buildMatch) {
+            const pkg = buildMatch[1];
+            const cacheStatus = buildMatch[2] === 'cache hit' ? 'cached' : 'built';
+            buildResults.push({ pkg, cacheStatus });
+            if (cacheStatus === 'cached') cached++;
+            total++;
+          }
+
+          // Match total time line: "  Time:    16.012s"
+          const timeMatch = line.match(/Time:\s+([\d.]+)s/);
+          if (timeMatch) {
+            totalTime = timeMatch[1];
+          }
+        }
+
+        // Print summarized build results
+        if (buildResults.length > 0) {
+          const cachedPkgs = buildResults.filter(r => r.cacheStatus === 'cached').map(r => r.pkg);
+          const builtPkgs = buildResults.filter(r => r.cacheStatus === 'built').map(r => r.pkg);
+
+          if (cachedPkgs.length > 0) {
+            log(`  ${colors.cyan}cached${colors.reset}: ${cachedPkgs.join(', ')}`, colors.reset);
+          }
+          if (builtPkgs.length > 0) {
+            log(`  ${colors.green}built${colors.reset}:  ${builtPkgs.join(', ')}`, colors.reset);
+          }
+
+          const timeStr = totalTime ? ` in ${totalTime}s` : '';
+          log(` ${colors.green}✓${colors.reset} ${total} packages (${cached} cached)${timeStr}`, colors.green);
+        } else {
+          log(' Packages built successfully', colors.green);
+        }
       }
+    } catch (error) {
+      log(' Failed to build packages', colors.red);
+      // In verbose mode, show the error output
+      if (error.stdout) {
+        console.error(error.stdout.toString());
+      }
+      if (error.stderr) {
+        console.error(error.stderr.toString());
+      }
+      process.exit(1);
     }
-  } catch (error) {
-    log(' Failed to build packages', colors.red);
-    // In verbose mode, show the error output
-    if (error.stdout) {
-      console.error(error.stdout.toString());
-    }
-    if (error.stderr) {
-      console.error(error.stderr.toString());
-    }
-    process.exit(1);
+  } else {
+    log('\nBuild skipped (--skip-build)', colors.cyan);
   }
 
   // Step 7b: Ensure entity textures are available (extract from JAR if missing)
@@ -1460,7 +1509,13 @@ async function mainVerbose() {
       baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
     }
     if (service.name === 'Minecraft Interface' && !baseEnv.MINECRAFT_VERSION) {
-      baseEnv.MINECRAFT_VERSION = '1.21.4';
+      baseEnv.MINECRAFT_VERSION = '1.21.9';
+    }
+    if (service.name === 'Planning' && !baseEnv.STERLING_IDLE_EPISODES_ENABLED) {
+      baseEnv.STERLING_IDLE_EPISODES_ENABLED = 'true';
+    }
+    if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
+      baseEnv.ENABLE_PLANNING_EXECUTOR = '1';
     }
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',

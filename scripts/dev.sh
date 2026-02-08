@@ -2,8 +2,38 @@
 
 # Conscious Bot Development Environment Startup Script
 # Starts all necessary services for the conscious bot system
+#
+# Usage:
+#   ./scripts/dev.sh                     # Full install + build
+#   ./scripts/dev.sh --skip-install      # Skip pnpm install
+#   ./scripts/dev.sh --skip-build        # Skip pnpm build
+#   ./scripts/dev.sh --skip-install --skip-build  # Fast restart
 
 set -e
+
+# Parse long options
+SKIP_INSTALL=0
+SKIP_BUILD=0
+for arg in "$@"; do
+  case "$arg" in
+    --skip-install) SKIP_INSTALL=1 ;;
+    --skip-build)   SKIP_BUILD=1 ;;
+  esac
+done
+
+needs_install() {
+  [[ $SKIP_INSTALL -eq 1 ]] && return 1
+  [[ ! -d node_modules ]] && return 0
+  [[ ! -f pnpm-lock.yaml ]] && return 0
+  [[ ! -f node_modules/.pnpm/state.json ]] && return 0
+  [[ pnpm-lock.yaml -nt node_modules/.pnpm/state.json ]] && return 0
+  return 1
+}
+
+needs_build() {
+  [[ $SKIP_BUILD -eq 1 ]] && return 1
+  return 0
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -75,15 +105,23 @@ echo -e "${GREEN} All ports are available${NC}"
 echo ""
 
 # Install dependencies if needed
-echo -e "${CYAN} Installing dependencies...${NC}"
-pnpm install
-echo -e "${GREEN} Dependencies installed${NC}"
+if needs_install; then
+  echo -e "${CYAN} Installing dependencies...${NC}"
+  pnpm install --prefer-offline
+  echo -e "${GREEN} Dependencies installed${NC}"
+else
+  echo -e "${CYAN} Dependencies up to date (skipped)${NC}"
+fi
 echo ""
 
 # Build packages if needed
-echo -e "${CYAN} Building packages...${NC}"
-pnpm build
-echo -e "${GREEN} Packages built${NC}"
+if needs_build; then
+  echo -e "${CYAN} Building packages...${NC}"
+  pnpm build
+  echo -e "${GREEN} Packages built${NC}"
+else
+  echo -e "${CYAN} Build skipped (--skip-build)${NC}"
+fi
 echo ""
 
 # Start all services
