@@ -29,24 +29,174 @@ import {
   createEnhancedMemorySystem,
   createDefaultMemoryConfig,
 } from './memory-system';
-import { getMemoryRuntimeConfig } from './config/memory-runtime-config';
+import { getMemoryRuntimeConfig, getMemorySystemConfig } from './config/memory-runtime-config';
+import {
+  EmbeddingService,
+  SidecarEmbeddingBackend,
+  type EmbeddingBackend,
+} from './embedding-service';
 
 const memoryConfig = getMemoryRuntimeConfig();
 
 // Mutable world seed — can be updated at runtime via POST /enhanced/seed
 let currentWorldSeed: string = memoryConfig.worldSeed;
 
-// Initialize enhanced memory system (lazy initialization)
+// ============================================================================
+// Degradation Reason Codes
+// ============================================================================
+type DegradedReason =
+  | 'enhanced_search_failed'
+  | 'reflection_query_failed'
+  | 'stats_unavailable'
+  | 'embedding_timeout'
+  | 'db_query_timeout';
+
+// ============================================================================
+// Shared Embedding Backend Instance (single-instance invariant)
+// The same backend instance is used by:
+//   1. EmbeddingService inside EnhancedMemorySystem (via config.embeddingBackend)
+//   2. /ready health checks
+// ============================================================================
+const embeddingBackend: EmbeddingBackend = new SidecarEmbeddingBackend(
+  process.env.OLLAMA_HOST || 'http://localhost:5002',
+  10_000
+);
+
+// ============================================================================
+// Lightweight DB Probe Pool (init-independent readiness check)
+// IMPORTANT: Derives connection config from the same source as the vector DB
+// (getMemorySystemConfig) to guarantee they target the same Postgres instance.
+// This pool exists solely for /ready to probe Postgres without requiring
+// enhancedMemorySystem to be initialized.
+// ============================================================================
+import { Pool } from 'pg';
+
+function buildProbePool(): Pool {
+  // Use the same config source as EnhancedVectorDatabase (via createDefaultMemoryConfig → getMemorySystemConfig)
+  const sysConfig = getMemorySystemConfig(currentWorldSeed);
+  const sanitizedSeed = currentWorldSeed.replace('-', 'n');
+  const seedDatabase = `${sysConfig.database}_seed_${sanitizedSeed}`;
+  const connectionString = `postgresql://${sysConfig.user}:${sysConfig.password}@${sysConfig.host}:${sysConfig.port}/${seedDatabase}`;
+  console.log(`[memory] Probe pool targeting: ${sysConfig.host}:${sysConfig.port}/${seedDatabase} (user: ${sysConfig.user})`);
+  return new Pool({
+    connectionString,
+    max: 1,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 1500,
+  });
+}
+
+let probePool: Pool | null = null;
+let probeSeed: string | null = null;
+
+function getProbePool(): Pool {
+  // Recreate if seed changed (different database); explicitly close old pool
+  if (probePool && probeSeed !== currentWorldSeed) {
+    const oldPool = probePool;
+    probePool = null;
+    probeSeed = null;
+    oldPool.end().catch((err) => {
+      console.warn('[memory] Failed to close old probe pool:', err.message);
+    });
+  }
+  if (!probePool) {
+    probePool = buildProbePool();
+    probeSeed = currentWorldSeed;
+  }
+  return probePool;
+}
+
+// ============================================================================
+// Seed-Keyed Lazy Init with Retry-on-Failure (Fix D)
+// ============================================================================
 let enhancedMemorySystem: any = null;
+let enhancedMemoryInitPromise: Promise<any> | null = null;
+let enhancedMemoryInitSeed: string | null = null;
 
 async function getEnhancedMemorySystem() {
-  if (!enhancedMemorySystem) {
-    enhancedMemorySystem = createEnhancedMemorySystem(
-      createDefaultMemoryConfig(currentWorldSeed)
-    );
-    await enhancedMemorySystem.initialize();
+  // Seed boundary invariant: if world seed changed, invalidate cached system
+  if (enhancedMemorySystem && enhancedMemoryInitSeed !== currentWorldSeed) {
+    console.warn(`[memory] World seed changed (${enhancedMemoryInitSeed} → ${currentWorldSeed}), reinitializing`);
+    enhancedMemorySystem = null;
+    enhancedMemoryInitPromise = null;
   }
-  return enhancedMemorySystem;
+
+  if (enhancedMemorySystem) return enhancedMemorySystem;
+
+  if (!enhancedMemoryInitPromise) {
+    enhancedMemoryInitPromise = (async () => {
+      const config = createDefaultMemoryConfig(currentWorldSeed);
+      // Thread shared backend to enforce single-instance invariant
+      config.embeddingBackend = embeddingBackend;
+      const system = createEnhancedMemorySystem(config);
+      await system.initialize();
+      return system;
+    })();
+  }
+
+  try {
+    enhancedMemorySystem = await enhancedMemoryInitPromise;
+    enhancedMemoryInitSeed = currentWorldSeed;
+    return enhancedMemorySystem;
+  } catch (err) {
+    enhancedMemoryInitPromise = null; // Clear so next call retries
+    throw err;
+  }
+}
+
+// ============================================================================
+// Init-Independent Subsystem Checks (Fix C)
+//
+// "Gating checks" (database, embeddings) determine /ready status code.
+// "Diagnostic checks" (enhanced_init) are informational only — they appear
+// in the payload but do NOT affect whether /ready returns 200 or 503.
+// ============================================================================
+/** Diagnostic entry: ok required; error and mode optional (mode for informational keys like knowledge_graph). */
+type DiagnosticEntry = { ok: boolean; error?: string; mode?: string };
+
+interface SubsystemChecks {
+  gating: Record<string, { ok: boolean; error?: string }>;
+  diagnostic: Record<string, DiagnosticEntry>;
+}
+
+async function getSubsystemChecks(): Promise<SubsystemChecks> {
+  const gating: Record<string, { ok: boolean; error?: string }> = {};
+  const diagnostic: Record<string, DiagnosticEntry> = {};
+
+  // Database: lightweight probe pool check (no init required)
+  // Timeout budget: 1500ms (must fit within planning's 2s discovery timeout)
+  try {
+    const pool = getProbePool();
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('db probe timeout')), 1500)),
+    ]);
+    gating.database = { ok: true };
+  } catch (err: any) {
+    gating.database = { ok: false, error: err.message };
+  }
+
+  // Embedding backend: same instance used by EmbeddingService
+  // Timeout budget: 1500ms (SidecarEmbeddingBackend.health() uses 3s internally,
+  // but we race it tighter here so /ready responds within ~1.5s worst case)
+  try {
+    const health = await Promise.race([
+      embeddingBackend.health(),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('embedding probe timeout')), 1500)),
+    ]);
+    gating.embeddings = { ok: health.ok, error: health.error };
+  } catch (err: any) {
+    gating.embeddings = { ok: false, error: err.message };
+  }
+
+  // Informational only — does NOT gate /ready
+  diagnostic.enhanced_init = { ok: enhancedMemorySystem !== null };
+  diagnostic.knowledge_graph = {
+    ok: enhancedMemorySystem?.knowledgeGraphMode === 'hybrid',
+    mode: enhancedMemorySystem?.knowledgeGraphMode ?? 'uninitialized',
+  };
+
+  return { gating, diagnostic };
 }
 
 const app: express.Application = express();
@@ -212,18 +362,42 @@ export function broadcastMemoryUpdate(event: string, data: any): void {
   }
 }
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// ============================================================================
+// Health Endpoints: /live, /ready, /health (Fix C)
+// ============================================================================
+
+// /live — process alive (always 200, for startup gating and Docker/K8s liveness probes)
+app.get('/live', (_req, res) => {
+  res.json({ status: 'alive', system: 'memory', timestamp: Date.now() });
+});
+
+// /ready — real subsystem checks, can return 503 (for routing decisions)
+// Only "gating" checks affect status; diagnostic checks are informational.
+app.get('/ready', async (_req, res) => {
+  const { gating, diagnostic } = await getSubsystemChecks();
+  const allGatingOk = Object.values(gating).every(c => c.ok);
+  res.status(allGatingOk ? 200 : 503).json({
+    status: allGatingOk ? 'ready' : 'degraded',
+    system: 'memory',
+    timestamp: Date.now(),
+    checks: gating,
+    diagnostic,
+  });
+});
+
+// /health — always 200, diagnostic payload for humans/dashboard/start.js
+app.get('/health', async (_req, res) => {
+  const { gating, diagnostic } = await getSubsystemChecks();
+  const allGatingOk = Object.values(gating).every(c => c.ok);
   res.json({
-    status: 'healthy',
+    status: allGatingOk ? 'healthy' : 'degraded',
     system: 'memory',
     timestamp: Date.now(),
     version: '0.1.0',
+    checks: { ...gating, ...diagnostic },
     enhancedMemorySystem: {
-      available: true,
-      description:
-        'New vector search + GraphRAG system with per-seed isolation',
-      endpoints: ['/enhanced/status', '/enhanced/seed', '/enhanced/database'],
+      available: !!enhancedMemorySystem,
+      endpoints: ['/live', '/ready', '/enhanced/status'],
     },
   });
 });
@@ -312,6 +486,7 @@ app.get('/state', (req, res) => {
 
 // GET /memories — Dashboard-compatible list for use-periodic-refresh (proxy target)
 app.get('/memories', async (req, res) => {
+  const degradedReasons: DegradedReason[] = [];
   try {
     enhancedMemorySystem = await getEnhancedMemorySystem();
 
@@ -338,7 +513,9 @@ app.get('/memories', async (req, res) => {
         tags: r.chunk?.metadata?.tags,
         score: r.importance ?? r.chunk?.decayProfile?.importance,
       }));
-    } catch {
+    } catch (err) {
+      console.warn('[memory] Enhanced search failed, falling back to episodic:', (err as Error).message);
+      degradedReasons.push('enhanced_search_failed');
       // Fallback to episodic experiences when enhanced system unavailable
       const recent = memorySystem.episodic.eventLogger.getRecentExperiences(86400000);
       memories = recent.map((m: any) => ({
@@ -351,10 +528,16 @@ app.get('/memories', async (req, res) => {
       }));
     }
 
-    res.json({ memories });
+    res.json({
+      memories,
+      ...(degradedReasons.length > 0 && {
+        _degraded: true,
+        _degraded_reasons: degradedReasons,
+      }),
+    });
   } catch (error) {
     console.error('Failed to list memories:', error);
-    res.json({ memories: [] });
+    res.json({ memories: [], _degraded: true, _degraded_reasons: ['enhanced_search_failed'] });
   }
 });
 
@@ -378,6 +561,7 @@ app.get('/events', (req, res) => {
 
 // GET /notes — Dashboard-compatible list from reflections (proxy target)
 app.get('/notes', async (req, res) => {
+  const degradedReasons: DegradedReason[] = [];
   try {
     enhancedMemorySystem = await getEnhancedMemorySystem();
 
@@ -410,14 +594,21 @@ app.get('/notes', async (req, res) => {
           confidence: meta.confidence ?? 0.5,
         };
       });
-    } catch {
-      // Database unavailable — return empty
+    } catch (err) {
+      console.warn('[memory] Reflection query failed:', (err as Error).message);
+      degradedReasons.push('reflection_query_failed');
     }
 
-    res.json({ notes });
+    res.json({
+      notes,
+      ...(degradedReasons.length > 0 && {
+        _degraded: true,
+        _degraded_reasons: degradedReasons,
+      }),
+    });
   } catch (error) {
     console.error('Failed to list notes:', error);
-    res.json({ notes: [] });
+    res.json({ notes: [], _degraded: true, _degraded_reasons: ['reflection_query_failed'] });
   }
 });
 
@@ -495,11 +686,12 @@ app.post('/search', async (req, res) => {
       confidence: searchResults.confidence,
     });
   } catch (error) {
-    console.error('Failed to perform memory search:', error);
-    res.status(500).json({
+    console.warn('[memory] Search failed:', (error as Error).message);
+    res.json({
       results: [],
       confidence: 0.0,
-      error: 'Search service unavailable',
+      _degraded: true,
+      _degraded_reasons: ['enhanced_search_failed'],
     });
   }
 });
@@ -963,6 +1155,8 @@ app.post('/enhanced/seed', async (req, res) => {
     if (enhancedMemorySystem) {
       await enhancedMemorySystem.close();
       enhancedMemorySystem = null;
+      enhancedMemoryInitPromise = null;
+      enhancedMemoryInitSeed = null;
     }
 
     currentWorldSeed = newSeed;
@@ -1030,8 +1224,8 @@ app.get('/enhanced/stats', async (req, res) => {
     let stats: any = null;
     try {
       stats = await enhancedMemorySystem.getStats();
-    } catch {
-      // Database may not be fully initialized — use status data instead
+    } catch (err) {
+      console.warn('[memory] Stats query failed:', (err as Error).message);
     }
 
     res.json({
@@ -1115,8 +1309,8 @@ app.get('/enhanced/memories', async (req, res) => {
           entityCount: r.chunk?.entities?.length ?? 0,
           relationshipCount: r.chunk?.relationships?.length ?? 0,
         }));
-    } catch {
-      // Database not available — return empty
+    } catch (err) {
+      console.warn('[memory] Enhanced memories browse failed:', (err as Error).message);
     }
 
     res.json({
@@ -1145,8 +1339,8 @@ app.get('/enhanced/knowledge-graph', async (req, res) => {
     let stats: any = null;
     try {
       stats = await enhancedMemorySystem.getStats();
-    } catch {
-      // Database not available
+    } catch (err) {
+      console.warn('[memory] Knowledge graph stats failed:', (err as Error).message);
     }
 
     res.json({
@@ -1348,6 +1542,8 @@ app.post('/enhanced/drop', async (req, res) => {
     if (enhancedMemorySystem) {
       await enhancedMemorySystem.close();
       enhancedMemorySystem = null;
+      enhancedMemoryInitPromise = null;
+      enhancedMemoryInitSeed = null;
     }
 
     res.json({
@@ -1452,8 +1648,8 @@ app.get('/enhanced/reflections', async (req, res) => {
           emotionalTone: meta.emotionalTone || 'neutral',
         };
       }
-    } catch {
-      // Database not available — return empty
+    } catch (err) {
+      console.warn('[memory] Reflections query failed:', (err as Error).message);
     }
 
     res.json({
@@ -1503,8 +1699,8 @@ app.post('/enhanced/reflections', async (req, res) => {
             message: `Reflection with dedupeKey "${dedupeKey}" already exists`,
           });
         }
-      } catch {
-        // DB check failure — proceed with creation (write queue will also dedupe)
+      } catch (err) {
+        console.warn('[memory] Dedupe preflight check failed, proceeding with creation:', (err as Error).message);
       }
     }
 
@@ -1650,7 +1846,7 @@ app.get('/enhanced/memories/:id', async (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`[Memory] Server running on port ${port}`);
-  console.log(`[Memory] Endpoints: /health, /enhanced/* (status, seed, database, stats)`);
+  console.log(`[Memory] Endpoints: /live, /ready, /health, /enhanced/* (status, seed, database, stats)`);
 });
 
 export default app;

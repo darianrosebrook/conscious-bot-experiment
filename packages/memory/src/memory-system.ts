@@ -101,6 +101,9 @@ export interface EnhancedMemorySystemConfig {
   enableMemoryConsolidation: boolean;
   enableMemoryArchiving: boolean;
 
+  // Injected embedding backend (single-instance invariant)
+  embeddingBackend?: import('./embedding-service').EmbeddingBackend;
+
   // Reflection and learning configuration
   enableNarrativeTracking: boolean;
   enableMetacognition: boolean;
@@ -213,6 +216,9 @@ export class EnhancedMemorySystem extends EventEmitter {
   private searchStats: Array<{ timestamp: number; latency: number }> = [];
   private initialized = false;
 
+  /** Persistent mode flag: 'hybrid' if KG init succeeded, 'vector_only' if it failed. */
+  knowledgeGraphMode: 'hybrid' | 'vector_only' | 'uninitialized' = 'uninitialized';
+
   // Reflection persistence write queue (S1: async, bounded, fire-and-forget)
   private reflectionWriteQueue: Array<{
     type: 'reflection' | 'lesson' | 'narrative_checkpoint';
@@ -281,11 +287,14 @@ export class EnhancedMemorySystem extends EventEmitter {
       dimension: config.embeddingDimension,
     });
 
-    this.embeddingService = new EmbeddingService({
-      ollamaHost: config.ollamaHost,
-      embeddingModel: config.embeddingModel,
-      dimension: config.embeddingDimension,
-    });
+    this.embeddingService = new EmbeddingService(
+      {
+        ollamaHost: config.ollamaHost,
+        embeddingModel: config.embeddingModel,
+        dimension: config.embeddingDimension,
+      },
+      config.embeddingBackend,
+    );
 
     this.chunkingService = new ChunkingService(config.chunkingConfig);
 
@@ -415,6 +424,22 @@ export class EnhancedMemorySystem extends EventEmitter {
     // Initialize database
     await this.vectorDb.initialize();
 
+    // Initialize knowledge graph tables (entities, relationships, indexes).
+    // Wrapped in try/catch: if it fails, hybrid search degrades to vector-only
+    // (graph search already catches errors internally).
+    try {
+      await this.knowledgeGraph.initialize();
+      this.knowledgeGraphMode = 'hybrid';
+    } catch (e) {
+      this.knowledgeGraphMode = 'vector_only';
+      const err = e as Error;
+      console.warn(
+        `⚠️ KG_INIT_FAILED — MODE: VECTOR_ONLY (graph search disabled)\n` +
+        `   Error: ${err.message}\n` +
+        `   Stack: ${err.stack?.split('\n').slice(0, 3).join('\n   ')}`
+      );
+    }
+
     // Test embedding service
     const health = await this.embeddingService.healthCheck();
     if (health.status !== 'healthy') {
@@ -476,6 +501,7 @@ export class EnhancedMemorySystem extends EventEmitter {
           id: chunk.id,
           content: chunk.content,
           embedding: embedding.embedding,
+          embeddingModelId: embedding.model.name,
           metadata: mergedMetadata,
           entities: [],
           relationships: [],

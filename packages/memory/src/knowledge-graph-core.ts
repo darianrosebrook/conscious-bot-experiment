@@ -536,7 +536,7 @@ export class EnhancedKnowledgeGraphCore {
     // Composite indexes for complex queries
     await client.query(`
       CREATE INDEX IF NOT EXISTS ${this.entityTable}_hybrid_search_idx
-      ON ${this.entityTable} (type, confidence, (decay_profile->>'importance')::numeric)
+      ON ${this.entityTable} (type, confidence, ((decay_profile->>'importance')::numeric))
     `);
 
     await client.query(`
@@ -1787,6 +1787,74 @@ export class EnhancedKnowledgeGraphCore {
       updatedAt: row.updated_at?.getTime() || Date.now(),
       lastAccessed: row.last_accessed?.getTime() || Date.now(),
       accessCount: row.access_count || 0,
+    };
+  }
+
+  /**
+   * Execute a KnowledgeQuery (required by GraphRAG).
+   * Delegates to the appropriate method based on query type.
+   * Parameters are extracted from the generic `parameters` bag.
+   */
+  async query(kq: KnowledgeQuery): Promise<QueryResult> {
+    const startTime = Date.now();
+    let entities: Entity[] = [];
+    let relationships: Relationship[] = [];
+    let confidence = 1.0;
+    const p = kq.parameters;
+
+    switch (kq.type) {
+      case QueryType.ENTITY: {
+        const result = await this.searchEntities({
+          query: typeof p.target === 'string' ? p.target : undefined,
+          entityTypes: p.entityTypes,
+          minConfidence: p.minConfidence,
+          limit: kq.limit ?? 50,
+          searchMode: 'text',
+        });
+        entities = result.entities;
+        break;
+      }
+
+      case QueryType.PATH: {
+        if (typeof p.source === 'string' && typeof p.target === 'string') {
+          const paths = await this.findPath(p.source, p.target, p.maxDepth ?? 3);
+          if (paths.length > 0) {
+            confidence = paths[0].confidence;
+          }
+        }
+        break;
+      }
+
+      case QueryType.NEIGHBORHOOD: {
+        const targetId = typeof p.target === 'string' ? p.target : undefined;
+        if (targetId) {
+          const neighborhood = await this.getEntityNeighborhood(targetId, p.maxDepth ?? 1);
+          if (neighborhood.entity) {
+            entities = [neighborhood.entity];
+            for (const n of neighborhood.neighbors) {
+              entities.push(n.entity);
+              relationships.push(n.relationship);
+            }
+          }
+        }
+        break;
+      }
+
+      case QueryType.RELATIONSHIP:
+      case QueryType.PATTERN:
+      case QueryType.INFERENCE:
+        // Not yet implemented for the Postgres-backed graph; return empty
+        break;
+    }
+
+    return {
+      entities,
+      relationships,
+      metadata: {
+        count: entities.length,
+        queryTime: Date.now() - startTime,
+        confidence,
+      },
     };
   }
 

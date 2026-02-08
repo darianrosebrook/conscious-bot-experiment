@@ -13,6 +13,14 @@ import { z } from 'zod';
 import { getMemoryRuntimeConfig } from './config/memory-runtime-config';
 
 // ============================================================================
+// Embedding Model Retrieval Policy (centralized constant)
+// ============================================================================
+// These are the only embedding_model_id values allowed in search queries.
+// New models must be added here AND verified to produce 768-dim vectors.
+export const ALLOWED_EMBEDDING_MODELS = ['embeddinggemma', 'legacy_768'] as const;
+export type AllowedEmbeddingModel = (typeof ALLOWED_EMBEDDING_MODELS)[number];
+
+// ============================================================================
 // Enhanced Types and Schemas
 // ============================================================================
 
@@ -20,6 +28,7 @@ export interface EnhancedChunkMetadata {
   id: string;
   content: string;
   embedding: number[];
+  embeddingModelId?: string;
   metadata: Record<string, any>;
 
   // Enhanced knowledge graph integration
@@ -68,6 +77,7 @@ export const EnhancedMemoryChunkSchema = z.object({
   id: z.string(),
   content: z.string(),
   embedding: z.array(z.number()).length(768),
+  embeddingModelId: z.string().optional(),
   metadata: z.record(z.any()),
 
   // Enhanced entity and relationship data
@@ -173,6 +183,9 @@ export interface EnhancedSearchOptions {
   queryEmbedding: number[];
   limit?: number;
   threshold?: number;
+
+  // Embedding model filter (defaults to 'embeddinggemma' + 'legacy_768')
+  embeddingModelId?: string;
 
   // Enhanced filtering
   memoryTypes?: string[];
@@ -308,6 +321,7 @@ export class EnhancedVectorDatabase {
       max: this.config.maxConnections,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      options: '-c statement_timeout=10000', // 10s query timeout
     });
   }
 
@@ -384,9 +398,43 @@ export class EnhancedVectorDatabase {
           temporal_context JSONB,
           spatial_context JSONB,
 
+          -- Embedding provenance: tracks which model produced this vector
+          embedding_model_id TEXT NOT NULL DEFAULT 'legacy_768',
+          embedding_dim INTEGER NOT NULL DEFAULT 768,
+
           created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
+          updated_at TIMESTAMP DEFAULT NOW(),
+
+          CONSTRAINT ${this.config.tableName}_chk_embedding_dim CHECK (embedding_dim = 768)
         )
+      `);
+
+      // Migrate existing tables: add embedding versioning columns if missing
+      const constraintName = `${this.config.tableName}_chk_embedding_dim`;
+      await client.query(`
+        DO $$
+        BEGIN
+          -- Add columns if they don't exist yet
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '${this.config.tableName}' AND column_name = 'embedding_model_id'
+          ) THEN
+            ALTER TABLE ${this.config.tableName}
+              ADD COLUMN embedding_model_id TEXT NOT NULL DEFAULT 'legacy_768',
+              ADD COLUMN embedding_dim INTEGER NOT NULL DEFAULT 768;
+          END IF;
+
+          -- Add CHECK constraint if it doesn't exist yet (scoped by table OID)
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = '${constraintName}'
+              AND conrelid = '${this.config.tableName}'::regclass
+          ) THEN
+            ALTER TABLE ${this.config.tableName}
+              ADD CONSTRAINT ${constraintName} CHECK (embedding_dim = 768);
+          END IF;
+        END
+        $$;
       `);
 
       // Enhanced indexes for hybrid search
@@ -585,8 +633,8 @@ export class EnhancedVectorDatabase {
       await client.query(
         `
         INSERT INTO ${this.config.tableName}
-        (id, content, embedding, metadata, entities, relationships, decay_profile, provenance, graph_links, temporal_context, spatial_context, updated_at)
-        VALUES ($1, $2, ${vectorLiteral}::vector, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, NOW())
+        (id, content, embedding, metadata, entities, relationships, decay_profile, provenance, graph_links, temporal_context, spatial_context, embedding_model_id, embedding_dim, updated_at)
+        VALUES ($1, $2, ${vectorLiteral}::vector, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11, $12, NOW())
         ON CONFLICT (id) DO UPDATE SET
           content = EXCLUDED.content,
           embedding = EXCLUDED.embedding,
@@ -598,6 +646,8 @@ export class EnhancedVectorDatabase {
           graph_links = EXCLUDED.graph_links,
           temporal_context = EXCLUDED.temporal_context,
           spatial_context = EXCLUDED.spatial_context,
+          embedding_model_id = EXCLUDED.embedding_model_id,
+          embedding_dim = EXCLUDED.embedding_dim,
           updated_at = NOW()
       `,
         [
@@ -611,6 +661,8 @@ export class EnhancedVectorDatabase {
           JSON.stringify(chunk.graphLinks || []),
           JSON.stringify(chunk.temporalContext || null),
           JSON.stringify(chunk.spatialContext || null),
+          chunk.embeddingModelId || 'legacy_768',
+          chunk.embedding.length,
         ]
       );
     } finally {
@@ -632,13 +684,13 @@ export class EnhancedVectorDatabase {
 
     const client = await this.pool.connect();
     try {
-      const vectorLiteral = `'[${options.queryEmbedding.join(',')}]'`;
+      const vectorLiteral = `[${options.queryEmbedding.join(',')}]`;
       const limit = options.limit || 30;
       const threshold = options.threshold || 0.1;
 
       // Build dynamic query based on search mode
-      let query = this.buildEnhancedSearchQuery(options);
-      let params: any[] = [vectorLiteral, limit, threshold];
+      const { query, extraParams } = this.buildEnhancedSearchQuery(options);
+      const params: any[] = [vectorLiteral, limit, threshold, ...extraParams];
 
       // Execute search
       const result = await client.query(query, params);
@@ -656,10 +708,21 @@ export class EnhancedVectorDatabase {
   }
 
   /**
-   * Build enhanced search query based on options
+   * Build enhanced search query based on options.
+   * Returns { query, extraParams } — caller must append extraParams to the base [vector, limit, threshold] array.
    */
-  private buildEnhancedSearchQuery(options: EnhancedSearchOptions): string {
+  private buildEnhancedSearchQuery(options: EnhancedSearchOptions): { query: string; extraParams: any[] } {
     const { searchMode = 'hybrid' } = options;
+    const extraParams: any[] = [];
+
+    // Parameterized model filter using centralized allowed-model set
+    const currentModelId = options.embeddingModelId || ALLOWED_EMBEDDING_MODELS[0]; // 'embeddinggemma'
+    const allowedModels = ALLOWED_EMBEDDING_MODELS.includes(currentModelId as AllowedEmbeddingModel)
+      ? [...ALLOWED_EMBEDDING_MODELS]
+      : [currentModelId, ...ALLOWED_EMBEDDING_MODELS];
+    extraParams.push(allowedModels);
+    const modelParamIdx = 3 + extraParams.length; // $4
+    this.paramIndex = modelParamIdx + 1; // next available: $5
 
     let baseQuery = `
       SELECT
@@ -669,6 +732,7 @@ export class EnhancedVectorDatabase {
         (1 - (embedding <=> $1::vector)) as similarity
       FROM ${this.config.tableName}
       WHERE (1 - (embedding <=> $1::vector)) >= $3
+      AND embedding_model_id = ANY($${modelParamIdx}::text[])
     `;
 
     // Add filters based on options
@@ -703,7 +767,7 @@ export class EnhancedVectorDatabase {
         baseQuery += ` ORDER BY (
           SELECT COUNT(*) FROM jsonb_array_elements(entities) e
           WHERE (e->>'confidence')::numeric >= 0.7
-        ) DESC, similarity DESC`;
+        ) DESC, (1 - (embedding <=> $1::vector)) DESC`;
         break;
 
       case 'decay_aware':
@@ -712,14 +776,14 @@ export class EnhancedVectorDatabase {
           (decay_profile->>'importance')::numeric * 0.3 +
           (1 - (decay_profile->>'baseDecayRate')::numeric) * 0.3 +
           GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - (decay_profile->>'lastAccessed')::numeric * INTERVAL '1 millisecond')) / (24 * 60 * 60 * 1000)) * 0.4
-        ) DESC, similarity DESC`;
+        ) DESC, (1 - (embedding <=> $1::vector)) DESC`;
         break;
 
       case 'hybrid':
       default:
         // Balanced approach combining all factors
         baseQuery += ` ORDER BY (
-          similarity * 0.4 +
+          (1 - (embedding <=> $1::vector)) * 0.4 +
           (SELECT COUNT(*) FROM jsonb_array_elements(entities) e WHERE (e->>'confidence')::numeric >= 0.7) * 0.1 +
           (decay_profile->>'importance')::numeric * 0.2 +
           (1 - (decay_profile->>'baseDecayRate')::numeric) * 0.1 +
@@ -730,7 +794,7 @@ export class EnhancedVectorDatabase {
 
     baseQuery += ` LIMIT $2`;
 
-    return baseQuery;
+    return { query: baseQuery, extraParams };
   }
 
   /**
@@ -1012,7 +1076,7 @@ export class EnhancedVectorDatabase {
   /**
    * Get next parameter index for query building
    */
-  private paramIndex = 4; // Start after vector, limit, threshold
+  private paramIndex = 5; // Start after vector($1), limit($2), threshold($3), modelFilter($4)
   private getNextParamIndex(): number {
     return this.paramIndex++;
   }
@@ -1153,12 +1217,12 @@ export class EnhancedVectorDatabase {
           COUNT(*) as total_chunks,
           AVG(vector_dims(embedding)) as avg_dimension,
           COUNT(DISTINCT (metadata->>'type')) as memory_types,
-          COUNT(DISTINCT e.entity_id) as entity_count,
-          COUNT(DISTINCT r.relationship_id) as relationship_count,
+          COUNT(DISTINCT (e.value->>'id')) as entity_count,
+          COUNT(DISTINCT (r.value->>'id')) as relationship_count,
           MAX(updated_at) as last_updated
         FROM ${this.config.tableName}
-        LEFT JOIN jsonb_array_elements(entities) e ON true
-        LEFT JOIN jsonb_array_elements(relationships) r ON true
+        LEFT JOIN LATERAL jsonb_array_elements(entities) e(value) ON true
+        LEFT JOIN LATERAL jsonb_array_elements(relationships) r(value) ON true
       `);
 
       const row = result.rows[0];
@@ -1431,6 +1495,28 @@ export class EnhancedVectorDatabase {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Get embedding model distribution across stored vectors
+   */
+  async getModelDistribution(): Promise<Record<string, number>> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT embedding_model_id, COUNT(*) as count FROM ${this.config.tableName} GROUP BY embedding_model_id`
+      );
+      return Object.fromEntries(result.rows.map((r: any) => [r.embedding_model_id, parseInt(r.count)]));
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get the underlying pool for lightweight health checks (no init required)
+   */
+  getPool(): Pool {
+    return this.pool;
   }
 
   /**

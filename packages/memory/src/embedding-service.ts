@@ -17,6 +17,52 @@
 import { z } from 'zod';
 
 // ============================================================================
+// Embedding Backend Abstraction (provider-agnostic)
+// ============================================================================
+
+export interface EmbeddingBackend {
+  embed(text: string, modelId: string): Promise<{ embedding: number[] }>;
+  health(): Promise<{ ok: boolean; provider: string; error?: string }>;
+}
+
+export class SidecarEmbeddingBackend implements EmbeddingBackend {
+  constructor(
+    private host: string,
+    private timeoutMs: number = 10_000
+  ) {}
+
+  async embed(text: string, modelId: string): Promise<{ embedding: number[] }> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`${this.host}/api/embeddings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelId, prompt: text }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Sidecar API error: ${response.statusText}`);
+      const data = (await response.json()) as { embedding: number[] };
+      return { embedding: data.embedding || [] };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async health(): Promise<{ ok: boolean; provider: string; error?: string }> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3_000);
+      const res = await fetch(`${this.host}/health`, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeout);
+      return { ok: res.ok, provider: 'mlx-sidecar' };
+    } catch (err: any) {
+      return { ok: false, provider: 'mlx-sidecar', error: err.message };
+    }
+  }
+}
+
+// ============================================================================
 // Types and Interfaces
 // ============================================================================
 
@@ -47,6 +93,7 @@ export interface EmbeddingResult {
 
 export interface EmbeddingServiceConfig {
   ollamaHost: string;
+  ollamaTimeoutMs: number;
   embeddingModel: string;
   dimension: number;
   maxRetries: number;
@@ -92,6 +139,7 @@ export interface EmbeddingQualityAnalysis {
 
 const DEFAULT_CONFIG: Required<EmbeddingServiceConfig> = {
   ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
+  ollamaTimeoutMs: 10_000,
   embeddingModel: 'embeddinggemma',
   dimension: 768,
   maxRetries: 3,
@@ -102,7 +150,7 @@ const DEFAULT_CONFIG: Required<EmbeddingServiceConfig> = {
   enablePerformanceMonitoring: true,
   enableModelFallback: true,
   primaryModel: 'embeddinggemma',
-  fallbackModels: ['all-minilm'],
+  fallbackModels: [], // No fallback — 768-dim is the only compatible dimension for current table
 };
 
 // Available embedding models with enhanced specifications
@@ -117,6 +165,8 @@ const EMBEDDING_MODELS: Record<string, EmbeddingModel> = {
     memoryTypes: ['episodic', 'semantic', 'emotional'],
     specializations: ['minecraft', 'conversational', 'technical'],
   },
+  // WARNING: all-minilm produces 384-dim embeddings — incompatible with the 768-dim vector table.
+  // Kept in registry for documentation only. Removed from fallbackModels to prevent corruption.
   'all-minilm': {
     name: 'all-minilm',
     dimension: 384,
@@ -155,6 +205,7 @@ const EMBEDDING_MODELS: Record<string, EmbeddingModel> = {
 
 export class EmbeddingService {
   private config: Required<EmbeddingServiceConfig>;
+  readonly backend: EmbeddingBackend;
   private cache: Map<string, { embedding: number[]; expiresAt: number }> =
     new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -167,8 +218,9 @@ export class EmbeddingService {
   > = new Map();
   private readonly SELECTION_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-  constructor(config: Partial<EmbeddingServiceConfig> = {}) {
+  constructor(config: Partial<EmbeddingServiceConfig> = {}, backend?: EmbeddingBackend) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.backend = backend ?? new SidecarEmbeddingBackend(this.config.ollamaHost, this.config.ollamaTimeoutMs);
   }
 
   /**
@@ -450,23 +502,28 @@ export class EmbeddingService {
     status: 'healthy' | 'unhealthy';
     model: string;
     responseTime: number;
+    provider?: string;
+    error?: string;
   }> {
     const startTime = Date.now();
 
     try {
-      await this.embed('test query');
+      const health = await this.backend.health();
       const responseTime = Date.now() - startTime;
 
       return {
-        status: 'healthy',
+        status: health.ok ? 'healthy' : 'unhealthy',
         model: this.config.embeddingModel,
         responseTime,
+        provider: health.provider,
+        error: health.error,
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         model: this.config.embeddingModel,
         responseTime: Date.now() - startTime,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -594,44 +651,24 @@ export class EmbeddingService {
     throw lastError || new Error('Failed to generate embedding with any model');
   }
 
-  /**
-   * Generate embedding using specific model
-   */
-  private async callOllama(
-    text: string,
-    modelName: string
-  ): Promise<{ embedding: number[] }> {
-    const response = await fetch(`${this.config.ollamaHost}/api/embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: modelName,
-        prompt: text,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.statusText}`);
-    }
-
-    const data = (await response.json()) as { embedding: number[] };
-    return {
-      embedding: data.embedding || [],
-    };
-  }
-
   private async generateEmbedding(
     text: string,
     model: EmbeddingModel
   ): Promise<EmbeddingResult> {
-    const response = await this.callOllama(text, model.name);
+    const response = await this.backend.embed(text, model.name);
 
-    // Validate embedding dimensions
+    // Validate embedding dimensions against model
     if (response.embedding.length !== model.dimension) {
       throw new Error(
         `Embedding dimension mismatch: expected ${model.dimension}, got ${response.embedding.length}`
+      );
+    }
+
+    // Defense-in-depth: validate against configured table dimension
+    if (response.embedding.length !== this.config.dimension) {
+      throw new Error(
+        `Embedding dimension mismatch: expected ${this.config.dimension}, got ${response.embedding.length}. ` +
+        `Model ${model.name} is incompatible with the configured vector table.`
       );
     }
 
