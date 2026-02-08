@@ -4,6 +4,10 @@
  * Fire-and-forget text-to-speech via a local Kokoro-ONNX OpenAI-compatible API.
  * Streams PCM audio to sox for playback through system speakers.
  *
+ * Uses double-buffering: while chunk N plays through sox, chunk N+1 is already
+ * being fetched from Kokoro. This eliminates the ~3-7s silent gap between
+ * sentences that occurs when generation is sequential with playback.
+ *
  * Treated like Sterling — an optional sibling service.
  * Degrades gracefully when Kokoro or sox is unavailable.
  *
@@ -35,6 +39,12 @@ interface CircuitBreakerState {
   isOpen: boolean;
 }
 
+/** A prefetched response ready to pipe to sox without waiting for generation. */
+interface PrefetchedChunk {
+  response: Response;
+  abort: AbortController;
+}
+
 // ============================================================================
 // Client Implementation
 // ============================================================================
@@ -54,6 +64,8 @@ export class TTSClient {
   private activeAbort: AbortController | null = null;
   /** Queued utterances; played in order after current playback finishes. */
   private queue: string[] = [];
+  /** Pre-fetched audio for the next chunk (generated while current chunk plays). */
+  private prefetched: PrefetchedChunk | null = null;
   private circuitBreaker: CircuitBreakerState = {
     failures: 0,
     lastFailureTime: 0,
@@ -158,9 +170,13 @@ export class TTSClient {
   // Internal
   // --------------------------------------------------------------------------
 
-  private async doSpeak(text: string): Promise<void> {
+  /**
+   * Fetch audio from Kokoro without playing it. Returns the Response for
+   * later piping to sox. Used to pre-generate the next chunk while the
+   * current chunk is still playing.
+   */
+  private async fetchAudio(text: string): Promise<PrefetchedChunk | null> {
     const controller = new AbortController();
-    this.activeAbort = controller;
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
@@ -180,33 +196,39 @@ export class TTSClient {
       clearTimeout(timer);
 
       if (!res.ok || !res.body) {
-        clearTimeout(timer);
         this.recordFailure();
-        this.activeAbort = null;
-        this.playNextFromQueue();
-        return;
+        return null;
       }
 
-      // Spawn sox to play raw PCM (24kHz, 16-bit signed, mono)
+      this.recordSuccess();
+      return { response: res, abort: controller };
+    } catch {
+      clearTimeout(timer);
+      this.recordFailure();
+      return null;
+    }
+  }
+
+  /**
+   * Play a fetched response through sox. Returns a Promise that resolves
+   * when sox finishes playing.
+   */
+  private playResponse(res: Response, abort: AbortController): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.activeAbort = abort;
+
       const sox = spawn(
         'sox',
         [
-          '-t',
-          'raw',
-          '-e',
-          'signed-integer',
-          '-b',
-          '16',
-          '-c',
-          '1',
-          '-r',
-          '24000',
+          '-t', 'raw',
+          '-e', 'signed-integer',
+          '-b', '16',
+          '-c', '1',
+          '-r', '24000',
           '-',
           '-d',
         ],
-        {
-          stdio: ['pipe', 'ignore', 'ignore'],
-        }
+        { stdio: ['pipe', 'ignore', 'ignore'] }
       );
       this.activeSox = sox;
 
@@ -217,30 +239,84 @@ export class TTSClient {
       sox.on('close', () => {
         if (this.activeSox === sox) {
           this.activeSox = null;
-          if (this.activeAbort) {
-            this.activeAbort.abort();
+          if (this.activeAbort === abort) {
             this.activeAbort = null;
           }
-          this.playNextFromQueue();
         }
+        resolve();
       });
 
-      // Pipe streaming response body to sox stdin
       const readable = Readable.fromWeb(res.body as any);
       readable.pipe(sox.stdin);
 
       readable.on('error', () => {
         this.killSoxProcess(sox);
         this.recordFailure();
+        resolve();
       });
+    });
+  }
 
-      // Success — reset circuit breaker on first data
-      this.recordSuccess();
-    } catch (err) {
-      clearTimeout(timer);
-      this.activeAbort = null;
-      this.recordFailure();
+  private async doSpeak(text: string): Promise<void> {
+    // Fetch audio for this chunk
+    const chunk = await this.fetchAudio(text);
+    if (!chunk) {
       this.playNextFromQueue();
+      return;
+    }
+
+    // Start prefetching the NEXT chunk while this one plays
+    this.startPrefetch();
+
+    // Play the current chunk — blocks until sox finishes
+    await this.playResponse(chunk.response, chunk.abort);
+
+    // When playback ends, the prefetched chunk may already be ready
+    this.playNextFromQueue();
+  }
+
+  /**
+   * If there's a next chunk in the queue, start fetching its audio now
+   * (while the current chunk plays through sox). The result is stored in
+   * this.prefetched and consumed by playNextFromQueue().
+   */
+  private startPrefetch(): void {
+    if (this.prefetched) return; // already prefetching
+    if (this.queue.length === 0) return;
+
+    const nextText = this.queue[0]; // peek, don't remove yet
+    // Fire-and-forget the fetch; store the promise result
+    this.fetchAudio(nextText).then((result) => {
+      if (result) {
+        this.prefetched = result;
+      }
+    }).catch(() => {
+      // Prefetch failed — will fall back to normal fetch in playNextFromQueue
+    });
+  }
+
+  private playNextFromQueue(): void {
+    if (this.queue.length === 0) {
+      this.prefetched = null;
+      return;
+    }
+
+    const next = this.queue.shift()!;
+
+    if (this.prefetched) {
+      // Use the pre-fetched audio — no generation wait!
+      const chunk = this.prefetched;
+      this.prefetched = null;
+
+      // Start prefetching the chunk after this one
+      this.startPrefetch();
+
+      this.playResponse(chunk.response, chunk.abort).then(() => {
+        this.playNextFromQueue();
+      }).catch(() => {});
+    } else {
+      // No prefetch available — fall back to fetch-then-play
+      this.doSpeak(next).catch(() => {});
     }
   }
 
@@ -266,11 +342,27 @@ export class TTSClient {
       return this.groupSegments(paragraphs);
     }
 
-    // Tier 2: Sentences — split on sentence-ending punctuation
-    const sentences = text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text];
-    const trimmedSentences = sentences
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    // Tier 2: Sentences — split on sentence-ending punctuation.
+    // Use a boundary-aware regex that avoids splitting on:
+    //   - Decimal numbers (3.5, 123.45)
+    //   - Common abbreviations (Dr., Mr., Mrs., e.g., i.e., etc.)
+    //   - Ellipses (...)
+    // A sentence boundary is: punctuation (.!?) followed by optional quotes,
+    // then whitespace, then an uppercase letter or end of string.
+    const sentenceBoundary =
+      /(?<![A-Z][a-z])(?<!\b(?:Dr|Mr|Mrs|Ms|Jr|Sr|St|vs|etc|e\.g|i\.e|approx|dept|govt|avg))(?<!\d)(?<!\.\.)([.!?]+["']?)\s+(?=[A-Z"])/g;
+    const sentences = text.split(sentenceBoundary).reduce<string[]>((acc, part, i) => {
+      // split with capture group interleaves: [text, punct, text, punct, ...]
+      // Reattach punctuation to the preceding segment
+      if (i % 2 === 1) {
+        if (acc.length > 0) acc[acc.length - 1] += part;
+      } else {
+        const trimmed = part.trim();
+        if (trimmed) acc.push(trimmed);
+      }
+      return acc;
+    }, []);
+    const trimmedSentences = sentences.filter((s) => s.length > 0);
 
     if (trimmedSentences.every((s) => s.length <= this.maxChunkSize)) {
       return this.groupSegments(trimmedSentences);
@@ -312,12 +404,6 @@ export class TTSClient {
     }
     if (current) grouped.push(current);
     return grouped;
-  }
-
-  private playNextFromQueue(): void {
-    if (this.queue.length === 0) return;
-    const next = this.queue.shift()!;
-    this.doSpeak(next).catch(() => {});
   }
 
   // --------------------------------------------------------------------------
@@ -367,6 +453,10 @@ export class TTSClient {
     if (this.activeSox) {
       this.killSoxProcess(this.activeSox);
       this.activeSox = null;
+    }
+    if (this.prefetched) {
+      this.prefetched.abort.abort();
+      this.prefetched = null;
     }
   }
 

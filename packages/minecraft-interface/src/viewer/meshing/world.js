@@ -52,6 +52,28 @@ class World {
     return true
   }
 
+  getBlockLight (pos) {
+    const key = columnKey(Math.floor(pos.x / 16) * 16, Math.floor(pos.z / 16) * 16)
+    const column = this.columns[key]
+    if (!column) return 0
+    try {
+      return column.getBlockLight(posInChunk(pos.floored()))
+    } catch (e) {
+      return 0
+    }
+  }
+
+  getSkyLight (pos) {
+    const key = columnKey(Math.floor(pos.x / 16) * 16, Math.floor(pos.z / 16) * 16)
+    const column = this.columns[key]
+    if (!column) return 15
+    try {
+      return column.getSkyLight(posInChunk(pos.floored()))
+    } catch (e) {
+      return 15
+    }
+  }
+
   getBlock (pos) {
     const key = columnKey(Math.floor(pos.x / 16) * 16, Math.floor(pos.z / 16) * 16)
 

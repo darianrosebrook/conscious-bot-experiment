@@ -254,6 +254,40 @@ describe('TTSClient', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Prefetch (double-buffering)
+  // -------------------------------------------------------------------------
+
+  describe('prefetch', () => {
+    it('starts fetching the next chunk while the current one is playing', async () => {
+      const fetchCalls: number[] = []; // timestamps of each fetch call
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        fetchCalls.push(Date.now());
+        // Simulate instant generation
+        return new Response(null, { status: 200 });
+      });
+
+      // Two sentences that will be split into two chunks
+      const s1 = 'A'.repeat(35) + '.';
+      const s2 = 'B'.repeat(35) + '.';
+      const text = `${s1} ${s2}`;
+
+      const client = createTestClient({ maxChunkSize: 60 });
+      client.speak(text);
+
+      // Wait for both fetches to fire (prefetch should start almost immediately)
+      await vi.waitFor(() => expect(fetchCalls.length).toBeGreaterThanOrEqual(2), {
+        timeout: 500,
+      });
+
+      // Both fetches should have started with minimal delay between them
+      // (not waiting for playback to finish)
+      const gap = fetchCalls[1] - fetchCalls[0];
+      expect(gap).toBeLessThan(200); // Should be near-instant, not seconds apart
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Text segmentation
   // -------------------------------------------------------------------------
 
@@ -347,6 +381,76 @@ describe('TTSClient', () => {
       ).input;
       // All grouped into one chunk since total < maxChunkSize
       expect(firstInput).toBe(text);
+    });
+
+    it('does not split decimal numbers mid-token', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      const text = 'I need 3.5 blocks of stone. That is enough.';
+      const client = createTestClient({ maxChunkSize: 30 });
+      client.speak(text);
+
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+      const firstInput = JSON.parse(
+        fetchSpy.mock.calls[0][1]!.body as string
+      ).input;
+      // Must NOT split "3.5" — the first chunk should contain "3.5 blocks"
+      expect(firstInput).toContain('3.5 blocks');
+    });
+
+    it('does not split on abbreviations like Dr. or e.g.', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      const text = 'I see Dr. Smith near the village. He has items.';
+      const client = createTestClient({ maxChunkSize: 40 });
+      client.speak(text);
+
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+      const firstInput = JSON.parse(
+        fetchSpy.mock.calls[0][1]!.body as string
+      ).input;
+      // "Dr. Smith" must stay together
+      expect(firstInput).toContain('Dr. Smith');
+    });
+
+    it('does not split coordinate numbers like 123.45', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      const text =
+        'The cave is at coords 123.45, 678.90. Let me go there.';
+      const client = createTestClient({ maxChunkSize: 60 });
+      client.speak(text);
+
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+      const firstInput = JSON.parse(
+        fetchSpy.mock.calls[0][1]!.body as string
+      ).input;
+      // Coordinates must not be split
+      expect(firstInput).toContain('123.45');
+      expect(firstInput).toContain('678.90');
+    });
+
+    it('splits correctly on ellipses followed by new sentence', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      const text = 'I see a village ahead... Maybe I should trade.';
+      const client = createTestClient({ maxChunkSize: 30 });
+      client.speak(text);
+
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+      const firstInput = JSON.parse(
+        fetchSpy.mock.calls[0][1]!.body as string
+      ).input;
+      // Ellipsis should create a clean break
+      expect(firstInput).toBe('I see a village ahead...');
     });
 
     it('caps queue at MAX_QUEUE_SIZE (50)', () => {

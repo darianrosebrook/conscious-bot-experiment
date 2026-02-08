@@ -39,6 +39,24 @@ function tintToGl (tint) {
   return [r / 255, g / 255, b / 255]
 }
 
+// Minecraft light curve: maps light level 0-15 to brightness multiplier.
+// The shader already applies its own ambient+directional lighting on top of vColor,
+// so we use a compressed range to avoid double-darkening. Level 0 gets a high floor
+// (0.25) and the curve is gentle (exponent 1.2) so that shadows are visible but
+// not crushed when composed with the shader's day/night dimming.
+const LIGHT_TABLE = new Float32Array(16)
+for (let i = 0; i < 16; i++) {
+  LIGHT_TABLE[i] = 0.25 + 0.75 * Math.pow(i / 15, 1.2)
+}
+
+function sampleFaceLight (world, cursor, dir) {
+  const neighborPos = cursor.offset(dir[0], dir[1], dir[2])
+  const blockLight = world.getBlockLight(neighborPos)
+  const skyLight = world.getSkyLight(neighborPos)
+  const combined = Math.max(blockLight, skyLight)
+  return LIGHT_TABLE[combined]
+}
+
 const elemFaces = {
   up: {
     dir: [0, 1, 0],
@@ -145,11 +163,15 @@ function renderLiquid (world, cursor, texture, type, biome, water, attr) {
     let tint = [1, 1, 1]
     if (water) {
       let m = 1 // Fake lighting to improve lisibility
-      if (Math.abs(dir[0]) > 0) m = 0.6
-      else if (Math.abs(dir[2]) > 0) m = 0.8
+      if (Math.abs(dir[0]) > 0) m = 0.75
+      else if (Math.abs(dir[2]) > 0) m = 0.85
       tint = getTints().water[biome]
       tint = [tint[0] * m, tint[1] * m, tint[2] * m]
     }
+
+    // Per-block lighting: sample light from the neighbor block this face is exposed to
+    const faceLight = sampleFaceLight(world, cursor, dir)
+    tint = [tint[0] * faceLight, tint[1] * faceLight, tint[2] * faceLight]
 
     const u = texture.u
     const v = texture.v
@@ -267,6 +289,9 @@ function renderElement (world, cursor, element, doAO, attr, globalMatrix, global
 
     const ndx = Math.floor(attr.positions.length / 3)
 
+    // Per-block lighting: sample light from the neighbor block this face is exposed to
+    const faceLight = sampleFaceLight(world, cursor, dir)
+
     let tint = [1, 1, 1]
     if (eFace.tintindex !== undefined) {
       if (eFace.tintindex === 0) {
@@ -350,9 +375,13 @@ function renderElement (world, cursor, element, doAO, attr, globalMatrix, global
         // TODO: correctly interpolate ao light based on pos (evaluate once for each corner of the block)
 
         const ao = (side1Block && side2Block) ? 0 : (3 - (side1Block + side2Block + cornerBlock))
-        light = (ao + 1) / 4
+        // Softened AO: floor of 0.4 instead of 0.25 to avoid over-darkening
+        light = 0.4 + (ao / 3) * 0.6
         aos.push(ao)
       }
+
+      // Multiply per-block lighting into the vertex color
+      light *= faceLight
 
       attr.colors.push(tint[0] * light, tint[1] * light, tint[2] * light)
     }
