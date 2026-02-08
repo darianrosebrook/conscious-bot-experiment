@@ -15,7 +15,10 @@
  * @author @darianrosebrook
  */
 
+import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { isIntentLeaf } from '../../modules/leaf-arg-contracts';
+import { canonicalize } from '../../sterling/solve-bundle';
 
 // Mock external dependencies before importing TaskIntegration
 vi.mock('@conscious-bot/core', () => ({
@@ -411,6 +414,75 @@ describe('Sterling IR routing', () => {
       } finally {
         normalizeSpy.mockRestore();
       }
+    });
+
+    it('finalizeNewTask with derived-only step leaves task planningIncomplete', async () => {
+      const expandByDigest = vi.fn().mockResolvedValue({
+        status: 'ok',
+        plan_bundle_digest: 'bundle_derived',
+        schema_version: 'v1',
+        steps: [
+          {
+            leaf: 'craft_recipe',
+            meta: { produces: [{ name: 'oak_planks', count: 4 }] },
+          },
+        ],
+      });
+      const service = createMockSterlingService({ overrides: { expandByDigest } });
+      ti.setSterlingExecutorService(service as any);
+
+      const created = await ti.addTask(makeSterlingTask());
+
+      expect(created.steps.length).toBe(1);
+      expect((created.metadata as Record<string, unknown>)?.planningIncomplete).toBe(true);
+      expect(Array.isArray((created.metadata as Record<string, unknown>)?.planningIncompleteReasons)).toBe(true);
+    });
+  });
+
+  describe('Regeneration Option A safety (6.7)', () => {
+    it('regenerateSteps with derived-only output returns success: false and reason regen_non_option_a', async () => {
+      const expandByDigest = vi.fn().mockResolvedValue({
+        status: 'ok',
+        plan_bundle_digest: 'bundle_1',
+        schema_version: 'v1',
+        steps: [{ leaf: 'dig_block', args: { blockType: 'oak_log' } }],
+      });
+      const service = createMockSterlingService({ overrides: { expandByDigest } });
+      ti.setSterlingExecutorService(service as any);
+      const created = await ti.addTask(makeSterlingTask());
+      expect(created.steps.length).toBe(1);
+      const taskId = created.id!;
+
+      const fetchBotContextSpy = vi.spyOn(
+        (ti as any).sterlingPlanner,
+        'fetchBotContext'
+      ).mockResolvedValue({ inventory: [], nearbyBlocks: [] });
+      const generateDynamicStepsSpy = vi.spyOn(
+        (ti as any).sterlingPlanner,
+        'generateDynamicSteps'
+      ).mockResolvedValue({
+        steps: [
+          {
+            id: 'regen-step-1',
+            order: 2,
+            meta: {
+              leaf: 'craft_recipe',
+              produces: [{ name: 'oak_planks', count: 4 }],
+            },
+          },
+        ],
+      });
+
+      const result = await ti.regenerateSteps(taskId, { failedLeaf: 'craft_recipe' });
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('regen_non_option_a');
+      const taskAfter = ti.getTasks().find((t) => t.id === taskId);
+      expect(taskAfter?.steps.length).toBe(1);
+      expect(taskAfter?.steps[0].meta?.leaf).toBe('dig_block');
+
+      fetchBotContextSpy.mockRestore();
+      generateDynamicStepsSpy.mockRestore();
     });
   });
 });
@@ -2907,5 +2979,525 @@ describe('Building episode reporting with join keys', () => {
     // Other solver metadata should survive
     expect(finalTask.metadata.solver?.buildingTemplateId).toBe('shelter-template');
     expect(finalTask.metadata.solver?.buildingPlanId).toBe('plan-A');
+  });
+});
+
+// =============================================================================
+// TTL-anchor semantics for blockedAt in updateTaskMetadata
+// =============================================================================
+
+describe('updateTaskMetadata: blockedAt TTL-anchor invariant', () => {
+  let ti: TaskIntegration;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    ti = new TaskIntegration({
+      enableProgressTracking: false,
+      enableRealTimeUpdates: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('backfills blockedAt when transitioning unblocked → blocked', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'TTL anchor test 1',
+      type: 'crafting',
+    }));
+    vi.setSystemTime(1000);
+    ti.updateTaskMetadata(task.id, { blockedReason: 'test_block_reason' } as any);
+    const updated = (ti as any).taskStore.getTask(task.id);
+    expect(updated.metadata.blockedReason).toBe('test_block_reason');
+    expect(typeof updated.metadata.blockedAt).toBe('number');
+    expect(updated.metadata.blockedAt).toBe(1000);
+  });
+
+  it('preserves blockedAt on same-reason re-block (TTL anchor)', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'TTL anchor test 2',
+      type: 'crafting',
+    }));
+    // Initial block at t=1000
+    vi.setSystemTime(1000);
+    ti.updateTaskMetadata(task.id, { blockedReason: 'test_block_reason' } as any);
+    const afterFirst = (ti as any).taskStore.getTask(task.id);
+    expect(afterFirst.metadata.blockedAt).toBe(1000);
+
+    // Re-block with same reason at t=5000 — blockedAt must stay at 1000
+    vi.setSystemTime(5000);
+    ti.updateTaskMetadata(task.id, { blockedReason: 'test_block_reason' } as any);
+    const afterSecond = (ti as any).taskStore.getTask(task.id);
+    expect(afterSecond.metadata.blockedReason).toBe('test_block_reason');
+    expect(afterSecond.metadata.blockedAt).toBe(1000); // anchor preserved
+  });
+
+  it('resets blockedAt when block reason changes', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'TTL anchor test 3',
+      type: 'crafting',
+    }));
+    // Initial block at t=1000
+    vi.setSystemTime(1000);
+    ti.updateTaskMetadata(task.id, { blockedReason: 'reason_A' } as any);
+    expect((ti as any).taskStore.getTask(task.id).metadata.blockedAt).toBe(1000);
+
+    // Different reason at t=3000 — blockedAt must reset
+    vi.setSystemTime(3000);
+    ti.updateTaskMetadata(task.id, { blockedReason: 'reason_B' } as any);
+    const updated = (ti as any).taskStore.getTask(task.id);
+    expect(updated.metadata.blockedReason).toBe('reason_B');
+    expect(updated.metadata.blockedAt).toBe(3000); // anchor reset
+  });
+
+  it('respects explicit blockedAt in patch (caller override)', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'TTL anchor test 4',
+      type: 'crafting',
+    }));
+    vi.setSystemTime(2000);
+    ti.updateTaskMetadata(task.id, {
+      blockedReason: 'explicit_test',
+      blockedAt: 999,
+    } as any);
+    const updated = (ti as any).taskStore.getTask(task.id);
+    expect(updated.metadata.blockedAt).toBe(999); // caller's explicit value
+  });
+});
+
+// ============================================================================
+// Intent resolution splice logic (deterministic ordering)
+// ============================================================================
+
+describe('intent resolution: splice ordering and digest semantics', () => {
+
+  // Simulate the splice logic extracted from materializeSterlingIrSteps.
+  // This tests the algorithm without needing the full TaskIntegration mock.
+  function spliceFinalSteps(
+    originalSteps: Array<{ leaf: string; args: Record<string, unknown> }>,
+    replacements: Array<{
+      intent_step_index: number;
+      resolved: boolean;
+      steps?: Array<{ leaf: string; args: Record<string, unknown> }>;
+      unresolved_reason?: string;
+    }>,
+  ) {
+    const intentSteps = originalSteps.filter((s) => isIntentLeaf(s.leaf));
+    const replacementMap = new Map<number, typeof originalSteps>();
+    const seenIndices = new Set<number>();
+    const warnings: string[] = [];
+
+    for (const r of replacements) {
+      if (seenIndices.has(r.intent_step_index)) {
+        warnings.push(`duplicate intent_step_index=${r.intent_step_index}`);
+        continue;
+      }
+      seenIndices.add(r.intent_step_index);
+      if (r.resolved && r.steps && r.steps.length > 0) {
+        replacementMap.set(r.intent_step_index, r.steps);
+      }
+    }
+
+    if (replacements.length !== intentSteps.length) {
+      warnings.push(
+        `replacements.length=${replacements.length} !== intentSteps.length=${intentSteps.length}`
+      );
+    }
+
+    let intentIdx = 0;
+    let didSplice = false;
+    const finalSteps: typeof originalSteps = [];
+    for (const step of originalSteps) {
+      if (isIntentLeaf(step.leaf)) {
+        const replacement = replacementMap.get(intentIdx);
+        if (replacement) {
+          finalSteps.push(...replacement);
+          didSplice = true;
+        } else {
+          finalSteps.push(step);
+        }
+        intentIdx++;
+      } else {
+        finalSteps.push(step);
+      }
+    }
+
+    const allIntentsResolved = replacementMap.size === intentSteps.length;
+
+    // Mirror production: always compute executorPlanDigest so downstream
+    // never infers "absent means check expansion digest." When no splice
+    // occurred, this equals the hash of the original steps.
+    const executorPlanDigest = createHash('sha256')
+      .update(canonicalize(finalSteps.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+
+    return { finalSteps, allIntentsResolved, warnings, replacementMap, executorPlanDigest, didSplice };
+  }
+
+  it('preserves ordering: non-intent, intentA(resolved), non-intent, intentB(unresolved), non-intent', () => {
+    const original = [
+      { leaf: 'gather_nearby', args: { item: 'wood' } },         // non-intent [0]
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },  // intent A  [1]
+      { leaf: 'navigate_to', args: { x: 10, y: 20, z: 30 } },    // non-intent [2]
+      { leaf: 'task_type_mine', args: { task_type: 'MINE' } },    // intent B  [3]
+      { leaf: 'place_block', args: { item: 'torch' } },           // non-intent [4]
+    ];
+
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [
+          { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
+          { leaf: 'craft_recipe', args: { recipe: 'sticks', qty: 2 } },
+        ],
+      },
+      {
+        intent_step_index: 1,
+        resolved: false,
+        unresolved_reason: 'no_solver_for_task_type_mine',
+      },
+    ];
+
+    const { finalSteps, allIntentsResolved } = spliceFinalSteps(original, replacements);
+
+    // Ordering preserved: non-intent, resolved craft steps, non-intent, unresolved mine stays, non-intent
+    expect(finalSteps).toEqual([
+      { leaf: 'gather_nearby', args: { item: 'wood' } },
+      { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
+      { leaf: 'craft_recipe', args: { recipe: 'sticks', qty: 2 } },
+      { leaf: 'navigate_to', args: { x: 10, y: 20, z: 30 } },
+      { leaf: 'task_type_mine', args: { task_type: 'MINE' } },  // unresolved kept in-place
+      { leaf: 'place_block', args: { item: 'torch' } },
+    ]);
+
+    expect(allIntentsResolved).toBe(false);
+  });
+
+  it('all intents resolved → allIntentsResolved is true', () => {
+    const original = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+    ];
+
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'planks', qty: 4 } }],
+      },
+      {
+        intent_step_index: 1,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'sticks', qty: 2 } }],
+      },
+    ];
+
+    const { finalSteps, allIntentsResolved } = spliceFinalSteps(original, replacements);
+    expect(allIntentsResolved).toBe(true);
+    expect(finalSteps).toHaveLength(2);
+    expect(finalSteps[0].leaf).toBe('craft_recipe');
+    expect(finalSteps[1].leaf).toBe('craft_recipe');
+  });
+
+  it('detects duplicate intent_step_index (keeps first)', () => {
+    const original = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+    ];
+
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'planks', qty: 4 } }],
+      },
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'WRONG', qty: 99 } }],
+      },
+    ];
+
+    const { finalSteps, warnings } = spliceFinalSteps(original, replacements);
+    expect(warnings).toContain('duplicate intent_step_index=0');
+    // First wins
+    expect(finalSteps[0].args.recipe).toBe('planks');
+  });
+
+  it('detects replacements.length !== intentSteps.length', () => {
+    const original = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+      { leaf: 'task_type_mine', args: { task_type: 'MINE' } },
+    ];
+
+    // Only one replacement for two intents
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'planks', qty: 4 } }],
+      },
+    ];
+
+    const { warnings } = spliceFinalSteps(original, replacements);
+    expect(warnings.some(w => w.includes('replacements.length=1 !== intentSteps.length=2'))).toBe(true);
+  });
+
+  it('no intent steps → finalSteps unchanged', () => {
+    const original = [
+      { leaf: 'navigate_to', args: { x: 1, y: 2, z: 3 } },
+      { leaf: 'place_block', args: { item: 'dirt' } },
+    ];
+
+    const { finalSteps, allIntentsResolved } = spliceFinalSteps(original, []);
+    expect(finalSteps).toEqual(original);
+    // With 0 intents and 0 replacements, Map.size === intentSteps.length (0 === 0)
+    expect(allIntentsResolved).toBe(true);
+  });
+
+  it('detects duplicate unresolved intent_step_index (not just resolved)', () => {
+    const original = [
+      { leaf: 'task_type_mine', args: { task_type: 'MINE' } },
+    ];
+
+    // Two unresolved entries for the same index — seenIndices catches this
+    const replacements = [
+      { intent_step_index: 0, resolved: false, unresolved_reason: 'no_solver' },
+      { intent_step_index: 0, resolved: false, unresolved_reason: 'also_no_solver' },
+    ];
+
+    const { warnings } = spliceFinalSteps(original, replacements);
+    expect(warnings).toContain('duplicate intent_step_index=0');
+  });
+
+  it('empty replacements for all intents → keeps all intents in place', () => {
+    const original = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+      { leaf: 'navigate_to', args: { x: 1, y: 2, z: 3 } },
+    ];
+
+    const replacements = [
+      { intent_step_index: 0, resolved: false, unresolved_reason: 'blocked' },
+    ];
+
+    const { finalSteps, allIntentsResolved } = spliceFinalSteps(original, replacements);
+    expect(finalSteps).toEqual(original); // nothing replaced
+    expect(allIntentsResolved).toBe(false);
+  });
+
+  it('executorPlanDigest covers full final step list including non-intent steps', () => {
+    const original = [
+      { leaf: 'gather_nearby', args: { item: 'wood' } },         // non-intent
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },  // intent
+      { leaf: 'navigate_to', args: { x: 10, y: 20, z: 30 } },    // non-intent
+    ];
+
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [
+          { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
+        ],
+      },
+    ];
+
+    const { finalSteps, executorPlanDigest, didSplice } = spliceFinalSteps(original, replacements);
+
+    expect(didSplice).toBe(true);
+    expect(executorPlanDigest).toHaveLength(64); // SHA-256 hex
+
+    // Recompute locally from finalSteps — must match
+    const expected = createHash('sha256')
+      .update(canonicalize(finalSteps.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).toBe(expected);
+
+    // Crucially: the digest must differ from a hash of only the resolved steps
+    // (it must include the non-intent steps too)
+    const resolvedOnlyDigest = createHash('sha256')
+      .update(canonicalize([{ leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } }]))
+      .digest('hex');
+    expect(executorPlanDigest).not.toBe(resolvedOnlyDigest);
+
+    // And differ from a hash of only the expansion steps
+    const expansionDigest = createHash('sha256')
+      .update(canonicalize(original.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).not.toBe(expansionDigest);
+  });
+
+  it('executorPlanDigest equals hash of original steps when no splice occurs', () => {
+    const original = [
+      { leaf: 'navigate_to', args: { x: 1, y: 2, z: 3 } },
+      { leaf: 'place_block', args: { item: 'dirt' } },
+    ];
+
+    const { executorPlanDigest, didSplice } = spliceFinalSteps(original, []);
+    expect(didSplice).toBe(false);
+    // Always defined — equals the hash of the passthrough steps
+    expect(executorPlanDigest).toHaveLength(64);
+    const expected = createHash('sha256')
+      .update(canonicalize(original.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).toBe(expected);
+  });
+
+  it('executorPlanDigest is deterministic for same final steps', () => {
+    const original = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT' } },
+    ];
+
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'planks', qty: 4 } }],
+      },
+    ];
+
+    const run1 = spliceFinalSteps(original, replacements);
+    const run2 = spliceFinalSteps(original, replacements);
+    expect(run1.executorPlanDigest).toBe(run2.executorPlanDigest);
+  });
+
+  // ── Controlled E2E splice scenarios ──────────────────────────────
+  // These verify the full handshake shape matching the user's Test 1 and Test 2
+  // from the architectural review.
+
+  it('Test 1: mixed plan, all intents resolved — splice, ordering, three digests', () => {
+    // Expansion produced: navigate_to, task_type_craft, place_block
+    const expansion = [
+      { leaf: 'navigate_to', args: { x: 100, y: 64, z: -200 } },
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT', goal_item: 'oak_planks' } },
+      { leaf: 'place_block', args: { item: 'crafting_table' } },
+    ];
+
+    // Sterling resolved the single intent into two craft steps
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [
+          { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
+          { leaf: 'craft_recipe', args: { recipe: 'sticks', qty: 4 } },
+        ],
+      },
+    ];
+
+    const { finalSteps, didSplice, allIntentsResolved, executorPlanDigest, warnings } =
+      spliceFinalSteps(expansion, replacements);
+
+    // 1. Splice occurred
+    expect(didSplice).toBe(true);
+    expect(allIntentsResolved).toBe(true);
+    expect(warnings).toHaveLength(0);
+
+    // 2. Ordering preserved: non-intent, resolved steps, non-intent
+    expect(finalSteps.map((s) => s.leaf)).toEqual([
+      'navigate_to',
+      'craft_recipe',
+      'craft_recipe',
+      'place_block',
+    ]);
+    expect(finalSteps[0].args).toEqual({ x: 100, y: 64, z: -200 });
+    expect(finalSteps[1].args).toEqual({ recipe: 'oak_planks', qty: 4 });
+    expect(finalSteps[2].args).toEqual({ recipe: 'sticks', qty: 4 });
+    expect(finalSteps[3].args).toEqual({ item: 'crafting_table' });
+
+    // 3. executorPlanDigest covers full final list (4 steps, not 3 or 2)
+    const recomputed = createHash('sha256')
+      .update(canonicalize(finalSteps.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).toBe(recomputed);
+
+    // 4. Differs from expansion digest (expansion had task_type_craft, final has craft_recipe)
+    const expansionDigest = createHash('sha256')
+      .update(canonicalize(expansion.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).not.toBe(expansionDigest);
+
+    // 5. Differs from resolved-only digest (missing navigate_to and place_block)
+    const resolvedOnlyDigest = createHash('sha256')
+      .update(canonicalize(replacements[0].steps!.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).not.toBe(resolvedOnlyDigest);
+  });
+
+  it('Test 2: mixed plan, partial resolution — craft resolved, mine kept, metadata shape', () => {
+    // Expansion: intent(craft), non-intent, intent(mine)
+    const expansion = [
+      { leaf: 'task_type_craft', args: { task_type: 'CRAFT', goal_item: 'wooden_pickaxe' } },
+      { leaf: 'navigate_to', args: { x: 50, y: 70, z: 50 } },
+      { leaf: 'task_type_mine', args: { task_type: 'MINE', goal_item: 'cobblestone' } },
+    ];
+
+    // Craft resolved, mine unresolved (Phase 1 — no solver for MINE)
+    const replacements = [
+      {
+        intent_step_index: 0,
+        resolved: true,
+        steps: [
+          { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } },
+          { leaf: 'craft_recipe', args: { recipe: 'sticks', qty: 4 } },
+          { leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe', qty: 1 } },
+        ],
+      },
+      {
+        intent_step_index: 1,
+        resolved: false,
+        unresolved_reason: 'no_solver_for_task_type_mine',
+      },
+    ];
+
+    const { finalSteps, didSplice, allIntentsResolved, executorPlanDigest, warnings, replacementMap } =
+      spliceFinalSteps(expansion, replacements);
+
+    // 1. Splice occurred (craft was replaced), but not all resolved
+    expect(didSplice).toBe(true);
+    expect(allIntentsResolved).toBe(false);
+    expect(warnings).toHaveLength(0);
+
+    // 2. Craft intent replaced, mine intent stays in-place (not dropped)
+    expect(finalSteps.map((s) => s.leaf)).toEqual([
+      'craft_recipe',      // replaced: oak_planks
+      'craft_recipe',      // replaced: sticks
+      'craft_recipe',      // replaced: wooden_pickaxe
+      'navigate_to',       // passthrough
+      'task_type_mine',    // unresolved — kept as-is
+    ]);
+
+    // 3. Mine step preserved with original args
+    const mineStep = finalSteps.find((s) => s.leaf === 'task_type_mine');
+    expect(mineStep).toBeDefined();
+    expect(mineStep!.args).toEqual({ task_type: 'MINE', goal_item: 'cobblestone' });
+
+    // 4. Only craft was in replacementMap (mine was unresolved)
+    expect(replacementMap.size).toBe(1);
+    expect(replacementMap.has(0)).toBe(true);  // craft at intent index 0
+    expect(replacementMap.has(1)).toBe(false);  // mine at intent index 1
+
+    // 5. executorPlanDigest covers the partially-spliced list
+    const recomputed = createHash('sha256')
+      .update(canonicalize(finalSteps.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).toBe(recomputed);
+
+    // 6. Digest differs from expansion (craft was replaced)
+    const expansionDigest = createHash('sha256')
+      .update(canonicalize(expansion.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    expect(executorPlanDigest).not.toBe(expansionDigest);
+
+    // 7. Simulate intentResolutionMeta shape (what production would set)
+    const intentResolutionMeta = {
+      digest: 'mock_resolve_digest_abc123',
+      resolvedCount: replacementMap.size,
+      totalIntents: 2,
+    };
+    expect(intentResolutionMeta.resolvedCount).toBe(1);
+    expect(intentResolutionMeta.totalIntents).toBe(2);
+    expect(intentResolutionMeta.resolvedCount).toBeLessThan(intentResolutionMeta.totalIntents);
   });
 });

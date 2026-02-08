@@ -325,7 +325,16 @@ export class SterlingPlanner {
       try {
         const esmRequire = createRequire(import.meta.url);
         const mcDataLoader = esmRequire('minecraft-data');
-        this._mcDataCache = mcDataLoader(process.env.MINECRAFT_VERSION || '1.21.4');
+        const requestedVersion = process.env.MINECRAFT_VERSION || '1.21.4';
+        this._mcDataCache = mcDataLoader(requestedVersion);
+        if (!this._mcDataCache) {
+          // minecraft-data doesn't have this version — fall back to nearest known
+          const fallback = '1.21.4';
+          console.warn(
+            `minecraft-data has no data for ${requestedVersion}, falling back to ${fallback}`
+          );
+          this._mcDataCache = mcDataLoader(fallback);
+        }
       } catch (err) {
         console.warn(
           'minecraft-data not available for Sterling solvers:',

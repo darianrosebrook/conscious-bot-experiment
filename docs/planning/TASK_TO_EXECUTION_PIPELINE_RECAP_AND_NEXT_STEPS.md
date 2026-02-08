@@ -546,7 +546,7 @@ pnpm --filter planning test -- --run src/executor/__tests__/sterling-step-execut
 pnpm --filter planning exec -- tsc --noEmit
 ```
 
-To pick up the pipeline: 6.1 is done (step-author inventory documented; unknown-leaf test and executor planningIncomplete-before-leaf check in place). Optionally do 6.3–6.7 for explainability and artifact usability.
+To pick up the pipeline: 6.1–6.4 are done. Three-digest truth model is wired and tested (122/122 tests). Direct Solver (Path A) proven end-to-end with live bot. Next priorities: Sterling IR live E2E (Path B), stuck-task re-plan trigger, optionally 6.5–6.7.
 
 ---
 
@@ -570,3 +570,94 @@ So wiring is complete. To **test the full pipeline** (planning to real bot):
 - Task with Option A steps (or shadow-first proof per `docs/planning/golden-run-runbook.md`).
 
 Recommended: run **shadow proof first** (runbook: `run-golden-reduce`, artifact with `execution.shadow_steps` or `executor_blocked_reason`), then enable live + bot for a single task and confirm one step reaches the bot.
+
+---
+
+## 10. Three-Digest Truth Model (Intent Resolution Pipeline)
+
+### Architecture
+
+The Sterling IR pipeline (`materializeSterlingIrSteps`) now produces three content-addressed digests:
+
+```
+expand_by_digest_v1  →  intent steps  [task_type_craft, {proposition_id, lemma}]
+        ↓                              expansionDigest (SHA-256, never overwritten)
+resolve_intent_steps  →  executable steps  [craft_recipe, {recipe: "oak_planks", qty: 4}]
+        ↓                              intentResolutionDigest (SHA-256, resolved steps only)
+splice into final plan  →  finalSteps  [navigate_to, craft_recipe, place_block]
+                                       executorPlanDigest (SHA-256, always defined)
+```
+
+| Digest | Scope | When computed | Mutability |
+|--------|-------|---------------|------------|
+| `expansionDigest` | Raw expansion output from `expand_by_digest` | After expansion response | Never overwritten |
+| `intentResolutionDigest` | Only the resolved intent replacement steps | After `resolve_intent_steps` | Never overwritten |
+| `executorPlanDigest` | Full final step list the executor will run | Always, unconditionally | Recomputed if steps change |
+
+**Key invariant:** `executorPlanDigest` is always defined. It represents "what will run." When no intent splice occurred, it equals the hash of the expansion steps directly (same content, same canonical form). This eliminates brittle inference of "digest absent means check expansion digest."
+
+### Intent Splicing
+
+`materializeSterlingIrSteps` walks the expansion plan:
+- Non-intent steps (e.g. `navigate_to`, `place_block`) pass through unchanged.
+- Intent leaves (e.g. `task_type_craft`) are replaced by their resolved equivalents (e.g. `craft_recipe { recipe: "oak_planks", qty: 4 }`).
+- A `didSplice` boolean tracks whether any replacement actually occurred.
+- `replacementMap` tracks per-intent-index → resolved steps for partial resolution scenarios.
+
+### Canonicalization
+
+All digests use `canonicalize()` from `sterling/solve-bundle.ts` for deterministic JSON serialization (sorted keys, stable ordering). The digest input is `finalSteps.map(s => ({ leaf: s.leaf, args: s.args }))` — only the leaf name and args, not metadata or ordering hints.
+
+### Golden-Run Recorder
+
+`GoldenRunReport.expansion` type now includes:
+- `executor_plan_digest?: string` — SHA-256 of the final step list
+- `intent_resolution_digest?: string` — SHA-256 of resolved intent steps only
+
+Production code writes these via the recorder after intent resolution completes.
+
+---
+
+## 11. Live E2E Proof: Direct Solver (Path A)
+
+### Test Setup
+
+- `pnpm start` with all 10 services (planning, cognition, minecraft-interface, sterling, etc.)
+- Bot given 16 oak_log via `rcon-cli "give BotSterling oak_log 16"`
+- Task posted: `POST /task` with `{ title: "Craft 4 oak planks", requirementCandidate: { type: "craft", item: "oak_planks", count: 4 } }`
+
+### Result
+
+Task completed end-to-end through the Direct Solver pipeline:
+
+```
+POST /task → generateDynamicSteps → mcData fallback (1.21.9→1.21.4)
+  → MinecraftCraftingSolver → craft_recipe { recipe: "oak_planks", qty: 4 }
+  → normalizeTaskStepsToOptionA (argsSource: explicit) → executor dispatch
+  → bot crafts oak_planks → task completed (2083ms)
+```
+
+Evidence:
+- `craftingPlanId: "f3ca2bcd943f8c83"`
+- Step: `craft_recipe { recipe: "oak_planks", qty: 4 }` with `meta.executable: true`
+- Full observability: `bundleHash`, `traceBundleHash`, `stepsDigest`, `solveJoinKeys`
+- `requirement.have: 4, requirement.needed: 0` → task completed
+
+### mcData Version Fallback
+
+`minecraft-data` npm package returns null for version 1.21.9 (only supports up to 1.21.4). `getMcData()` in `sterling-planner.ts` now falls back:
+
+```ts
+this._mcDataCache = mcDataLoader(requestedVersion);
+if (!this._mcDataCache) {
+  const fallback = '1.21.4';
+  console.warn(`minecraft-data has no data for ${requestedVersion}, falling back to ${fallback}`);
+  this._mcDataCache = mcDataLoader(fallback);
+}
+```
+
+### Known Gaps
+
+- **Path B (Sterling IR) live E2E not yet proven:** Requires `sterling_ir` task from thought-to-task conversion.
+- **Stuck tasks:** Tasks with `solver-unsolved` and 0 steps are permanently ineligible — no re-plan trigger when inventory changes (`task-block-evaluator.ts:134-137`).
+- **Goal endpoint:** `POST /goal` doesn't call `inferRequirementFromEndpointParams`, so tasks created via goals get `requirement: null` and route to `unplannable`. Use `POST /task` with `requirementCandidate` instead.

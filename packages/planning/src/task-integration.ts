@@ -87,6 +87,10 @@ import {
   normalizeTaskStepsToOptionA,
   type TaskWithSteps,
 } from './modules/step-option-a-normalizer';
+import { createHash } from 'node:crypto';
+import { isIntentLeaf } from './modules/leaf-arg-contracts';
+import { buildCraftingRules } from './sterling/minecraft-crafting-rules';
+import { canonicalize } from './sterling/solve-bundle';
 
 const PLANNING_INGEST_DEBUG_400 =
   process.env.PLANNING_INGEST_DEBUG_400 === '1';
@@ -1899,7 +1903,19 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private async materializeSterlingIrSteps(
     taskData: Partial<Task>
   ): Promise<
-    | { outcome: 'ok'; steps: TaskStep[]; planBundleDigest?: string; schemaVersion?: string; requestId: string }
+    | {
+        outcome: 'ok';
+        steps: TaskStep[];
+        planBundleDigest?: string;
+        executorPlanDigest: string;
+        intentResolution?: {
+          digest: string;
+          resolvedCount: number;
+          totalIntents: number;
+        };
+        schemaVersion?: string;
+        requestId: string;
+      }
     | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
     | { outcome: 'error'; error: string; requestId: string }
   > {
@@ -2013,7 +2029,152 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       };
     }
 
-    const steps: TaskStep[] = response.steps.map((step, index) => ({
+    // ── Intent leaf resolution ──────────────────────────────────────────
+    // Check if any expanded steps are intent leaves (e.g. task_type_craft).
+    // If so, resolve them to executor-native leaves via Sterling's domain solver.
+    // Uses per-intent replacement mapping for deterministic splicing.
+    const hasIntentLeaves = response.steps.some((s) => isIntentLeaf(s.leaf));
+    let finalSteps = response.steps;
+    // expansionDigest: always the digest from expand_by_digest — never overwritten.
+    const expansionDigest = response.plan_bundle_digest;
+    // intentResolutionMeta: populated only when intent resolution runs.
+    let intentResolutionMeta: { digest: string; resolvedCount: number; totalIntents: number } | undefined;
+
+    if (hasIntentLeaves && this.sterlingExecutorService && process.env.STERLING_INTENT_RESOLVE !== '0') {
+      const intentSteps = response.steps.filter((s) => isIntentLeaf(s.leaf));
+
+      // Guard: only attempt resolution when we have inputs the solver needs.
+      // Without rules (requires requirement.item + mcData), Sterling will
+      // return "blocked: no_rules_provided" — skip the round-trip entirely.
+      const mcData = this.getMcData();
+      const goalItem = (taskData.metadata as any)?.requirement?.item as string | undefined;
+      const canResolve = !!(mcData && goalItem);
+
+      if (!canResolve) {
+        console.log(
+          `[Sterling] Skipping intent resolution: ${!mcData ? 'no mcData' : 'no requirement.item'} — keeping ${intentSteps.length} intent step(s) as-is`
+        );
+      } else {
+        try {
+          const botCtx = await this.fetchBotContext();
+          const inventory = this.buildInventoryIndex(botCtx.inventory);
+          const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
+            ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
+            : [];
+
+          const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+
+          const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
+            {
+              intent_steps: intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
+              world_state: { inventory, nearby_blocks: nearbyBlocks },
+              rules,
+              schema_version: schemaVersion,
+              request_id: `${requestId}_resolve`,
+            },
+            expandTimeoutMs,
+          );
+
+          if (resolveResponse.status === 'ok') {
+            const replacements = resolveResponse.replacements;
+
+            // Build an index: intent_step_index → replacement steps.
+            // Use a separate seenIndices set to detect ALL duplicates
+            // (resolved or unresolved), not just resolved-only collisions.
+            const replacementMap = new Map<number, typeof response.steps>();
+            const seenIndices = new Set<number>();
+            let totalResolved = 0;
+            for (const r of replacements) {
+              if (seenIndices.has(r.intent_step_index)) {
+                console.warn(
+                  `[Sterling] Contract violation: duplicate intent_step_index=${r.intent_step_index} in replacements — keeping first`
+                );
+                continue;
+              }
+              seenIndices.add(r.intent_step_index);
+              if (r.resolved && r.steps && r.steps.length > 0) {
+                replacementMap.set(r.intent_step_index, r.steps);
+                totalResolved += r.steps.length;
+              }
+            }
+
+            if (replacements.length !== intentSteps.length) {
+              console.warn(
+                `[Sterling] Contract violation: replacements.length=${replacements.length} !== intentSteps.length=${intentSteps.length}`
+              );
+            }
+
+            if (totalResolved > 0) {
+              // Deterministic splice: walk original steps in order. For each
+              // intent step, look up its replacement by index. Non-intent steps
+              // pass through unchanged. Unresolved intent steps stay as-is
+              // (executor handles them via shadow/blocked path).
+              let intentIdx = 0;
+              finalSteps = [];
+              for (const step of response.steps) {
+                if (isIntentLeaf(step.leaf)) {
+                  const replacement = replacementMap.get(intentIdx);
+                  if (replacement) {
+                    finalSteps.push(...replacement);
+                  } else {
+                    // Unresolved — keep original intent step
+                    finalSteps.push(step);
+                  }
+                  intentIdx++;
+                } else {
+                  finalSteps.push(step);
+                }
+              }
+
+              // Track intent resolution metadata for the caller to persist.
+              // Never overwrite the expansion digest — it covers the original
+              // expanded plan. The intent resolution digest covers only resolved
+              // replacement steps. The executor plan digest (computed below)
+              // covers the actual finalSteps being executed.
+              intentResolutionMeta = {
+                digest: resolveResponse.plan_bundle_digest,
+                resolvedCount: replacementMap.size,
+                totalIntents: intentSteps.length,
+              };
+              console.log(
+                `[Sterling] Resolved ${replacementMap.size}/${intentSteps.length} intent step(s) → ${totalResolved} executable step(s)`
+              );
+            } else {
+              console.log(
+                `[Sterling] Intent resolution returned ok but no steps resolved — keeping intent steps as-is`
+              );
+            }
+          } else {
+            // Resolution failed/blocked — log but continue with intent steps
+            const reason = resolveResponse.status === 'blocked'
+              ? resolveResponse.blocked_reason
+              : resolveResponse.status === 'error'
+                ? resolveResponse.error
+                : 'unknown';
+            console.log(
+              `[Sterling] Intent resolution ${resolveResponse.status}: ${reason} — keeping ${intentSteps.length} intent step(s) as-is`
+            );
+          }
+        } catch (err) {
+          console.warn(
+            '[Sterling] Intent resolution error — keeping intent steps as-is:',
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+    }
+
+    // Compute executor plan digest: SHA-256 of the canonical JSON of the
+    // final step list being executed. Always defined so downstream code
+    // never needs to infer "digest absent means check expansion digest."
+    // When no splice occurred, this equals what you'd get hashing the
+    // expansion steps directly (same content, same canonical form).
+    const executorPlanDigest = createHash('sha256')
+      .update(canonicalize(finalSteps.map((s) => ({ leaf: s.leaf, args: s.args }))))
+      .digest('hex');
+    // ── End intent leaf resolution ───────────────────────────────────────
+
+    const steps: TaskStep[] = finalSteps.map((step, index) => ({
       id: step.id ?? `sterling-step-${index + 1}`,
       label: step.id ? `Leaf: ${step.leaf}` : `Leaf: ${step.leaf}`,
       done: false,
@@ -2031,9 +2192,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     recordExpansion({
       request_id: requestId,
       status: 'ok',
-      plan_bundle_digest: response.plan_bundle_digest,
+      plan_bundle_digest: expansionDigest,
+      executor_plan_digest: executorPlanDigest,
+      intent_resolution_digest: intentResolutionMeta?.digest,
       schema_version: response.schema_version ?? schemaVersion,
-      steps: response.steps.map((step, index) => ({
+      steps: finalSteps.map((step, index) => ({
         id: step.id ?? `sterling-step-${index + 1}`,
         leaf: step.leaf,
         order: step.order ?? index + 1,
@@ -2044,7 +2207,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return {
       outcome: 'ok',
       steps,
-      planBundleDigest: response.plan_bundle_digest,
+      planBundleDigest: expansionDigest,
+      executorPlanDigest,
+      intentResolution: intentResolutionMeta,
       schemaVersion: response.schema_version ?? schemaVersion,
       requestId,
     };
@@ -2093,7 +2258,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       | undefined;
     let steps: TaskStep[] = [];
     let sterlingExpansion:
-      | { outcome: 'ok'; steps: TaskStep[]; planBundleDigest?: string; schemaVersion?: string; requestId: string }
+      | {
+          outcome: 'ok';
+          steps: TaskStep[];
+          planBundleDigest?: string;
+          executorPlanDigest: string;
+          intentResolution?: { digest: string; resolvedCount: number; totalIntents: number };
+          schemaVersion?: string;
+          requestId: string;
+        }
       | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string }
       | { outcome: 'error'; error: string; requestId: string }
       | undefined;
@@ -2201,20 +2374,35 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     if (isSterlingIr && sterlingExpansion) {
       task.metadata.sterling ??= {};
-      (task.metadata.sterling as any).exec = {
-        requestId: sterlingExpansion.requestId,
-        status: sterlingExpansion.outcome,
-        state:
-          sterlingExpansion.outcome === 'ok'
-            ? 'expanded'
-            : sterlingExpansion.outcome === 'blocked'
-              ? 'blocked'
-              : 'error',
-        planBundleDigest: sterlingExpansion.outcome === 'ok' ? sterlingExpansion.planBundleDigest : undefined,
-        schemaVersion: sterlingExpansion.outcome === 'ok' ? sterlingExpansion.schemaVersion : undefined,
-        blockedReason: sterlingExpansion.outcome === 'blocked' ? sterlingExpansion.reason : undefined,
-        error: sterlingExpansion.outcome === 'error' ? sterlingExpansion.error : undefined,
-      };
+      // Three-digest model persisted under sterling.exec:
+      // planBundleDigest: expansion digest from expand_by_digest (covers original expanded plan)
+      // executorPlanDigest: SHA-256 of final spliced step list (covers what executor actually runs)
+      // intentResolution: digest + counts from resolve_intent_steps (covers replacement steps only)
+      if (sterlingExpansion.outcome === 'ok') {
+        (task.metadata.sterling as any).exec = {
+          requestId: sterlingExpansion.requestId,
+          status: 'ok',
+          state: 'expanded',
+          planBundleDigest: sterlingExpansion.planBundleDigest,
+          executorPlanDigest: sterlingExpansion.executorPlanDigest,
+          intentResolution: sterlingExpansion.intentResolution,
+          schemaVersion: sterlingExpansion.schemaVersion,
+        };
+      } else if (sterlingExpansion.outcome === 'blocked') {
+        (task.metadata.sterling as any).exec = {
+          requestId: sterlingExpansion.requestId,
+          status: 'blocked',
+          state: 'blocked',
+          blockedReason: sterlingExpansion.reason,
+        };
+      } else {
+        (task.metadata.sterling as any).exec = {
+          requestId: sterlingExpansion.requestId,
+          status: 'error',
+          state: 'error',
+          error: sterlingExpansion.error,
+        };
+      }
       if (sterlingExpansion.outcome === 'blocked') {
         applyTaskBlock(task, sterlingExpansion.reason, {
           status: 'pending_planning',
@@ -2274,9 +2462,25 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         `[TaskIntegration] updateTaskMetadata: origin field ignored for task ${taskId}; origin is immutable after creation`
       );
     }
+    // Invariant: blockedReason and blockedAt must be set together.
+    // TTL-anchor semantics: blockedAt means "when this block episode started."
+    // If the task is already blocked with the same reason and has a numeric
+    // blockedAt, preserve the original anchor so TTL expiry counts from the
+    // first block, not from the latest re-affirmation. Only reset blockedAt
+    // when the reason changes or the task transitions unblocked → blocked.
+    let patchWithBlockedAt = safeMetadata;
+    if (safeMetadata.blockedReason != null && safeMetadata.blockedAt == null) {
+      const existingMeta = task.metadata ?? {};
+      const sameReason = existingMeta.blockedReason === safeMetadata.blockedReason;
+      const hasAnchor = typeof existingMeta.blockedAt === 'number';
+      patchWithBlockedAt = {
+        ...safeMetadata,
+        blockedAt: sameReason && hasAnchor ? existingMeta.blockedAt : Date.now(),
+      };
+    }
     task.metadata = {
       ...task.metadata,
-      ...safeMetadata,
+      ...patchWithBlockedAt,
       updatedAt: Date.now(),
     };
     this.taskStore.setTask(task);
@@ -3472,13 +3676,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   }
 
   /**
-   * Get all active tasks
+   * Get all active tasks (including pending_planning so GET /tasks shows sterling_ir tasks awaiting step expansion).
    */
   getActiveTasks(): Task[] {
-    // Return active/pending tasks sorted by priority (desc) then createdAt (asc)
     return this.taskStore
       .getAllTasks()
-      .filter((task) => task.status === 'active' || task.status === 'pending')
+      .filter(
+        (task) =>
+          task.status === 'active' ||
+          task.status === 'pending' ||
+          task.status === 'pending_planning'
+      )
       .sort((a, b) => {
         if (a.priority !== b.priority) return b.priority - a.priority;
         return (a.metadata.createdAt || 0) - (b.metadata.createdAt || 0);
@@ -4030,7 +4238,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       reason?: string;
       feasibilityRejections?: string;
     }
-  ): Promise<{ success: boolean; stepsDigest?: string; steps?: any[] }> {
+  ): Promise<{
+    success: boolean;
+    stepsDigest?: string;
+    steps?: any[];
+    reason?: 'regen_non_option_a' | string;
+  }> {
     const task = this.taskStore.getTask(taskId);
     if (!task) return { success: false };
 
@@ -4073,8 +4286,23 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       ...task.steps.filter((s) => s.done),
       ...newSteps.map((s, i) => ({ ...s, order: doneCount + i + 1 })),
     ];
+
+    // Option A safety: normalize on a copy first; if planningIncomplete, do not persist
+    const tempTask: Task = {
+      ...task,
+      steps: updatedSteps,
+      metadata: { ...task.metadata },
+    };
+    normalizeTaskStepsToOptionA(tempTask as TaskWithSteps);
+    if ((tempTask.metadata as Record<string, unknown>)?.planningIncomplete === true) {
+      return {
+        success: false,
+        reason: 'regen_non_option_a',
+      };
+    }
+
     task.steps = updatedSteps;
-    normalizeTaskStepsToOptionA(task as TaskWithSteps);
+    task.metadata = tempTask.metadata;
     this.taskStore.setTask(task);
 
     return { success: true, stepsDigest: digest, steps: updatedSteps };

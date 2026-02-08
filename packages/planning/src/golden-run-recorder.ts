@@ -65,6 +65,7 @@ export type GoldenRunReport = {
     task_id?: string;
     dedupe_key?: string | null;
     status?: string;
+    title?: string;
     /** True when addTask returned an existing task (sterling_ir dedupe). */
     dedupe_hit?: boolean;
     /** Task id returned (same as task_id when dedupe_hit). */
@@ -76,6 +77,10 @@ export type GoldenRunReport = {
     request_id?: string;
     status?: 'ok' | 'blocked' | 'error';
     plan_bundle_digest?: string;
+    /** SHA-256 of canonical JSON of the final step list the executor will run. */
+    executor_plan_digest?: string;
+    /** SHA-256 covering only the resolved intent replacement steps. */
+    intent_resolution_digest?: string;
     schema_version?: string;
     blocked_reason?: string;
     error?: string;
@@ -133,6 +138,9 @@ const RUN_STALE_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Max length of execution.decisions so artifact stays bounded. */
 const MAX_DECISIONS = 200;
+
+/** Max entries in taskId -> latestRunId index. Evict oldest (insertion order) when exceeded. */
+const MAX_TASK_INDEX_ENTRIES = 500;
 
 /** Keys omitted from payload fingerprint so timestamp noise does not defeat idempotency. */
 const FINGERPRINT_NOISE_KEYS = new Set([
@@ -313,6 +321,8 @@ export class GoldenRunRecorder {
     string,
     { at: number; payloadFingerprint: string }
   >();
+  /** taskId -> latestRunId for O(1) lookup. Bounded; evict oldest when exceeded. */
+  private taskIdToLatestRunId = new Map<string, string>();
 
   constructor(baseDir: string = DEFAULT_BASE_DIR) {
     this.baseDir = baseDir;
@@ -380,6 +390,17 @@ export class GoldenRunRecorder {
     }
   }
 
+  private updateTaskIndex(taskId: string, runId: string): void {
+    if (!taskId) return;
+    const safeRunId = sanitizeRunId(runId);
+    this.taskIdToLatestRunId.delete(taskId);
+    this.taskIdToLatestRunId.set(taskId, safeRunId);
+    while (this.taskIdToLatestRunId.size > MAX_TASK_INDEX_ENTRIES) {
+      const oldest = this.taskIdToLatestRunId.keys().next().value;
+      if (oldest !== undefined) this.taskIdToLatestRunId.delete(oldest);
+    }
+  }
+
   private update(runId: string, patch: Record<string, unknown>): void {
     try {
       const report = this.ensureRun(runId);
@@ -389,6 +410,8 @@ export class GoldenRunRecorder {
       if (Array.isArray(exec?.decisions) && exec.decisions.length > MAX_DECISIONS) {
         exec.decisions = exec.decisions.slice(-MAX_DECISIONS);
       }
+      const taskId = (merged as GoldenRunReport).task?.task_id;
+      if (taskId) this.updateTaskIndex(taskId, runId);
       const safeRunId = sanitizeRunId(runId);
       this.runs.set(safeRunId, merged as GoldenRunReport);
       this.queueWrite(safeRunId, merged as GoldenRunReport);
@@ -505,8 +528,48 @@ export class GoldenRunRecorder {
   }
 
   /**
+   * Record a regeneration attempt (6.7 Option A safety).
+   * Appends a decision: reason 'regen_success' or failure reason (e.g. 'regen_non_option_a').
+   */
+  recordRegenerationAttempt(
+    runId: string,
+    data: { success: boolean; reason?: string }
+  ): void {
+    if (!runId) return;
+    const reason = data.success ? 'regen_success' : (data.reason ?? 'regen_failed');
+    const decision: ExecutionDecision = { reason, ts: Date.now() };
+    this.update(runId, {
+      execution: {
+        decisions: [decision],
+      },
+    });
+  }
+
+  /**
+   * Record leaf rewrite used (6.6 dig_block quarantine: allow-but-measure).
+   * Appends a decision so rewrite usage is auditable and retirable.
+   */
+  recordLeafRewriteUsed(
+    runId: string,
+    payload: { leaf: string; originalLeaf: string }
+  ): void {
+    if (!runId) return;
+    const decision: ExecutionDecision = {
+      leaf: payload.leaf,
+      reason: 'rewrite_used',
+      ts: Date.now(),
+    };
+    this.update(runId, {
+      execution: {
+        decisions: [decision],
+      },
+    });
+  }
+
+  /**
    * Record why executor did not dispatch (so the artifact explains empty dispatched_steps).
    * Idempotency: if same (runId, reason, leaf) and equivalent payload within BLOCKED_THROTTLE_MS, skip write to avoid I/O storm.
+   * When taskId is provided, merges task.task_id so the taskId index is updated even when this is the first write for the run.
    */
   recordExecutorBlocked(
     runId: string,
@@ -517,7 +580,8 @@ export class GoldenRunRecorder {
       validation_error?: string;
       original_leaf?: string;
       [k: string]: unknown;
-    }
+    },
+    taskId?: string
   ): void {
     if (!runId) return;
     const key = blockedEventKey(runId, reason, payload?.leaf);
@@ -538,7 +602,7 @@ export class GoldenRunRecorder {
       reason,
       ts: now,
     };
-    this.update(runId, {
+    const patch: Record<string, unknown> = {
       execution: {
         decisions: [decision],
         executor_blocked_reason: reason,
@@ -546,7 +610,9 @@ export class GoldenRunRecorder {
           ? { executor_blocked_payload: payload }
           : {}),
       },
-    });
+    };
+    if (taskId) patch.task = { task_id: taskId };
+    this.update(runId, patch);
   }
 
   /** Return report from in-memory cache (with loop_started derived from evidence), or null if not found. */
@@ -554,6 +620,22 @@ export class GoldenRunRecorder {
     const safeRunId = sanitizeRunId(runId);
     const report = this.runs.get(safeRunId) ?? null;
     return report ? deriveLoopStarted(report) : null;
+  }
+
+  /**
+   * Return latest report for taskId (O(1) via taskId -> latestRunId index).
+   * Returns null if taskId has no known run or run was evicted.
+   */
+  getLatestReportByTaskId(taskId: string): GoldenRunReport | null {
+    if (!taskId) return null;
+    const runId = this.taskIdToLatestRunId.get(taskId);
+    if (!runId) return null;
+    const report = this.runs.get(runId) ?? null;
+    if (!report) {
+      this.taskIdToLatestRunId.delete(taskId);
+      return null;
+    }
+    return deriveLoopStarted(report);
   }
 
   /** Read report from disk (for dev artifact fetch). Returns null if file missing or invalid. Applies loop_started derivation. */
