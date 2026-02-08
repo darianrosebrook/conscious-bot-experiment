@@ -15,12 +15,25 @@ import type {
   KeepAliveThought,
 } from '@conscious-bot/cognition';
 import { getDefaultLanguageIOClient } from '@conscious-bot/cognition';
-import crypto from 'crypto';
+import crypto, { createHash } from 'crypto';
 import { getGoldenRunRecorder } from '../golden-run-recorder';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+/**
+ * Decision code from idle episode emission attempt.
+ * Makes suppression reasons inspectable without log archaeology.
+ */
+export type IdleEpisodeDecision =
+  | 'emitted_executable'
+  | 'emitted_blocked'
+  | 'emitted_error'
+  | 'suppressed_in_flight'
+  | 'suppressed_lease_cooldown'
+  | 'suppressed_hourly_cap'
+  | 'suppressed_pending_planning';
 
 /**
  * Configuration for keep-alive integration.
@@ -120,6 +133,13 @@ export class KeepAliveIntegration {
   private recentConversions: number[] = [];
   private recentConversionWindowMs = 30_000;
 
+  // ── Idle episode safeguards ──
+  // Dedupe lease: suppress re-emission when world context unchanged
+  private lastIdleLeaseKey: string = '';
+  // Hard cap: sliding window of idle episode timestamps (max per hour)
+  private idleEpisodeTimestamps: number[] = [];
+  private readonly MAX_IDLE_EPISODES_PER_HOUR = 6;
+
   constructor(config: Partial<KeepAliveIntegrationConfig> = {}) {
     this.config = { ...DEFAULT_KEEPALIVE_INTEGRATION_CONFIG, ...config };
   }
@@ -186,10 +206,16 @@ export class KeepAliveIntegration {
 
     if (this.config.enableSterlingIdleEpisodes) {
       if ((executorState.pendingPlanningSterlingIrCount ?? 0) > 0) {
+        if (process.env.KEEPALIVE_DEBUG === 'true') {
+          console.log('[KeepAliveIntegration] Idle episode suppressed: suppressed_pending_planning');
+        }
         return null;
       }
-      const sent = await this.trySterlingIdleEpisode(executorState, botState);
-      if (sent) {
+      const decision = await this.trySterlingIdleEpisode(executorState, botState);
+      if (process.env.KEEPALIVE_DEBUG === 'true' && decision.startsWith('suppressed_')) {
+        console.log(`[KeepAliveIntegration] Idle episode suppressed: ${decision}`);
+      }
+      if (decision.startsWith('emitted_')) {
         return null;
       }
     }
@@ -354,15 +380,54 @@ export class KeepAliveIntegration {
     return `IDLE_EPISODE_V1\n${JSON.stringify(payload)}`;
   }
 
+  /**
+   * Compute a coarse lease key from world state + narrative context.
+   * When the key is unchanged, the idle episode is suppressed (same context, same cooldown).
+   * When the key changes (inventory changed, new task outcome), emit even within cooldown.
+   */
+  private computeIdleLease(botState: BotState, executorState: ExecutorState): string {
+    const invSummary = (botState.inventory ?? [])
+      .map((i) => `${i.name}:${i.count}`)
+      .sort()
+      .join(',');
+    const invDigest = createHash('sha256').update(invSummary).digest('hex').slice(0, 12);
+    // Coarse spatial bucket: 8-block grid + biome. Moving biomes or ~8 blocks
+    // changes the opportunity landscape (new resources, new dangers).
+    // Math.floor produces consistent cells [..., [-16,-9], [-8,-1], [0,7], [8,15], ...].
+    // Boundary jitter (oscillating at x≈8.0) can cause extra emissions — acceptable
+    // because the hourly cap bounds total volume regardless.
+    const pos = botState.position;
+    const bucketX = pos ? Math.floor(pos.x / 8) : 0;
+    const bucketZ = pos ? Math.floor(pos.z / 8) : 0;
+    const spatialBucket = pos
+      ? `${bucketX}:${bucketZ}:${botState.biome ?? ''}`
+      : 'unknown';
+    return `${executorState.idleReason}:${invDigest}:${spatialBucket}:${executorState.recentTaskConversions}`;
+  }
+
   private async trySterlingIdleEpisode(
     executorState: ExecutorState,
     botState: BotState
-  ): Promise<boolean> {
-    if (this.idleEpisodeInFlight) return false;
+  ): Promise<IdleEpisodeDecision> {
+    if (this.idleEpisodeInFlight) return 'suppressed_in_flight';
     const now = Date.now();
-    if (now - this.lastIdleEpisodeAt < this.config.idleEpisodeCooldownMs) {
-      return false;
+
+    // ── Safeguard 1: Dedupe lease ──
+    // If world context hasn't changed, respect cooldown. If it changed, allow re-emission.
+    const leaseKey = this.computeIdleLease(botState, executorState);
+    if (leaseKey === this.lastIdleLeaseKey && now - this.lastIdleEpisodeAt < this.config.idleEpisodeCooldownMs) {
+      return 'suppressed_lease_cooldown';
     }
+
+    // ── Safeguard 3: Hourly hard cap ──
+    const oneHourAgo = now - 3_600_000;
+    this.idleEpisodeTimestamps = this.idleEpisodeTimestamps.filter((t) => t > oneHourAgo);
+    if (this.idleEpisodeTimestamps.length >= this.MAX_IDLE_EPISODES_PER_HOUR) {
+      return 'suppressed_hourly_cap';
+    }
+
+    this.lastIdleLeaseKey = leaseKey;
+    this.idleEpisodeTimestamps.push(now);
 
     const runId = crypto.randomUUID();
     const requestId = `idle_${runId}`;
@@ -412,7 +477,7 @@ export class KeepAliveIntegration {
           reason: result.code,
           duration_ms: result.durationMs,
         });
-        return true;
+        return 'emitted_error';
       }
 
       const reducer = result.result;
@@ -454,9 +519,10 @@ export class KeepAliveIntegration {
           },
           convertEligible: true,
         });
+        return 'emitted_executable';
       }
 
-      return true;
+      return 'emitted_blocked';
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       recorder.recordIdleEpisode(runId, {
@@ -466,7 +532,7 @@ export class KeepAliveIntegration {
         reason: errorMessage,
       });
       console.error('[KeepAliveIntegration] Idle episode failed:', error);
-      return true;
+      return 'emitted_error';
     } finally {
       this.idleEpisodeInFlight = false;
     }

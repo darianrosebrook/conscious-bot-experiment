@@ -246,7 +246,10 @@ export class EnvironmentIntegration extends EventEmitter {
       }
       return await response.json();
     } catch (error) {
-      console.error('Failed to fetch minecraft data:', error);
+      const code = (error as any)?.cause?.code ?? (error as any)?.code;
+      if (code !== 'ECONNREFUSED') {
+        console.error('Failed to fetch minecraft data:', error);
+      }
       return null;
     }
   }

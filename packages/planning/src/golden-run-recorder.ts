@@ -35,6 +35,9 @@ export type GoldenRunReport = {
       enabled?: boolean;
       mode?: 'shadow' | 'live' | string;
       loop_started?: boolean;
+      interval_registered?: boolean;
+      last_tick_at?: number;
+      tick_count?: number;
       enable_planning_executor_env?: string | undefined;
       executor_live_confirm_env?: string | undefined;
     };
@@ -81,6 +84,8 @@ export type GoldenRunReport = {
     executor_plan_digest?: string;
     /** SHA-256 covering only the resolved intent replacement steps. */
     intent_resolution_digest?: string;
+    /** SHA-256 of the resolution context (inventory + nearbyBlocks + goalItem). Enables replay of "why did the plan change?" */
+    resolution_context_digest?: string;
     schema_version?: string;
     blocked_reason?: string;
     error?: string;
@@ -91,6 +96,15 @@ export type GoldenRunReport = {
       order?: number;
     }>;
   };
+  /** Append-only bounded trace of expansion retry attempts (max 20). */
+  expansion_retries?: Array<{
+    attempt: number;
+    reason: string;
+    classification: 'transient' | 'contract_broken' | 'success' | 'exhausted';
+    next_eligible_at?: number;
+    backoff_ms?: number;
+    ts: number;
+  }>;
   execution?: {
     /** Append-only linear story of blocks and dispatches (bounded). */
     decisions?: ExecutionDecision[];
@@ -447,6 +461,23 @@ export class GoldenRunRecorder {
   recordExpansion(runId: string, data: GoldenRunReport['expansion']): void {
     if (!runId) return;
     this.update(runId, { expansion: data ?? {} });
+  }
+
+  /** Append one expansion retry event (bounded at 20 entries). */
+  recordExpansionRetry(
+    runId: string,
+    entry: NonNullable<GoldenRunReport['expansion_retries']>[number]
+  ): void {
+    if (!runId) return;
+    const report = this.ensureRun(runId);
+    report.expansion_retries ??= [];
+    if (report.expansion_retries.length < 20) {
+      report.expansion_retries.push(entry);
+    }
+    report.updated_at = Date.now();
+    const safeRunId = sanitizeRunId(runId);
+    this.runs.set(safeRunId, report);
+    this.queueWrite(safeRunId, report);
   }
 
   /** Store the Sterling server identity line once per run (evidence-grade). */

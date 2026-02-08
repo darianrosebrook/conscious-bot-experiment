@@ -14,6 +14,14 @@ declare global {
         failures: number;
         lastAttempt: number;
         breaker: 'closed' | 'open' | 'half-open';
+        /** True when setInterval is registered (not just during a cycle). */
+        intervalRegistered?: boolean;
+        /** Timestamp of the most recent tick (whether it ran a cycle or not). */
+        lastTickAt?: number;
+        /** Monotonic tick counter. */
+        tickCount?: number;
+        /** Last error message (cleared on successful cycle). */
+        lastError?: string;
       }
     | undefined;
   // eslint-disable-next-line no-var
@@ -198,7 +206,7 @@ export function parseExecutorConfig(): ExecutorConfig {
     mode: isLive ? 'live' : 'shadow',
     maxStepsPerMinute: Number(process.env.EXECUTOR_MAX_STEPS_PER_MINUTE || 6),
     failureCooldownMs: Number(process.env.EXECUTOR_FAILURE_COOLDOWN_MS || 10000),
-    leafAllowlist: new Set(), // populated by caller with KNOWN_LEAF_NAMES
+    leafAllowlist: new Set(), // populated by caller with KNOWN_LEAVES (from leaf-arg-contracts)
   };
 }
 
@@ -247,8 +255,22 @@ export function startAutonomousExecutor(
     global.__planningInterval = undefined;
   }
 
+  // Mark interval as registered — this persists between ticks, unlike `running`.
+  if (global.__planningExecutorState) {
+    global.__planningExecutorState.intervalRegistered = true;
+  }
+
   global.__planningInterval = setInterval(async () => {
     try {
+      // Liveness: bump tick counter and timestamp on every tick, even if
+      // the kill switch prevents runCycle(). This lets telemetry distinguish
+      // "interval not registered" from "interval registered but gated."
+      const st = global.__planningExecutorState;
+      if (st) {
+        st.lastTickAt = Date.now();
+        st.tickCount = (st.tickCount ?? 0) + 1;
+      }
+
       // Kill switch: checked every tick before runCycle().
       //
       // Semantics and limitations:
@@ -266,7 +288,6 @@ export function startAutonomousExecutor(
         return;
       }
 
-      const st = global.__planningExecutorState;
       if (st?.breaker === 'open') {
         const elapsed = Date.now() - (st.lastAttempt || 0);
         if (elapsed < opts.breakerOpenMs) return;
@@ -275,10 +296,13 @@ export function startAutonomousExecutor(
 
       try {
         await runCycle();
+        // Clear last error on success
+        if (st) st.lastError = undefined;
       } catch (error) {
         const s = global.__planningExecutorState;
         if (s) {
           s.failures = Math.min(s.failures + 1, 100);
+          s.lastError = error instanceof Error ? error.message : String(error);
           const backoff = Math.min(2 ** s.failures * 250, opts.maxBackoffMs);
           console.warn(
             `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
@@ -299,6 +323,9 @@ export function stopAutonomousExecutor(): void {
   if (global.__planningInterval) {
     clearInterval(global.__planningInterval);
     global.__planningInterval = undefined;
+  }
+  if (global.__planningExecutorState) {
+    global.__planningExecutorState.intervalRegistered = false;
   }
 }
 

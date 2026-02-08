@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   materializeStepToOptionA,
   normalizeTaskStepsToOptionA,
+  validateStepAgainstRegistry,
 } from '../step-option-a-normalizer';
 
 /** Step shape used by normalizer; meta may have args, leaf, produces, etc. */
@@ -151,5 +152,73 @@ describe('normalizeTaskStepsToOptionA', () => {
     expect(reasons).toHaveLength(1);
     expect(reasons[0].leaf).toBe('unsupported_leaf_xyz');
     expect(reasons[0].reason).toBe('unknown_leaf');
+  });
+
+  it('intent leaf (task_type_craft) is classified as intent_leaf_not_executable, not unknown_leaf', () => {
+    const task: TaskWithMeta = {
+      id: 't1',
+      steps: [
+        { id: 's1', meta: { leaf: 'task_type_craft', args: { proposition_id: 'p1', task_type: 'CRAFT' } } },
+      ],
+      metadata: {},
+    };
+    normalizeTaskStepsToOptionA(task);
+    expect(task.metadata?.planningIncomplete).toBe(true);
+    const reasons = task.metadata?.planningIncompleteReasons as Array<{ leaf?: string; reason: string }>;
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0].leaf).toBe('task_type_craft');
+    expect(reasons[0].reason).toBe('intent_leaf_not_executable');
+  });
+
+  it('mixed executable and intent leaves: only intent leaves are incomplete', () => {
+    const task: TaskWithMeta = {
+      id: 't1',
+      steps: [
+        { id: 's1', meta: { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 4 } } },
+        { id: 's2', meta: { leaf: 'task_type_mine', args: { proposition_id: 'p2' } } },
+      ],
+      metadata: {},
+    };
+    normalizeTaskStepsToOptionA(task);
+    expect(task.metadata?.planningIncomplete).toBe(true);
+    const reasons = task.metadata?.planningIncompleteReasons as Array<{ leaf?: string; reason: string }>;
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0].leaf).toBe('task_type_mine');
+    expect(reasons[0].reason).toBe('intent_leaf_not_executable');
+  });
+});
+
+describe('validateStepAgainstRegistry', () => {
+  it('returns valid for executable leaves in KNOWN_LEAVES', () => {
+    expect(validateStepAgainstRegistry({ meta: { leaf: 'craft_recipe' } })).toEqual({ valid: true });
+    expect(validateStepAgainstRegistry({ meta: { leaf: 'acquire_material' } })).toEqual({ valid: true });
+    expect(validateStepAgainstRegistry({ meta: { leaf: 'smelt' } })).toEqual({ valid: true });
+  });
+
+  it('returns intent_leaf for task_type_* leaves', () => {
+    const result = validateStepAgainstRegistry({ meta: { leaf: 'task_type_craft' } });
+    expect(result).toEqual({ valid: false, reason: 'intent_leaf', leaf: 'task_type_craft' });
+  });
+
+  it('returns intent_leaf for all Sterling expand-by-digest leaves', () => {
+    const intentLeaves = [
+      'task_type_craft', 'task_type_mine', 'task_type_explore',
+      'task_type_navigate', 'task_type_build', 'task_type_collect',
+      'task_type_gather', 'task_type_attack', 'task_type_find', 'task_type_check',
+    ];
+    for (const leaf of intentLeaves) {
+      const result = validateStepAgainstRegistry({ meta: { leaf } });
+      expect(result).toEqual({ valid: false, reason: 'intent_leaf', leaf });
+    }
+  });
+
+  it('returns unknown_leaf for unrecognized leaves', () => {
+    const result = validateStepAgainstRegistry({ meta: { leaf: 'something_random' } });
+    expect(result).toEqual({ valid: false, reason: 'unknown_leaf', leaf: 'something_random' });
+  });
+
+  it('returns missing_leaf when step has no leaf in meta', () => {
+    expect(validateStepAgainstRegistry({ meta: {} })).toEqual({ valid: false, reason: 'missing_leaf' });
+    expect(validateStepAgainstRegistry({})).toEqual({ valid: false, reason: 'missing_leaf' });
   });
 });

@@ -10,6 +10,7 @@
  */
 
 import { stepToLeafExecution } from './step-to-leaf-execution';
+import { KNOWN_LEAVES, isIntentLeaf } from './leaf-arg-contracts';
 
 /** Task-like shape with steps and metadata we can mutate. Compatible with Task (TaskStep has meta?). */
 export type TaskWithSteps = {
@@ -28,7 +29,35 @@ export type NormalizeOptions = {
   allowMaterialize?: boolean;
 };
 
-const MAX_PLANNING_INCOMPLETE_REASONS = 10;
+// ============================================================================
+// Step Registry Validation (fail-closed boundary gate)
+// ============================================================================
+
+export type StepValidationResult =
+  | { valid: true }
+  | { valid: false; reason: 'missing_leaf' }
+  | { valid: false; reason: 'intent_leaf'; leaf: string }
+  | { valid: false; reason: 'unknown_leaf'; leaf: string };
+
+/**
+ * Validate a step's leaf against the executable registry. Fail-closed:
+ * returns an error for any leaf not in KNOWN_LEAVES.
+ *
+ * Intent leaves (task_type_*) get a specific reason so callers can
+ * distinguish "this is an intent label that needs translation" from
+ * "this is a genuinely unknown leaf name."
+ */
+export function validateStepAgainstRegistry(
+  step: { meta?: Record<string, unknown> }
+): StepValidationResult {
+  const leaf = step.meta?.leaf as string | undefined;
+  if (!leaf) return { valid: false, reason: 'missing_leaf' };
+  if (isIntentLeaf(leaf)) return { valid: false, reason: 'intent_leaf', leaf };
+  if (!KNOWN_LEAVES.has(leaf)) return { valid: false, reason: 'unknown_leaf', leaf };
+  return { valid: true };
+}
+
+const MAX_PLANNING_INCOMPLETE_REASONS = 20;
 
 /** Optional out-param: set materialized when step was derived and we wrote meta.args. */
 export type MaterializeOut = { materialized?: boolean };
@@ -84,13 +113,26 @@ export function normalizeTaskStepsToOptionA(
   const reasons: Array<{ leaf?: string; reason: string }> = [];
 
   for (const step of steps) {
+    // Registry validation: classify step before attempting leaf extraction
+    const validation = validateStepAgainstRegistry(step);
+    if (!validation.valid && validation.reason === 'intent_leaf') {
+      anyIncomplete = true;
+      if (reasons.length < MAX_PLANNING_INCOMPLETE_REASONS) {
+        reasons.push({
+          leaf: validation.leaf,
+          reason: 'intent_leaf_not_executable',
+        });
+      }
+      continue;
+    }
+
     const result = stepToLeafExecution(step);
     if (!result) {
       anyIncomplete = true;
       if (reasons.length < MAX_PLANNING_INCOMPLETE_REASONS) {
         reasons.push({
           leaf: (step.meta?.leaf as string) ?? undefined,
-          reason: 'unknown_leaf',
+          reason: validation.valid === false ? validation.reason : 'unknown_leaf',
         });
       }
       continue;

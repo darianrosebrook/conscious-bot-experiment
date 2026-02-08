@@ -66,23 +66,27 @@ describe('Legacy Planner Guards (Phase 4)', () => {
     expect(matches).toEqual([]);
   });
 
-  it('createIntegratedPlanningCoordinator is not imported from @conscious-bot/planning', () => {
-    // Search all packages, not just planning
-    try {
-      const result = execSync(
-        `grep -rn "from '@conscious-bot/planning'" "${path.resolve(PLANNING_SRC, '../../..')}" --include="*.ts" ` +
-        `| grep "createIntegratedPlanningCoordinator" ` +
-        `| grep -v "node_modules" ` +
-        `| grep -v "__tests__" ` +
-        `| grep -v ".test.ts"`,
-        { encoding: 'utf-8', timeout: 10_000 }
-      ).trim();
-      const matches = result ? result.split('\n').filter(Boolean) : [];
-      expect(matches).toEqual([]);
-    } catch {
-      // No matches — good
-    }
-  });
+  it(
+    'createIntegratedPlanningCoordinator is not imported from @conscious-bot/planning',
+    () => {
+      // Search all packages, not just planning — broader scan needs more time.
+      try {
+        const result = execSync(
+          `grep -rn "from '@conscious-bot/planning'" "${path.resolve(PLANNING_SRC, '../../..')}" --include="*.ts" ` +
+            `| grep "createIntegratedPlanningCoordinator" ` +
+            `| grep -v "node_modules" ` +
+            `| grep -v "__tests__" ` +
+            `| grep -v ".test.ts"`,
+          { encoding: 'utf-8', timeout: 30_000 }
+        ).trim();
+        const matches = result ? result.split('\n').filter(Boolean) : [];
+        expect(matches).toEqual([]);
+      } catch {
+        // No matches — good
+      }
+    },
+    30_000
+  );
 
   // -----------------------------------------------------------------------
   // Guard 4.2: Compiler-is-lowering guard (Pivot 1)

@@ -399,6 +399,12 @@ export function mapBTActionToMinecraft(
       };
     case 'wait':
       return { type: 'wait', parameters: { duration: args.duration || 2000 } };
+    case 'step_forward_safely':
+      return {
+        type: 'move_forward',
+        parameters: { distance: args.distance || 1 },
+        timeout: 5000,
+      };
     // Add new action mappings for cognitive reflection generated actions
     case 'move_and_gather':
       return {
@@ -440,6 +446,14 @@ export function mapBTActionToMinecraft(
         parameters: {
           workstation: args.workstation || 'crafting_table',
         },
+      };
+    case 'chat':
+      return {
+        type: 'chat',
+        parameters: {
+          message: (args.message || 'Hello!').slice(0, 256),
+        },
+        timeout: 5000,
       };
     default:
       if (strict) return null;

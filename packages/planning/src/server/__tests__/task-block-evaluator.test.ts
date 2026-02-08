@@ -12,7 +12,7 @@ import {
   isTaskEligible,
   DEFAULT_BLOCKED_TTL_MS,
   BLOCKED_REASON_TTL_POLICY,
-} from '../task-block-evaluator';
+} from '../../task-lifecycle/task-block-evaluator';
 
 describe('task-block-evaluator (pure functions)', () => {
   describe('shouldAutoUnblockTask', () => {

@@ -298,4 +298,119 @@ describe('GoldenRunRecorder', () => {
       reason: 'shadow',
     });
   });
+
+  describe('merge preservation: partial task patch does not erase richer task fields', () => {
+    it('recordExecutorBlocked with taskId preserves existing task.title and task.status', () => {
+      const recorder = new GoldenRunRecorder();
+      const runId = 'merge-preserve-1';
+      const taskId = 'task-merge-1';
+
+      // Step 1: recordTask sets rich task data
+      recorder.recordTask(runId, {
+        task_id: taskId,
+        title: 'Craft wooden pickaxe',
+        status: 'in_progress',
+      });
+
+      // Step 2: recordExecutorBlocked patches {task: {task_id}} only
+      recorder.recordExecutorBlocked(
+        runId,
+        'planning_incomplete',
+        { leaf: 'craft_recipe' },
+        taskId
+      );
+
+      // Assert: title and status survived the partial merge
+      const report = recorder.getReport(runId);
+      expect(report).not.toBeNull();
+      expect(report?.task?.task_id).toBe(taskId);
+      expect(report?.task?.title).toBe('Craft wooden pickaxe');
+      expect(report?.task?.status).toBe('in_progress');
+    });
+
+    it('recordExecutorBlocked without taskId does not erase existing task', () => {
+      const recorder = new GoldenRunRecorder();
+      const runId = 'merge-preserve-2';
+
+      recorder.recordTask(runId, {
+        task_id: 'task-no-erase',
+        title: 'Mine diamonds',
+        status: 'pending',
+      });
+
+      // Block without taskId — should not touch task at all
+      recorder.recordExecutorBlocked(runId, 'rate_limited', {
+        leaf: 'acquire_material',
+      });
+
+      const report = recorder.getReport(runId);
+      expect(report?.task?.task_id).toBe('task-no-erase');
+      expect(report?.task?.title).toBe('Mine diamonds');
+    });
+
+    it('recordExecutorBlocked before recordTask does not prevent later enrichment', () => {
+      const recorder = new GoldenRunRecorder();
+      const runId = 'merge-preserve-3';
+      const taskId = 'task-late-enrich';
+
+      // Block first (only task_id set)
+      recorder.recordExecutorBlocked(
+        runId,
+        'unknown_leaf',
+        { leaf: 'dig_block' },
+        taskId
+      );
+
+      // Then recordTask enriches with title/status
+      recorder.recordTask(runId, {
+        task_id: taskId,
+        title: 'Build shelter',
+        status: 'pending',
+      });
+
+      const report = recorder.getReport(runId);
+      expect(report?.task?.task_id).toBe(taskId);
+      expect(report?.task?.title).toBe('Build shelter');
+      expect(report?.task?.status).toBe('pending');
+    });
+  });
+
+  describe('getLatestReportByTaskId (6.5)', () => {
+    it('returns report when taskId has recordTask; two runs for same taskId returns newer', () => {
+      const recorder = new GoldenRunRecorder();
+      const taskId = 'task-index-1';
+      const run1 = 'run-index-1';
+      const run2 = 'run-index-2';
+
+      recorder.recordTask(run1, { task_id: taskId, status: 'pending' });
+      recorder.recordInjection(run1, { committed_ir_digest: 'd1' });
+      expect(recorder.getLatestReportByTaskId(taskId)).not.toBeNull();
+      expect(recorder.getLatestReportByTaskId(taskId)?.run_id).toBe(run1);
+
+      recorder.recordTask(run2, { task_id: taskId, status: 'in_progress' });
+      recorder.recordInjection(run2, { committed_ir_digest: 'd2' });
+      expect(recorder.getLatestReportByTaskId(taskId)).not.toBeNull();
+      expect(recorder.getLatestReportByTaskId(taskId)?.run_id).toBe(run2);
+      expect(recorder.getLatestReportByTaskId(taskId)?.injection?.committed_ir_digest).toBe('d2');
+    });
+
+    it('returns null when taskId has no known run', () => {
+      const recorder = new GoldenRunRecorder();
+      expect(recorder.getLatestReportByTaskId('unknown-task-xyz')).toBeNull();
+    });
+
+    it('index is updated by block-only activity (recordExecutorBlocked)', () => {
+      const recorder = new GoldenRunRecorder();
+      const runId = 'block-only-run';
+      const taskId = 'task-block-only';
+
+      recorder.recordTask(runId, { task_id: taskId, status: 'pending' });
+      recorder.recordExecutorBlocked(runId, 'unknown_leaf', { leaf: 'dig_block' });
+
+      const report = recorder.getLatestReportByTaskId(taskId);
+      expect(report).not.toBeNull();
+      expect(report?.run_id).toBe(runId);
+      expect(report?.execution?.executor_blocked_reason).toBe('unknown_leaf');
+    });
+  });
 });

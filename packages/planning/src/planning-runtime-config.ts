@@ -21,6 +21,8 @@ export type PlanningRuntimeConfig = {
     /** Option B task_type_* bridge allowlisted (golden + shadow only). */
     taskTypeBridge: boolean;
   };
+  /** Legacy leaf rewrites (dig_block -> acquire_material). Default false (Policy A: allow-but-measure). */
+  legacyLeafRewriteEnabled: boolean;
   /** Stable digest of config slice for artifact evidence. */
   configDigest: string;
   /** For banner: human-readable capability list */
@@ -55,6 +57,10 @@ const ENV = {
   },
   get enablePlanningExecutor(): boolean {
     return process.env.ENABLE_PLANNING_EXECUTOR === '1';
+  },
+  /** Legacy leaf rewrites (dig_block -> acquire_material). Default false (Policy A: allow-but-measure). */
+  get legacyLeafRewriteEnabled(): boolean {
+    return String(process.env.STERLING_LEGACY_LEAF_REWRITE_ENABLED || '') === '1';
   },
 };
 
@@ -138,9 +144,12 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     executorMode === 'shadow' &&
     ENV.enableTaskTypeBridge;
 
+  const legacyLeafRewriteEnabled = ENV.legacyLeafRewriteEnabled;
+
   const capabilitiesList: string[] = [];
   if (skipReadiness) capabilitiesList.push('skip_readiness');
   if (taskTypeBridge) capabilitiesList.push('task_type_bridge');
+  if (legacyLeafRewriteEnabled) capabilitiesList.push('legacy_leaf_rewrite');
 
   // Digest must use only allowlisted non-secret keys. Do not add credentials or tokens here.
   const canonical = {
@@ -149,6 +158,7 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     executorEnabled,
     skipReadiness,
     taskTypeBridge,
+    legacyLeafRewriteEnabled,
   };
   const configDigest = computeConfigDigest(canonical);
 
@@ -157,6 +167,7 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     executorMode,
     executorEnabled,
     capabilities: { skipReadiness, taskTypeBridge },
+    legacyLeafRewriteEnabled,
     configDigest,
     capabilitiesList,
   };

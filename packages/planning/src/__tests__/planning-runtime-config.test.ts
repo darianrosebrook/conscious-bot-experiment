@@ -31,6 +31,7 @@ describe('PlanningRuntimeConfig', () => {
       GOLDEN_RUN_MODE: '',
       ENABLE_TASK_TYPE_BRIDGE: '',
       ENABLE_PLANNING_EXECUTOR: '',
+      STERLING_LEGACY_LEAF_REWRITE_ENABLED: '',
     });
     resetPlanningRuntimeConfigForTesting();
   });
@@ -130,5 +131,17 @@ describe('PlanningRuntimeConfig', () => {
     expect(banner).toContain('run_mode=golden');
     expect(banner).toContain('executor_mode=shadow');
     expect(banner).toMatch(/config_digest=[a-f0-9]+/);
+  });
+
+  it('legacyLeafRewriteEnabled defaults to false and is true when STERLING_LEGACY_LEAF_REWRITE_ENABLED=1', () => {
+    setEnv({ STERLING_LEGACY_LEAF_REWRITE_ENABLED: '' });
+    const config = getPlanningRuntimeConfig();
+    expect(config.legacyLeafRewriteEnabled).toBe(false);
+
+    resetPlanningRuntimeConfigForTesting();
+    setEnv({ STERLING_LEGACY_LEAF_REWRITE_ENABLED: '1' });
+    const configOn = getPlanningRuntimeConfig();
+    expect(configOn.legacyLeafRewriteEnabled).toBe(true);
+    expect(configOn.capabilitiesList).toContain('legacy_leaf_rewrite');
   });
 });

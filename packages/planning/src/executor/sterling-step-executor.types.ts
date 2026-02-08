@@ -15,6 +15,8 @@ export interface SterlingStepExecutorConfig {
   buildingLeaves: Set<string>;
   taskTypeBridgeLeafNames: Set<string>;
   enableTaskTypeBridge: boolean;
+  /** Allow dig_block -> acquire_material rewrite in live/cert. Default false (Policy A: allow-but-measure). */
+  legacyLeafRewriteEnabled: boolean;
 }
 
 export interface SterlingStepExecutorContext {
@@ -54,7 +56,8 @@ export interface SterlingStepExecutorContext {
     recordExecutorBlocked: (
       runId: string,
       reason: string,
-      detail?: Record<string, unknown>
+      detail?: Record<string, unknown>,
+      taskId?: string
     ) => void;
     recordShadowDispatch: (
       runId: string,
@@ -62,6 +65,14 @@ export interface SterlingStepExecutorContext {
     ) => void;
     recordVerification: (runId: string, payload: GoldenRunVerification) => void;
     recordDispatch: (runId: string, payload: Record<string, unknown>) => void;
+    recordRegenerationAttempt: (
+      runId: string,
+      data: { success: boolean; reason?: string }
+    ) => void;
+    recordLeafRewriteUsed: (
+      runId: string,
+      payload: { leaf: string; originalLeaf: string }
+    ) => void;
   };
   toDispatchResult: (
     actionResult: Record<string, unknown> | null | undefined
@@ -101,5 +112,5 @@ export interface SterlingStepExecutorContext {
   regenerateSteps: (
     taskId: string,
     failureContext: Record<string, unknown>
-  ) => Promise<{ success: boolean; stepsDigest?: string }>;
+  ) => Promise<{ success: boolean; stepsDigest?: string; reason?: string }>;
 }

@@ -21,6 +21,7 @@ import {
   getPlanningRuntimeConfig,
   buildPlanningBanner,
 } from '../planning-runtime-config';
+import { mapBTActionToMinecraft } from './action-mapping';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -1232,14 +1233,16 @@ export function createPlanningEndpoints(
           );
 
           // Evidence hygiene: include executor mode/enablement so "no dispatch" isn't ambiguous.
-          const loopStarted = Boolean(
-            (globalThis as any).__planningExecutorState?.running
-          );
+          const execState = (globalThis as any).__planningExecutorState;
+          const loopStarted = Boolean(execState?.intervalRegistered);
           recorder.recordRuntime(runId, {
             executor: {
               enabled: planningConfig.executorEnabled,
               mode: planningConfig.executorMode,
               loop_started: loopStarted,
+              interval_registered: Boolean(execState?.intervalRegistered),
+              last_tick_at: execState?.lastTickAt,
+              tick_count: execState?.tickCount,
               enable_planning_executor_env:
                 process.env.ENABLE_PLANNING_EXECUTOR,
               executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
@@ -1366,14 +1369,16 @@ export function createPlanningEndpoints(
             planningConfigReduce.capabilities.taskTypeBridge
           );
 
-          const loopStartedRunReduce = Boolean(
-            (globalThis as any).__planningExecutorState?.running
-          );
+          const execStateReduce = (globalThis as any).__planningExecutorState;
+          const loopStartedRunReduce = Boolean(execStateReduce?.intervalRegistered);
           recorder.recordRuntime(runId, {
             executor: {
               enabled: planningConfigReduce.executorEnabled,
               mode: planningConfigReduce.executorMode,
               loop_started: loopStartedRunReduce,
+              interval_registered: Boolean(execStateReduce?.intervalRegistered),
+              last_tick_at: execStateReduce?.lastTickAt,
+              tick_count: execStateReduce?.tickCount,
               enable_planning_executor_env:
                 process.env.ENABLE_PLANNING_EXECUTOR,
             },
@@ -1440,6 +1445,156 @@ export function createPlanningEndpoints(
           console.error('[dev run-golden-reduce] Failed:', error);
           return res.status(500).json({
             error: 'run-golden-reduce failed',
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    );
+
+    // Dev-only: enqueue a task with pre-baked executor-native steps.
+    // Bypasses Sterling reduce/expand entirely to prove executor dispatch works.
+    // Outer guard: ENABLE_DEV_ENDPOINTS=true (line 1114 block).
+    // Inner guard: NODE_ENV + ENABLE_DEV_ENDPOINTS re-check (defense-in-depth).
+    router.post(
+      '/api/dev/enqueue-native-steps',
+      async (req: Request, res: Response) => {
+        try {
+          if (
+            process.env.NODE_ENV === 'production' ||
+            process.env.ENABLE_DEV_ENDPOINTS !== 'true'
+          ) {
+            return res
+              .status(403)
+              .json({ error: 'Dev endpoints are disabled' });
+          }
+
+          const { steps: rawSteps, title, description } = req.body || {};
+
+          // Validate caller-provided steps: reject missing leaf or unmapped leaf
+          if (Array.isArray(rawSteps) && rawSteps.length > 0) {
+            const invalid: string[] = [];
+            for (let i = 0; i < rawSteps.length; i++) {
+              const s = rawSteps[i];
+              const leaf = s.meta?.leaf || s.leaf;
+              if (!leaf || typeof leaf !== 'string') {
+                invalid.push(`step[${i}]: missing or non-string leaf`);
+              } else {
+                const mapped = mapBTActionToMinecraft(
+                  leaf,
+                  s.meta?.args || s.args || {},
+                  { strict: true }
+                );
+                if (!mapped) {
+                  invalid.push(
+                    `step[${i}]: leaf '${leaf}' has no action mapping (strict mode)`
+                  );
+                }
+              }
+            }
+            if (invalid.length > 0) {
+              return res.status(400).json({
+                error: 'Invalid steps — rejected before enqueue',
+                invalid,
+                hint: 'Each step must have a leaf that maps to a known MC action',
+              });
+            }
+          }
+
+          // Default steps: chat (speech) + step_forward_safely (physical actuation) + wait (timing)
+          const steps =
+            Array.isArray(rawSteps) && rawSteps.length > 0
+              ? rawSteps.map((s: any, i: number) => ({
+                  id: s.id || `native-step-${i}`,
+                  order: s.order ?? i,
+                  label:
+                    s.label ||
+                    `Step ${i}: ${s.meta?.leaf || s.leaf || 'unknown'}`,
+                  done: false,
+                  meta: {
+                    leaf: s.meta?.leaf || s.leaf,
+                    args: s.meta?.args || s.args || {},
+                    argsSource: 'explicit',
+                    authority: 'dev-injected',
+                    executable: true,
+                  },
+                }))
+              : [
+                  {
+                    id: 'native-step-0',
+                    order: 0,
+                    label: 'Say hello (proof of speech dispatch)',
+                    done: false,
+                    meta: {
+                      leaf: 'chat',
+                      args: {
+                        message:
+                          '[E2E] Bot executor dispatch proof — hello world!',
+                      },
+                      argsSource: 'explicit',
+                      authority: 'dev-injected',
+                      executable: true,
+                    },
+                  },
+                  {
+                    id: 'native-step-1',
+                    order: 1,
+                    label: 'Step forward (proof of physical actuation)',
+                    done: false,
+                    meta: {
+                      leaf: 'step_forward_safely',
+                      args: { distance: 1 },
+                      argsSource: 'explicit',
+                      authority: 'dev-injected',
+                      executable: true,
+                    },
+                  },
+                  {
+                    id: 'native-step-2',
+                    order: 2,
+                    label: 'Wait briefly',
+                    done: false,
+                    meta: {
+                      leaf: 'wait',
+                      args: { duration: 2000 },
+                      argsSource: 'explicit',
+                      authority: 'dev-injected',
+                      executable: true,
+                    },
+                  },
+                ];
+
+          const task = await planningSystem.goalFormulation.addTask({
+            title: title || 'Dev: native step dispatch proof',
+            description:
+              description ||
+              'Executor-native steps injected via /api/dev/enqueue-native-steps',
+            type: 'autonomous',
+            source: 'manual',
+            priority: 0.9,
+            urgency: 0.9,
+            status: 'active',
+            steps,
+            metadata: {
+              tags: ['dev-injected', 'native-steps'],
+              category: 'dev',
+              origin: {
+                kind: 'dev',
+                name: 'enqueue-native-steps',
+                createdAt: Date.now(),
+              },
+            },
+          });
+
+          return res.json({
+            success: true,
+            task_id: task?.id ?? null,
+            step_count: steps.length,
+            leaves: steps.map((s: any) => s.meta?.leaf),
+          });
+        } catch (error) {
+          console.error('[dev enqueue-native-steps] Failed:', error);
+          return res.status(500).json({
+            error: 'enqueue-native-steps failed',
             details: error instanceof Error ? error.message : String(error),
           });
         }

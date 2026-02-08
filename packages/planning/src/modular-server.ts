@@ -73,6 +73,7 @@ import {
   type KeepAliveIntegration,
 } from './modules/keep-alive-integration';
 import { getGoldenRunRecorder, toDispatchResult } from './golden-run-recorder';
+import { getPlanningRuntimeConfig } from './planning-runtime-config';
 // Dynamic import to avoid TypeScript path resolution issues
 // import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
 
@@ -206,6 +207,7 @@ import {
   isExecutableStep,
 } from './modules/executable-step';
 import { stepToLeafExecution } from './modules/step-to-leaf-execution';
+import { INTENT_LEAVES, KNOWN_LEAVES } from './modules/leaf-arg-contracts';
 import { executeSterlingStep } from './executor';
 import {
   buildTaskFromRequirement,
@@ -245,7 +247,7 @@ import {
   evaluateTaskBlockState,
   isTaskEligible,
   DEFAULT_BLOCKED_TTL_MS,
-} from './server/task-block-evaluator';
+} from './task-lifecycle/task-block-evaluator';
 import {
   isCircuitBreakerOpen,
   tripCircuitBreaker,
@@ -358,63 +360,15 @@ function resolvedBlock(task: any) {
   );
 }
 
-// Known leaf names (shared across services)
-const KNOWN_LEAF_NAMES = new Set([
-  // Movement
-  'move_to',
-  'step_forward_safely',
-  'follow_entity',
-  'sterling_navigate',
-  // Interaction
-  'dig_block',
-  'acquire_material',
-  'place_block',
-  'place_torch_if_needed',
-  'retreat_and_block',
-  'consume_food',
-  'sleep',
-  'collect_items',
-  // Sensing
-  'sense_hostiles',
-  'chat',
-  'wait',
-  'get_light_level',
-  'find_resource',
-  // Crafting
-  'craft_recipe',
-  'smelt',
-  'place_workstation',
-  'introspect_recipe',
-  // Container
-  'open_container',
-  'transfer_items',
-  'close_container',
-  'manage_inventory',
-  // Combat
-  'attack_entity',
-  'equip_weapon',
-  'retreat_from_threat',
-  'use_item',
-  'equip_tool',
-  // Farming
-  'till_soil',
-  'plant_crop',
-  'harvest_crop',
-  'manage_farm',
-  // World interaction
-  'interact_with_block',
-  'operate_piston',
-  'control_redstone',
-  'build_structure',
-  'control_environment',
-  // Construction (P0 stubs)
-  'prepare_site',
-  'build_module',
-  'place_feature',
-]);
+// Dispatchable leaf names — derived from CONTRACTS in leaf-arg-contracts.ts.
+// A leaf is dispatchable iff it has an explicit LeafArgContract entry.
+// KNOWN_LEAVES is exported from leaf-arg-contracts.ts as Object.keys(CONTRACTS).
+const KNOWN_LEAF_NAMES = KNOWN_LEAVES;
 
-/** Option B bridge: task_type_* leaves from Sterling expand-by-digest. Only allowlisted when ENABLE_TASK_TYPE_BRIDGE=1 (dev/golden only; forbidden in production). */
-const TASK_TYPE_BRIDGE_LEAF_NAMES = new Set<string>(['task_type_craft']);
+/** Option B bridge: task_type_* intent leaves from Sterling expand-by-digest.
+ *  Only allowlisted when ENABLE_TASK_TYPE_BRIDGE=1 (dev/golden only; forbidden in production).
+ *  Uses INTENT_LEAVES from leaf-arg-contracts (single source of truth). */
+const TASK_TYPE_BRIDGE_LEAF_NAMES = INTENT_LEAVES;
 
 const ENABLE_TASK_TYPE_BRIDGE =
   String(process.env.ENABLE_TASK_TYPE_BRIDGE || '') === '1';
@@ -458,6 +412,14 @@ declare global {
         failures: number;
         lastAttempt: number;
         breaker: 'closed' | 'open' | 'half-open';
+        /** True when setInterval is registered (not just during a cycle). */
+        intervalRegistered?: boolean;
+        /** Timestamp of the most recent tick (whether it ran a cycle or not). */
+        lastTickAt?: number;
+        /** Monotonic tick counter. */
+        tickCount?: number;
+        /** Last error message (cleared on successful cycle). */
+        lastError?: string;
       }
     | undefined;
   // Interval handle for executor loop
@@ -1126,6 +1088,7 @@ function buildSterlingStepExecutorContext() {
       buildingLeaves: BUILDING_LEAVES,
       taskTypeBridgeLeafNames: TASK_TYPE_BRIDGE_LEAF_NAMES,
       enableTaskTypeBridge: ENABLE_TASK_TYPE_BRIDGE,
+      legacyLeafRewriteEnabled: getPlanningRuntimeConfig().legacyLeafRewriteEnabled,
     },
     leafAllowlist: executorConfig.leafAllowlist,
     mode: executorConfig.mode,
@@ -1789,6 +1752,35 @@ async function autonomousTaskExecutor() {
         console.log(
           `[AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: ${blockState.failReason}`
         );
+      }
+    }
+
+    // ── Expansion retry for pending_planning sterling_ir tasks ──
+    // Budget: at most 2 retries per tick to avoid hammering Sterling when it's down.
+    // Runs AFTER TTL evaluation (stale tasks fail first) and BEFORE eligible-task
+    // filtering (so newly-promoted tasks are immediately eligible).
+    const EXPANSION_RETRY_BUDGET = 2;
+    let expansionRetriesThisTick = 0;
+    const pendingPlanningTasks = activeTasks.filter(
+      (t) => t.status === 'pending_planning' && t.type === 'sterling_ir'
+    );
+    for (const ppt of pendingPlanningTasks) {
+      if (expansionRetriesThisTick >= EXPANSION_RETRY_BUDGET) break;
+
+      // Respect nextEligibleAt — single scheduling truth
+      const nextEligible = (ppt.metadata as any)?.nextEligibleAt ?? 0;
+      if (nowMs < nextEligible) continue;
+
+      expansionRetriesThisTick++;
+      try {
+        const result = await taskIntegration.retryExpansion(ppt.id);
+        if (result.outcome === 'ok') {
+          console.log(`[AUTONOMOUS EXECUTOR] Re-expansion succeeded for task ${ppt.id}`);
+        } else if (result.outcome !== 'skipped') {
+          console.log(`[AUTONOMOUS EXECUTOR] Re-expansion ${result.outcome} for task ${ppt.id}: ${'reason' in result ? result.reason : 'error' in result ? result.error : ''}`);
+        }
+      } catch (err) {
+        console.warn(`[AUTONOMOUS EXECUTOR] Re-expansion error for task ${ppt.id}:`, err);
       }
     }
 
