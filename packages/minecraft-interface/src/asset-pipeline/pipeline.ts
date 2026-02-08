@@ -16,6 +16,8 @@ import { JarDownloader } from './jar-downloader.js';
 import { AssetExtractor } from './asset-extractor.js';
 import { AtlasBuilder } from './atlas-builder.js';
 import { BlockStatesBuilder } from './blockstates-builder.js';
+import { BedrockEntityExtractor } from './bedrock-entity-extractor.js';
+import { BedrockEntityTransformer } from './bedrock-entity-transformer.js';
 import type {
   AssetPipelineOptions,
   GeneratedAssets,
@@ -29,7 +31,7 @@ const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.minecraft-assets-cache');
  * Progress events emitted during pipeline execution.
  */
 export interface PipelineProgress {
-  stage: 'resolving' | 'downloading' | 'extracting' | 'building-atlas' | 'building-blockstates' | 'saving';
+  stage: 'resolving' | 'downloading' | 'extracting' | 'extracting-bedrock-entities' | 'building-atlas' | 'building-blockstates' | 'saving';
   message: string;
   progress?: number; // 0-100
 }
@@ -64,10 +66,11 @@ export class AssetPipeline {
   /**
    * Gets the output paths for a version's generated assets.
    */
-  getOutputPaths(version: string): { texturePath: string; blockStatesPath: string; rawAssetsPath: string } {
+  getOutputPaths(version: string): { texturePath: string; blockStatesPath: string; entitiesPath: string; rawAssetsPath: string } {
     return {
       texturePath: path.join(this.generatedDir, version, 'textures.png'),
       blockStatesPath: path.join(this.generatedDir, version, 'blockstates.json'),
+      entitiesPath: path.join(this.generatedDir, version, 'entities.json'),
       rawAssetsPath: path.join(this.cacheDir, 'extracted', version),
     };
   }
@@ -169,6 +172,32 @@ export class AssetPipeline {
     // Stage 3: Extract assets
     onProgress?.({ stage: 'extracting', message: 'Extracting assets from JAR...' });
     const extracted = await this.assetExtractor.extract(jarResult.jarPath, versionId);
+
+    // Stage 3.5: Extract Bedrock entity models
+    onProgress?.({ stage: 'extracting-bedrock-entities', message: 'Extracting Bedrock entity models...' });
+    try {
+      const bedrockExtractor = new BedrockEntityExtractor({
+        cacheDir: path.join(this.cacheDir, 'bedrock'),
+      });
+      const bedrockResult = await bedrockExtractor.extract((downloaded, total) => {
+        const progress = Math.round((downloaded / total) * 100);
+        onProgress?.({
+          stage: 'extracting-bedrock-entities',
+          message: `Downloading Bedrock entity data: ${Math.round(downloaded / 1024 / 1024)}MB / ${Math.round(total / 1024 / 1024)}MB`,
+          progress,
+        });
+      });
+
+      const transformer = new BedrockEntityTransformer({ verbose: false });
+      const entitiesJson = transformer.transform(bedrockResult);
+      await fs.promises.writeFile(
+        paths.entitiesPath,
+        JSON.stringify(entitiesJson, null, 2)
+      );
+    } catch (bedrockError) {
+      // Non-fatal: if Bedrock extraction fails, the viewer falls back to bundled entities.json
+      console.warn('[asset-pipeline] Bedrock entity extraction failed (non-fatal):', bedrockError);
+    }
 
     // Stage 4: Build texture atlas
     onProgress?.({ stage: 'building-atlas', message: `Building texture atlas (${extracted.textures.length} textures)...` });
@@ -293,11 +322,11 @@ export class AssetPipeline {
   }
 
   /**
-   * Injects generated assets into prismarine-viewer's public directory.
+   * Injects generated assets into the viewer's public directory.
    * This allows the viewer to use our generated assets.
    *
    * @param version - Version to inject
-   * @param pvPublicDir - Path to prismarine-viewer's public directory
+   * @param pvPublicDir - Path to the viewer's public directory
    */
   async injectIntoViewer(version: string, pvPublicDir: string): Promise<void> {
     if (!(await this.isGenerated(version))) {

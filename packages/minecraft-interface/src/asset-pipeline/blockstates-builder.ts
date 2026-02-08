@@ -2,9 +2,9 @@
  * BlockStates Builder - Processes blockstate and model definitions for the renderer.
  *
  * This module resolves model inheritance, maps texture references to atlas UV coordinates,
- * and produces a format compatible with prismarine-viewer's worker.js.
+ * and produces a format compatible with the viewer's worker.js.
  *
- * The approach is ported from prismarine-viewer's modelsBuilder.js.
+ * The approach is ported from the viewer's modelsBuilder.js.
  *
  * @module asset-pipeline/blockstates-builder
  */

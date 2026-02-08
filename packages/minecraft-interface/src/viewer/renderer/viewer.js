@@ -9,16 +9,16 @@
  *
  * MODIFIED: Added animation timing and updateAnimations() call in update()
  *
- * @module prismarine-viewer/lib/viewer
+ * @module viewer/renderer/viewer
  */
 
-const THREE = require('three')
-const TWEEN = require('@tweenjs/tween.js')
-const { WorldRenderer } = require('./worldrenderer')
-const { Entities } = require('./entities')
-const { Primitives } = require('./primitives')
-const { getVersion } = require('./version')
-const { Vec3 } = require('vec3')
+import * as THREE from 'three'
+import TWEEN from '@tweenjs/tween.js'
+import { WorldRenderer } from './worldrenderer.js'
+import { Entities } from '../entities/entities.js'
+import { Primitives } from './primitives.js'
+import { getVersion } from '../utils/version.js'
+import { Vec3 } from 'vec3'
 
 class Viewer {
   constructor (renderer) {
@@ -64,7 +64,9 @@ class Viewer {
     }
     console.log('Using version: ' + version)
     this.version = version
-    this.world.setVersion(version)
+    if (this.world.setVersion(version) === false) {
+      return false
+    }
     this.entities.clear()
     this.primitives.clear()
     return true
@@ -154,4 +156,4 @@ class Viewer {
   }
 }
 
-module.exports = { Viewer }
+export { Viewer }

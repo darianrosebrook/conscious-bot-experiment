@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { createBot } from 'mineflayer';
-import { mineflayer as createViewer } from 'prismarine-viewer';
+import { mineflayer as createViewer } from '../src/viewer/index.js';
 import { join } from 'path';
 
 // Import viewer enhancements

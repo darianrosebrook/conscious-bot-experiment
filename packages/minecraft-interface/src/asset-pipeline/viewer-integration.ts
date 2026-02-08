@@ -1,8 +1,8 @@
 /**
- * Viewer Integration - Integrates animated material with prismarine-viewer.
+ * Viewer Integration - Integrates animated material with the viewer.
  *
  * This module provides functions to:
- * 1. Replace prismarine-viewer's MeshPhongMaterial with our animated ShaderMaterial
+ * 1. Replace the viewer's MeshPhongMaterial with our animated ShaderMaterial
  * 2. Set up the render loop to update animation time
  * 3. Load and configure the animation map from blockstates
  *
@@ -10,7 +10,7 @@
  * ```typescript
  * import { integrateAnimatedMaterial } from './viewer-integration';
  *
- * // After prismarine-viewer is initialized
+ * // After the viewer is initialized
  * const cleanup = await integrateAnimatedMaterial(viewer, {
  *   blockStatesUrl: '/mc-assets/blocksStates/1.21.9.json',
  *   textureUrl: '/mc-assets/textures/1.21.9.png',
@@ -48,7 +48,7 @@ export interface ViewerIntegrationOptions {
 }
 
 /**
- * Viewer interface (minimal type for prismarine-viewer compatibility).
+ * Viewer interface (minimal type for the viewer compatibility).
  */
 export interface ViewerLike {
   world: {
@@ -76,12 +76,12 @@ export interface IntegrationResult {
 }
 
 /**
- * Integrates our animated material with prismarine-viewer.
+ * Integrates our animated material with the viewer.
  *
  * This replaces the viewer's default MeshPhongMaterial with our custom
  * ShaderMaterial that supports animated textures.
  *
- * @param viewer - The prismarine-viewer instance
+ * @param viewer - The the viewer instance
  * @param options - Integration options
  * @returns Integration result with cleanup function
  */
@@ -257,11 +257,11 @@ async function fetchJSON(url: string): Promise<Record<string, unknown>> {
 }
 
 /**
- * Hook into prismarine-viewer's render loop.
+ * Hook into the viewer's render loop.
  *
  * This patches the viewer to call our update function each frame.
  *
- * @param viewer - The prismarine-viewer instance
+ * @param viewer - The the viewer instance
  * @param integration - The integration result from integrateAnimatedMaterial
  * @returns Cleanup function to remove the hook
  */
@@ -305,11 +305,11 @@ export function hookRenderLoop(
 }
 
 /**
- * Complete setup for animated textures in prismarine-viewer.
+ * Complete setup for animated textures in the viewer.
  *
  * Combines material integration and render loop hook.
  *
- * @param viewer - The prismarine-viewer instance
+ * @param viewer - The the viewer instance
  * @param options - Integration options
  * @returns Cleanup function
  */

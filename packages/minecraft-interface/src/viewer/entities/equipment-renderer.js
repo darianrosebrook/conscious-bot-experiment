@@ -16,7 +16,7 @@
  * @module prismarine-viewer/lib/equipment-renderer
  */
 
-/* global THREE */
+import * as THREE from 'three'
 
 // ============================================================================
 // CONSTANTS
@@ -603,7 +603,7 @@ class EquipmentManager {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   EQUIPMENT_SLOTS,
   BIPED_BONES,
   ARMOR_MATERIALS,

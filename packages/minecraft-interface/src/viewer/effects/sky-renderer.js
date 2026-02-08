@@ -19,7 +19,7 @@
  * @author @darianrosebrook
  */
 
-/* global THREE */
+import * as THREE from 'three'
 
 // ============================================================================
 // SKY COLOR PALETTES (Minecraft-accurate)
@@ -99,12 +99,10 @@ float smoothstep01(float t) {
 }
 
 // Calculate day progress (0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset)
+// Formula matches animated-material-client.js: ((worldTime + 6000) % 24000) / 24000
+// Using the integer-offset form avoids floating-point drift between sky and block lighting.
 float getDayProgress(float mcTime) {
-  // Minecraft time: 0 = 6AM, 6000 = noon, 12000 = 6PM, 18000 = midnight
-  // Convert to 0-1 where 0.5 = noon
-  float normalized = mod(mcTime, 24000.0) / 24000.0;
-  // Shift so 0.5 = noon (6000 MC time)
-  return mod(normalized + 0.25, 1.0);
+  return mod(mcTime + 6000.0, 24000.0) / 24000.0;
 }
 
 // Get sky brightness factor based on time
@@ -360,10 +358,10 @@ class SkyRenderer {
     const normalizedTime = (time % 24000) / 24000
     const angle = normalizedTime * Math.PI * 2 - Math.PI / 2 // Offset so noon is overhead
 
-    // Sun moves in the XY plane (east-west arc)
+    // Sun moves in the XY plane (east-west arc), matching vanilla Minecraft's vertical arc
     const x = Math.cos(angle)
     const y = Math.sin(angle)
-    const z = 0.1 // Slight tilt for visual interest
+    const z = 0.0
 
     return new THREE.Vector3(x, y, z).normalize()
   }
@@ -451,10 +449,9 @@ function createSkyRenderer (scene, camera) {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   SkyRenderer,
   createSkyRenderer,
-  // Export color constants for potential customization
   DAY_HORIZON_COLOR,
   DAY_ZENITH_COLOR,
   TWILIGHT_HORIZON_COLOR,

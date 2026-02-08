@@ -1,30 +1,33 @@
 /**
  * mineflayer.js - Enhanced Prismarine Viewer Server Integration
  *
- * This is a patched version of prismarine-viewer's lib/mineflayer.js that:
+ * This is a patched version that:
  * 1. Emits equipment data with entity updates
  * 2. Emits world time for day/night cycle
  * 3. Better entity tracking for animation support
  *
- * This file is copied to node_modules/prismarine-viewer/lib/mineflayer.js
- * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
- *
- * @module prismarine-viewer/lib/mineflayer
+ * @module viewer/server/mineflayer
  * @author @darianrosebrook
  */
 
-const EventEmitter = require('events')
+import { EventEmitter } from 'events'
+import { WorldView } from '../renderer/worldView.js'
+import express from 'express'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
+import { setupRoutes } from './common.js'
+import { createRequire } from 'node:module'
 
-module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, prefix = '' }) => {
-  const { WorldView } = require('../viewer')
-  const express = require('express')
+// createRequire() bridges ESM→CJS: when tsx runs server.ts as ESM,
+// `require` is not defined. This gives us a CJS-style require that
+// can load minecraft-data (a CJS package with lazy getters).
+const require = createRequire(import.meta.url)
 
+export default function mineflayerViewer (bot, { viewDistance = 6, firstPerson = false, port = 3000, prefix = '' }) {
   const app = express()
-  const http = require('http').createServer(app)
+  const http = createServer(app)
+  const io = new Server(http, { path: prefix + '/socket.io' })
 
-  const io = require('socket.io')(http, { path: prefix + '/socket.io' })
-
-  const { setupRoutes } = require('./common')
   setupRoutes(app, prefix)
 
   const sockets = []
@@ -119,6 +122,70 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
   // ============================================================================
 
   io.on('connection', (socket) => {
+    // ========================================================================
+    // Extract minimal minecraft-data subset for worker shim
+    // The worker bundle uses a lightweight shim instead of the full minecraft-data
+    // package (366MB). We extract only the fields that prismarine-chunk,
+    // prismarine-registry, and our meshing code actually need at runtime.
+    // ========================================================================
+    try {
+      const mcDataMod = require('minecraft-data')
+      const mcDataForVersion = mcDataMod(bot.version)
+      const mcDataTints = mcDataMod('1.16.2') // models.js hardcodes this version for tints
+
+      // Build version→dataVersion lookup table for comparison operators.
+      // The shim reconstructs version['>=']('1.21.5') etc. from this map.
+      const versionMap = {}
+      for (const v of mcDataMod.versions.pc) {
+        versionMap[v.minecraftVersion] = v.dataVersion
+        if (!versionMap[v.majorVersion]) versionMap[v.majorVersion] = v.dataVersion
+      }
+
+      // Extract supportFeature results as a feature map.
+      // supportFeature() is a closure over version-specific feature data that
+      // gets lost during JSON serialization. The shim reconstructs it.
+      const featureNames = [
+        'blockStateId', 'blockHashes', 'incrementedChatType',
+        'segmentedRegistryCodecData', 'theFlattening', 'dimensionDataIsAvailable',
+        'fixedBiomes', 'dimensionIsAString', 'dimensionIsAnInt',
+        'itemCount', 'usesNetty', 'chunksHaveLight',
+      ]
+      const featureMap = {}
+      for (const f of featureNames) {
+        const v = mcDataForVersion.supportFeature(f)
+        if (v) featureMap[f] = v
+      }
+
+      socket.emit('mcData', {
+        version: bot.version,
+        data: {
+          // prismarine-registry / prismarine-chunk core data
+          biomes: mcDataForVersion.biomes,
+          biomesByName: mcDataForVersion.biomesByName,
+          blocksArray: mcDataForVersion.blocksArray,
+          blocksByName: mcDataForVersion.blocksByName,
+          blockCollisionShapes: mcDataForVersion.blockCollisionShapes,
+          blockStates: mcDataForVersion.blockStates,
+          materials: mcDataForVersion.materials,
+          itemsArray: mcDataForVersion.itemsArray,
+          version: mcDataForVersion.version,
+          // prismarine-block reads these for potion/enchantment-aware digging
+          effectsByName: mcDataForVersion.effectsByName,
+          enchantmentsByName: mcDataForVersion.enchantmentsByName,
+          // Feature map — shim reconstructs supportFeature() from this
+          _featureMap: featureMap,
+          // models.js needs tints for grass/foliage/water coloring
+          tints: mcDataTints.tints,
+        },
+        // Version→dataVersion lookup for comparison operators
+        versionMap,
+        tintsVersion: '1.16.2'
+      })
+      console.log(`[mineflayer] Emitted mcData subset for version ${bot.version} (${Object.keys(featureMap).length} features, ${Object.keys(versionMap).length} version entries)`)
+    } catch (e) {
+      console.error('[mineflayer] Failed to extract mcData for worker shim:', e.message)
+    }
+
     socket.emit('version', bot.version)
 
     // Emit bot info for name tag display
@@ -129,27 +196,8 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
 
     sockets.push(socket)
 
-    // Debug: Check how many chunks the bot has loaded
-    const syncWorld = bot.world?.sync || bot.world
-    const loadedColumns = syncWorld?.columns ? Object.keys(syncWorld.columns).length : 0
-    console.log(`[prismarine-viewer] Bot world has ${loadedColumns} columns loaded at position ${JSON.stringify(bot.entity.position)}`)
-    console.log(`[prismarine-viewer] viewDistance=${viewDistance}, bot.version=${bot.version}`)
-
+    // Position logged at debug level — this fires on every socket connect
     const worldView = new WorldView(bot.world, viewDistance, bot.entity.position, socket)
-
-    // Debug: Track chunk loading
-    const originalSocketEmit = socket.emit.bind(socket)
-    let chunkCount = 0
-    socket.emit = function(event, ...args) {
-      if (event === 'loadChunk') {
-        chunkCount++
-        if (chunkCount <= 5 || chunkCount % 50 === 0) {
-          console.log(`[prismarine-viewer] Emitting loadChunk #${chunkCount}`)
-        }
-      }
-      return originalSocketEmit(event, ...args)
-    }
-
     worldView.init(bot.entity.position)
 
     worldView.on('blockClicked', (block, face, button) => {
@@ -318,6 +366,11 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
 
     bot.on('move', botPosition)
     worldView.listenToBot(bot)
+
+    // CRITICAL: Emit initial position immediately so the client camera
+    // moves to the bot's location. Without this, the camera stays at (0,0,0)
+    // until the bot moves for the first time.
+    botPosition()
 
     socket.on('disconnect', () => {
       bot.removeListener('move', botPosition)

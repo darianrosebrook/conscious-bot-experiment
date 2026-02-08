@@ -1325,7 +1325,10 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
-   * Create a task from a social chat interaction
+   * Create a task from a social chat interaction.
+   * Posts directly to /task (not /goal) so it doesn't participate in goal
+   * lifecycle, dedup, or threat holds — social-chat-derived tasks are
+   * ephemeral action items, not persistent goals.
    */
   private async createTaskFromSocialChat(
     sender: string,
@@ -1336,27 +1339,21 @@ export class BotAdapter extends EventEmitter {
       const planningUrl =
         process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
 
-      const response = await resilientFetch(`${planningUrl}/goal`, {
+      const response = await resilientFetch(`${planningUrl}/task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: `Respond to ${sender}: "${message.slice(0, 50)}"`,
-          description: taskSuggestion,
+          title: taskSuggestion,
+          description: `${taskSuggestion} (from ${sender}: "${message.slice(0, 100)}")`,
+          type: 'autonomous',
+          source: 'social-chat',
           priority: 0.8,
           urgency: 0.6,
-          tasks: [
-            {
-              type: 'autonomous',
-              description: taskSuggestion,
-              priority: 0.8,
-              urgency: 0.6,
-              parameters: {
-                sender,
-                message,
-                source: 'social-chat',
-              },
-            },
-          ],
+          parameters: {
+            sender,
+            message,
+            source: 'social-chat',
+          },
         }),
       });
 

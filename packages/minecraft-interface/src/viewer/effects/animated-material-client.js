@@ -9,7 +9,7 @@
  * @author @darianrosebrook
  */
 
-/* global THREE */
+import * as THREE from 'three'
 
 // ============================================================================
 // Day/Night Color Constants (Minecraft-accurate)
@@ -52,6 +52,7 @@ const animatedFragmentShader = `
   uniform sampler2D animationMap;
   uniform float time;
   uniform float animationMapSize;
+  uniform float frameVStepUniform;
   uniform float dayProgress;
   uniform vec3 dayAmbientColor;
   uniform vec3 nightAmbientColor;
@@ -95,7 +96,10 @@ const animatedFragmentShader = `
     vec4 data = texture2D(animationMap, uv);
     float frameCount = data.r * 255.0;
     float frametimeMs = data.g * 255.0 * 50.0;
-    float frameVStep = data.b;
+    // Use precise uniform for frameVStep instead of lossy 8-bit blue channel.
+    // The blue channel stored floor(0.0078125 * 255) = 1, recovering only 0.00392
+    // instead of the needed 0.0078125. The uniform provides full float precision.
+    float frameVStep = frameVStepUniform;
     float flags = data.a * 255.0;
     return vec4(frameCount, frametimeMs, frameVStep, flags);
   }
@@ -106,7 +110,8 @@ const animatedFragmentShader = `
     float frameVStep = animData.z;
     float flags = animData.w;
 
-    if (frameCount <= 1.0) {
+    // Non-animated textures: return base texture directly
+    if (frameCount < 2.0 || frametimeMs < 1.0 || frameVStep < 0.0001) {
       return texture2D(map, uv);
     }
 
@@ -116,6 +121,9 @@ const animatedFragmentShader = `
     float cycleTime = frameCount * frametimeMs;
     float timeInCycle = mod(timeMs, cycleTime);
     float exactFrame = timeInCycle / frametimeMs;
+
+    // Clamp frame to valid range to prevent sampling outside the strip
+    exactFrame = clamp(exactFrame, 0.0, frameCount - 0.001);
 
     if (shouldInterpolate) {
       float frame1 = floor(exactFrame);
@@ -181,7 +189,13 @@ const animatedFragmentShader = `
  */
 function generateAnimationMap (blockStates, atlasSize) {
   const animations = buildAnimationLookup(blockStates)
-  const mapSize = Math.min(atlasSize, 256)
+  // Animation map must be large enough that each 16x16 texture tile gets its own
+  // distinct region. With a 2048x2048 atlas and 16px tiles, we need at least
+  // 2048/16 = 128 distinct cells. Using atlasSize/16 ensures 1:1 tile mapping
+  // without allocating a full atlas-sized buffer (which would be 16MB+).
+  // Each texel in this map covers exactly one 16x16 texture tile in the atlas.
+  const tileSize = 16
+  const mapSize = Math.max(128, Math.ceil(atlasSize / tileSize))
   const data = new Uint8Array(mapSize * mapSize * 4)
   data.fill(0)
 
@@ -302,7 +316,8 @@ function createAnimatedMaterial (map, animationMap, options = {}) {
       map: { value: map },
       animationMap: { value: animationMap || defaultAnimMap },
       time: { value: 0 },
-      animationMapSize: { value: animationMap ? 256 : 1 },
+      animationMapSize: { value: animationMap ? (animationMap.image ? animationMap.image.width : 256) : 1 },
+      frameVStepUniform: { value: options.frameVStep || (16 / 2048) },
       dayProgress: { value: options.dayProgress || 0.5 },
       dayAmbientColor: { value: DAY_AMBIENT_COLOR.clone() },
       nightAmbientColor: { value: NIGHT_AMBIENT_COLOR.clone() },
@@ -347,13 +362,14 @@ function updateAnimatedMaterial (material, deltaTime) {
  */
 function updateDayProgress (material, worldTime) {
   if (material.uniforms && material.uniforms.dayProgress) {
-    // Convert world time to day progress (0 = midnight, 0.5 = noon)
-    material.uniforms.dayProgress.value = (worldTime % 24000) / 24000
+    // Minecraft time: 0=sunrise(6am), 6000=noon, 12000=sunset(6pm), 18000=midnight
+    // Shader expects: 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
+    // Offset by 6000 so MC noon (6000) maps to shader noon (0.5)
+    material.uniforms.dayProgress.value = ((worldTime + 6000) % 24000) / 24000
   }
 }
 
-// Export for use in index.js
-module.exports = {
+export {
   generateAnimationMap,
   buildAnimationLookup,
   createAnimatedMaterial,

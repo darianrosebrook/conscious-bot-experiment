@@ -3,7 +3,7 @@
  *
  * This module arranges individual block textures into a single atlas image,
  * generating UV coordinate mappings for the renderer. The approach is ported
- * from prismarine-viewer's atlas.js but with TypeScript types and ESM support.
+ * from the viewer's atlas.js but with TypeScript types and ESM support.
  *
  * @module asset-pipeline/atlas-builder
  */

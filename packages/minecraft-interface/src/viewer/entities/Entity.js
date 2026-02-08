@@ -244,8 +244,10 @@ function getMesh (texture, jsonModel, entityType) {
       tex.magFilter = THREE.NearestFilter
       tex.minFilter = THREE.NearestFilter
       tex.flipY = false
-      tex.wrapS = THREE.RepeatWrapping
-      tex.wrapT = THREE.RepeatWrapping
+      // ClampToEdge so UVs outside [0,1] (e.g. from model mismatch or rounding) do not
+      // wrap and show wrong texture regions; avoids stretched/wrong pixels on limbs.
+      tex.wrapS = THREE.ClampToEdgeWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
       material.map = tex
       material.needsUpdate = true
     })

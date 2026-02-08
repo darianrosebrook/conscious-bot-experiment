@@ -13,7 +13,7 @@
  * @author @darianrosebrook
  */
 
-/* global THREE */
+import * as THREE from 'three'
 
 // ============================================================================
 // CONSTANTS
@@ -639,17 +639,12 @@ class EntityExtrasManager {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
-  // Managers
+export {
   NameTagManager,
   CapeManager,
   ShadowManager,
   EntityExtrasManager,
-
-  // Factory functions
   createNameTagCanvas,
-
-  // Constants (for customization)
   NAME_TAG_HEIGHT_OFFSET,
   NAME_TAG_FADE_START,
   NAME_TAG_FADE_END,

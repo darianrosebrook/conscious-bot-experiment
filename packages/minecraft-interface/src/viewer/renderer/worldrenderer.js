@@ -1,4 +1,3 @@
-/* global Worker */
 /**
  * worldrenderer.js - Patched World Renderer
  *
@@ -6,25 +5,15 @@
  * the blockStates race condition by sending blockStates synchronously when
  * pre-loaded via blockStatesData.
  *
- * The original issue: updateTexturesData() loads blockStates via async promise,
- * but chunks are sent to workers immediately. Workers early-return if blocksStates
- * is null, causing terrain to not render.
- *
- * The fix: If blockStatesData is pre-set (by our custom asset loading), send it
- * to workers synchronously in updateTexturesData() instead of loading async.
- *
- * This file is copied to node_modules/prismarine-viewer/viewer/lib/worldrenderer.js
- * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
- *
- * @module prismarine-viewer/viewer/lib/worldrenderer
+ * @module viewer/renderer/worldrenderer
  * @author @darianrosebrook
  */
 
-const THREE = require('three')
-const Vec3 = require('vec3').Vec3
-const { loadTexture, loadJSON } = globalThis.isElectron ? require('./utils.electron.js') : require('./utils')
-const { EventEmitter } = require('events')
-const { dispose3 } = require('./dispose')
+import * as THREE from 'three'
+import { Vec3 } from 'vec3'
+import { loadTexture, loadJSON } from '../utils/utils.web.js'
+import { EventEmitter } from 'events'
+import { dispose3 } from '../utils/dispose.js'
 
 function mod (x, n) {
   return ((x % n) + n) % n
@@ -41,6 +30,7 @@ class WorldRenderer {
     this.renderUpdateEmitter = new EventEmitter()
     this.blockStatesData = undefined
     this.texturesDataUrl = undefined
+    this.mcDataPayload = null
 
     // Track whether blockStates have been sent to workers
     this.blockStatesSentToWorkers = false
@@ -49,12 +39,10 @@ class WorldRenderer {
 
     this.workers = []
     for (let i = 0; i < numWorkers; i++) {
-      // Node environement needs an absolute path, but browser needs the url of the file
-      let src = __dirname
-      if (typeof window !== 'undefined') src = 'worker.js'
-      else src += '/worker.js'
-
-      const worker = new Worker(src)
+      const worker = new Worker(
+        new URL('../meshing/worker.js', import.meta.url),
+        { type: 'module' }
+      )
       worker.onmessage = ({ data }) => {
         if (data.type === 'geometry') {
           let mesh = this.sectionMeshs[data.key]
@@ -81,6 +69,9 @@ class WorldRenderer {
         } else if (data.type === 'sectionFinished') {
           this.sectionsOutstanding.delete(data.key)
           this.renderUpdateEmitter.emit('update')
+        } else if (data.type === 'workerDebug') {
+          console.log(`[worker ${i}]`, data.msg)
+          if (data.stack) console.error(`[worker ${i}]`, data.stack)
         }
       }
       if (worker.on) worker.on('message', (data) => { worker.onmessage({ data }) })
@@ -104,6 +95,27 @@ class WorldRenderer {
     this.version = version
     this.resetWorld()
     this.active = true
+
+    // INVARIANT: mcDataPayload must be set before setVersion() is called.
+    // Without it, workers will crash when prismarine-chunk/registry try to read
+    // from the minecraft-data shim before it's been hydrated.
+    if (!this.mcDataPayload) {
+      console.error(
+        '[worldrenderer] FATAL: setVersion() called without mcDataPayload. ' +
+        'Workers will crash — the minecraft-data shim has no data to serve. ' +
+        'Ensure socket "mcData" event is received and viewer.world.mcDataPayload ' +
+        'is set before calling setVersion().'
+      )
+      return false
+    }
+
+    // Send mcData to workers BEFORE version — the shim must be populated
+    // before `new World(version)` triggers `require('minecraft-data')(version)`
+    for (const worker of this.workers) {
+      worker.postMessage({ type: 'mcData', ...this.mcDataPayload })
+    }
+    console.log('[worldrenderer] Sent mcData to workers')
+
     for (const worker of this.workers) {
       worker.postMessage({ type: 'version', version })
     }
@@ -117,9 +129,6 @@ class WorldRenderer {
    * If blockStatesData is pre-set (by custom asset loading in index.js), send it
    * to workers immediately and synchronously. This eliminates the race condition
    * where chunks arrive before blockStates are loaded.
-   *
-   * Original behavior: Always load blockStates via async loadJSON, which causes
-   * race conditions with chunk loading.
    */
   updateTexturesData () {
     // Load texture (this is always async, but material.map being set is our "ready" signal)
@@ -164,7 +173,19 @@ class WorldRenderer {
     for (const worker of this.workers) {
       worker.postMessage({ type: 'chunk', x, z, chunk })
     }
-    for (let y = 0; y < 256; y += 16) {
+    // Post-1.18 worlds extend from minY=-64 to minY+worldHeight=320.
+    // Parse the chunk JSON to discover actual Y range, falling back to legacy 0..255.
+    // Cache values for removeColumn to use.
+    if (this.minY === undefined) {
+      try {
+        const parsed = typeof chunk === 'string' ? JSON.parse(chunk) : chunk
+        if (typeof parsed.minY === 'number') this.minY = parsed.minY
+        if (typeof parsed.worldHeight === 'number') this.worldHeight = parsed.worldHeight
+      } catch (_) { /* fallback to defaults */ }
+    }
+    const minY = this.minY ?? 0
+    const worldHeight = this.worldHeight ?? 256
+    for (let y = minY; y < minY + worldHeight; y += 16) {
       const loc = new Vec3(x, y, z)
       this.setSectionDirty(loc)
       this.setSectionDirty(loc.offset(-16, 0, 0))
@@ -179,7 +200,10 @@ class WorldRenderer {
     for (const worker of this.workers) {
       worker.postMessage({ type: 'unloadChunk', x, z })
     }
-    for (let y = 0; y < 256; y += 16) {
+    // Use same Y range as addColumn (post-1.18 worlds have minY=-64, worldHeight=384)
+    const minY = this.minY ?? 0
+    const worldHeight = this.worldHeight ?? 256
+    for (let y = minY; y < minY + worldHeight; y += 16) {
       this.setSectionDirty(new Vec3(x, y, z), false)
       const key = `${x},${y},${z}`
       const mesh = this.sectionMeshs[key]
@@ -233,4 +257,4 @@ class WorldRenderer {
   }
 }
 
-module.exports = { WorldRenderer }
+export { WorldRenderer }

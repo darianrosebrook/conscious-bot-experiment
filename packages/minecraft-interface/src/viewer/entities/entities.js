@@ -9,15 +9,12 @@
  * @module prismarine-viewer/lib/entities
  */
 
-const THREE = require('three');
-const TWEEN = require('@tweenjs/tween.js');
-
-const Entity = require('./Entity');
-const { dispose3 } = require('../utils/dispose');
-const { EquipmentManager } = require('./equipment-renderer');
-const { EntityExtrasManager } = require('./entity-extras');
-
-const { createCanvas } = require('canvas');
+import * as THREE from 'three'
+import TWEEN from '@tweenjs/tween.js'
+import Entity from './Entity.js'
+import { dispose3 } from '../utils/dispose.js'
+import { EquipmentManager } from './equipment-renderer.js'
+import { EntityExtrasManager } from './entity-extras.js'
 
 // ============================================================================
 // SKELETAL ANIMATION SYSTEM
@@ -68,6 +65,11 @@ const BIPED_QUADRUPED_ENTITIES = [
 const MULTI_LEGGED_ENTITIES = [
   'spider',
   'cave_spider',
+];
+
+// Flying entities with wing bones
+const FLYER_ENTITIES = [
+  'bat',
 ];
 
 // Map from canonical leg0-leg3 names to actual bone names per entity type.
@@ -349,6 +351,110 @@ function createQuadrupedIdleClip() {
   return new THREE.AnimationClip('idle', duration, tracks);
 }
 
+/**
+ * Create flying animation clip for flyer entities (bat).
+ * Wings flap via Y-axis rotation, body tilts forward and bobs.
+ */
+function createFlyerFlyClip(bonesByName) {
+  const tracks = [];
+  const duration = 0.5; // Fast wing flap cycle (~120 BPM)
+  const steps = 16;
+  const times = [];
+  for (let i = 0; i <= steps; i++) times.push((i / steps) * duration);
+
+  // Wing flap: leftWing rotates Y from 0 → -45° → 0, rightWing mirrors
+  if (bonesByName['leftWing']) {
+    const quats = times.map(t => {
+      const angle = Math.cos((t / duration) * Math.PI * 2) * (Math.PI / 4); // ±45°
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(0, -angle, 0));
+      return [q.x, q.y, q.z, q.w];
+    }).flat();
+    tracks.push(new THREE.QuaternionKeyframeTrack('leftWing.quaternion', times, quats));
+  }
+
+  if (bonesByName['rightWing']) {
+    const quats = times.map(t => {
+      const angle = Math.cos((t / duration) * Math.PI * 2) * (Math.PI / 4); // ±45°
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(0, angle, 0));
+      return [q.x, q.y, q.z, q.w];
+    }).flat();
+    tracks.push(new THREE.QuaternionKeyframeTrack('rightWing.quaternion', times, quats));
+  }
+
+  // Wing tips follow with smaller amplitude
+  if (bonesByName['leftWingTip']) {
+    const quats = times.map(t => {
+      const angle = Math.cos((t / duration) * Math.PI * 2) * (Math.PI / 8); // ±22°
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(0, -angle, 0));
+      return [q.x, q.y, q.z, q.w];
+    }).flat();
+    tracks.push(new THREE.QuaternionKeyframeTrack('leftWingTip.quaternion', times, quats));
+  }
+
+  if (bonesByName['rightWingTip']) {
+    const quats = times.map(t => {
+      const angle = Math.cos((t / duration) * Math.PI * 2) * (Math.PI / 8); // ±22°
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(0, angle, 0));
+      return [q.x, q.y, q.z, q.w];
+    }).flat();
+    tracks.push(new THREE.QuaternionKeyframeTrack('rightWingTip.quaternion', times, quats));
+  }
+
+  // Body pitch: slight forward tilt (~45°) with bobbing
+  if (bonesByName['body']) {
+    const quats = times.map(t => {
+      const bob = Math.cos((t / duration) * Math.PI * 2) * 0.15; // ±8.5°
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(-(Math.PI / 4) + bob, 0, 0));
+      return [q.x, q.y, q.z, q.w];
+    }).flat();
+    tracks.push(new THREE.QuaternionKeyframeTrack('body.quaternion', times, quats));
+  }
+
+  return new THREE.AnimationClip('walk', duration, tracks);
+}
+
+/**
+ * Create idle animation for flyer entities.
+ * Wings held slightly folded, gentle body sway.
+ */
+function createFlyerIdleClip(bonesByName) {
+  const tracks = [];
+  const duration = 2.0;
+
+  // Wings held at resting angle (slightly folded)
+  if (bonesByName['leftWing']) {
+    tracks.push(createBoneRotationTrack('leftWing', [
+      { time: 0.0, rotation: { x: 0, y: -0.3, z: 0 } },
+      { time: 1.0, rotation: { x: 0, y: -0.35, z: 0 } },
+      { time: 2.0, rotation: { x: 0, y: -0.3, z: 0 } },
+    ]));
+  }
+
+  if (bonesByName['rightWing']) {
+    tracks.push(createBoneRotationTrack('rightWing', [
+      { time: 0.0, rotation: { x: 0, y: 0.3, z: 0 } },
+      { time: 1.0, rotation: { x: 0, y: 0.35, z: 0 } },
+      { time: 2.0, rotation: { x: 0, y: 0.3, z: 0 } },
+    ]));
+  }
+
+  // Gentle body sway
+  if (bonesByName['body']) {
+    tracks.push(createBoneRotationTrack('body', [
+      { time: 0.0, rotation: { x: 0, y: 0, z: 0 } },
+      { time: 1.0, rotation: { x: 0.05, y: 0, z: 0.02 } },
+      { time: 2.0, rotation: { x: 0, y: 0, z: 0 } },
+    ]));
+  }
+
+  return new THREE.AnimationClip('idle', duration, tracks);
+}
+
 // Entities with biped bone names but non-standard casing (piglin uses lowercase)
 const BIPED_MAPPED_ENTITIES = [
   'piglin',
@@ -372,6 +478,8 @@ function getEntityCategory(entityType) {
   if (type === 'creeper') return 'quadruped';
   // Multi-legged entities get quadruped animation on their first 4 legs
   if (MULTI_LEGGED_ENTITIES.includes(type)) return 'quadruped';
+  // Flying entities with wing bones
+  if (FLYER_ENTITIES.includes(type)) return 'flyer';
   // Witch has no limb bones — skip animation
   return 'unknown';
 }
@@ -417,8 +525,19 @@ function getEntityMesh(entity, scene) {
     warden: 'iron_golem',
     frog: 'slime',
     tadpole: 'fish/cod',
+    goat: 'sheep',
+    item: null,           // Items on ground — skip rendering (no suitable model)
+    chest_minecart: null, // No minecart model available
   };
   const fallbackName = normalizedName ? fallbackMap[normalizedName] : null;
+  // null explicitly means "skip rendering this entity type entirely"
+  if (normalizedName && fallbackName === null && normalizedName in fallbackMap) {
+    if (!loggedFallbacks.has(normalizedName)) {
+      loggedFallbacks.add(normalizedName);
+      console.warn(`[viewer] Entity skipped (no model): ${normalizedName}`);
+    }
+    return null;
+  }
   if (normalizedName) {
     try {
       const e = new Entity(textureVersion, normalizedName, scene);
@@ -576,6 +695,9 @@ class Entities {
     } else if (category === 'quadruped') {
       idleClip = createQuadrupedIdleClip();
       walkClip = createQuadrupedWalkClip(entityType, bonesByName);
+    } else if (category === 'flyer') {
+      idleClip = createFlyerIdleClip(bonesByName);
+      walkClip = createFlyerFlyClip(bonesByName);
     }
 
     // Only set up animation if clips have actual tracks. Sub-geometries like
@@ -829,4 +951,4 @@ class Entities {
   }
 }
 
-module.exports = { Entities };
+export { Entities }

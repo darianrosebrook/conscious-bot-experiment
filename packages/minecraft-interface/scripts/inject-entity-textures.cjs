@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Inject entity textures from Minecraft JAR into prismarine-viewer.
+ * Inject entity textures from Minecraft JAR into the viewer.
  *
  * This script extracts entity textures (player skins, mobs, etc.) from the
- * Minecraft JAR and copies them to prismarine-viewer's public folder.
+ * Minecraft JAR and copies them to the viewer's public folder.
  *
  * For versions not supported by minecraft-assets (e.g., 1.21.9), this uses
  * our asset-extractor pipeline to pull textures directly from the JAR.
@@ -37,12 +37,10 @@ const EXTRACTED_CACHE_DIR = path.join(os.homedir(), '.minecraft-assets-cache', '
 async function main() {
   console.log(`[inject-entity-textures] Injecting entity textures for ${VERSION}...`);
 
-  // Find prismarine-viewer installation
-  let pvRoot;
-  try {
-    pvRoot = path.dirname(require.resolve('prismarine-viewer/package.json'));
-  } catch (err) {
-    console.error('[inject-entity-textures] Error: prismarine-viewer not found');
+  // Resolve internalized viewer directory
+  const pvRoot = path.resolve(__dirname, '..', 'src', 'viewer');
+  if (!fs.existsSync(path.join(pvRoot, 'public'))) {
+    console.error('[inject-entity-textures] Error: viewer public dir not found at', path.join(pvRoot, 'public'));
     process.exit(1);
   }
 
@@ -88,7 +86,7 @@ async function main() {
     await extractEntityTextures(jarPath, VERSION);
   }
 
-  // Copy to prismarine-viewer
+  // Copy to viewer public directory
   console.log(`[inject-entity-textures] Copying to ${pvEntityDir}...`);
   fs.mkdirSync(pvEntityDir, { recursive: true });
   copyRecursive(extractedEntityDir, pvEntityDir);
@@ -217,18 +215,13 @@ async function injectCustomSkin(entityDir, skinPath) {
     console.log(`[inject-entity-textures]   -> ${path.relative(entityDir, target)}`);
   }
 
-  // Also copy to fallback versions that prismarine-viewer may use for entity textures
-  // (prismarine-viewer often falls back to older versions like 1.16.4 for entity paths)
-  let pvRoot;
-  try {
-    pvRoot = path.dirname(require.resolve('prismarine-viewer/package.json'));
-  } catch {
-    return; // Can't find prismarine-viewer
-  }
+  // Also copy to fallback versions the viewer may use for entity textures
+  // (the viewer often falls back to older versions like 1.16.4 for entity paths)
+  const viewerRoot = path.resolve(__dirname, '..', 'src', 'viewer');
 
   const fallbackVersions = ['1.16.4', '1.17.1', '1.18.1', '1.19', '1.20.1'];
   for (const fallbackVersion of fallbackVersions) {
-    const fallbackEntityDir = path.join(pvRoot, 'public', 'textures', fallbackVersion, 'entity');
+    const fallbackEntityDir = path.join(viewerRoot, 'public', 'textures', fallbackVersion, 'entity');
     if (fs.existsSync(fallbackEntityDir)) {
       // Older versions use entity/steve.png directly
       const oldStyleTarget = path.join(fallbackEntityDir, 'steve.png');

@@ -465,6 +465,8 @@ export interface AssetServerOptions {
   pipeline?: AssetPipelineOptions;
   /** Enable auto-generation for missing versions */
   autoGenerate?: boolean;
-  /** Fallback to prismarine-viewer's bundled assets */
+  /** Fallback to viewer's bundled assets */
   fallbackToBundled?: boolean;
+  /** Path to a custom skin PNG to serve in place of steve.png */
+  customSkinPath?: string;
 }

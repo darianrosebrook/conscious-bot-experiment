@@ -11,7 +11,7 @@
     "mc-simple": "dist/bin/mc-simple.js"
   },
   "scripts": {
-    "postinstall": "node scripts/rebuild-prismarine-viewer.cjs 2>/dev/null || true",
+    "postinstall:legacy": "echo 'prismarine-viewer internalized — see src/viewer/'",
     "generate-textures": "node scripts/generate-textures.cjs",
     "generate-textures:force": "node scripts/generate-textures.cjs -f",
     "mc:assets": "npx tsx scripts/mc-assets.ts",
@@ -20,6 +20,7 @@
     "mc:assets:clean": "npx tsx scripts/mc-assets.ts clean",
     "mc:assets:inject": "npx tsx scripts/mc-assets.ts inject",
     "build": "tsc",
+    "build:viewer": "NODE_OPTIONS='--max-old-space-size=8192' vite build --config src/viewer/vite.config.js",
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",
     "test:run": "vitest run",
@@ -67,14 +68,19 @@
     "test:manual": "npx tsx bin/test-manual.ts",
     "test:curl": "./bin/test-curl.sh",
     "test:curl:quick": "./bin/test-curl.sh --quick",
-    "test:p21": "vitest run src/entity-belief/__tests__/p21-conformance-minecraft.test.ts src/entity-belief/__tests__/p21b-conformance-minecraft.test.ts"
+    "test:p21": "vitest run src/entity-belief/__tests__/p21-conformance-minecraft.test.ts src/entity-belief/__tests__/p21b-conformance-minecraft.test.ts",
+    "test:viewer": "vitest run src/__tests__/viewer-entity-skins-regression.test.ts",
+    "verify:viewer": "vitest run src/__tests__/viewer-entity-skins-regression.test.ts",
+    "extract-entities": "npx tsx src/asset-pipeline/extract-bedrock-entities.ts"
   },
   "dependencies": {
     "@conscious-bot/core": "workspace:*",
     "@conscious-bot/planning": "workspace:*",
     "@conscious-bot/world": "workspace:*",
+    "@tweenjs/tween.js": "^23.1.1",
     "@types/three": "^0.179.0",
     "canvas": "^3.1.0",
+    "compression": "^1.7.4",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "js-yaml": "^4.1.0",
@@ -88,8 +94,11 @@
     "mineflayer-pvp": "^1.3.2",
     "mineflayer-statemachine": "^1.7.0",
     "mineflayer-tool": "^1.2.0",
-    "prismarine-viewer": "^1.33.0",
+    "prismarine-chunk": "^1.22.0",
+    "socket.io": "^4.0.0",
+    "socket.io-client": "^4.0.0",
     "three": "^0.179.1",
+    "three.meshline": "^1.3.0",
     "vec3": "^0.1.10",
     "ws": "^8.18.3",
     "yauzl": "^3.2.0"
@@ -102,13 +111,12 @@
     "@types/node": "^20.19.11",
     "@types/ws": "^8.18.1",
     "@types/yauzl": "^2.10.3",
-    "assert": "^2.1.0",
     "minecraft-assets": "^1.17.0",
+    "puppeteer": "^24.37.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "webpack": "^5.95.0",
-    "webpack-cli": "^6.0.0"
+    "vite": "^6.4.1",
+    "vitest": "^3.2.4"
   },
   "keywords": [
     "minecraft",

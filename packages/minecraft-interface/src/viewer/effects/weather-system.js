@@ -21,7 +21,7 @@
  * @author @darianrosebrook
  */
 
-/* global THREE */
+import * as THREE from 'three'
 
 // ============================================================================
 // CONSTANTS
@@ -80,8 +80,8 @@ void main() {
   pos.y = cameraPos.y + height * 0.5 - fallDistance;
 
   // Wind drift (slight angle)
-  pos.x += sin(time * 0.5 + offset * 10.0) * windStrength * 0.1;
-  pos.z += cos(time * 0.3 + offset * 7.0) * windStrength * 0.05;
+  pos.x += sin(time * 0.5 + offset * 10.0) * windStrength * 0.3;
+  pos.z += cos(time * 0.3 + offset * 7.0) * windStrength * 0.15;
 
   // Keep particles within area around camera
   pos.x = cameraPos.x + mod(pos.x - cameraPos.x + areaSize * 0.5, areaSize) - areaSize * 0.5;
@@ -171,7 +171,7 @@ void main() {
   vAlpha = 1.0 - smoothstep(15.0, 50.0, distance);
 
   // Rotation for variety
-  vRotation = offset * 6.28 + time * 0.5;
+  vRotation = offset * 6.28 + time * (0.3 + offset * 0.4);
 
   // Size with attenuation
   gl_PointSize = size * (150.0 / distance);
@@ -386,7 +386,7 @@ class WeatherSystem {
     this.lightningTimer = LIGHTNING_DURATION + LIGHTNING_FADE
     this.lightningIntensity = 1.0
 
-    console.log('[weather-system] Lightning flash!')
+    // Lightning flash triggered (no log — fires frequently during storms)
   }
 
   /**
@@ -468,7 +468,7 @@ class WeatherSystem {
     // Random lightning during thunderstorm
     if (this.isThundering && !this.lightningActive && this.currentIntensity > 0.5) {
       // Small chance of lightning each frame
-      if (Math.random() < deltaTime * 0.1) { // ~10% chance per second
+      if (Math.random() < deltaTime * 0.033) { // ~3.3% chance per second (~30s intervals)
         this.triggerLightning()
       }
     }
@@ -529,10 +529,9 @@ function createWeatherSystem (scene, camera) {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   WeatherSystem,
   createWeatherSystem,
-  // Export constants for potential customization
   RAIN_PARTICLE_COUNT,
   SNOW_PARTICLE_COUNT,
   WEATHER_AREA_SIZE,

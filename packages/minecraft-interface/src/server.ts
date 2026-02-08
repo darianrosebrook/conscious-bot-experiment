@@ -21,9 +21,24 @@ import {
   MemoryIntegrationService,
 } from './index';
 import type { Bot } from 'mineflayer';
-import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
+import { mineflayer as startMineflayerViewer } from './viewer/index.js';
+import { getVersionStatus } from './viewer/utils/version.js';
 import { resilientFetch } from '@conscious-bot/core';
 import { Vec3 } from 'vec3';
+
+// ── Process-level error guards ──────────────────────────────────────────────
+// Prevent EPIPE / ECONNRESET on transient socket errors from crashing the process.
+// These are expected when the Minecraft server drops, a dashboard SSE client disconnects,
+// or a proxy connection breaks mid-write.
+process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+    console.warn(`[minecraft-interface] Caught ${err.code} (non-fatal): ${err.message}`);
+    return; // swallow — do not crash
+  }
+  // Re-throw anything else so it still crashes loudly
+  console.error('[minecraft-interface] Uncaught exception:', err);
+  process.exit(1);
+});
 
 // Startup barrier for gating processing until all services are ready
 import {
@@ -184,10 +199,10 @@ app.use(
 app.use(express.json());
 
 // Mount custom asset server for Minecraft textures and blockstates
-// This serves generated assets with fallback to prismarine-viewer's bundled assets
+// This serves generated assets with fallback to the viewer's bundled assets
 app.use('/mc-assets', createAssetServer({
   autoGenerate: true, // Auto-generate on demand to keep textures/entities in sync
-  fallbackToBundled: true, // Fallback to prismarine-viewer's bundled assets
+  fallbackToBundled: true, // Fallback to viewer's bundled assets
 }));
 
 // Warn if WORLD_SEED is not set — Mineflayer cannot extract the seed
@@ -751,6 +766,13 @@ app.get('/state-stream', (req, res) => {
   res.flushHeaders();
 
   sseClients.add(res);
+
+  // Guard against EPIPE crashes when client disconnects mid-write.
+  // Without this, the async 'error' event on the socket is unhandled and crashes the process.
+  res.socket?.on('error', () => {
+    sseClients.delete(res);
+  });
+
   console.log(`[SSE] Bot state client connected (${sseClients.size} total)`);
 
   // Send initial state immediately
@@ -1606,6 +1628,24 @@ app.get('/state', async (req, res) => {
       });
     }
 
+    // Gate world-state extraction on bot.entity/position so we do not call
+    // mapBotStateToPlanningContext before the bot is fully spawned. Callers
+    // (dashboard, planning) should treat 503 as "wait and retry".
+    if (!bot.entity || !bot.entity.position) {
+      const now = Date.now();
+      if (!global.lastStateLog || now - global.lastStateLog > 60000) {
+        console.log(
+          '[Minecraft Interface] Bot not fully spawned, /state returning 503'
+        );
+        global.lastStateLog = now;
+      }
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not fully spawned',
+        status: 'spawning',
+      });
+    }
+
     // Verbose logging removed - this endpoint is polled frequently
     // Enable for debugging specific state issues:
     // console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
@@ -1761,6 +1801,13 @@ app.get('/inventory', async (req, res) => {
     }
 
     const bot = minecraftInterface.botAdapter.getBot();
+    if (!bot?.entity?.position) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not fully spawned',
+        status: 'spawning',
+      });
+    }
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
     const inventory = gameState.worldState?.inventory?.items || [];
@@ -2543,8 +2590,6 @@ function startViewerSafely(bot: any, port: number) {
 
     // Check version support and warn if using fallback
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getVersionStatus } = require('prismarine-viewer/viewer/lib/version');
       const mcVersion = bot.version;
       const status = getVersionStatus(mcVersion);
 
@@ -2591,7 +2636,7 @@ app.post('/stop-viewer', async (req, res) => {
       });
     }
 
-    // Note: prismarine-viewer doesn't provide a direct stop method
+    // Note: the viewer doesn't provide a direct stop method
     // We can only mark it as inactive and let it be cleaned up
     viewerActive = false;
     console.log('[Prismarine] Viewer stopped');

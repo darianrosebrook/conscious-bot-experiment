@@ -1,9 +1,8 @@
-/* global THREE */
 /**
  * index.js - Prismarine Viewer Client Entry Point
  *
- * This is the main client-side entry point for prismarine-viewer.
- * It replaces the original lib/index.js during the postinstall rebuild.
+ * This is the main client-side entry point for the viewer.
+ * It is bundled by Vite into public/.
  *
  * Customizations:
  * 1. POV toggle (F5 key or button) - switch between 1st/3rd person
@@ -13,29 +12,29 @@
  * 5. Animated texture shader for water/lava/fire animations
  * 6. Procedural sky dome with sun/moon/stars
  *
- * This file is copied to node_modules/prismarine-viewer/lib/index.js
- * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
- *
- * @module prismarine-viewer/lib/index
+ * @module viewer/client/index
  * @author @darianrosebrook
  */
 
-global.THREE = require('three')
-const TWEEN = require('@tweenjs/tween.js')
-require('three/examples/js/controls/OrbitControls')
+import * as THREE from 'three'
+import { WebGLRenderer } from 'three'
+globalThis.THREE = THREE
+import TWEEN from '@tweenjs/tween.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
-const { Viewer, Entity } = require('../viewer')
-const {
+import { Viewer } from '../renderer/viewer.js'
+import Entity from '../entities/Entity.js'
+import {
   generateAnimationMap,
   createAnimatedMaterial,
   updateAnimatedMaterial,
   updateDayProgress
-} = require('./animated-material-client')
-const { createSkyRenderer } = require('./sky-renderer')
-const { createWeatherSystem } = require('./weather-system')
-const { EntityExtrasManager } = require('./entity-extras')
+} from '../effects/animated-material-client.js'
+import { createSkyRenderer } from '../effects/sky-renderer.js'
+import { createWeatherSystem } from '../effects/weather-system.js'
+import { EntityExtrasManager } from '../entities/entity-extras.js'
 
-const io = require('socket.io-client')
+import io from 'socket.io-client'
 const socket = io({
   path: window.location.pathname + 'socket.io'
 })
@@ -119,30 +118,64 @@ function setupAnimatedMaterial (blockStates) {
     return
   }
 
-  try {
-    const texture = viewer.world.material.map
-    const atlasSize = texture.image ? texture.image.width : 1024
+  const texture = viewer.world.material.map
 
-    // Generate animation lookup map from blockstates
-    const animMap = generateAnimationMap(blockStates, atlasSize)
+  function doSetup () {
+    try {
+      const atlasSize = texture.image ? texture.image.width : null
+      if (!atlasSize) {
+        console.warn('[viewer] Animated material: texture.image still null, aborting')
+        return
+      }
 
-    // Create the animated material
-    animatedMaterial = createAnimatedMaterial(texture, animMap, {
-      dayProgress: 0.5, // Start at noon
-      ambientLightIntensity: 0.6,
-      directionalLightIntensity: 0.5
-    })
+      console.log(`[viewer] Setting up animated material with atlas size ${atlasSize}x${atlasSize}`)
 
-    // Replace the world's material
-    const originalMaterial = viewer.world.material
-    viewer.world.material = animatedMaterial
+      // Generate animation lookup map from blockstates
+      const animMap = generateAnimationMap(blockStates, atlasSize)
 
-    console.log('[viewer] Animated material enabled - water/lava/fire will animate')
+      // Create the animated material
+      // frameVStep = tileSize / atlasSize gives precise UV step per animation frame
+      const tileSize = 16
+      animatedMaterial = createAnimatedMaterial(texture, animMap, {
+        dayProgress: 0.5, // Start at noon
+        ambientLightIntensity: 0.6,
+        directionalLightIntensity: 0.5,
+        frameVStep: tileSize / atlasSize
+      })
 
-    // Store original for potential cleanup
-    viewer.world._originalMaterial = originalMaterial
-  } catch (e) {
-    console.error('[viewer] Failed to setup animated material:', e)
+      // Replace the world's material
+      const originalMaterial = viewer.world.material
+      viewer.world.material = animatedMaterial
+
+      console.log('[viewer] Animated material enabled - water/lava/fire will animate')
+
+      // Store original for potential cleanup
+      viewer.world._originalMaterial = originalMaterial
+    } catch (e) {
+      console.error('[viewer] Failed to setup animated material:', e)
+    }
+  }
+
+  // texture.image may not be loaded yet (THREE.TextureLoader is async).
+  // Wait for the image to actually load before reading its dimensions.
+  if (texture.image && texture.image.width) {
+    doSetup()
+  } else {
+    console.log('[viewer] Waiting for texture atlas image to load...')
+    // Poll for texture.image readiness (TextureLoader doesn't expose a reliable callback here)
+    let attempts = 0
+    const maxAttempts = 100 // 5 seconds at 50ms intervals
+    const poll = setInterval(() => {
+      attempts++
+      if (texture.image && texture.image.width) {
+        clearInterval(poll)
+        doSetup()
+      } else if (attempts >= maxAttempts) {
+        clearInterval(poll)
+        console.warn('[viewer] Texture atlas image did not load after 5s, using fallback size')
+        doSetup()
+      }
+    }, 50)
   }
 }
 
@@ -178,7 +211,7 @@ socket.on('entityEquipment', (data) => {
       id: data.id,
       equipment: data.equipment
     })
-    console.log(`[viewer] Updated equipment for entity ${data.id}`)
+    // Equipment update applied
   } catch (e) {
     // Ignore equipment update errors
   }
@@ -200,7 +233,7 @@ socket.on('weather', (data) => {
       skyRenderer.setStarBrightness(starBrightness)
     }
 
-    console.log(`[viewer] Weather changed to: ${data.state}${data.isSnowBiome ? ' (snow)' : ''}`)
+    // Weather state applied
   } catch (e) {
     console.warn('[viewer] Failed to update weather:', e)
   }
@@ -215,15 +248,16 @@ let lastYaw = null
 let lastPitch = null
 let botVelocity = 0 // For cape animation
 
-const renderer = new THREE.WebGLRenderer()
+const renderer = new WebGLRenderer()
 renderer.setPixelRatio(window.devicePixelRatio || 1)
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
 const viewer = new Viewer(renderer)
+window.__viewer = viewer
 
 function createOrbitControls () {
-  const ctrl = new THREE.OrbitControls(viewer.camera, renderer.domElement)
+  const ctrl = new OrbitControls(viewer.camera, renderer.domElement)
   ctrl.mouseButtons = {
     LEFT: THREE.MOUSE.ROTATE,
     MIDDLE: THREE.MOUSE.DOLLY,
@@ -357,10 +391,23 @@ socket.on('botInfo', (data) => {
   }
 })
 
+// ============================================================================
+// minecraft-data shim: receive server-extracted mcData for worker bundle
+// ============================================================================
+let pendingMcData = null
+
+socket.on('mcData', (payload) => {
+  // mcData received for version
+  pendingMcData = payload
+})
+
 // Queue for loadChunk events that arrive before viewer is ready
 // This fixes a race condition where chunks arrive during async blockStates loading
 const pendingChunks = []
 let viewerReady = false
+
+// Buffer for position events that arrive before the version handler completes
+let pendingPosition = null
 
 // Track whether workers have received blockStates
 let workersBlockStatesReady = false
@@ -374,6 +421,17 @@ socket.on('loadChunk', ({ x, z, chunk }) => {
     pendingChunks.push({ x, z, chunk })
   }
   // Once viewerReady is true, viewer.listen()'s handler will process new chunks
+})
+
+// Register position listener IMMEDIATELY to buffer initial position events.
+// The server emits position on socket connect, but the async version handler
+// (which loads blockstates) hasn't finished yet, so we buffer the position.
+socket.on('position', (posData) => {
+  if (!viewerReady) {
+    pendingPosition = posData
+    return
+  }
+  handlePosition(posData)
 })
 
 /**
@@ -405,7 +463,7 @@ function waitForWorkersReady (worldRenderer, timeout = 10000) {
       const blockStatesReady = worldRenderer.blockStatesData != null || textureReady
 
       if (textureReady && blockStatesReady) {
-        console.log('[viewer] Workers ready - texture loaded, blockStates should be in workers')
+        // Workers ready — texture loaded, blockStates distributed
         workersBlockStatesReady = true
         resolve()
         return
@@ -428,36 +486,90 @@ function waitForWorkersReady (worldRenderer, timeout = 10000) {
   })
 }
 
+/**
+ * Handle a position update from the server.
+ * Extracted from the version handler so it can also process buffered positions.
+ */
+function handlePosition ({ pos, addMesh, yaw, pitch }) {
+  lastPos = pos
+  lastYaw = yaw
+  lastPitch = pitch
+
+  if (viewMode === 'third') {
+    initOrbitControls()
+    controls.target.set(pos.x, pos.y, pos.z)
+    if (firstPositionUpdate && pos.y > 0) {
+      viewer.camera.position.set(pos.x, pos.y + 6, pos.z + 6)
+      controls.update()
+      firstPositionUpdate = false
+    }
+  } else if (yaw !== undefined && pitch !== undefined) {
+    destroyOrbitControls()
+    viewer.setFirstPersonCamera(pos, yaw, pitch)
+  }
+
+  if (addMesh) {
+    if (!botMesh) {
+      const textureVersion = globalThis.__MC_VERSION || '1.21.9'
+      botMesh = new Entity(textureVersion, 'player', viewer.scene).mesh
+      viewer.scene.add(botMesh)
+
+      // Set up entity extras (name tag, cape, shadow) for bot mesh
+      botExtrasManager = new EntityExtrasManager()
+      botExtrasManager.setup(botMesh, {
+        name: botUsername,
+        height: 1.8,
+        width: 0.6,
+        showCape: true,
+        capeColor: 0x2244aa,
+        showShadow: true
+      })
+      // Bot extras initialized
+    }
+
+    // Calculate velocity for cape animation
+    if (lastPos) {
+      const dx = pos.x - lastPos.x
+      const dz = pos.z - lastPos.z
+      botVelocity = Math.sqrt(dx * dx + dz * dz) / 0.05 // Approximate velocity
+    }
+
+    new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
+    if (yaw !== undefined) {
+      const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
+      const dy = 2 * da % (Math.PI * 2) - da
+      new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 50).start()
+    }
+  }
+}
+
 socket.on('version', async (version) => {
-  console.log(`[viewer] Received version: ${version}`)
+  console.log(`[viewer] Initializing version ${version}`)
   globalThis.__MC_VERSION = version
 
   // Configure custom asset URLs before setting version
   configureCustomAssets(viewer, version)
 
   // Try to load custom blockstates first
-  console.log('[viewer] Loading custom blockstates...')
   const customBlockStates = await loadCustomBlockStates(version)
   if (customBlockStates && viewer.world) {
     // CRITICAL: Set blockStatesData BEFORE setVersion() so updateTexturesData()
     // can send it to workers synchronously instead of loading async
     viewer.world.blockStatesData = customBlockStates
-    console.log(`[viewer] Using custom blockstates with ${Object.keys(customBlockStates).length} blocks`)
-  } else {
-    console.log('[viewer] No custom blockstates loaded, will use bundled')
   }
 
-  console.log('[viewer] Calling setVersion...')
+  // Pass mcData to worldrenderer so it can forward to workers before version message
+  if (pendingMcData && viewer.world) {
+    viewer.world.mcDataPayload = pendingMcData
+  }
+
   if (!viewer.setVersion(version)) {
     return false
   }
-  console.log('[viewer] setVersion complete')
 
   // CRITICAL FIX: Wait for workers to receive blockStates before processing chunks
   // This prevents the race condition where chunks arrive before blockStates
-  console.log('[viewer] Waiting for workers to be ready...')
   await waitForWorkersReady(viewer.world)
-  console.log('[viewer] Workers ready!')
 
   // Set up animated material after texture loads
   // The material.map is now guaranteed to be ready from waitForWorkersReady
@@ -469,30 +581,29 @@ socket.on('version', async (version) => {
   if (!skyRenderer) {
     skyRenderer = createSkyRenderer(viewer.scene, viewer.camera)
     skyRenderer.setTime(currentWorldTime)
-    console.log('[viewer] Sky renderer initialized')
   }
 
   // Initialize weather system
   if (!weatherSystem) {
     weatherSystem = createWeatherSystem(viewer.scene, viewer.camera)
-    console.log('[viewer] Weather system initialized')
   }
 
   firstPositionUpdate = true
-  console.log('[viewer] About to call viewer.listen(socket)...')
+  if (!globalThis.__ASSET_SERVER_URL) {
+    console.warn(
+      '[viewer] __ASSET_SERVER_URL not set - entity textures may load from bundled assets only; custom skins may not work'
+    )
+  }
   viewer.listen(socket)
-  console.log('[viewer] viewer.listen() complete')
 
   // Mark viewer as ready and process any queued chunks
   // Workers are now GUARANTEED to have blockStates loaded
   viewerReady = true
-  console.log(`[viewer] Viewer ready! pendingChunks.length = ${pendingChunks.length}`)
   if (pendingChunks.length > 0) {
-    console.log(`[viewer] Processing ${pendingChunks.length} queued chunks (workers have blockStates)...`)
+    console.log(`[viewer] Processing ${pendingChunks.length} queued chunks`)
     for (const { x, z, chunk } of pendingChunks) {
       viewer.addColumn(x, z, chunk)
     }
-    console.log(`[viewer] Finished processing queued chunks`)
     pendingChunks.length = 0 // Clear the queue
   }
 
@@ -503,56 +614,11 @@ socket.on('version', async (version) => {
 
   createPOVButton()
 
-  socket.on('position', ({ pos, addMesh, yaw, pitch }) => {
-    lastPos = pos
-    lastYaw = yaw
-    lastPitch = pitch
+  console.log('[viewer] Ready')
 
-    if (viewMode === 'third') {
-      initOrbitControls()
-      controls.target.set(pos.x, pos.y, pos.z)
-      if (firstPositionUpdate && pos.y > 0) {
-        viewer.camera.position.set(pos.x, pos.y + 6, pos.z + 6)
-        controls.update()
-        firstPositionUpdate = false
-      }
-    } else if (yaw !== undefined && pitch !== undefined) {
-      destroyOrbitControls()
-      viewer.setFirstPersonCamera(pos, yaw, pitch)
-    }
-
-    if (addMesh) {
-      if (!botMesh) {
-        const textureVersion = globalThis.__MC_VERSION || '1.21.9'
-        botMesh = new Entity(textureVersion, 'player', viewer.scene).mesh
-        viewer.scene.add(botMesh)
-
-        // Set up entity extras (name tag, cape, shadow) for bot mesh
-        botExtrasManager = new EntityExtrasManager()
-        botExtrasManager.setup(botMesh, {
-          name: botUsername,
-          height: 1.8,
-          width: 0.6,
-          showCape: true,
-          capeColor: 0x2244aa,
-          showShadow: true
-        })
-        console.log(`[viewer] Bot extras initialized for ${botUsername}`)
-      }
-
-      // Calculate velocity for cape animation
-      if (lastPos) {
-        const dx = pos.x - lastPos.x
-        const dz = pos.z - lastPos.z
-        botVelocity = Math.sqrt(dx * dx + dz * dz) / 0.05 // Approximate velocity
-      }
-
-      new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
-      if (yaw !== undefined) {
-        const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
-        const dy = 2 * da % (Math.PI * 2) - da
-        new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 50).start()
-      }
-    }
-  })
+  // Process buffered position event (sent by server before async setup completed)
+  if (pendingPosition) {
+    handlePosition(pendingPosition)
+    pendingPosition = null
+  }
 })

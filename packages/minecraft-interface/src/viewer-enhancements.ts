@@ -1,7 +1,7 @@
 /**
  * Viewer Enhancements Module
  *
- * Provides additional improvements to the prismarine-viewer for better
+ * Provides additional improvements to the viewer for better
  * entity rendering, lighting, and animation support.
  *
  * Features:
@@ -327,7 +327,7 @@ export class EnhancedViewer extends EventEmitter {
    */
   private getEntityMesh(entityId: number): THREE.Object3D | null {
     try {
-      // Access the entities manager from prismarine-viewer
+      // Access the entities manager from the viewer
       const viewer = this.bot.viewer;
       if (!viewer || !viewer.world || !viewer.world.entities) {
         return null;

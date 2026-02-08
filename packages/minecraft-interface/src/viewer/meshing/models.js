@@ -1,9 +1,19 @@
-const { Vec3 } = require('vec3')
+import { Vec3 } from 'vec3'
+import mcData from 'minecraft-data'
 
-const tints = require('minecraft-data')('1.16.2').tints
+// Tints are loaded lazily because in the worker bundle, minecraft-data is replaced
+// by a shim that must be populated via postMessage BEFORE any data access. Top-level
+// calls like `mcData('1.16.2')` would fail because postMessage hasn't fired yet at
+// module evaluation time.
+let tints = null
 
-for (const key of Object.keys(tints)) {
-  tints[key] = prepareTints(tints[key])
+function getTints () {
+  if (tints) return tints
+  tints = mcData('1.16.2').tints
+  for (const key of Object.keys(tints)) {
+    tints[key] = prepareTints(tints[key])
+  }
+  return tints
 }
 
 function prepareTints (tints) {
@@ -137,7 +147,7 @@ function renderLiquid (world, cursor, texture, type, biome, water, attr) {
       let m = 1 // Fake lighting to improve lisibility
       if (Math.abs(dir[0]) > 0) m = 0.6
       else if (Math.abs(dir[2]) > 0) m = 0.8
-      tint = tints.water[biome]
+      tint = getTints().water[biome]
       tint = [tint[0] * m, tint[1] * m, tint[2] * m]
     }
 
@@ -241,7 +251,6 @@ function renderElement (world, cursor, element, doAO, attr, globalMatrix, global
       if (!neighbor) continue
       if (cullIfIdentical && neighbor.type === block.type) continue
       if (!neighbor.transparent && neighbor.isCube) continue
-      if (neighbor.position.y < 0) continue
     }
 
     const minx = element.from[0]
@@ -262,15 +271,15 @@ function renderElement (world, cursor, element, doAO, attr, globalMatrix, global
     if (eFace.tintindex !== undefined) {
       if (eFace.tintindex === 0) {
         if (block.name === 'redstone_wire') {
-          tint = tints.redstone[`${block.getProperties().power}`]
+          tint = getTints().redstone[`${block.getProperties().power}`]
         } else if (block.name === 'birch_leaves' ||
           block.name === 'spruce_leaves' ||
           block.name === 'lily_pad') {
-          tint = tints.constant[block.name]
+          tint = getTints().constant[block.name]
         } else if (block.name.includes('leaves') || block.name === 'vine') {
-          tint = tints.foliage[biome]
+          tint = getTints().foliage[biome]
         } else {
-          tint = tints.grass[biome]
+          tint = getTints().grass[biome]
         }
       }
     }
@@ -801,4 +810,4 @@ function greedyMergeUpFaces (attr) {
   }
 }
 
-module.exports = { getSectionGeometry }
+export { getSectionGeometry }

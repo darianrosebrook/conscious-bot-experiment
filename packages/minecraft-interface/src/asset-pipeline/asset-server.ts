@@ -2,7 +2,7 @@
  * Asset Server Middleware - Express middleware for serving generated assets.
  *
  * This middleware serves generated texture atlases and blockstates JSON files,
- * with optional fallback to prismarine-viewer's bundled assets.
+ * with optional fallback to the internalized viewer's bundled assets.
  *
  * @module asset-pipeline/asset-server
  */
@@ -10,12 +10,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import type { Request, Response, NextFunction, Router } from 'express';
 import { Router as ExpressRouter } from 'express';
 import { AssetPipeline } from './pipeline.js';
 import type { AssetServerOptions } from './types.js';
+import { getVersionStatus, getAllVersions } from '../viewer/utils/version.js';
 
 const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Creates an Express middleware/router for serving generated Minecraft assets.
@@ -30,6 +34,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   const {
     autoGenerate = false,
     fallbackToBundled = true,
+    customSkinPath,
   } = options;
 
   const pipeline = new AssetPipeline(options.pipeline);
@@ -38,16 +43,90 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   // Track in-progress generations to avoid duplicates
   const generatingVersions = new Set<string>();
 
+  // Resolve custom skin path (check explicit option, env var, monorepo root, cwd, ~/Downloads)
+  const resolvedCustomSkinPath = (() => {
+    // Walk up from this file to find monorepo root (has pnpm-workspace.yaml)
+    let monorepoRoot: string | null = null;
+    let dir = path.dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 10; i++) {
+      if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml')) || fs.existsSync(path.join(dir, 'pnpm-lock.yaml'))) {
+        monorepoRoot = dir;
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    const candidates = [
+      customSkinPath,
+      process.env.CUSTOM_SKIN_PATH,
+      monorepoRoot ? path.join(monorepoRoot, 'createdSkin.png') : null,
+      path.resolve('createdSkin.png'), // cwd
+      path.join(process.env.HOME || '', 'Downloads', 'createdSkin.png'),
+    ].filter(Boolean) as string[];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        console.log(`[asset-server] Custom skin found: ${candidate}`);
+        return candidate;
+      }
+    }
+    console.log('[asset-server] No custom skin found (checked: monorepo root, cwd, ~/Downloads)');
+    return null;
+  })();
+
   /**
-   * Find prismarine-viewer's public directory for fallback.
+   * Paths that should be served from the custom skin instead of the JAR original.
+   * Covers both the legacy flat "steve.png" path and the modern "player/wide/steve.png".
+   */
+  const CUSTOM_SKIN_PATHS = new Set([
+    'steve.png',
+    'player/wide/steve.png',
+    'player/slim/steve.png',
+  ]);
+
+  /**
+   * Entity texture fallbacks for 1.21.x where Mojang switched to biome-variant naming.
+   * The viewer's entities.json uses legacy paths (cow/cow, pig/pig, sheep/sheep_fur)
+   * but 1.21.9 assets use temperate_*, cold_*, warm_* variants.
+   */
+  const ENTITY_TEXTURE_FALLBACKS_1_21: Record<string, string> = {
+    // Biome-variant animal renames in 1.21.9+
+    // Nested paths (cow/cow.png) used by most entities
+    'cow/cow.png': 'cow/temperate_cow.png',
+    'pig/pig.png': 'pig/temperate_pig.png',
+    'sheep/sheep_fur.png': 'sheep/sheep_wool.png',
+    'chicken/chicken.png': 'chicken/temperate_chicken.png',
+    'wolf/wolf.png': 'wolf/temperate_wolf.png',
+    'wolf/wolf_angry.png': 'wolf/temperate_wolf_angry.png',
+    'wolf/wolf_tame.png': 'wolf/temperate_wolf_tame.png',
+    // Flat paths (chicken.png) — some entities use "textures/entity/chicken" not "textures/entity/chicken/chicken"
+    'chicken.png': 'chicken/temperate_chicken.png',
+    // Equipment renames in 1.21.9+ — pig saddle moved to equipment folder
+    'pig/pig_saddle.png': 'equipment/pig_saddle/saddle.png',
+  };
+
+  function tryEntityFallback(
+    version: string,
+    relativePath: string,
+    texturesVersionDir: string,
+  ): string | null {
+    if (!version.startsWith('1.21')) return null;
+    const fallback = ENTITY_TEXTURE_FALLBACKS_1_21[relativePath];
+    if (!fallback) return null;
+    const fallbackPath = path.join(texturesVersionDir, 'entity', fallback);
+    return fs.existsSync(fallbackPath) ? fallbackPath : null;
+  }
+
+  /**
+   * Find viewer's public directory for fallback.
+   * Now points to our internalized src/viewer/public/ instead of node_modules.
    */
   function findPvPublicDir(): string | null {
-    try {
-      const pvPackagePath = require.resolve('prismarine-viewer/package.json');
-      return path.join(path.dirname(pvPackagePath), 'public');
-    } catch {
-      return null;
+    const viewerPublicDir = path.resolve(__dirname, '../viewer/public');
+    if (fs.existsSync(viewerPublicDir)) {
+      return viewerPublicDir;
     }
+    return null;
   }
 
   let pvPublicDir = findPvPublicDir();
@@ -85,7 +164,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         return fs.createReadStream(paths.texturePath).pipe(res);
       }
 
-      // Fallback to prismarine-viewer's bundled assets
+      // Fallback to viewer's bundled assets
       if (fallbackToBundled && pvPublicDir) {
         const bundledPath = path.join(pvPublicDir, 'textures', `${version}.png`);
         if (fs.existsSync(bundledPath)) {
@@ -147,7 +226,7 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         return fs.createReadStream(paths.blockStatesPath).pipe(res);
       }
 
-      // Fallback to prismarine-viewer's bundled assets
+      // Fallback to viewer's bundled assets
       if (fallbackToBundled && pvPublicDir) {
         const bundledPath = path.join(pvPublicDir, 'blocksStates', `${version}.json`);
         if (fs.existsSync(bundledPath)) {
@@ -193,7 +272,34 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   });
 
   /**
+   * Bundled version fallback chain for entity textures.
+   * entities.json models use Bedrock Edition UV layouts that match these older bundled textures.
+   * 1.21.9 JAR textures use Java Edition layouts with different dimensions/UV organization.
+   * We prefer bundled textures that match the model data over extracted JAR textures.
+   */
+  const ENTITY_BUNDLED_FALLBACK_VERSIONS = ['1.20.1', '1.19', '1.18.1', '1.17.1', '1.16.4'];
+
+  /**
+   * Try to find an entity texture in bundled viewer assets across multiple versions.
+   * Returns the file path if found, null otherwise.
+   */
+  function tryBundledEntityTexture(relativePath: string): string | null {
+    if (!pvPublicDir) return null;
+    for (const v of ENTITY_BUNDLED_FALLBACK_VERSIONS) {
+      const bundledPath = path.join(pvPublicDir, 'textures', v, 'entity', relativePath);
+      if (fs.existsSync(bundledPath)) return bundledPath;
+    }
+    return null;
+  }
+
+  /**
    * Serves entity textures (PNG), preserving directory structure.
+   *
+   * Resolution order:
+   *   1. Custom skin override (for steve.png)
+   *   2. Bundled viewer textures (match entities.json Bedrock model UVs)
+   *   3. Generated/extracted JAR textures (with biome-variant fallbacks)
+   *   4. Auto-generate on demand
    *
    * Example:
    *   GET /entity/1.21.9/player/wide/steve.png
@@ -206,10 +312,56 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
     }
 
     try {
-      const paths = pipeline.getOutputPaths(version);
-      const generatedPath = path.join(paths.rawAssetsPath, 'entity', relativePath);
+      // 1. Custom skin override — serve the user's skin for steve.png requests
+      if (resolvedCustomSkinPath && CUSTOM_SKIN_PATHS.has(relativePath)) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'no-cache'); // Don't cache custom skin so changes take effect
+        res.setHeader('X-Asset-Source', 'custom-skin');
+        return fs.createReadStream(resolvedCustomSkinPath).pipe(res);
+      }
+
+      // Helper: simpleName for flat paths like "steve.png" → "steve"
       const simpleName = relativePath.includes('/') ? null : path.basename(relativePath, '.png');
       const altRelativePath = simpleName ? path.join(simpleName, `${simpleName}.png`) : null;
+
+      // 2. Bundled viewer textures (preferred for entity UV compatibility)
+      // entities.json uses Bedrock model definitions whose UV coords match these older textures.
+      if (fallbackToBundled && pvPublicDir) {
+        // Direct path match across bundled versions
+        const bundledMatch = tryBundledEntityTexture(relativePath);
+        if (bundledMatch) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Asset-Source', 'bundled');
+          return fs.createReadStream(bundledMatch).pipe(res);
+        }
+        // Alt path (e.g., "steve.png" → "steve/steve.png")
+        if (altRelativePath) {
+          const altBundledMatch = tryBundledEntityTexture(altRelativePath);
+          if (altBundledMatch) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('X-Asset-Source', 'bundled');
+            return fs.createReadStream(altBundledMatch).pipe(res);
+          }
+        }
+        // Player skin candidates (e.g., "steve.png" → "player/wide/steve.png")
+        if (simpleName) {
+          for (const candidate of [`player/wide/${simpleName}.png`, `player/slim/${simpleName}.png`]) {
+            const playerMatch = tryBundledEntityTexture(candidate);
+            if (playerMatch) {
+              res.setHeader('Content-Type', 'image/png');
+              res.setHeader('Cache-Control', 'public, max-age=86400');
+              res.setHeader('X-Asset-Source', 'bundled');
+              return fs.createReadStream(playerMatch).pipe(res);
+            }
+          }
+        }
+      }
+
+      // 3. Generated/extracted JAR textures (for entities not in bundled assets)
+      const paths = pipeline.getOutputPaths(version);
+      const generatedPath = path.join(paths.rawAssetsPath, 'entity', relativePath);
       const altGeneratedPath = altRelativePath ? path.join(paths.rawAssetsPath, 'entity', altRelativePath) : null;
       const playerSkinCandidates = simpleName
         ? [
@@ -239,34 +391,16 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         }
       }
 
-      if (fallbackToBundled && pvPublicDir) {
-        const bundledPath = path.join(pvPublicDir, 'textures', version, 'entity', relativePath);
-        if (fs.existsSync(bundledPath)) {
-          res.setHeader('Content-Type', 'image/png');
-          res.setHeader('Cache-Control', 'public, max-age=86400');
-          res.setHeader('X-Asset-Source', 'bundled');
-          return fs.createReadStream(bundledPath).pipe(res);
-        }
-        if (altRelativePath) {
-          const altBundledPath = path.join(pvPublicDir, 'textures', version, 'entity', altRelativePath);
-          if (fs.existsSync(altBundledPath)) {
-            res.setHeader('Content-Type', 'image/png');
-            res.setHeader('Cache-Control', 'public, max-age=86400');
-            res.setHeader('X-Asset-Source', 'bundled');
-            return fs.createReadStream(altBundledPath).pipe(res);
-          }
-        }
-        for (const candidate of playerSkinCandidates) {
-          const candidateBundled = path.join(pvPublicDir, 'textures', version, 'entity', candidate);
-          if (fs.existsSync(candidateBundled)) {
-            res.setHeader('Content-Type', 'image/png');
-            res.setHeader('Cache-Control', 'public, max-age=86400');
-            res.setHeader('X-Asset-Source', 'bundled');
-            return fs.createReadStream(candidateBundled).pipe(res);
-          }
-        }
+      // Check biome-variant fallbacks against generated/extracted assets
+      const generatedFallbackPath = tryEntityFallback(version, relativePath, paths.rawAssetsPath);
+      if (generatedFallbackPath) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Asset-Source', 'generated-fallback');
+        return fs.createReadStream(generatedFallbackPath).pipe(res);
       }
 
+      // 4. Auto-generate on demand
       if (autoGenerate && !generatingVersions.has(version)) {
         generatingVersions.add(version);
         console.log(`[asset-server] Auto-generating assets for ${version} (entity textures)...`);
@@ -312,18 +446,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
     try {
       const cached = await pipeline.listCached();
 
-      // Try to load version support info from patched prismarine-viewer
-      let versionSupport: Record<string, unknown> | null = null;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { getVersionStatus, getAllVersions } = require('prismarine-viewer/viewer/lib/version');
-        versionSupport = {
-          supportedVersions: getAllVersions(),
-        };
-      } catch {
-        // Version module not available (prismarine-viewer not rebuilt yet)
-        versionSupport = null;
-      }
+      const versionSupport = {
+        supportedVersions: getAllVersions(),
+      };
 
       // Build version status for each cached version
       const versionStatuses = cached.map((c) => {
@@ -335,15 +460,9 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         let viewerSupported = true;
         let viewerFallback: string | null = null;
         if (versionSupport) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { getVersionStatus } = require('prismarine-viewer/viewer/lib/version');
-            const status = getVersionStatus(c.version);
-            viewerSupported = status.supported;
-            viewerFallback = status.fallback;
-          } catch {
-            // Ignore
-          }
+          const status = getVersionStatus(c.version);
+          viewerSupported = status.supported;
+          viewerFallback = status.fallback;
         }
 
         return {

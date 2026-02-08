@@ -7,9 +7,6 @@
  * 3. Version fallback logic for unsupported versions
  * 4. Status reporting for version compatibility
  *
- * This file is copied to node_modules/prismarine-viewer/viewer/lib/version.js
- * by scripts/rebuild-prismarine-viewer.cjs during postinstall.
- *
  * @module prismarine-viewer/viewer/lib/version
  * @author @darianrosebrook
  */
@@ -26,11 +23,6 @@ const supportedVersions = [
 // Dynamically registered versions from the asset pipeline
 const dynamicVersions = []
 
-/**
- * Register a version dynamically (called by asset pipeline when assets are generated).
- *
- * @param {string} version - The Minecraft version to register
- */
 function registerDynamicVersion (version) {
   if (!supportedVersions.includes(version) && !dynamicVersions.includes(version)) {
     dynamicVersions.push(version)
@@ -38,50 +30,28 @@ function registerDynamicVersion (version) {
   }
 }
 
-/**
- * Parse version string into comparable parts.
- *
- * @param {string} version - Version string like "1.21.9"
- * @returns {number[]} Array of version parts [1, 21, 9]
- */
 function parseVersion (version) {
   return version.split('.').map(p => parseInt(p, 10) || 0)
 }
 
-/**
- * Get the major.minor version for fallback matching.
- *
- * @param {string} version - Full version string
- * @returns {string} Major.minor version (e.g., "1.21")
- */
 function toMajor (version) {
   const parts = version.split('.')
   return parts.slice(0, 2).join('.')
 }
 
-/**
- * Find the closest supported version within the same major version.
- *
- * @param {string} major - Major.minor version (e.g., "1.21")
- * @param {string} targetVersion - The target version to match
- * @returns {string|null} Closest supported version, or null if none found
- */
 function findClosestInMajor (major, targetVersion) {
   const allVersions = [...supportedVersions, ...dynamicVersions]
   const sameFamily = allVersions.filter(v => v.startsWith(major + '.') || v === major)
 
   if (sameFamily.length === 0) return null
 
-  // Sort by patch version descending, pick the highest that's <= target
   const targetParts = parseVersion(targetVersion)
   const sorted = sameFamily.sort((a, b) => {
     const pa = parseVersion(a)
     const pb = parseVersion(b)
-    // Compare patch versions (third part)
     return (pb[2] || 0) - (pa[2] || 0)
   })
 
-  // Find the highest version that's <= target
   for (const v of sorted) {
     const vParts = parseVersion(v)
     if ((vParts[2] || 0) <= (targetParts[2] || 0)) {
@@ -89,30 +59,18 @@ function findClosestInMajor (major, targetVersion) {
     }
   }
 
-  // If no version <= target, return the lowest in family
   return sorted[sorted.length - 1]
 }
 
-/**
- * Get the best matching version for rendering.
- *
- * This is the main entry point used by prismarine-viewer.
- *
- * @param {string} version - The requested Minecraft version
- * @returns {string|null} The version to use, or null if unsupported
- */
 function getVersion (version) {
-  // Check static list first
   if (supportedVersions.includes(version)) {
     return version
   }
 
-  // Check dynamic registrations
   if (dynamicVersions.includes(version)) {
     return version
   }
 
-  // Try major version fallback (e.g., 1.21.10 → 1.21.9)
   const major = toMajor(version)
   const fallback = findClosestInMajor(major, version)
 
@@ -121,17 +79,10 @@ function getVersion (version) {
     return fallback
   }
 
-  // No fallback available
   console.error(`[version] ${version} is not supported and no fallback found`)
   return null
 }
 
-/**
- * Get detailed status for a version.
- *
- * @param {string} version - The Minecraft version to check
- * @returns {Object} Version status object
- */
 function getVersionStatus (version) {
   const isStatic = supportedVersions.includes(version)
   const isDynamic = dynamicVersions.includes(version)
@@ -147,16 +98,11 @@ function getVersionStatus (version) {
   }
 }
 
-/**
- * Get all supported versions.
- *
- * @returns {string[]} Array of all supported versions
- */
 function getAllVersions () {
   return [...supportedVersions, ...dynamicVersions]
 }
 
-module.exports = {
+export {
   getVersion,
   supportedVersions,
   dynamicVersions,
