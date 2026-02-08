@@ -1,4 +1,4 @@
-# Execution Path Audit — 2026-02-02
+# Execution Path Audit — 2026-02-08
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Trigger (executor/cognition/safety)
         -> mineflayer Bot (world mutation)
 ```
 
-The `/action` endpoint at `packages/minecraft-interface/src/server.ts:1590` is the **single gateway**. The `normalizeActionResponse()` function in `packages/planning/src/server/action-response.ts` is the **single interpreter** for responses from this endpoint.
+The `/action` endpoint at `packages/minecraft-interface/src/server.ts:1831` is the **single gateway**. The `normalizeActionResponse()` function in `packages/planning/src/server/action-response.ts` is the **single interpreter** for responses from this endpoint.
 
 ---
 
@@ -27,12 +27,12 @@ The `/action` endpoint at `packages/minecraft-interface/src/server.ts:1590` is t
 ### PATH 1: Planning Service Autonomous Executor (primary)
 
 ```
-autonomousTaskExecutor() [modular-server.ts:1483]
+autonomousTaskExecutor() [modular-server.ts:1626]
   -> setInterval every 10s (gated by ENABLE_PLANNING_EXECUTOR=1)
   -> threat hold evaluation
   -> step selection + guard pipeline (geofence, allowlist, rate limiter)
-  -> toolExecutor.execute() [modular-server.ts:453]
-    -> executeActionWithBotCheck() [modular-server.ts:534]
+  -> toolExecutor.execute() [modular-server.ts:581]
+    -> executeActionWithBotCheck() [modular-server.ts:676]
       -> normalizeActionResponse() [action-response.ts:30]
       -> HTTP POST /action -> minecraft-interface
 ```
@@ -66,7 +66,7 @@ IntrusiveThoughtProcessor [intrusive-thought-processor.ts:1325]
 ### PATH 4: Direct chat
 
 ```
-POST /chat [server.ts:1124]
+POST /chat [server.ts:1340]
   -> bot.chat(message) directly
 ```
 
@@ -76,19 +76,16 @@ Benign — chat is not a world-mutating action in the same sense.
 
 ## Dead / Legacy Paths (should be removed or disabled)
 
-### DEAD 1: PlanExecutor / `/execute-scenario`
+### DEAD 1: PlanExecutor / `/execute-scenario` — **RETIRED**
 
 ```
-POST /execute-scenario [server.ts:1830]
-  -> planExecutor.executePlanningCycle()
-    -> ALWAYS returns error: "No planning coordinator"
+POST /execute-scenario [server.ts:2155]
+  -> Returns 410 Gone (retired stub)
 ```
 
-**Evidence:** `PlanExecutor` is constructed without a `planningCoordinator` (server.ts:741). The `executePlanningCycle` method checks for it and returns early with an error at plan-executor.ts:164.
+**Previous behavior:** `PlanExecutor` was constructed without a `planningCoordinator`, causing `executePlanningCycle` to always error with "No planning coordinator." This produced 7 ERROR lines per soak run.
 
-**Impact:** This is the source of the **7 ERROR lines per run** in post-fix-run.log: `"Planning cycle error: No plan available for execution"`. Something is calling this on a timer.
-
-**Recommendation:** Find and disable the timer that calls this. If `execute-scenario` needs to stay for external callers, make it return a clean "legacy retired" response instead of logging an error + stack trace.
+**Current status (2026-02-08):** Endpoint now returns a clean `410 Gone` response with `{ retired: true, message: 'Planning execution flows through the planning service (port 3002).' }`. No error logging, no stack trace. The `executeTask()` caller in `mc-client.ts:327` is a deprecated stub that returns an error immediately without hitting the network.
 
 ### DEAD 2: ActionExecutor (action-executor.ts)
 
@@ -108,17 +105,14 @@ ActionExecutor.executeActionPlan() [action-executor.ts:46]
 
 **Recommendation:** Keep but clearly mark as non-production.
 
-### DEAD 4: Autonomous executor `executeTask()` fallback
+### DEAD 4: Autonomous executor `executeTask()` fallback — **RETIRED**
 
 ```
-executeTask(currentTask) [mc-client.ts:317]
-  -> HTTP POST /execute-scenario
-    -> hits DEAD 1 (PlanExecutor, always fails)
+executeTask(currentTask) [mc-client.ts:327]
+  -> Returns error immediately: "executeTask is retired"
 ```
 
-This fallback path in the autonomous executor sends tasks to the dead `/execute-scenario` endpoint. It will always fail silently.
-
-**Recommendation:** Remove the `executeTask()` fallback from the autonomous executor.
+Previously sent tasks to the dead `/execute-scenario` endpoint. Now a deprecated stub that returns an error without hitting the network. The autonomous executor falls through to leaf mapping.
 
 ---
 

@@ -1,8 +1,14 @@
 # Episodic Memory: Experience and Event Storage
 
-**Module:** `memory/episodic/`  
-**Purpose:** Autobiographical memory system storing significant experiences and events  
+**Module:** `memory/episodic/`
+**Purpose:** Autobiographical memory system storing significant experiences and events
 **Author:** @darianrosebrook
+
+> **Implementation Status: PARTIALLY IMPLEMENTED**
+> Last verified: 2026-02-08
+> Code location: `packages/memory/src/episodic/`
+> Implemented: `event-logger.ts`, `memory-consolidation.ts`, `episodic-retrieval.ts`, `narrative-generator.ts`
+> Design-only (not yet implemented): Some class hierarchies and sub-components described below exist only as design targets.
 
 ## Overview
 

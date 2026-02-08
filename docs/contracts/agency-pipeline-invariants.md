@@ -4,7 +4,7 @@ Covers the control plane, data plane, and acceptance criteria for the agency
 emission subsystem (drive tick, recording fix, INTENT extraction,
 thought-to-task converter).
 
-Last updated: 2026-02-02
+Last updated: 2026-02-08
 
 ---
 
@@ -346,8 +346,7 @@ npx vitest run packages/planning/src/task-integration/
 
 # Specific test files
 npx vitest run packages/cognition/src/__tests__/drive-tick.test.ts
-npx vitest run packages/cognition/src/__tests__/intent-extraction.test.ts
-npx vitest run packages/cognition/src/__tests__/llm-output-sanitizer.test.ts
+npx vitest run packages/cognition/src/__tests__/llm-output-sanitizer.test.ts  # includes INTENT extraction tests
 
 # Typecheck
 npx tsc --noEmit -p packages/cognition/tsconfig.json

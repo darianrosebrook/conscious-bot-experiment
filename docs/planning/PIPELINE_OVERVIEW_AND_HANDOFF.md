@@ -30,7 +30,7 @@
 
 ### 1.3 mcData Version Fallback and Live E2E Proof
 
-- **mcData fallback:** `minecraft-data` npm package only supports up to version 1.21.4; bot runs 1.21.9. Added fallback in `getMcData()` (`sterling-planner.ts`) to use 1.21.4 when the requested version returns null. This unblocked the entire Direct Solver pipeline (Path A).
+- **mcData fallback:** `minecraft-data` npm package only supports up to version 1.21.4; bot runs 1.21.9. Added fallback in `getMcData()` (`task-integration/sterling-planner.ts:323`) to use 1.21.4 when the requested version returns null. This unblocked the entire Direct Solver pipeline (Path A).
 - **Live E2E proof (Direct Solver / Path A):** Task created via `POST /task` → Sterling Rig A → mcData fallback 1.21.9→1.21.4 → crafting solver solved → `craft_recipe { recipe: "oak_planks", qty: 4 }` with `executable: true` → executor dispatched live → task completed in 2083ms. Full observability chain: `craftingPlanId`, `bundleHash`, `traceBundleHash`, `stepsDigest`, `solveJoinKeys`.
 - **Two execution pipelines identified:**
   - **Path A (Direct Solver):** `POST /task` → `generateDynamicSteps` → crafting solver → Option A steps → executor dispatch. Proven end-to-end.
@@ -232,7 +232,7 @@ For **solver** observability (solveMeta.bundles, live backend, payload snapshot)
 | `packages/planning/src/executor/sterling-step-executor.ts` | planningIncomplete check before leaf; backoff; recordExecutorBlocked on early returns. |
 | `packages/planning/src/golden-run-recorder.ts` | Throttle, eviction, fingerprint; execution.decisions; schema_revision, features; executor_plan_digest, intent_resolution_digest in expansion. |
 | `packages/planning/src/task-integration.ts` | finalizeNewTask / regenerateSteps call normalizeTaskStepsToOptionA; materializeSterlingIrSteps with intent splicing and three-digest model (executorPlanDigest always defined). |
-| `packages/planning/src/task-integration/sterling-planner.ts` | Sterling solver wiring; getMcData() with version fallback (1.21.9→1.21.4). |
+| `packages/planning/src/task-integration/sterling-planner.ts` | Sterling solver wiring; `getMcData()` (line 323) with version fallback (1.21.9→1.21.4). |
 | `packages/planning/src/modular-server.ts` | toolExecutor uses mapBTActionToMinecraft(..., { strict: true }). |
 | `packages/planning/src/server/task-block-evaluator.ts` | isTaskEligible respects nextEligibleAt; returns false for pending tasks with 0 steps. |
 | `packages/planning/src/sterling/solve-bundle.ts` | canonicalize() used by three-digest model for content-addressed hashing. |

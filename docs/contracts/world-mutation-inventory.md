@@ -1,4 +1,4 @@
-# World Mutation Call-Site Inventory — 2026-02-02
+# World Mutation Call-Site Inventory — 2026-02-08
 
 ## Purpose
 
@@ -10,7 +10,7 @@ Complete inventory of every code path that can mutate the Minecraft world. Used 
 
 | # | File | Line | Instance | Used By |
 |---|------|------|----------|---------|
-| 1 | `minecraft-interface/src/server.ts` | 1655 | Global cached on `(global)._cachedActionTranslator` | `/action` endpoint (all HTTP callers) |
+| 1 | `minecraft-interface/src/server.ts` | 1900 | Global cached on `(global)._cachedActionTranslator` | `/action` endpoint (all HTTP callers) |
 | 2 | `minecraft-interface/src/plan-executor.ts` | 121 | `this.actionTranslator` on PlanExecutor | SafetyMonitor (via `botAdapter.initializeSafetyMonitor()`) |
 | 3 | `minecraft-interface/src/standalone.ts` | 39 | `this.actionTranslator` | Standalone testing interface (non-prod) |
 | 4 | `minecraft-interface/src/__tests__/action-dispatch-contract.test.ts` | 148 | Test-only | Test harness |
@@ -23,7 +23,7 @@ Complete inventory of every code path that can mutate the Minecraft world. Used 
 
 | # | File | Line | Origin | Goes Through Guards? |
 |---|------|------|--------|---------------------|
-| 1 | `planning/src/modular-server.ts` | 559 | `executeActionWithBotCheck()` → `mcPostJson('/action')` | **YES** — geofence, rate limit, threat holds, shadow mode |
+| 1 | `planning/src/modular-server.ts` | 581 | `executeActionWithBotCheck()` → `mcPostJson('/action')` | **YES** — geofence, rate limit, threat holds, shadow mode |
 | 2 | `cognition/src/intrusive-thought-processor.ts` | 1327 | ~~`fetch(minecraftEndpoint/action)`~~ → `fetch(planningEndpoint/task)` | **YES** — routed through planning service |
 | 3 | `planning/src/reactive-executor/minecraft-executor.ts` | 338 | `fetch(minecraftInterfaceUrl/action)` | **NO** |
 | 4 | `planning/src/reactive-executor/reactive-executor.ts` | 1085 | `fetch(minecraftUrl/action)` — craftTask | **NO** |
@@ -42,7 +42,7 @@ Complete inventory of every code path that can mutate the Minecraft world. Used 
 
 | # | File | Line | Context |
 |---|------|------|---------|
-| 1 | `minecraft-interface/src/server.ts` | 1706 | `/action` endpoint handler (canonical) |
+| 1 | `minecraft-interface/src/server.ts` | 1963 | `/action` endpoint handler (canonical) |
 | 2 | `minecraft-interface/src/automatic-safety-monitor.ts` | 354, 364, 389 | Safety flee/shelter (uses PlanExecutor's instance) |
 | 3 | `minecraft-interface/src/action-executor.ts` | 64 | Dead code — never instantiated in prod |
 | 4 | `minecraft-interface/src/standalone-simple.ts` | 727+ | Non-prod standalone interface |
@@ -55,13 +55,13 @@ Complete inventory of every code path that can mutate the Minecraft world. Used 
 
 | # | Path | File | Line | Status |
 |---|------|------|------|--------|
-| 1 | `executeTask()` → POST `/execute-scenario` | `planning/src/modules/mc-client.ts` | 323 | **DEAD** — always fails (no planningCoordinator) |
-| 2 | `/execute-scenario` → `planExecutor.executePlanningCycle()` | `minecraft-interface/src/server.ts` | 1858 | **DEAD** — PlanExecutor has no coordinator (line 742) |
-| 3 | `autonomousTaskExecutor` fallback → `executeTask()` | `planning/src/modular-server.ts` | 2265 | **DEAD** — falls through to #1 above |
+| 1 | `executeTask()` — deprecated stub | `planning/src/modules/mc-client.ts` | 327 | **RETIRED** — returns error immediately, no network call |
+| 2 | `/execute-scenario` — returns 410 Gone | `minecraft-interface/src/server.ts` | 2155 | **RETIRED** — clean 410 stub, no error logging |
+| 3 | `autonomousTaskExecutor` fallback → `executeTask()` | `planning/src/modular-server.ts` | — | **RETIRED** — falls through to leaf mapping |
 | 4 | `ActionExecutor.executeActionPlan()` | `minecraft-interface/src/action-executor.ts` | 46 | **DEAD** — exported but never instantiated |
 | 5 | `runMinecraftScenario()` | `minecraft-interface/src/index.ts` | 171 | **DEAD** — uses stub coordinator |
 
-**Impact of dead paths:** #1→#2→#3 chain produces 7 ERROR lines per soak run. #4 and #5 are inert.
+**Impact of dead paths:** #1→#2→#3 chain has been retired (endpoint returns 410, stub returns error immediately). No error logging. #4 and #5 are inert.
 
 ---
 

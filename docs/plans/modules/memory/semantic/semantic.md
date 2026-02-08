@@ -1,8 +1,14 @@
 # Semantic Memory: Knowledge Graph and Factual Information
 
-**Module:** `memory/semantic/`  
-**Purpose:** Structured knowledge representation and factual reasoning foundation  
+**Module:** `memory/semantic/`
+**Purpose:** Structured knowledge representation and factual reasoning foundation
 **Author:** @darianrosebrook
+
+> **Implementation Status: PARTIALLY IMPLEMENTED**
+> Last verified: 2026-02-08
+> Code location: `packages/memory/src/semantic/`
+> Implemented: `knowledge-graph-core.ts`, `relationship-extractor.ts`, `query-engine.ts`, `graph-rag.ts`
+> Design-only: `EntityManager` and `SemanticReasoner` classes described below are architectural targets — the actual code uses a simpler flat-module organization.
 
 ## Overview
 

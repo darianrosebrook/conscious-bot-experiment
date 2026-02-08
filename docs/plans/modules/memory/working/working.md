@@ -1,8 +1,14 @@
 # Working Memory: Cognitive Workspace
 
-**Module:** `memory/working/`  
-**Purpose:** Short-term cognitive workspace for active information processing  
+**Module:** `memory/working/`
+**Purpose:** Short-term cognitive workspace for active information processing
 **Author:** @darianrosebrook
+
+> **Implementation Status: PARTIALLY IMPLEMENTED**
+> Last verified: 2026-02-08
+> Code location: `packages/memory/src/working/`
+> Implemented: `central-executive.ts`, `attention-manager.ts`, `goal-tracker.ts`
+> Naming note: Code uses `goal-tracker.ts` rather than `GoalStackManager` referenced below.
 
 ## Overview
 

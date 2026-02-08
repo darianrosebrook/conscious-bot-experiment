@@ -1,8 +1,14 @@
 # Forward Model Implementation Plan
 
-**Module:** `modules/planning/forward_model/`  
-**Purpose:** Predictive simulation and counterfactual replay for action evaluation  
+**Module:** `modules/planning/forward_model/`
+**Purpose:** Predictive simulation and counterfactual replay for action evaluation
 **Author:** @darianrosebrook
+
+> **Implementation Status: DESIGN SPECIFICATION**
+> Last verified: 2026-02-08
+> This document describes planned architecture that has **not yet been implemented**.
+> No `LightweightSimulator`, `CandidateScorer`, `PredictionTracker`, or `RiskAnalyzer` classes exist in the codebase.
+> The interfaces and code snippets below are design targets, not descriptions of existing code.
 
 ## Architecture Overview
 
