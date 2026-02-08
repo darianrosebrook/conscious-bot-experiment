@@ -1,19 +1,20 @@
 # Prismarine-Viewer Replacement Analysis
 
-**Date**: 2026-02-03
+**Date**: 2026-02-03 (updated 2026-02-08)
 **Purpose**: Document what it would take to replace prismarine-viewer entirely and analyze the upstream dependency chain.
 
 ---
 
 ## Executive Summary
 
-**Current State**: We've built a custom asset pipeline that extracts textures/blockstates directly from Minecraft JARs, eliminating dependency on the `minecraft-assets` package. However, we still depend on `prismarine-viewer` for:
-- Three.js rendering scaffolding
-- WebWorker-based chunk mesh building
-- WebSocket bot↔browser communication
-- Browser client UI
+**Current State**: We've built a standalone Vite-built viewer (`src/viewer/`) that replaces prismarine-viewer's browser client entirely. The only remaining dependency on prismarine-viewer is its server-side `mineflayer.js` WebSocket relay. We now have:
+- Our own Three.js rendering (scene, camera, controls) in `src/viewer/client/`
+- Our own chunk meshing worker (~525KB, down from 255MB) in `src/viewer/meshing/`
+- Our own entity rendering with bone hierarchy and cube rotation fixes in `src/viewer/entities/`
+- Our own sky dome and weather effects in `src/viewer/effects/`
+- Our own animated material shader in `src/viewer/renderer/`
 
-**Recommendation**: Keep prismarine-viewer as a rendering backend, but continue building independence in the asset/data layer. Full replacement has diminishing returns.
+**Recommendation**: We have effectively completed Phase 3 (Custom Viewer). The remaining prismarine-viewer dependency is minimal (server-side WebSocket relay only). Minecraft 1.21.9 is fully supported with no version rollback needed.
 
 ---
 
@@ -428,8 +429,13 @@ node scripts/inject-entity-textures.cjs 1.21.9 --custom-skin /Users/darianrosebr
 
 ## Conclusion
 
-**The asset pipeline was the right investment.** It solved the actual problem (new version support) without the maintenance burden of a full viewer replacement.
+**The standalone viewer migration is effectively complete.** We have replaced prismarine-viewer's browser client with our own Vite-built viewer in `src/viewer/`. The only remaining prismarine-viewer dependency is the server-side WebSocket relay (`mineflayer.js`), which is a thin event bridge.
 
-**Keep prismarine-viewer** as the rendering backend. It's stable, functional, and the community maintains it. Our patches are minimal (2 files, 36 lines).
+**Key wins from the migration**:
+- **No version rollback**: Minecraft 1.21.9 fully supported, no need to fall back to 1.21.4
+- **No fragile patches**: Eliminated pnpm patch + webpack rebuild workflow
+- **Fixed entity geometry**: Bone hierarchy (absolute→relative pivots) and cube rotation (pivot-centered) bugs fixed — these existed in the original prismarine-viewer and were never fixed upstream
+- **Small bundles**: Worker reduced from 255MB to 525KB via minecraft-data shim
+- **Modern THREE.js**: Using 0.179 instead of prismarine-viewer's 0.128
 
-**Full replacement is possible** but offers diminishing returns. The 5000-7500 lines of code would need ongoing maintenance as Minecraft evolves. Only pursue if prismarine-viewer becomes unmaintained or requirements change significantly.
+**The remaining prismarine-viewer dependency** (server-side WebSocket relay) could be replaced with ~200 lines of custom code if needed, but provides no immediate benefit since it works correctly.

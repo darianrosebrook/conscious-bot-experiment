@@ -11,10 +11,9 @@
  * @module viewer/entities/Entity
  */
 
-/* global THREE */
-
-const entities = require('./entities.json')
-const { loadTexture } = globalThis.isElectron ? require('../utils/utils.electron.js') : require('../utils/utils.web')
+import * as THREE from 'three'
+import entities from './entities.json'
+import { loadTexture } from '../utils/utils.web.js'
 
 // Material cache: same texture path → shared MeshLambertMaterial.
 // Textures are already cached in utils.web.js; this avoids creating duplicate
@@ -127,13 +126,12 @@ function addCube (attr, boneId, bone, cube, texWidth = 64, texHeight = 64) {
         cube.origin[2] + pos[2] * cube.size[2] + (pos[2] ? inflate : -inflate)
       )
 
-      // Apply cube-level rotation around the cube's own pivot (per-cube, not per-bone)
-      vecPos = vecPos.applyEuler(cubeRotation)
-      // Convert from model-space to bone-local space.
-      // Do NOT apply bone.rotation here — the skeleton system applies bone
-      // rotations at render time via the skinning pass. Baking bone rotation
-      // into the geometry causes a double-transform: once baked, once by GPU skinning.
+      // Cube rotation is around the bone pivot, not world origin.
+      // Translate to pivot-local, rotate, translate back.
       vecPos = vecPos.sub(bone.position)
+      vecPos = vecPos.applyEuler(cubeRotation)
+      vecPos = vecPos.applyEuler(bone.rotation)
+      vecPos = vecPos.add(bone.position)
 
       attr.positions.push(vecPos.x, vecPos.y, vecPos.z)
       attr.normals.push(...dir)
@@ -149,23 +147,10 @@ function addCube (attr, boneId, bone, cube, texWidth = 64, texHeight = 64) {
   }
 }
 
-/**
- * Create a mesh for an entity model.
- *
- * MODIFIED: Now accepts entityType and stores animation data in userData.
- *
- * @param {string} texture - Path to the texture file
- * @param {object} jsonModel - The entity model definition
- * @param {string} entityType - The Minecraft entity type (e.g., 'zombie')
- * @returns {THREE.SkinnedMesh}
- */
 function getMesh (texture, jsonModel, entityType) {
   const bones = {}
-  const bonesByName = {} // Named lookup for animation system
+  const bonesByName = {}
 
-  // Some entities in entities.json have undefined texturewidth/textureheight
-  // (bat, player, sheep, snow_golem, villager, wandering_trader).
-  // Default to 64x64 which is the standard Minecraft entity texture size.
   const texWidth = jsonModel.texturewidth || 64
   const texHeight = jsonModel.textureheight || 64
 
@@ -180,7 +165,7 @@ function getMesh (texture, jsonModel, entityType) {
   let i = 0
   for (const jsonBone of jsonModel.bones) {
     const bone = new THREE.Bone()
-    bone.name = jsonBone.name // Store bone name for animation lookups
+    bone.name = jsonBone.name
     if (jsonBone.pivot) {
       bone.position.x = jsonBone.pivot[0]
       bone.position.y = jsonBone.pivot[1]
@@ -195,7 +180,6 @@ function getMesh (texture, jsonModel, entityType) {
       bone.rotation.y = -jsonBone.rotation[1] * Math.PI / 180
       bone.rotation.z = -jsonBone.rotation[2] * Math.PI / 180
     }
-    // Store initial rotation for animation reset
     bone.userData.initialRotation = {
       x: bone.rotation.x,
       y: bone.rotation.y,
@@ -212,24 +196,30 @@ function getMesh (texture, jsonModel, entityType) {
     i++
   }
 
-  // Store absolute pivots before the parenting pass. Once we start making
-  // child positions relative to their parents, the .position values change,
-  // so deep chains (e.g. cat: body → tail1 → tail2) would subtract an
-  // already-modified parent position instead of the original absolute pivot.
+  // Build a lookup of absolute pivots from the JSON before modifying bone positions.
+  // addCube() above already used these absolute pivots for vertex transforms,
+  // so the geometry data is correct.
   const absolutePivots = {}
   for (const jsonBone of jsonModel.bones) {
-    absolutePivots[jsonBone.name] = bones[jsonBone.name].position.clone()
+    absolutePivots[jsonBone.name] = jsonBone.pivot
+      ? new THREE.Vector3(jsonBone.pivot[0], jsonBone.pivot[1], jsonBone.pivot[2])
+      : new THREE.Vector3()
   }
 
+  // Convert absolute pivots to parent-relative positions BEFORE building
+  // the hierarchy. THREE.js treats bone.position as local to parent, so
+  // if we leave absolute pivots, child world positions double-count the
+  // parent offset (e.g. body at [0,24,0] under waist at [0,12,0] would
+  // produce world [0,36,0] instead of [0,24,0]).
   const rootBones = []
   for (const jsonBone of jsonModel.bones) {
     if (jsonBone.parent) {
-      bones[jsonBone.parent].add(bones[jsonBone.name])
-      // Convert absolute model-space pivot to parent-relative position.
-      // Use stored absolute pivots so this works at any hierarchy depth.
-      bones[jsonBone.name].position.copy(
-        absolutePivots[jsonBone.name].clone().sub(absolutePivots[jsonBone.parent])
-      )
+      const childBone = bones[jsonBone.name]
+      const parentAbsolute = absolutePivots[jsonBone.parent]
+      const childAbsolute = absolutePivots[jsonBone.name]
+      // relative = child_absolute - parent_absolute
+      childBone.position.copy(childAbsolute).sub(parentAbsolute)
+      bones[jsonBone.parent].add(childBone)
     } else {
       rootBones.push(bones[jsonBone.name])
     }
@@ -245,14 +235,11 @@ function getMesh (texture, jsonModel, entityType) {
   geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(geoData.skinWeights, 4))
   geometry.setIndex(geoData.indices)
 
-  // Reuse material for entities sharing the same texture to reduce draw calls.
-  // Each entity still gets its own geometry, so UV rescaling is per-instance.
   let material = materialCache[texture]
   if (!material) {
-    material = new THREE.MeshLambertMaterial({ transparent: true, alphaTest: 0.1 })
+    material = new THREE.MeshLambertMaterial({ alphaTest: 0.1 })
     material.userData.isCached = true
     materialCache[texture] = material
-    // First time: load texture and configure the shared material
     loadTexture(texture, tex => {
       tex.magFilter = THREE.NearestFilter
       tex.minFilter = THREE.NearestFilter
@@ -266,37 +253,13 @@ function getMesh (texture, jsonModel, entityType) {
 
   const mesh = new THREE.SkinnedMesh(geometry, material)
   mesh.add(...rootBones)
-  // Force world matrix computation for the entire bone hierarchy before
-  // binding. bind() snapshots each bone's world matrix to compute
-  // inverseBindMatrices; without this, child bones may have stale matrices
-  // because add() does not trigger automatic recalculation.
-  mesh.updateMatrixWorld(true)
   mesh.bind(skeleton)
   mesh.scale.set(1 / 16, 1 / 16, 1 / 16)
 
-  // Shift geometry so the entity's feet sit on y=0 (ground plane).
-  // Bedrock models define y=0 at the world origin, not the entity's feet,
-  // so without this offset entities float above the ground.
-  geometry.computeBoundingBox()
-  if (geometry.boundingBox) {
-    const yShift = -geometry.boundingBox.min.y
-    const posAttr = geometry.getAttribute('position')
-    for (let j = 0; j < posAttr.count; j++) {
-      posAttr.setY(j, posAttr.getY(j) + yShift)
-    }
-    posAttr.needsUpdate = true
-    geometry.boundingBox = null // Invalidate cached bounding box
-  }
-
-  // Store animation-relevant data in userData for the animation system
   mesh.userData.entityType = entityType
   mesh.userData.bonesByName = bonesByName
   mesh.userData.skeleton = skeleton
 
-  // UV rescaling runs per-geometry (each entity has its own BufferGeometry).
-  // For cached textures, loadTexture fires the callback synchronously so the
-  // image dimensions are immediately available. For uncached textures, the
-  // callback fires asynchronously and we rescale UVs at that point.
   loadTexture(texture, tex => {
     const img = tex.image
     if (img && (img.width !== texWidth || img.height !== texHeight)) {
@@ -326,14 +289,8 @@ function resolveEntityTexturePath (version, texturePath) {
   return texturePath.replace('textures', 'textures/' + version) + '.png'
 }
 
-// Diagnostic: set globalThis.__VIEWER_DEBUG_ENTITY_TEXTURES = true to log first entity texture resolution
 let _debugEntityTextureLogged = false
 
-/**
- * Entity class - creates a mesh from entity model definitions.
- *
- * MODIFIED: Now tracks skinned meshes for animation system.
- */
 class Entity {
   constructor (version, type, scene) {
     const e = entities[type]
@@ -344,7 +301,6 @@ class Entity {
     this.mesh.userData.skinnedMeshes = []
 
     for (const [name, jsonModel] of Object.entries(e.geometry)) {
-      // Look up texture by geometry key name; fall back to 'default' or first available texture
       const texture = e.textures[name] || e.textures['default'] || Object.values(e.textures)[0]
       if (!texture) continue
       const resolvedPath = resolveEntityTexturePath(version, texture)
@@ -358,12 +314,8 @@ class Entity {
         )
       }
       const mesh = getMesh(resolvedPath, jsonModel, type)
-      /* const skeletonHelper = new THREE.SkeletonHelper( mesh )
-      skeletonHelper.material.linewidth = 2
-      scene.add( skeletonHelper ) */
       this.mesh.add(mesh)
 
-      // Track skinned meshes for animation system
       if (mesh.isSkinnedMesh) {
         this.mesh.userData.skinnedMeshes.push(mesh)
       }
@@ -371,4 +323,4 @@ class Entity {
   }
 }
 
-module.exports = Entity
+export default Entity

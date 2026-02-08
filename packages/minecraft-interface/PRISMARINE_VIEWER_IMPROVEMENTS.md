@@ -1,13 +1,35 @@
 # Prismarine Viewer Improvements
 
-This document outlines the improvements made to the Prismarine viewer to address issues with T-pose mobs, basic rendering, and lack of live day/night cycles.
+This document outlines the improvements made to the Minecraft viewer, including the migration from prismarine-viewer's patched client to our own standalone Vite-built viewer.
+
+## Architecture Evolution
+
+### Original Approach (deprecated)
+- Patched prismarine-viewer via `pnpm patch` and postinstall scripts
+- Injected custom JS files into prismarine-viewer's `node_modules`
+- Rebuilt webpack bundles after each change
+
+### Current Approach
+- **Standalone viewer** in `src/viewer/` — our own Three.js application
+- **Vite build** produces `dist/index.html`, `dist/assets/index-*.js` (~1950KB), `dist/assets/worker-*.js` (~525KB)
+- **minecraft-data shim** reduces worker bundle from 255MB to ~525KB by stubbing unused data
+- No pnpm patches for the viewer client; prismarine-viewer is only used for its server-side `mineflayer.js` WebSocket relay
+- Fully supports **Minecraft 1.21.9** and forward — no version rollback needed
+
+### Build Command
+```bash
+cd packages/minecraft-interface
+NODE_OPTIONS='--max-old-space-size=8192' npx vite build --config src/viewer/vite.config.js
+```
+
+---
 
 ## Issues Addressed
 
 ### 1. T-Pose Mobs and Characters
 **Problem**: Entities were showing only basic T-poses without proper animations.
 
-**Solution**: 
+**Solution**:
 - Implemented enhanced entity animation updates through the `EnhancedViewer` class
 - Added periodic entity position and animation updates (every 100ms)
 - Improved entity rendering distance and update frequency
@@ -31,11 +53,83 @@ This document outlines the improvements made to the Prismarine viewer to address
 - Implemented enhanced viewer configuration options
 - Added entity render distance improvements
 
+### 4. Entity Geometry Bugs (bone hierarchy and cube rotation)
+
+**Problem**: Entities rendered with floating, offset, or detached body parts. Two root causes:
+
+#### 4a. Bone Hierarchy: Absolute vs Relative Pivots
+
+Minecraft Bedrock entity models (used in `entities.json`) specify bone pivots as **absolute coordinates**. THREE.js treats `bone.position` as **local to parent**. When bones are added to a parent-child hierarchy, absolute pivots cause position doubling.
+
+Example: an iron golem body at `[0, 24, 0]` under a waist at `[0, 12, 0]` produces world position `[0, 36, 0]` (doubled) instead of the correct `[0, 24, 0]`.
+
+**Fix** (`src/viewer/entities/Entity.js` lines 197-224):
+```javascript
+// Build a lookup of absolute pivots from the JSON
+const absolutePivots = {}
+for (const jsonBone of jsonModel.bones) {
+  absolutePivots[jsonBone.name] = jsonBone.pivot
+    ? new THREE.Vector3(jsonBone.pivot[0], jsonBone.pivot[1], jsonBone.pivot[2])
+    : new THREE.Vector3()
+}
+
+// Convert absolute pivots to parent-relative positions
+for (const jsonBone of jsonModel.bones) {
+  if (jsonBone.parent) {
+    const childBone = bones[jsonBone.name]
+    const parentAbsolute = absolutePivots[jsonBone.parent]
+    const childAbsolute = absolutePivots[jsonBone.name]
+    childBone.position.copy(childAbsolute).sub(parentAbsolute)
+    bones[jsonBone.parent].add(childBone)
+  } else {
+    rootBones.push(bones[jsonBone.name])
+  }
+}
+```
+
+This bug existed in the original prismarine-viewer code but was masked in THREE.js 0.128 (which prismarine-viewer used). Our viewer uses THREE.js 0.179 where the bind matrix math exposes the error.
+
+#### 4b. Cube Rotation Pivot
+
+Bedrock models allow per-cube rotation (e.g., the chicken body has `rotation: [90, 0, 0]` to orient it horizontally). The rotation should be around the **bone's pivot point**, not around world origin.
+
+**Before** (wrong — rotates around world origin):
+```javascript
+vecPos = vecPos.applyEuler(cubeRotation)
+vecPos = vecPos.sub(bone.position)
+vecPos = vecPos.applyEuler(bone.rotation)
+vecPos = vecPos.add(bone.position)
+```
+
+**After** (correct — rotates around bone pivot):
+```javascript
+vecPos = vecPos.sub(bone.position)
+vecPos = vecPos.applyEuler(cubeRotation)
+vecPos = vecPos.applyEuler(bone.rotation)
+vecPos = vecPos.add(bone.position)
+```
+
+This affected 39 cubes across 13 entity types: chicken, all minecarts, arrows, striders, and projectiles. The original prismarine-viewer code had this same bug.
+
+### 5. Worker Bundle Size (255MB)
+
+**Problem**: The Vite-built worker included the full `minecraft-data` package (every version's block/item/entity data), producing a 255MB bundle.
+
+**Fix**: Created `src/viewer/meshing/minecraft-data-shim.js` that stubs out unused data tables and only retains the block/biome data needed for chunk meshing. Result: ~525KB worker bundle.
+
+### 6. Camera Position Race Condition
+
+**Problem**: Camera stuck at (0,0,0) on initial load because `position` events arrived before the viewer was ready.
+
+**Fix**: Buffer initial position events in `mineflayer.js` and replay them once the viewer client connects.
+
+---
+
 ## Technical Implementation
 
 ### Enhanced Viewer Module (`viewer-enhancements.ts`)
 
-The new `EnhancedViewer` class provides:
+The `EnhancedViewer` class provides:
 
 ```typescript
 interface ViewerEnhancementOptions {
@@ -62,7 +156,17 @@ interface ViewerEnhancementOptions {
    - Updates lighting every 1000ms
    - Provides time synchronization every 5000ms
 
-3. **Error Handling**
+3. **Sky Dome and Weather**
+   - Procedural sky with sun, moon, and stars
+   - Rain and snow particle systems
+   - Lightning effects with configurable frequency
+   - Smooth day/night color transitions
+
+4. **Frustum Culling**
+   - Entity visibility culling based on camera frustum
+   - Reduces draw calls for scenes with many entities
+
+5. **Error Handling**
    - Graceful error handling for entity updates
    - Non-critical error suppression
    - Robust error recovery
@@ -119,6 +223,8 @@ pnpm run mc-viewer
 - **Entity Updates**: 100ms intervals provide smooth animation without performance impact
 - **Lighting Updates**: 1000ms intervals balance visual quality with performance
 - **Time Sync**: 5000ms intervals provide accurate time without overhead
+- **Worker Bundle**: ~525KB (down from 255MB) via minecraft-data shim
+- **Main Bundle**: ~1950KB (Three.js + viewer code)
 - **Error Handling**: Non-critical errors are suppressed to prevent log spam
 
 ## Monitoring and Debugging
@@ -134,15 +240,15 @@ Event listeners for debugging:
 
 ```typescript
 enhancedViewer.on('started', () => {
-  console.log('✅ Enhanced viewer features activated');
+  console.log('Enhanced viewer features activated');
 });
 
 enhancedViewer.on('error', (error) => {
-  console.warn('⚠️ Enhanced viewer error:', error.type, error.error?.message);
+  console.warn('Enhanced viewer error:', error.type, error.error?.message);
 });
 ```
 
-## POV Switcher and Right-Click Orbit (patched)
+## POV Switcher and Right-Click Orbit
 
 The viewer client includes a POV switcher and right-click orbit controls:
 
@@ -150,17 +256,51 @@ The viewer client includes a POV switcher and right-click orbit controls:
 - **Right-click orbit**: In third-person mode, both left-click and right-click drag orbit the camera around the bot. Middle-click scrolls (dolly/zoom).
 - **Third-person orbit**: Camera orbits around bot position with smooth damping.
 
-The patched client is applied via `patches/prismarine-viewer-lib-index.patched.js` and copied during the postinstall rebuild step.
+These controls are implemented in our standalone viewer (`src/viewer/index.js`), not via a prismarine-viewer patch.
+
+## Viewer Source Structure
+
+The viewer source lives in `src/viewer/` and is built with Vite:
+
+```
+src/viewer/
+├── index.html              # Entry HTML
+├── index.js                # Client entry (POV, orbit, custom assets, animated material)
+├── vite.config.js          # Vite build config
+├── entities/
+│   ├── Entity.js           # Bedrock model → THREE.js SkinnedMesh (bone hierarchy fix)
+│   ├── entities.js         # Entity manager with animation, fallbacks, frustum culling
+│   ├── entities.json       # Bedrock-format entity geometry definitions
+│   ├── entity-extras.js    # Name tags, shadows, capes
+│   └── equipment-renderer.js
+├── meshing/
+│   ├── worker.js           # Web Worker entry for chunk meshing
+│   ├── world.js            # Chunk mesh management
+│   ├── models.js           # Block model → geometry
+│   ├── atlas.js            # Texture atlas loader
+│   ├── minecraft-data-shim.js  # Stubs unused data (keeps bundle small)
+│   └── modelsBuilder.js    # Model variant resolution
+├── effects/
+│   ├── sky-renderer.js     # Procedural sky dome
+│   └── weather-system.js   # Rain, snow, lightning
+├── renderer/
+│   └── animated-material-client.js  # Custom ShaderMaterial for texture animations
+├── client/
+│   └── index.js            # Camera, controls, Three.js scene setup
+├── server/
+│   └── mineflayer.js       # WebSocket relay (bot → browser)
+└── utils/
+    └── utils.web.js        # Texture loading, browser utilities
+```
 
 ## Future Improvements
 
 Potential enhancements for future versions:
 
-1. **Custom Entity Models**: Support for custom entity model rendering
-2. **Advanced Lighting**: Dynamic shadows and ambient occlusion
-3. **Weather Effects**: Rain, snow, and weather particle effects
-4. **Performance Optimization**: WebGL optimizations for better frame rates
-5. **Mobile Support**: Touch controls and mobile-optimized rendering
+1. **Advanced Lighting**: Dynamic shadows and ambient occlusion
+2. **Performance Optimization**: Greedy meshing, instanced rendering
+3. **Mobile Support**: Touch controls and mobile-optimized rendering
+4. **Entity equipment**: Armor, held items rendering
 
 ## Troubleshooting
 
@@ -176,7 +316,12 @@ Potential enhancements for future versions:
    - Check that world time is being received
    - Verify lighting update interval is set
 
-3. **Performance Issues**
+3. **Entities Floating or Detached**
+   - Ensure `Entity.js` has the absolute-to-relative pivot conversion
+   - Ensure cube rotation is applied around bone pivot, not world origin
+   - Check `entities.json` for correct bone parent-child relationships
+
+4. **Performance Issues**
    - Reduce update intervals if needed
    - Disable non-essential features
    - Check for excessive entity count
@@ -196,98 +341,13 @@ console.log('World time:', bot.world?.time);
 
 ## Version Compatibility
 
-- **Prismarine Viewer**: 1.33.0+
 - **Mineflayer**: 4.32.0+
 - **Node.js**: 18.0.0+
 - **TypeScript**: 5.9.2+
-- **Minecraft**: 1.8.8 - 1.21.9 (extended via patch)
+- **THREE.js**: 0.179 (bundled in viewer)
+- **Minecraft**: 1.8.8 - 1.21.9 (via custom asset pipeline, no version rollback needed)
 
----
-
-## Prismarine Viewer Patch (`patches/prismarine-viewer@1.33.0.patch`)
-
-The patch extends prismarine-viewer to support newer Minecraft versions that aren't yet in the upstream package.
-
-### What the Patch Does
-
-1. **Extends supported versions** (`viewer/lib/version.js`):
-   - Adds Minecraft 1.21.5, 1.21.6, 1.21.7, 1.21.8, and 1.21.9 to `supportedVersions` array
-   - These versions are generated by our custom asset pipeline
-
-2. **Fixes webpack build** (`webpack.config.js`):
-   - Adds `assert: false` to webpack resolve fallbacks
-   - Required for compatibility with newer `minecraft-data` package (v3.103.0+)
-   - Without this, webpack fails with "Cannot find module 'assert/'" error
-
-### Why This Patch Exists
-
-- **Upstream lag**: The `prismarine-viewer` and `minecraft-assets` packages often lag behind Minecraft releases
-- **Custom asset pipeline**: We extract textures/blockstates directly from Minecraft JARs
-- **Worker.js bundling**: The viewer's `worker.js` bundles `minecraft-data` internally, requiring rebuild after updates
-
-### How the Patch is Applied
-
-The patch is automatically applied by pnpm during install via:
-```json
-// package.json
-{
-  "pnpm": {
-    "patchedDependencies": {
-      "prismarine-viewer@1.33.0": "patches/prismarine-viewer@1.33.0.patch"
-    }
-  }
-}
-```
-
-### Regenerating the Patch
-
-If you need to modify the patch (e.g., add new Minecraft versions):
-
-```bash
-# 1. Create a writable patch directory
-pnpm patch prismarine-viewer@1.33.0
-
-# 2. Make changes to files in the returned directory path
-#    - viewer/lib/version.js: Add new versions to supportedVersions array
-#    - webpack.config.js: Update fallbacks if needed
-
-# 3. Commit the patch
-pnpm patch-commit <path-from-step-1>
-
-# 4. Rebuild the viewer bundles (index.js and worker.js)
-node packages/minecraft-interface/scripts/rebuild-prismarine-viewer.cjs
-```
-
-### Post-Install: Asset Generation
-
-After installing, generate assets for new versions:
-
-```bash
-# Generate assets for a specific version
-pnpm --filter @conscious-bot/minecraft-interface mc:assets extract 1.21.9
-
-# Or extract the latest Minecraft release
-pnpm --filter @conscious-bot/minecraft-interface mc:assets extract --latest
-```
-
-Assets are cached in `packages/minecraft-interface/.asset-cache/` and copied to prismarine-viewer's public folder.
-
-### Troubleshooting Patch Issues
-
-| Symptom | Cause | Solution |
-|---------|-------|----------|
-| "hunk header integrity check failed" | Invalid git diff index | Use `pnpm patch` + `pnpm patch-commit` workflow |
-| "Do not have data for X.XX.X" | Version not in supportedVersions | Add to patch's version.js |
-| "Cannot find module 'assert/'" | Webpack fallback missing | Add `assert: false` to webpack.config.js |
-| 404 for textures/blockStates | Assets not generated/copied | Run asset pipeline, check public/ folder |
-| Worker errors after minecraft-data update | Bundled worker.js stale | Rebuild with `rebuild-prismarine-viewer.cjs` |
-
-### Files in the Patch
-
-| File | Purpose |
-|------|---------|
-| `viewer/lib/version.js` | Defines which MC versions are supported |
-| `webpack.config.js` | Build config for index.js and worker.js |
+Minecraft 1.21.9 is fully supported. We do not need to roll back to 1.21.4 or any earlier version. The custom asset pipeline extracts textures and blockstates directly from Minecraft JARs, so new versions can be supported as soon as they release.
 
 ---
 

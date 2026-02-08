@@ -6,15 +6,21 @@
 
 The conscious-bot project relies on the **prismarine ecosystem** for Minecraft protocol handling, world representation, and 3D visualization. We've already built a custom asset pipeline that eliminates version lag, but several core dependencies remain. This document catalogs all prismarine dependencies and provides a clear replacement roadmap.
 
-**Current Status**: Hybrid approach
+**Current Status**: Standalone viewer with minimal prismarine-viewer dependency
 - ✅ **Replaced**: Asset extraction, texture atlases, blockstate processing
 - ✅ **Replaced**: Skeletal entity animations (walk/idle cycles)
 - ✅ **Replaced**: POV switching and orbit controls
 - ✅ **Replaced**: Animated textures (water/lava/fire with frame interpolation)
 - ✅ **Replaced**: Day/night lighting cycle (Minecraft-accurate colors)
+- ✅ **Replaced**: Entity bone hierarchy (absolute→relative pivot conversion for THREE.js 0.179)
+- ✅ **Replaced**: Cube rotation pivot fix (39 cubes across 13 entity types)
+- ✅ **Replaced**: Sky dome (procedural sun/moon/stars)
+- ✅ **Replaced**: Weather effects (rain, snow, lightning)
+- ✅ **Replaced**: Browser client (standalone Vite-built viewer, no webpack patches)
 - ✅ **Working**: Player skins (via Microsoft auth + ONLINE_MODE)
 - ✅ **Working**: Custom asset server for MC 1.21.5-1.21.9 textures
-- ❌ **Not Started**: Chunk meshing, physics simulation
+- ✅ **Working**: Minecraft 1.21.9 (no version rollback needed)
+- ❌ **Not Started**: Physics simulation replacement (keeping prismarine-physics)
 
 ---
 
@@ -80,30 +86,38 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - Smooth day/night lighting interpolation
 - Direct JAR extraction eliminates NPM package version lag
 
-### 2.2 Viewer Source Customizations ✅
+### 2.2 Standalone Viewer ✅
 
-**Location**: `packages/minecraft-interface/src/prismarine-viewer-src/`
+**Location**: `packages/minecraft-interface/src/viewer/`
 
-We maintain our own source files that get injected into prismarine-viewer via pnpm patch and postinstall scripts. This gives us version control, debugging capability, and a clear migration path.
+We maintain our own standalone viewer built with Vite, replacing the previous approach of patching prismarine-viewer's webpack-built client. This gives us full control over the rendering pipeline, eliminates fragile postinstall/patch workflows, and allows us to use modern THREE.js (0.179).
 
-| File | Mechanism | Purpose |
-|------|-----------|---------|
-| `index.js` | postinstall copy | POV toggle (F5), orbit controls, custom asset URLs, animated material setup |
-| `animated-material-client.js` | postinstall copy | Custom ShaderMaterial for water/lava/fire animations |
-| `Entity.js` | pnpm patch | Store bone refs in `mesh.userData` for animation lookups |
-| `entities.js` | pnpm patch | Full skeletal animation system (walk/idle cycles) |
-| `viewer.js` | pnpm patch | Render loop with `updateAnimations(deltaTime)` call |
-| `animation-system.js` | reference | Standalone animation logic (importable) |
+| Directory | Purpose |
+|-----------|---------|
+| `entities/Entity.js` | Bedrock model → THREE.js SkinnedMesh with bone hierarchy fix |
+| `entities/entities.js` | Entity manager with skeletal animation, fallbacks, frustum culling |
+| `entities/entities.json` | Bedrock-format entity geometry definitions (30+ entity types) |
+| `effects/sky-renderer.js` | Procedural sky dome with sun, moon, stars |
+| `effects/weather-system.js` | Rain, snow, lightning particle systems |
+| `renderer/animated-material-client.js` | Custom ShaderMaterial for water/lava/fire |
+| `meshing/worker.js` | Web Worker for chunk meshing (~525KB bundle) |
+| `meshing/minecraft-data-shim.js` | Stubs unused minecraft-data (255MB→525KB) |
+| `client/index.js` | Three.js scene, camera, controls |
+| `server/mineflayer.js` | WebSocket relay (bot → browser) |
+| `index.js` | Client entry with POV toggle, orbit controls, asset loading |
 
-**Patch Application**:
+**Build**:
+```bash
+cd packages/minecraft-interface
+NODE_OPTIONS='--max-old-space-size=8192' npx vite build --config src/viewer/vite.config.js
+# Output: dist/index.html, dist/assets/index-*.js (~1950KB), dist/assets/worker-*.js (~525KB)
 ```
-pnpm install
-  → pnpm patch applies Entity.js, entities.js, viewer.js
-  → postinstall runs rebuild-prismarine-viewer.cjs
-    → copies index.js to lib/index.js
-    → copies animated-material-client.js to lib/
-    → webpack rebuilds client bundle with both files
-```
+
+**Key fixes over original prismarine-viewer**:
+- **Bone hierarchy**: Converts absolute Bedrock pivots to parent-relative positions for THREE.js 0.179
+- **Cube rotation**: Rotates around bone pivot instead of world origin (fixes chicken body, minecarts, arrows)
+- **Worker size**: minecraft-data shim reduces bundle from 255MB to ~525KB
+- **Camera race condition**: Buffers initial position events for viewer startup
 
 ### 2.3 Skeletal Animation System ✅
 
@@ -184,14 +198,9 @@ Player skins work through Mojang's session authentication system, not custom loa
 - Docker running with `ONLINE_MODE=TRUE`
 - First-time connection prompts for Microsoft login
 
-### 2.6 Viewer Patches (pnpm) ✅
+### 2.6 Viewer Independence (no patches needed) ✅
 
-**Location**: `patches/prismarine-viewer@1.33.0.patch`
-
-The pnpm patch file is auto-generated from our source files. Contains diffs for:
-- `viewer/lib/entity/Entity.js` - Bone storage for animation
-- `viewer/lib/entities.js` - Animation system injection
-- `viewer/lib/viewer.js` - Render loop integration
+The standalone viewer in `src/viewer/` has eliminated the need for pnpm patches to prismarine-viewer's client-side code. The only remaining use of prismarine-viewer is its server-side `mineflayer.js` WebSocket relay, which bridges bot events to the browser. Our viewer connects to this same WebSocket but renders everything with our own code.
 
 ---
 
@@ -232,29 +241,34 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - Face culling optimization (only render visible faces)
 - Biome color interpolation (smooth transitions)
 
-### 3.2 Entity Rendering (Partially Complete)
+### 3.2 Entity Rendering (Mostly Complete)
 
-**Current**: Hybrid - prismarine-viewer base + our animation system
+**Current**: Standalone viewer with full entity pipeline
 
 **What We've Built** ✅:
 - Skeletal animation system with AnimationMixer per entity
 - Walk/idle cycles for bipeds and quadrupeds
 - Velocity-based animation state machine
 - Smooth crossfade transitions (0.2s)
-- Run/jump/fall animations (TypeScript, not yet in patch)
+- Bone hierarchy fix: absolute→relative pivot conversion for THREE.js 0.179
+- Cube rotation fix: pivot-centered rotation (fixes chicken, minecarts, arrows, striders)
+- Entity fallback system for unknown types (goat→sheep, glow_squid→squid, etc.)
+- Frustum culling for entity visibility
+- Name tag rendering (canvas-based sprites with distance scaling)
+- Shadow projection (simple disc shadow)
+- Cape rendering
 
 **What Still Needs Work**:
 - Equipment rendering (armor, held items)
-- Cape rendering
-- Name tag rendering
-- Shadow projection
 
 **What's Now Working** ✅:
 - Player skins (via Microsoft auth + ONLINE_MODE)
+- 30+ entity types with correct 3D geometry
+- Entities verified on Minecraft 1.21.9
 
 **Remaining Estimate**:
-- Lines of code: 400-600
-- Time: 3-5 days
+- Lines of code: 200-400 (equipment only)
+- Time: 2-3 days
 - Complexity: Medium
 
 ### 3.3 World Renderer Integration (Medium Effort)
@@ -306,13 +320,17 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 - [x] POV toggle (1st/3rd person)
 - [x] Orbit controls for 3rd person view
 
-### Phase 3: Enhanced Rendering (Partially Complete)
+### Phase 3: Enhanced Rendering (Mostly Complete)
 - [x] Animated textures (water, lava, fire, sea lantern, etc.)
 - [x] Day/night lighting cycle with smooth transitions
 - [x] Player skins (via Microsoft auth)
 - [x] Custom asset server for MC 1.21.5-1.21.9
-- [ ] Custom sky rendering (sun/moon position, stars)
-- [ ] Weather effects (rain, snow particles)
+- [x] Custom sky rendering (procedural sun/moon/stars dome)
+- [x] Weather effects (rain, snow, lightning particles)
+- [x] Entity bone hierarchy fix (absolute→relative pivots for THREE.js 0.179)
+- [x] Entity cube rotation fix (pivot-centered rotation for 39 cubes/13 entity types)
+- [x] Standalone Vite-built viewer (no webpack patches)
+- [x] Worker bundle optimization (255MB→525KB via minecraft-data shim)
 - [ ] Block lighting (torch light, redstone)
 - [ ] Entity equipment rendering (armor, held items)
 
@@ -334,42 +352,65 @@ The pnpm patch file is auto-generated from our source files. Contains diffs for:
 
 ### 5.1 Directory Structure
 
-Our migration code is organized into three tiers:
+Our viewer code is organized in two tiers — the standalone viewer (browser) and the asset pipeline (server):
 
 ```
 packages/minecraft-interface/src/
-├── prismarine-viewer-src/          # Tier 1: Direct patches (JS, injected into viewer)
-│   ├── README.md                   # Documentation + regeneration instructions
-│   ├── index.js                    # Client entry (POV, orbit, custom assets, animated material)
-│   ├── animated-material-client.js # Custom ShaderMaterial for texture animations
-│   ├── Entity.js                   # Bone storage for animations
-│   ├── entities.js                 # Animation system + entity manager
-│   ├── viewer.js                   # Render loop integration
-│   └── animation-system.js         # Standalone animation logic
+├── viewer/                            # Standalone Vite-built viewer (browser-side)
+│   ├── index.html                     # Entry HTML
+│   ├── index.js                       # Client entry (POV, orbit, assets, animated material)
+│   ├── vite.config.js                 # Build config
+│   ├── entities/
+│   │   ├── Entity.js                  # Bedrock model → SkinnedMesh (bone hierarchy fix)
+│   │   ├── entities.js                # Entity manager, animation, fallbacks, culling
+│   │   ├── entities.json              # Bedrock-format entity geometry (30+ types)
+│   │   ├── entity-extras.js           # Name tags, shadows, capes
+│   │   └── equipment-renderer.js      # (in progress)
+│   ├── meshing/
+│   │   ├── worker.js                  # Web Worker for chunk meshing
+│   │   ├── minecraft-data-shim.js     # Stubs unused data (255MB→525KB)
+│   │   ├── world.js                   # Chunk mesh management
+│   │   └── models.js                  # Block model → geometry
+│   ├── effects/
+│   │   ├── sky-renderer.js            # Procedural sky dome
+│   │   └── weather-system.js          # Rain, snow, lightning
+│   ├── renderer/
+│   │   └── animated-material-client.js # ShaderMaterial for texture animations
+│   ├── client/
+│   │   └── index.js                   # Three.js scene, camera, controls
+│   ├── server/
+│   │   └── mineflayer.js              # WebSocket relay (bot → browser)
+│   └── utils/
+│       └── utils.web.js               # Texture loading, browser utilities
 │
-├── asset-pipeline/                 # Tier 2: TypeScript enhancements (server-side)
-│   ├── entity-animations.ts        # Full animation system (authoritative)
-│   ├── animated-material.ts        # Custom shaders
-│   ├── viewer-integration.ts       # Hooks into prismarine-viewer
-│   └── ...                         # Asset extraction, atlas, etc.
+├── asset-pipeline/                    # Server-side asset processing
+│   ├── entity-animations.ts           # Skeletal animation system (authoritative)
+│   ├── animated-material.ts           # Custom shaders
+│   ├── viewer-integration.ts          # Hooks into viewer startup
+│   ├── atlas-builder.ts               # Texture atlas (replaces minecraft-assets)
+│   ├── blockstates-builder.ts         # Model resolution
+│   ├── asset-extractor.ts             # JAR extraction
+│   ├── jar-downloader.ts              # Version management
+│   ├── version-resolver.ts            # Mojang manifest client
+│   ├── asset-server.ts                # Serves custom assets
+│   └── pipeline.ts                    # Orchestrates generation
 │
-└── custom-viewer/                  # Tier 3: Future full replacement (not started)
-    ├── index.ts                    # Entry point
-    ├── renderer/                   # Three.js scene management
-    ├── meshing/                    # Chunk mesh generation
-    ├── entities/                   # Entity rendering
-    └── shaders/                    # GLSL shaders
+└── viewer-enhancements.ts             # Server-side bot↔viewer bridge
 ```
 
-### 5.2 Three-Tier Migration Strategy
+### 5.2 Migration Status
 
-| Tier | Purpose | When to Use |
-|------|---------|-------------|
-| **Tier 1: Patches** | Minimal changes to prismarine-viewer | Small fixes, feature injection |
-| **Tier 2: Enhancements** | TypeScript code that integrates with viewer | Complex logic, server-side processing |
-| **Tier 3: Replacement** | Full custom implementation | When prismarine-viewer is deprecated |
+The previous three-tier strategy (Patches → Enhancements → Replacement) has been superseded. We have completed the migration to a standalone viewer:
+
+| Previous Tier | Status | Current State |
+|---------------|--------|---------------|
+| **Tier 1: Patches** | ✅ Eliminated | No pnpm patches needed for viewer client |
+| **Tier 2: Enhancements** | ✅ Active | Asset pipeline, viewer-enhancements.ts |
+| **Tier 3: Replacement** | ✅ Complete | `src/viewer/` is the standalone viewer |
 
 ### 5.3 Current Prismarine Usage
+
+Prismarine-viewer is only used for its server-side WebSocket relay:
 
 ```
 packages/minecraft-interface/
@@ -378,47 +419,22 @@ packages/minecraft-interface/
 └── src/viewer-enhancements.ts          # Wraps prismarine-viewer with custom features
 ```
 
-### 5.4 Custom Replacements (Asset Pipeline)
+The browser-side rendering is entirely our own code in `src/viewer/`.
 
-```
-packages/minecraft-interface/src/asset-pipeline/
-├── animated-material.ts                # Custom Three.js shader (replaces basic animation)
-├── entity-animations.ts                # Skeletal animation system
-├── atlas-builder.ts                    # Texture atlas (replaces minecraft-assets)
-├── blockstates-builder.ts              # Model resolution (replaces viewer's loader)
-├── asset-extractor.ts                  # JAR extraction (replaces minecraft-assets)
-├── jar-downloader.ts                   # Version management (replaces minecraft-assets)
-├── version-resolver.ts                 # Mojang manifest client
-├── viewer-integration.ts               # Hooks into prismarine-viewer
-├── asset-server.ts                     # Serves custom assets
-└── pipeline.ts                         # Orchestrates generation
-```
-
-### 5.5 Patch Regeneration Workflow
-
-When modifying viewer customizations:
+### 5.4 Viewer Build Workflow
 
 ```bash
-# 1. Edit source files in prismarine-viewer-src/
-vim src/prismarine-viewer-src/entities.js
+# Build the standalone viewer
+cd packages/minecraft-interface
+NODE_OPTIONS='--max-old-space-size=8192' npx vite build --config src/viewer/vite.config.js
 
-# 2. Start a fresh patch session
-pnpm patch prismarine-viewer@1.33.0
-
-# 3. Copy source files to patch directory
-cp src/prismarine-viewer-src/Entity.js \
-   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/entity/
-cp src/prismarine-viewer-src/entities.js \
-   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
-cp src/prismarine-viewer-src/viewer.js \
-   node_modules/.pnpm_patches/prismarine-viewer@1.33.0/viewer/lib/
-
-# 4. Commit the patch
-pnpm patch-commit 'node_modules/.pnpm_patches/prismarine-viewer@1.33.0'
-
-# 5. Verify
-pnpm install
+# Output:
+#   dist/index.html
+#   dist/assets/index-*.js   (~1950KB)
+#   dist/assets/worker-*.js  (~525KB)
 ```
+
+No patch regeneration is needed — edit files directly in `src/viewer/` and rebuild.
 
 ---
 
@@ -434,8 +450,13 @@ pnpm install
 | Custom asset server | ✅ Done | MC 1.21.5-1.21.9 support |
 | Player skins | ✅ Done | Via Microsoft auth (no code needed) |
 | Day/night cycle | ✅ Done | Smooth color interpolation |
+| Sky dome | ✅ Done | Procedural sun/moon/stars |
+| Weather effects | ✅ Done | Rain, snow, lightning |
+| Entity bone hierarchy | ✅ Done | Absolute→relative pivot fix for THREE.js 0.179 |
+| Entity cube rotation | ✅ Done | Pivot-centered rotation (13 entity types) |
+| Standalone viewer | ✅ Done | Vite-built, no webpack patches needed |
+| Worker optimization | ✅ Done | 255MB→525KB via minecraft-data shim |
 | Entity equipment | ⏳ Next | Armor, held items needed |
-| Chunk meshing | ⏳ Maybe | High effort, current solution works |
 | Physics | ❌ Keep | Pathfinding depends on it |
 | Protocol handling | ❌ Keep | mineflayer is excellent |
 | World storage | ❌ Keep | prismarine-world is solid |
@@ -590,5 +611,5 @@ packages/minecraft-interface/src/asset-pipeline/
 
 ---
 
-*Last updated: 2026-02-04*
+*Last updated: 2026-02-08*
 *Author: Claude Code*
