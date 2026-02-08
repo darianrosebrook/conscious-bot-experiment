@@ -31,4 +31,7 @@ export type {
   SterlingSolveStepCallback,
   SterlingLanguageReducerResult,
   SterlingLanguageIOResultMessage,
+  SterlingExpandByDigestStep,
+  SterlingIntentReplacement,
+  SterlingResolveIntentStepsResultMessage,
 } from './types';

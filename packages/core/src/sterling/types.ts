@@ -60,6 +60,7 @@ export interface SterlingRequest {
     | 'get_domain_declaration_v1'
     | 'language_io.reduce'
     | 'expand_by_digest_v1'
+    | 'resolve_intent_steps'
     | 'server_info_v1';
   domain?: SterlingDomain;
   [key: string]: unknown;
@@ -257,6 +258,39 @@ export interface SterlingExpandByDigestResultMessage {
   retry_after_ms?: number;
 }
 
+/**
+ * Per-intent replacement entry from resolve_intent_steps.
+ * Each entry maps one intent step (by index) to its resolved executable
+ * steps or an unresolved reason. This enables deterministic splicing on
+ * the TS side without positional guessing.
+ */
+export interface SterlingIntentReplacement {
+  intent_step_index: number;
+  resolved: boolean;
+  /** Present when resolved === true: the executable steps that replace this intent step. */
+  steps?: SterlingExpandByDigestStep[];
+  /** Present when resolved === false: why resolution failed. */
+  unresolved_reason?: string;
+}
+
+export type SterlingResolveIntentStepsStatus = 'ok' | 'blocked' | 'error';
+
+/** Response from resolve_intent_steps command. */
+export interface SterlingResolveIntentStepsResultMessage {
+  type: 'resolve_intent_steps.result';
+  request_id: string;
+  status: SterlingResolveIntentStepsStatus;
+  replacements?: SterlingIntentReplacement[];
+  plan_bundle_digest?: string;
+  schema_version?: string;
+  blocked_reason?: string;
+  error?: string;
+  /** @deprecated Legacy shape — present on pre-v0.2.0 servers that return flat steps instead of replacements. */
+  steps?: SterlingExpandByDigestStep[];
+  /** @deprecated Legacy shape — present on pre-v0.2.0 servers. */
+  unresolved_steps?: Array<{ leaf: string; reason: string }>;
+}
+
 /** Response from server_info_v1 command (evidence-grade server identity). */
 export interface SterlingServerInfoResultMessage {
   type: 'server_info.result';
@@ -285,6 +319,7 @@ export type SterlingMessage =
   | SterlingDeclarationRetrievedMessage
   | SterlingDeclarationNotFoundMessage
   | SterlingExpandByDigestResultMessage
+  | SterlingResolveIntentStepsResultMessage
   | SterlingServerInfoResultMessage
   | SterlingLanguageIOResultMessage;
 

@@ -24,6 +24,7 @@ import type {
   SterlingSolutionEdge,
   SterlingLanguageReducerResult,
   SterlingExpandByDigestStep,
+  SterlingIntentReplacement,
 } from './types';
 
 // ============================================================================
@@ -820,6 +821,147 @@ export class SterlingClient extends EventEmitter {
       try {
         this.send({
           command: 'expand_by_digest_v1',
+          request_id: requestId,
+          ...request,
+        });
+      } catch (err) {
+        cleanup();
+        this.recordFailure();
+        resolve({
+          status: 'error',
+          error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    });
+  }
+
+  /**
+   * Resolve abstract intent steps into executor-native steps via domain solvers.
+   *
+   * Sends resolve_intent_steps command with intent steps + world state,
+   * waits for resolve_intent_steps.result response.
+   *
+   * Returns per-intent replacements so the caller can deterministically
+   * splice each intent step → its concrete replacement steps.
+   */
+  async resolveIntentSteps(
+    request: {
+      intent_steps: Array<{ leaf: string; args: Record<string, unknown> }>;
+      world_state: { inventory: Record<string, number>; nearby_blocks: string[] };
+      rules?: Array<Record<string, unknown>>;
+      schema_version?: string;
+      request_id?: string;
+    },
+    timeoutMs: number = 10000,
+  ): Promise<
+    | {
+        status: 'ok';
+        replacements: SterlingIntentReplacement[];
+        plan_bundle_digest: string;
+        schema_version?: string;
+      }
+    | { status: 'blocked'; blocked_reason: string; replacements?: SterlingIntentReplacement[] }
+    | { status: 'error'; error: string }
+  > {
+    if (this.isCircuitOpen()) {
+      return { status: 'error', error: 'Circuit breaker is open' };
+    }
+
+    if (this.connectionState !== 'connected') {
+      try {
+        await this.connect();
+      } catch (err) {
+        return {
+          status: 'error',
+          error: `Connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+
+    const requestId =
+      request.request_id || `resolve_${++this.requestIdCounter}_${Date.now()}`;
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        this.recordFailure();
+        resolve({ status: 'error', error: `Resolve timeout after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      const handler = (msg: SterlingMessage) => {
+        if (msg.type === 'resolve_intent_steps.result' && msg.request_id === requestId) {
+          cleanup();
+
+          // Dual-read: accept either modern `replacements` or legacy `steps`/`unresolved_steps` shape.
+          // Legacy servers (pre-v0.2.0) return flat steps/unresolved_steps instead
+          // of per-intent replacements. Synthesize replacements from legacy shape
+          // only for single-intent requests; multi-intent + legacy = keep as-is.
+          let replacements = msg.replacements;
+          const isLegacyShape = !replacements && (msg.steps || msg.unresolved_steps);
+          if (isLegacyShape) {
+            const isSingleIntent = request.intent_steps.length === 1;
+            if (isSingleIntent) {
+              if (msg.status === 'ok' && msg.steps) {
+                console.warn(
+                  '[Sterling] Legacy resolve_intent_steps shape detected (steps instead of replacements) — synthesizing single replacement'
+                );
+                replacements = [{
+                  intent_step_index: 0,
+                  resolved: msg.steps.length > 0,
+                  steps: msg.steps.length > 0 ? msg.steps : undefined,
+                  unresolved_reason: msg.steps.length === 0 ? 'legacy_empty_response' : undefined,
+                }];
+              } else if (msg.status === 'blocked' && msg.unresolved_steps) {
+                console.warn(
+                  '[Sterling] Legacy resolve_intent_steps blocked shape detected — synthesizing single unresolved replacement'
+                );
+                const reasons = msg.unresolved_steps.map((u) => u.reason).filter(Boolean);
+                replacements = [{
+                  intent_step_index: 0,
+                  resolved: false,
+                  unresolved_reason: reasons.length > 0 ? reasons.join('; ') : 'legacy_blocked',
+                }];
+              }
+            } else {
+              console.warn(
+                `[Sterling] Legacy shape with ${request.intent_steps.length} intent steps — cannot synthesize per-intent replacements; returning empty`
+              );
+              replacements = [];
+            }
+          }
+
+          if (msg.status === 'ok') {
+            this.recordSuccess();
+            resolve({
+              status: 'ok',
+              replacements: replacements || [],
+              plan_bundle_digest: msg.plan_bundle_digest || '',
+              schema_version: msg.schema_version,
+            });
+          } else if (msg.status === 'blocked') {
+            this.recordSuccess();
+            resolve({
+              status: 'blocked',
+              blocked_reason: msg.blocked_reason || 'no_solve_for_intent',
+              replacements: replacements,
+            });
+          } else {
+            this.recordFailure();
+            resolve({ status: 'error', error: msg.error || 'Sterling resolve error' });
+          }
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'resolve_intent_steps',
           request_id: requestId,
           ...request,
         });

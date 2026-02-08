@@ -258,6 +258,9 @@ export type {
   SterlingSolveStepCallback,
   SterlingLanguageReducerResult,
   SterlingLanguageIOResultMessage,
+  SterlingExpandByDigestStep,
+  SterlingIntentReplacement,
+  SterlingResolveIntentStepsResultMessage,
 } from './sterling';
 
 // Version info
