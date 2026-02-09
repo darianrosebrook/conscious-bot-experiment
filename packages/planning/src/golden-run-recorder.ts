@@ -53,6 +53,29 @@ export type GoldenRunReport = {
     request_id?: string;
     source?: string;
   };
+  /** Checkpoint A (attempt): Recorded BEFORE expandByDigest WebSocket call. */
+  sterling_expand_requested?: {
+    committed_ir_digest: string;
+    schema_version?: string;
+    envelope_id?: string | null;
+    request_id: string;
+    requested_at: number;
+  };
+  /** Checkpoint A (result): Recorded AFTER expandByDigest returns or throws. */
+  sterling_expand_result?: {
+    request_id: string;
+    status: 'ok' | 'blocked' | 'error' | 'timeout';
+    blocked_reason?: string;
+    error?: string;
+    step_count?: number;
+    plan_bundle_digest?: string;
+    resolved_at: number;
+    elapsed_ms: number;
+    /** Number of ingest-retry attempts (0 = no retries, first call succeeded/failed). */
+    attempt_count?: number;
+    /** WS-level request_id used for the final expandByDigest call (differs from request_id when retries occurred). */
+    final_request_id?: string;
+  };
   idle_episode?: {
     client_request_id?: string;
     request_id?: string;
@@ -342,6 +365,11 @@ export class GoldenRunRecorder {
     this.baseDir = baseDir;
   }
 
+  /** Resolve the absolute file path for a given run ID's artifact. */
+  getArtifactPath(runId: string): string {
+    return path.join(this.baseDir, `golden-${sanitizeRunId(runId)}.json`);
+  }
+
   private ensureRun(runId: string): GoldenRunReport {
     const safeRunId = sanitizeRunId(runId);
     const existing = this.runs.get(safeRunId);
@@ -372,6 +400,17 @@ export class GoldenRunRecorder {
     const payload = JSON.stringify(normalized, null, 2);
     await fs.writeFile(tmpPath, payload, 'utf8');
     await fs.rename(tmpPath, filePath);
+  }
+
+  /** Explicitly flush a run to disk. Awaitable — callers can wait for completion. */
+  async flushRun(runId: string): Promise<void> {
+    const safeRunId = sanitizeRunId(runId);
+    const report = this.runs.get(safeRunId);
+    if (!report) return;
+    // Wait for any pending write to finish, then write the latest state
+    const pending = this.writeQueue.get(safeRunId) ?? Promise.resolve();
+    await pending.catch(() => undefined);
+    await this.writeRun(report);
   }
 
   private queueWrite(runId: string, report: GoldenRunReport): void {
@@ -461,6 +500,16 @@ export class GoldenRunRecorder {
   recordExpansion(runId: string, data: GoldenRunReport['expansion']): void {
     if (!runId) return;
     this.update(runId, { expansion: data ?? {} });
+  }
+
+  recordSterlingExpandRequested(runId: string, data: GoldenRunReport['sterling_expand_requested']): void {
+    if (!runId) return;
+    this.update(runId, { sterling_expand_requested: data });
+  }
+
+  recordSterlingExpandResult(runId: string, data: GoldenRunReport['sterling_expand_result']): void {
+    if (!runId) return;
+    this.update(runId, { sterling_expand_result: data });
   }
 
   /** Append one expansion retry event (bounded at 20 entries). */

@@ -1601,6 +1601,376 @@ export function createPlanningEndpoints(
       }
     );
 
+    // ── Smoke checkpoint helpers ──────────────────────────────────────
+    function buildCheckpointProof(report: any) {
+      const A_requested = report?.sterling_expand_requested
+        ? {
+            ok: true,
+            digest: report.sterling_expand_requested.committed_ir_digest,
+            requested_at: report.sterling_expand_requested.requested_at,
+          }
+        : { ok: false };
+
+      const expandResult = report?.sterling_expand_result;
+      const A_result = expandResult
+        ? {
+            ok: expandResult.status === 'ok',
+            status: expandResult.status,
+            step_count: expandResult.step_count,
+            blocked_reason: expandResult.blocked_reason,
+            error: expandResult.error,
+            elapsed_ms: expandResult.elapsed_ms,
+          }
+        : { ok: false };
+
+      const expansion = report?.expansion;
+      const B_expansion = expansion
+        ? {
+            ok:
+              expansion.status === 'ok' &&
+              (expansion.steps?.length ?? 0) > 0,
+            executor_plan_digest: expansion.executor_plan_digest,
+            step_count: expansion.steps?.length ?? 0,
+          }
+        : { ok: false };
+
+      const dispatched = report?.execution?.dispatched_steps ?? [];
+      const C_dispatch = {
+        ok:
+          dispatched.length > 0 &&
+          dispatched.every((s: any) => s.result?.status === 'ok'),
+        count: dispatched.length,
+        steps: dispatched.map((s: any) => ({
+          leaf: s.leaf,
+          status: s.result?.status ?? 'pending',
+        })),
+      };
+
+      const verification = report?.execution?.verification;
+      const D_verification = verification
+        ? {
+            ok: verification.status === 'verified',
+            status: verification.status,
+            kind: verification.kind,
+          }
+        : { ok: false };
+
+      return { A_requested, A_result, B_expansion, C_dispatch, D_verification };
+    }
+
+    function isAllCheckpointsOk(report: any): boolean {
+      const cp = buildCheckpointProof(report);
+      return (
+        cp.A_requested.ok &&
+        cp.A_result.ok &&
+        cp.B_expansion.ok &&
+        cp.C_dispatch.ok &&
+        cp.D_verification.ok
+      );
+    }
+
+    // Dev-only: Sterling→Leaf correlation smoke test.
+    // Creates a sterling_ir task with a known stub digest, polls for completion,
+    // and returns a 4-checkpoint proof report (A_requested, A_result, B_expansion, C_dispatch, D_verification).
+    //
+    // Accepts optional body: { variant: 'ok' | 'ok_fresh' | 'unknown_digest' | 'slow_wait' | ... }
+    //   - 'ok' (default): uses the smoke stub digest (expects full pipeline pass, dedupes on repeat)
+    //   - 'ok_fresh': generates a unique digest per run via prefix-wildcard (never dedupes)
+    //   - 'unknown_digest': uses a hard-coded non-existent digest (expects F2 blocked failure)
+    //   - 'slow_wait': expand ok but 120s wait step exceeds poll timeout (F6)
+    //   - 'ok_fresh_01'..'ok_fresh_03': static pool (legacy, prefer ok_fresh)
+    //   - 'slow_wait_fresh': generates unique slow_wait digest per run (never dedupes)
+    const SMOKE_VARIANTS: Record<string, { digest: string; label: string }> = {
+      ok: { digest: 'smoke_e2e_chat_wait_v1', label: 'happy path (stub present)' },
+      ok_fresh_01: { digest: 'smoke_e2e_chat_wait_v1_fresh_01', label: 'fresh happy path 01 (static pool)' },
+      ok_fresh_02: { digest: 'smoke_e2e_chat_wait_v1_fresh_02', label: 'fresh happy path 02 (static pool)' },
+      ok_fresh_03: { digest: 'smoke_e2e_chat_wait_v1_fresh_03', label: 'fresh happy path 03 (static pool)' },
+      unknown_digest: { digest: 'smoke_e2e_NONEXISTENT_v1', label: 'F2: digest unknown (blocked)' },
+      slow_wait: { digest: 'smoke_e2e_slow_wait_v1', label: 'F6: expand ok, dispatch exceeds poll timeout' },
+    };
+    // Dynamic variants: generate a unique digest per run via prefix-wildcard.
+    // Sterling resolves these by matching the prefix to the base entry and
+    // returning the same steps with a derived plan_bundle_digest.
+    const DYNAMIC_VARIANTS: Record<string, { prefix: string; label: string }> = {
+      ok_fresh: { prefix: 'smoke_e2e_chat_wait_v1_', label: 'fresh happy path (prefix-wildcard, never dedupes)' },
+      slow_wait_fresh: { prefix: 'smoke_e2e_slow_wait_v1_', label: 'fresh slow_wait (prefix-wildcard, never dedupes)' },
+    };
+
+    router.post(
+      '/api/dev/sterling-smoke',
+      async (req: Request, res: Response) => {
+        const endpointStart = Date.now();
+        try {
+          if (
+            process.env.NODE_ENV === 'production' ||
+            process.env.ENABLE_DEV_ENDPOINTS !== 'true'
+          ) {
+            return res
+              .status(403)
+              .json({ error: 'Dev endpoints are disabled' });
+          }
+          if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
+            return res.status(503).json({
+              error: 'Executor not enabled',
+              detail: 'Set ENABLE_PLANNING_EXECUTOR=1',
+            });
+          }
+
+          // Resolve variant (default: ok)
+          const variantKey = typeof req.body?.variant === 'string'
+            ? req.body.variant
+            : 'ok';
+          let smokeDigest: string;
+          if (SMOKE_VARIANTS[variantKey]) {
+            smokeDigest = SMOKE_VARIANTS[variantKey].digest;
+          } else if (DYNAMIC_VARIANTS[variantKey]) {
+            // Generate unique digest per run via prefix-wildcard
+            const runSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+            smokeDigest = `${DYNAMIC_VARIANTS[variantKey].prefix}${runSuffix}`;
+          } else {
+            const allVariants = [
+              ...Object.keys(SMOKE_VARIANTS),
+              ...Object.keys(DYNAMIC_VARIANTS),
+            ];
+            return res.status(400).json({
+              error: 'Invalid variant',
+              detail: `Allowed variants: ${allVariants.join(', ')}`,
+            });
+          }
+
+          // Guard: Sterling must be reachable
+          if (deps?.getServerBanner) {
+            const bannerLine = await deps.getServerBanner(8000);
+            if (!bannerLine || bannerLine.trim().length === 0) {
+              return res.status(503).json({
+                error: 'sterling_not_connected',
+                detail: 'Could not fetch Sterling server banner',
+              });
+            }
+          }
+
+          const runId = sanitizeRunId(crypto.randomUUID());
+          const recorder = getGoldenRunRecorder();
+
+          // Record banners + runtime (same pattern as inject/enqueue)
+          if (deps?.getServerBanner) {
+            const bannerLine = await deps.getServerBanner(3000);
+            if (bannerLine) recorder.recordServerBanner(runId, bannerLine);
+          }
+          const planningConfig = getPlanningRuntimeConfig();
+          recorder.recordPlanningBanner(
+            runId,
+            buildPlanningBanner(planningConfig),
+            planningConfig.configDigest,
+            planningConfig.capabilities.taskTypeBridge
+          );
+          const execState = (globalThis as any).__planningExecutorState;
+          recorder.recordRuntime(runId, {
+            executor: {
+              enabled: planningConfig.executorEnabled,
+              mode: planningConfig.executorMode,
+              loop_started: Boolean(execState?.intervalRegistered),
+              interval_registered: Boolean(execState?.intervalRegistered),
+              last_tick_at: execState?.lastTickAt,
+              tick_count: execState?.tickCount,
+              enable_planning_executor_env:
+                process.env.ENABLE_PLANNING_EXECUTOR,
+              executor_live_confirm_env: process.env.EXECUTOR_LIVE_CONFIRM,
+            },
+            bridge_enabled: planningConfig.capabilities.taskTypeBridge,
+          });
+
+          recorder.recordInjection(runId, {
+            committed_ir_digest: smokeDigest,
+            schema_version: '1.1.0',
+            envelope_id: null,
+            request_id: `smoke_${runId}`,
+            source: 'dev_sterling_smoke',
+          });
+
+          // Create sterling_ir task with smoke digest
+          const requestedTaskId = `sterling-ir-${runId}`;
+          const task = await planningSystem.goalFormulation.addTask({
+            id: requestedTaskId,
+            title: `[Sterling Smoke] expand→dispatch proof (${variantKey})`,
+            description: `Sterling smoke correlation proof ${runId} variant=${variantKey}`,
+            type: 'sterling_ir',
+            source: 'manual',
+            priority: 0.9,
+            urgency: 0.9,
+            metadata: {
+              tags: ['golden-run', 'dev-sterling-smoke'],
+              category: 'sterling_ir',
+              sterling: {
+                committedIrDigest: smokeDigest,
+                schemaVersion: '1.1.0',
+                envelopeId: null,
+              },
+              goldenRun: {
+                runId,
+                requestedAt: Date.now(),
+                source: 'dev_sterling_smoke',
+              },
+            },
+          });
+
+          const taskId = task?.id ?? requestedTaskId;
+          const dedupeHit = task != null && task.id !== requestedTaskId;
+
+          // Dedupe hit: the digest already has a completed/in-flight task.
+          // Read the ORIGINAL task's golden-run artifact for checkpoint data.
+          if (dedupeHit) {
+            const origRunId = (task.metadata as any)?.goldenRun?.runId;
+            const origReport = origRunId
+              ? recorder.getReport(origRunId)
+              : null;
+            const origTaskStatus = task.status ?? 'unknown';
+            const allOk = origReport ? isAllCheckpointsOk(origReport) : false;
+            // Flush original run's artifact if it exists in memory
+            if (origRunId) {
+              try { await recorder.flushRun(origRunId); } catch { /* best-effort */ }
+            }
+            return res.json({
+              proof_passed: allOk,
+              run_id: runId,
+              task_id: taskId,
+              task_status: origTaskStatus,
+              variant: variantKey,
+              dedupe_hit: true,
+              original_run_id: origRunId ?? null,
+              checkpoints: origReport
+                ? buildCheckpointProof(origReport)
+                : {
+                    A_requested: { ok: false },
+                    A_result: { ok: false },
+                    B_expansion: { ok: false },
+                    C_dispatch: { ok: false, count: 0, steps: [] },
+                    D_verification: { ok: false },
+                  },
+              all_checkpoints_ok: allOk,
+              timed_out: false,
+              elapsed_ms: Date.now() - endpointStart,
+              artifact_path: origRunId
+                ? `artifacts/golden-run/golden-${origRunId}.json`
+                : null,
+              artifact_abs_path: origRunId
+                ? recorder.getArtifactPath(origRunId)
+                : null,
+            });
+          }
+
+          // Poll for task completion (3s interval, configurable timeout)
+          // Early-exit: if A_result already shows non-ok, no need to wait for dispatch.
+          // Bounded override: poll_timeout_ms in request body (min 5000, max 45000).
+          const POLL_INTERVAL_MS = 3000;
+          const rawPollTimeout = typeof req.body?.poll_timeout_ms === 'number'
+            ? req.body.poll_timeout_ms
+            : 45000;
+          const POLL_TIMEOUT_MS = Math.max(5000, Math.min(45000, rawPollTimeout));
+          const pollStart = Date.now();
+          let timedOut = false;
+          let finalTaskStatus: string | undefined;
+          let earlyExit = false;
+
+          // Pre-poll check: expansion may have already completed synchronously
+          // (e.g. blocked_digest_unknown resolves in <100ms). Avoid sleeping 3s for nothing.
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          {
+            const preReport = recorder.getReport(runId);
+            const preResult = preReport?.sterling_expand_result;
+            if (preResult && preResult.status !== 'ok') {
+              earlyExit = true;
+              const allTasks = [
+                ...planningSystem.goalFormulation.getCurrentTasks(),
+                ...planningSystem.goalFormulation.getCompletedTasks(),
+              ];
+              const found = allTasks.find((t: any) => t.id === taskId);
+              finalTaskStatus = found?.status;
+            }
+          }
+
+          while (!earlyExit && Date.now() - pollStart < POLL_TIMEOUT_MS) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, POLL_INTERVAL_MS)
+            );
+
+            // Check checkpoint A result — if expand already failed, return immediately
+            const intermediateReport = recorder.getReport(runId);
+            const expandResult = intermediateReport?.sterling_expand_result;
+            if (expandResult && expandResult.status !== 'ok') {
+              earlyExit = true;
+              // Still check task status for the response
+              const allTasks = [
+                ...planningSystem.goalFormulation.getCurrentTasks(),
+                ...planningSystem.goalFormulation.getCompletedTasks(),
+              ];
+              const found = allTasks.find((t: any) => t.id === taskId);
+              finalTaskStatus = found?.status;
+              break;
+            }
+
+            const allTasks = [
+              ...planningSystem.goalFormulation.getCurrentTasks(),
+              ...planningSystem.goalFormulation.getCompletedTasks(),
+            ];
+            const found = allTasks.find((t: any) => t.id === taskId);
+            finalTaskStatus = found?.status;
+            if (
+              finalTaskStatus === 'completed' ||
+              finalTaskStatus === 'failed'
+            ) {
+              break;
+            }
+          }
+
+          if (
+            !earlyExit &&
+            finalTaskStatus !== 'completed' &&
+            finalTaskStatus !== 'failed'
+          ) {
+            timedOut = true;
+          }
+
+          // Build checkpoint proof from golden-run report
+          const report = recorder.getReport(runId);
+          const checkpoints = buildCheckpointProof(report);
+          const allOk = isAllCheckpointsOk(report);
+
+          // Persist artifact to disk (awaitable — ensures file exists before returning path)
+          try {
+            await recorder.flushRun(runId);
+          } catch (flushErr) {
+            console.warn('[dev sterling-smoke] Artifact flush failed:', flushErr);
+          }
+
+          const artifactAbsPath = recorder.getArtifactPath(runId);
+
+          return res.json({
+            proof_passed: allOk && !timedOut,
+            run_id: runId,
+            task_id: taskId,
+            task_status: finalTaskStatus ?? 'unknown',
+            variant: variantKey,
+            early_exit: earlyExit || undefined,
+            checkpoints,
+            all_checkpoints_ok: allOk,
+            timed_out: timedOut,
+            elapsed_ms: Date.now() - endpointStart,
+            artifact_path: `artifacts/golden-run/golden-${runId}.json`,
+            artifact_abs_path: artifactAbsPath,
+          });
+        } catch (error) {
+          console.error('[dev sterling-smoke] Failed:', error);
+          return res.status(500).json({
+            error: 'sterling-smoke failed',
+            details:
+              error instanceof Error ? error.message : String(error),
+            elapsed_ms: Date.now() - endpointStart,
+          });
+        }
+      }
+    );
+
     router.get(
       '/api/dev/golden-run-artifact/:runId',
       async (req: Request, res: Response) => {

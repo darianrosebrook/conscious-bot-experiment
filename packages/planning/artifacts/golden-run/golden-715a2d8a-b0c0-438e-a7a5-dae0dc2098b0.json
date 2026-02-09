@@ -1,0 +1,129 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "715a2d8a-b0c0-438e-a7a5-dae0dc2098b0",
+  "created_at": 1770597176178,
+  "updated_at": 1770597293824,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "chat",
+        "args": {
+          "message": "[Sterling E2E] smoke proof"
+        },
+        "dispatched_at": 1770597282339,
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "step_id": "sterling-step-2",
+        "leaf": "wait",
+        "args": {
+          "duration": 1000
+        },
+        "dispatched_at": 1770597292603,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "chat",
+        "reason": "dispatch",
+        "ts": 1770597282346
+      },
+      {
+        "step_id": "sterling-step-2",
+        "leaf": "wait",
+        "reason": "dispatch",
+        "ts": 1770597293737
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "wait"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_e2e_chat_wait_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_715a2d8a-b0c0-438e-a7a5-dae0dc2098b0",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_e2e_chat_wait_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770597176179_qo4jcq",
+    "requested_at": 1770597176198
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770597176179_qo4jcq",
+    "status": "ok",
+    "step_count": 2,
+    "plan_bundle_digest": "smoke_e2e_v1_static",
+    "resolved_at": 1770597176200,
+    "elapsed_ms": 2,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770597176179_qo4jcq"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770597176179_qo4jcq",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_e2e_v1_static",
+    "executor_plan_digest": "be62c94fbfb156a431c7a8a3aef179b68d940d383e97ddce973b805582c9f723",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "chat",
+        "order": 1,
+        "args": {
+          "message": "[Sterling E2E] smoke proof"
+        }
+      },
+      {
+        "id": "sterling-step-2",
+        "leaf": "wait",
+        "order": 2,
+        "args": {
+          "duration": 1000
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-715a2d8a-b0c0-438e-a7a5-dae0dc2098b0",
+    "dedupe_key": "1.1.0:smoke_e2e_chat_wait_v1",
+    "status": "pending"
+  }
+}

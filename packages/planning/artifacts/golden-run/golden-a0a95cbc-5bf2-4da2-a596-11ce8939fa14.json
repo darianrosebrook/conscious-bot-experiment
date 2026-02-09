@@ -1,0 +1,108 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "a0a95cbc-5bf2-4da2-a596-11ce8939fa14",
+  "created_at": 1770600216675,
+  "updated_at": 1770600469574,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": false,
+      "interval_registered": false,
+      "last_tick_at": 1770600208011,
+      "tick_count": 20,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_e2e_NONEXISTENT_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_a0a95cbc-5bf2-4da2-a596-11ce8939fa14",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_e2e_NONEXISTENT_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770600468041_69c88t",
+    "requested_at": 1770600468069
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770600468041_69c88t",
+    "status": "blocked",
+    "attempt": 2,
+    "delay_ms": 1000,
+    "total_delay_ms": 1500,
+    "reason": "blocked_digest_unknown — digest may not have propagated yet",
+    "blocked_reason": "blocked_digest_unknown",
+    "ingest_retries": 2,
+    "ingest_retry_delay_ms": 1500,
+    "ingest_retry_elapsed_ms": 1504
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770600468041_69c88t",
+    "status": "blocked",
+    "blocked_reason": "blocked_digest_unknown",
+    "resolved_at": 1770600469573,
+    "elapsed_ms": 1504,
+    "attempt_count": 2,
+    "final_request_id": "sterling_exec_1770600468041_69c88t_retry2"
+  },
+  "task": {
+    "task_id": "sterling-ir-a0a95cbc-5bf2-4da2-a596-11ce8939fa14",
+    "dedupe_key": "1.1.0:smoke_e2e_NONEXISTENT_v1",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770600229539,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770600259539
+    },
+    {
+      "attempt": 2,
+      "ts": 1770600269550,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770600329550
+    },
+    {
+      "attempt": 3,
+      "ts": 1770600339813,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770600459813
+    },
+    {
+      "attempt": 4,
+      "ts": 1770600469574,
+      "reason": "blocked_digest_unknown",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770600709574
+    }
+  ]
+}

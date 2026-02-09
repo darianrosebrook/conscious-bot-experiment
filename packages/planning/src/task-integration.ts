@@ -2011,6 +2011,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       };
     }
 
+    // ── Checkpoint A (requested): record BEFORE any WebSocket call ──────
+    const expandStartedAt = Date.now();
+    if (runId && recorder) {
+      recorder.recordSterlingExpandRequested(runId, {
+        committed_ir_digest: digest,
+        schema_version: schemaVersion,
+        envelope_id: sterlingMeta?.envelopeId ?? null,
+        request_id: requestId,
+        requested_at: expandStartedAt,
+      });
+    }
+
     // ── Expand with ingest-time retry for digest propagation gap ──────────
     // When reduce commits a digest and expand is called in the same request path,
     // Sterling's backend may not have propagated the digest yet. Retry briefly
@@ -2025,43 +2037,71 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     let ingestRetryTotalMs = 0;
     const ingestStartMs = Date.now();
 
-    response = await this.sterlingExecutorService.expandByDigest(
-      {
-        committed_ir_digest: digest,
-        schema_version: schemaVersion,
-        request_id: requestId,
-        envelope_id: sterlingMeta?.envelopeId ?? undefined,
-      },
-      expandTimeoutMs,
-    );
-
-    // Retry loop: only for blocked_digest_unknown (timing gap from reduce→expand)
-    while (
-      response.status === 'blocked' &&
-      (response as any).blocked_reason === 'blocked_digest_unknown' &&
-      ingestRetryCount < INGEST_RETRY_DELAYS_MS.length
-    ) {
-      const delayMs = INGEST_RETRY_DELAYS_MS[ingestRetryCount];
-      ingestRetryCount++;
-      ingestRetryTotalMs += delayMs;
-      recordExpansion({
-        request_id: requestId,
-        status: 'ingest_retry',
-        attempt: ingestRetryCount,
-        delay_ms: delayMs,
-        total_delay_ms: ingestRetryTotalMs,
-        reason: 'blocked_digest_unknown — digest may not have propagated yet',
-      });
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
       response = await this.sterlingExecutorService.expandByDigest(
         {
           committed_ir_digest: digest,
           schema_version: schemaVersion,
-          request_id: `${requestId}_retry${ingestRetryCount}`,
+          request_id: requestId,
           envelope_id: sterlingMeta?.envelopeId ?? undefined,
         },
         expandTimeoutMs,
       );
+
+      // Retry loop: only for blocked_digest_unknown (timing gap from reduce→expand)
+      while (
+        response.status === 'blocked' &&
+        (response as any).blocked_reason === 'blocked_digest_unknown' &&
+        ingestRetryCount < INGEST_RETRY_DELAYS_MS.length
+      ) {
+        const delayMs = INGEST_RETRY_DELAYS_MS[ingestRetryCount];
+        ingestRetryCount++;
+        ingestRetryTotalMs += delayMs;
+        recordExpansion({
+          request_id: requestId,
+          status: 'ingest_retry',
+          attempt: ingestRetryCount,
+          delay_ms: delayMs,
+          total_delay_ms: ingestRetryTotalMs,
+          reason: 'blocked_digest_unknown — digest may not have propagated yet',
+        });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        response = await this.sterlingExecutorService.expandByDigest(
+          {
+            committed_ir_digest: digest,
+            schema_version: schemaVersion,
+            request_id: `${requestId}_retry${ingestRetryCount}`,
+            envelope_id: sterlingMeta?.envelopeId ?? undefined,
+          },
+          expandTimeoutMs,
+        );
+      }
+    } catch (expandErr) {
+      // Checkpoint A (result): exception from expandByDigest (unexpected — WS client
+      // normally resolves with status objects, but send failures can throw)
+      const expandErrMsg = expandErr instanceof Error ? expandErr.message : String(expandErr);
+      const isCatchTimeout = /timeout/i.test(expandErrMsg);
+      if (runId && recorder) {
+        recorder.recordSterlingExpandResult(runId, {
+          request_id: requestId,
+          status: isCatchTimeout ? 'timeout' : 'error',
+          error: expandErrMsg,
+          resolved_at: Date.now(),
+          elapsed_ms: Date.now() - expandStartedAt,
+          attempt_count: ingestRetryCount,
+          final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
+        });
+      }
+      recordExpansion({
+        request_id: requestId,
+        status: 'error',
+        error: expandErr instanceof Error ? expandErr.message : String(expandErr),
+      });
+      return {
+        outcome: 'error',
+        error: expandErr instanceof Error ? expandErr.message : String(expandErr),
+        requestId,
+      };
     }
 
     const ingestRetry = ingestRetryCount > 0
@@ -2069,6 +2109,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       : undefined;
 
     if (response.status === 'blocked') {
+      // Checkpoint A (result): blocked after retries exhausted
+      if (runId && recorder) {
+        recorder.recordSterlingExpandResult(runId, {
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: response.blocked_reason ?? 'unknown',
+          resolved_at: Date.now(),
+          elapsed_ms: Date.now() - expandStartedAt,
+          attempt_count: ingestRetryCount,
+          final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
+        });
+      }
       recordExpansion({
         request_id: requestId,
         status: 'blocked',
@@ -2087,6 +2139,21 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     if (response.status === 'error') {
+      // Checkpoint A (result): error from Sterling
+      // Classify: WS client resolves timeouts as { status: 'error', error: 'Expand timeout after Nms' }
+      const errorMsg = response.error || 'Sterling executor error';
+      const isTimeout = /timeout/i.test(errorMsg);
+      if (runId && recorder) {
+        recorder.recordSterlingExpandResult(runId, {
+          request_id: requestId,
+          status: isTimeout ? 'timeout' : 'error',
+          error: errorMsg,
+          resolved_at: Date.now(),
+          elapsed_ms: Date.now() - expandStartedAt,
+          attempt_count: ingestRetryCount,
+          final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
+        });
+      }
       recordExpansion({
         request_id: requestId,
         status: 'error',
@@ -2104,6 +2171,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     if (!response.steps || response.steps.length === 0) {
+      // Checkpoint A (result): blocked — invalid/empty steps bundle
+      if (runId && recorder) {
+        recorder.recordSterlingExpandResult(runId, {
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_invalid_steps_bundle',
+          resolved_at: Date.now(),
+          elapsed_ms: Date.now() - expandStartedAt,
+          attempt_count: ingestRetryCount,
+          final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
+        });
+      }
       recordExpansion({
         request_id: requestId,
         status: 'blocked',
@@ -2393,6 +2472,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         source: 'sterling',
       },
     }));
+
+    // Checkpoint A (result): successful expansion
+    if (runId && recorder) {
+      recorder.recordSterlingExpandResult(runId, {
+        request_id: requestId,
+        status: 'ok',
+        step_count: finalSteps.length,
+        plan_bundle_digest: expansionDigest,
+        resolved_at: Date.now(),
+        elapsed_ms: Date.now() - expandStartedAt,
+        attempt_count: ingestRetryCount,
+        final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
+      });
+    }
 
     recordExpansion({
       request_id: requestId,

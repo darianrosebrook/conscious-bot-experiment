@@ -682,6 +682,116 @@ All have `permissions: ['sense']` to prevent accidental mutation.
 
 ---
 
+## Sterling→Leaf Correlation Proof
+
+### 4-Checkpoint Model
+
+The smoke endpoint (`POST /api/dev/sterling-smoke`) proves that Sterling drove leaf execution
+through the full pipeline: expand → materialize → executor → dispatch → verify. It returns
+a structured proof report with 4 checkpoints:
+
+| Checkpoint | Field | What it proves |
+|------------|-------|----------------|
+| **A (requested)** | `sterling_expand_requested` | `expandByDigest` was called with the correct digest BEFORE any WebSocket I/O |
+| **A (result)** | `sterling_expand_result` | The expand call completed (ok/blocked/error/timeout) and we captured timing, step count, retry metadata |
+| **B (expansion)** | `expansion` | `materializeSterlingIrSteps` produced executor-ready steps with a plan digest |
+| **C (dispatch)** | `execution.dispatched_steps` | Each step was dispatched to the MC interface and got a result |
+| **D (verification)** | `execution.verification` | Post-dispatch verification ran (inventory delta, position delta, etc.) |
+
+### What the stub approach proves vs. does NOT prove
+
+- **Proves**: Given a committed IR digest, Sterling expand returns pre-baked steps,
+  and those steps flow through `materializeSterlingIrSteps` → executor → dispatch → verify.
+  The full TypeScript pipeline is exercised.
+- **Does NOT prove**: The reduce→digest selection path (Sterling choosing WHICH digest to commit).
+  That requires `run-golden-reduce` or a live reduce call.
+
+### Smoke Endpoint
+
+```
+POST /api/dev/sterling-smoke
+Content-Type: application/json
+
+{ "variant": "ok" }              # default — uses stub digest (happy path, dedupes on repeat)
+{ "variant": "ok_fresh" }        # generates unique digest per run (never dedupes, prefix-wildcard)
+{ "variant": "unknown_digest" }  # F2 test — uses non-existent digest (blocked failure)
+{ "variant": "slow_wait" }       # F6 test — expand ok, 120s wait exceeds poll timeout
+{ "variant": "slow_wait_fresh" } # F6 test, unique per run (never dedupes)
+```
+
+**Prerequisites**:
+- `ENABLE_DEV_ENDPOINTS=true`
+- `ENABLE_PLANNING_EXECUTOR=1`
+- `EXECUTOR_MODE=live`
+- `EXECUTOR_LIVE_CONFIRM=YES`
+- Sterling running and connected (ws://localhost:8766)
+
+**Response fields**:
+- `proof_passed`: `true` only when all checkpoints ok AND no timeout (use for CI/dashboards)
+- `all_checkpoints_ok`: raw checkpoint aggregation (ignores timeout)
+- `variant`: which variant was used
+- `early_exit`: present when expand failed and polling was short-circuited
+- `artifact_path`: path to persisted golden-run artifact on disk
+
+**Fresh run** (variant=ok_fresh, prefix-wildcard, never dedupes):
+
+```bash
+curl -s -X POST http://localhost:3002/api/dev/sterling-smoke \
+  -H 'Content-Type: application/json' -d '{"variant":"ok_fresh"}' | python3 -m json.tool
+```
+
+Expected: `proof_passed: true`, unique `run_id` and `task_id` every call, artifact persisted.
+The endpoint generates `smoke_e2e_chat_wait_v1_<12-char-uuid>` as the digest. Sterling's
+prefix-wildcard resolver matches `smoke_e2e_chat_wait_v1_` and returns the base entry's steps
+with a derived `plan_bundle_digest`. This gives unlimited fresh runs without file edits or restarts.
+
+**Happy path** (variant=ok, stub loaded):
+
+```bash
+curl -s -X POST http://localhost:3002/api/dev/sterling-smoke \
+  -H 'Content-Type: application/json' -d '{"variant":"ok"}' | python3 -m json.tool
+```
+
+Expected: `proof_passed: true`, `all_checkpoints_ok: true`, artifact persisted to disk.
+
+**F2 test** (variant=unknown_digest, no restart needed):
+
+```bash
+curl -s -X POST http://localhost:3002/api/dev/sterling-smoke \
+  -H 'Content-Type: application/json' -d '{"variant":"unknown_digest"}' | python3 -m json.tool
+```
+
+Expected: `proof_passed: false`, `A_requested.ok: true`, `A_result.ok: false` (status: blocked),
+`C_dispatch.count: 0`, `early_exit: true` (returns in ~3s instead of 45s).
+
+### Failure Modes
+
+| # | Failure | Signal | Endpoint behavior |
+|---|---------|--------|-------------------|
+| F1 | Sterling not connected | No WebSocket | 503 `sterling_not_connected` |
+| F2 | Digest unknown (use variant=unknown_digest) | A_result.status='blocked' | 200, proof with `C_dispatch.count: 0`, `early_exit: true` |
+| F3 | Stub loaded but steps malformed | A_result.status='blocked' | 200, proof with `A_result.ok: false` |
+| F4 | Expansion ok but executor disabled | B_expansion.ok=true, C_dispatch.count=0 | 200, proof with `C_dispatch.ok: false` |
+| F5 | Dispatch ok but verification fails | A-C ok, D fails | 200, proof with `D_verification.ok: false` |
+| F6 | Timeout (45s) | Partial checkpoints | 200, proof with `timed_out: true` |
+
+### Golden-Run Artifact Fields
+
+The smoke run writes a golden-run artifact with these additional fields:
+
+- `sterling_expand_requested`: Recorded BEFORE the WebSocket call to `expandByDigest`
+- `sterling_expand_result`: Recorded AFTER the call completes (ok/blocked/error/timeout)
+  - `attempt_count`: number of ingest retries (0 = no retries)
+  - `final_request_id`: WS-level request_id used for the final call (differs from `request_id` when retries occurred)
+
+These are separate from the existing `expansion` field, which captures the full expansion
+details for the executor. The new fields capture the request-response pair for evidence.
+
+Timeout classification: the WS client resolves timeouts as `{ status: 'error', error: 'Expand timeout after Nms' }`.
+The recording layer detects this pattern and sets `status: 'timeout'` for accurate classification.
+
+---
+
 ## Known Composability Gaps
 
 ### P0 -- Critical for basic gameplay

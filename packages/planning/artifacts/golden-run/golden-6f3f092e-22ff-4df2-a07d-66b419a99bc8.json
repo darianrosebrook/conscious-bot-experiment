@@ -1,0 +1,97 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "6f3f092e-22ff-4df2-a07d-66b419a99bc8",
+  "created_at": 1770601984634,
+  "updated_at": 1770602244697,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "idle_episode": {
+    "client_request_id": "idle_6f3f092e-22ff-4df2-a07d-66b419a99bc8",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "3511b7a5c8590e4f",
+    "duration_ms": 3
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "sterling_expand_requested": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "3511b7a5c8590e4f",
+    "request_id": "sterling_exec_1770602244669_pndn7z",
+    "requested_at": 1770602244695
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770602244669_pndn7z",
+    "status": "blocked",
+    "blocked_reason": "blocked_invalid_ir_bundle",
+    "resolved_at": 1770602244696,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770602244669_pndn7z"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770602244669_pndn7z",
+    "status": "blocked",
+    "blocked_reason": "blocked_invalid_ir_bundle",
+    "ingest_retries": 0
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-6f3f092e-22ff-4df2-a07d-66b419a99bc8-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770602004659,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770602034659
+    },
+    {
+      "attempt": 2,
+      "ts": 1770602044664,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770602104664
+    },
+    {
+      "attempt": 3,
+      "ts": 1770602114680,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770602234680
+    },
+    {
+      "attempt": 4,
+      "ts": 1770602244697,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770602484697
+    }
+  ]
+}
