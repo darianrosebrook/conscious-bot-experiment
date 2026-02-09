@@ -20,6 +20,7 @@ export interface SafetyMonitorConfig {
   checkInterval: number; // How often to check health (ms)
   autoFleeEnabled: boolean;
   autoShelterEnabled: boolean;
+  autoAttackEnabled: boolean;
   maxFleeDistance: number;
 }
 
@@ -73,6 +74,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       checkInterval: 2000, // Check every 2 seconds
       autoFleeEnabled: true,
       autoShelterEnabled: true,
+      autoAttackEnabled: true,
       maxFleeDistance: 20,
       ...config,
     };
@@ -229,20 +231,32 @@ export class AutomaticSafetyMonitor extends EventEmitter {
         const snapshot = this.beliefBus.getCurrentSnapshot();
         const reflexResult = assessReflexThreats(snapshot);
 
-        if (reflexResult.hasCriticalThreat) {
-          if (this.shouldLog('critical-threat', this.logThrottleMs)) {
+        // Check for high-or-above threats (not just critical)
+        const hasHighOrAbove = reflexResult.threats.some(
+          (t) => t.threatLevel === 'critical' || t.threatLevel === 'high'
+        );
+
+        if (hasHighOrAbove) {
+          const threatLevel = reflexResult.hasCriticalThreat
+            ? 'critical'
+            : 'high';
+          const reason = reflexResult.hasCriticalThreat
+            ? 'critical_threat'
+            : 'high_threat';
+
+          if (this.shouldLog(`${threatLevel}-threat`, this.logThrottleMs)) {
             console.log(
-              '[SafetyMonitor] Critical threat from belief snapshot'
+              `[SafetyMonitor] ${threatLevel === 'critical' ? '🚨' : '⚠️'} ${threatLevel} threat from belief snapshot`
             );
           }
-          await this.triggerEmergencyResponse('critical_threat', {
-            threatLevel: 'critical',
+          await this.triggerEmergencyResponse(reason, {
+            threatLevel,
             threats: reflexResult.threats.map((t) => ({
               type: t.classLabel,
               distance: t.distBucket * 2,
-              threatLevel: 100,
+              threatLevel: t.threatLevel === 'critical' ? 100 : 70,
             })),
-            recommendedAction: 'flee',
+            recommendedAction: threatLevel, // Let triggerEmergencyResponse re-assess
           });
         }
         return;
@@ -320,6 +334,12 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       const threatAssessment = await this.assessThreats();
 
       switch (threatAssessment.recommendedAction) {
+        case 'attack':
+          if (this.config.autoAttackEnabled) {
+            await this.attackNearestThreat(threatAssessment);
+          }
+          break;
+
         case 'flee':
           if (this.config.autoFleeEnabled) {
             await this.fleeFromThreats();
@@ -454,6 +474,65 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       console.log('✅ Shelter found');
     } catch (error) {
       console.error('Find shelter action failed:', error);
+    }
+  }
+
+  /**
+   * Engage the nearest hostile entity in combat.
+   * Equips best weapon first, then delegates to the attack_entity action.
+   * Falls back to flee if no valid target found or combat fails.
+   */
+  private async attackNearestThreat(assessment: ThreatAssessment): Promise<void> {
+    if (this.shouldLog('attack', this.logThrottleMs)) {
+      console.log('[SafetyMonitor] Engaging nearest threat...');
+    }
+
+    // Find nearest hostile entity from bot.entities
+    let nearest: any = null;
+    let nearestDist = Infinity;
+    for (const entity of Object.values(this.bot.entities)) {
+      if (!this.isHostileEntity(entity) || !entity?.position) continue;
+      const dist = this.bot.entity.position.distanceTo(entity.position);
+      if (dist < nearestDist && dist < 16) {
+        nearest = entity;
+        nearestDist = dist;
+      }
+    }
+
+    if (!nearest) {
+      if (this.shouldLog('attack-no-target', this.logThrottleMs)) {
+        console.log('[SafetyMonitor] No valid target found, falling back to flee');
+      }
+      if (this.config.autoFleeEnabled) await this.fleeFromThreats();
+      return;
+    }
+
+    try {
+      // Equip best weapon first
+      await this.actionTranslator.executeAction({
+        type: 'equip_weapon',
+        parameters: { preferredType: 'any' },
+        timeout: 3000,
+      });
+
+      // Attack the entity
+      await this.actionTranslator.executeAction({
+        type: 'attack_entity',
+        parameters: {
+          entityId: nearest.id,
+          radius: 16,
+          duration: 10000,
+          retreatHealth: 6,
+        },
+        timeout: 15000,
+      });
+
+      if (this.shouldLog('attack-complete', this.logThrottleMs)) {
+        console.log('[SafetyMonitor] Combat engagement completed');
+      }
+    } catch (error) {
+      console.error('Combat engagement failed, falling back to flee:', error);
+      if (this.config.autoFleeEnabled) await this.fleeFromThreats();
     }
   }
 

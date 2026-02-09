@@ -238,7 +238,10 @@ export type MinecraftActionType =
   | 'build_module'
   | 'place_feature'
   | 'place_workstation'
-  | 'acquire_material';
+  | 'acquire_material'
+  | 'equip_weapon'
+  | 'equip_tool'
+  | 'retreat_from_threat';
 
 export interface MinecraftAction {
   type: MinecraftActionType;

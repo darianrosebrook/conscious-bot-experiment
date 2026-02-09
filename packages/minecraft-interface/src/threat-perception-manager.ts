@@ -107,15 +107,35 @@ export class ThreatPerceptionManager {
         const distance = this.bot.entity.position.distanceTo(entity.position);
         const entityId = `${entity.name || entity.type}_${entity.id}`;
 
-        // Skip if recently detected (memory/persistence)
-        const lastSeen = this.knownThreats.get(entityId)?.lastSeen ?? 0;
-        if (Date.now() - lastSeen < this.config.persistenceWindowMs) {
+        // Check if recently detected (memory/persistence)
+        const known = this.knownThreats.get(entityId);
+        const lastSeen = known?.lastSeen ?? 0;
+        const recentlyDetected = Date.now() - lastSeen < this.config.persistenceWindowMs;
+
+        // For recently-detected entities: skip LOS check (we already know
+        // they're there) but still include them in the threat list so
+        // re-assessments during emergency response see the full picture.
+        if (recentlyDetected && known) {
+          // Update position/distance but keep in the threat list
+          const updatedThreat: ThreatEntity = {
+            ...known,
+            position: entity.position,
+            distance,
+            lastSeen: Date.now(),
+            threatLevel: this.calculateContextualThreatLevel(entity, distance, botHealth),
+          };
+          threats.push(updatedThreat);
+          this.knownThreats.set(entityId, updatedThreat);
+          maxThreatLevel = Math.max(maxThreatLevel, updatedThreat.threatLevel);
           continue;
         }
 
-        // Perform line-of-sight check via raycasting
-        let hasLineOfSight = false;
-        if (this.config.lineOfSightRequired) {
+        // Perform line-of-sight check via raycasting (first detection only)
+        // Entities within melee range (≤4 blocks) bypass FOV — the bot can
+        // "feel" a hit even without facing the attacker.
+        const withinMeleeRange = distance <= 4;
+        let hasLineOfSight = withinMeleeRange; // melee-range = implicit LOS
+        if (this.config.lineOfSightRequired && !withinMeleeRange) {
           hasLineOfSight = await this.checkLineOfSight(entity.position);
           if (!hasLineOfSight) {
             if (this.observationLogDebug && this.shouldLogLos(entityId, now)) {
@@ -185,7 +205,8 @@ export class ThreatPerceptionManager {
       const overallThreatLevel = this.determineThreatLevel(maxThreatLevel);
       const recommendedAction = this.determineRecommendedAction(
         overallThreatLevel,
-        botHealth
+        botHealth,
+        threats,
       );
 
       if (now - this.lastAssessmentLogAt >= this.assessmentLogThrottleMs) {
@@ -299,16 +320,74 @@ export class ThreatPerceptionManager {
   }
 
   /**
-   * Determine recommended action based on level and health.
+   * Determine recommended action based on level, health, and threat composition.
+   *
+   * Fight conditions (all must be true):
+   * - Bot is holding a weapon (sword/axe/bow/crossbow/trident)
+   * - Health > 10 (half hearts)
+   * - At most 2 external threats (not overwhelmed)
+   * - All threats are fightable (creepers require a ranged weapon)
+   *
+   * Creeper rule: creepers trigger fight only if bot has a ranged weapon.
    */
   private determineRecommendedAction(
     level: 'low' | 'medium' | 'high' | 'critical',
-    health: number
+    health: number,
+    threats: ThreatEntity[] = [],
   ): 'none' | 'flee' | 'find_shelter' | 'attack' {
-    if (level === 'critical') return 'flee';
-    if (level === 'high') return health < 10 ? 'flee' : 'find_shelter';
-    if (level === 'medium') return 'find_shelter';
+    // Always flee if critically low health
+    if (health <= 6) return 'flee';
+
+    // Check if bot has a weapon
+    const hasWeapon = this.botHasWeapon();
+    const hasRangedWeapon = this.botHasRangedWeapon();
+
+    // Check if all threats are fightable (non-creeper, or creeper + ranged)
+    const externalThreats = threats.filter(t => t.type !== 'low_health');
+    const allFightable = externalThreats.every(t => {
+      if (t.type === 'creeper') return hasRangedWeapon;
+      return true;
+    });
+
+    // Fight conditions: armed, enough health, not overwhelmed, fightable threats
+    const canFight =
+      hasWeapon &&
+      health > 10 &&
+      externalThreats.length <= 2 &&
+      externalThreats.length > 0 &&
+      allFightable;
+
+    if (level === 'critical') return canFight ? 'attack' : 'flee';
+    if (level === 'high') return canFight ? 'attack' : (health < 10 ? 'flee' : 'find_shelter');
+    if (level === 'medium') {
+      // At medium threat, fight if armed and a threat is within melee range —
+      // seeking shelter while being punched is futile.
+      const meleeContact = externalThreats.some(t => t.distance <= 4);
+      return canFight && meleeContact ? 'attack' : 'find_shelter';
+    }
     return 'none';
+  }
+
+  /**
+   * Check if bot is currently holding a melee or ranged weapon.
+   */
+  private botHasWeapon(): boolean {
+    // Check held item first
+    const held = this.bot.heldItem;
+    if (held && /sword|axe|bow|crossbow|trident/.test(held.name)) return true;
+    // Also check inventory — the safety monitor will equip before attacking
+    const items = this.bot.inventory?.items() ?? [];
+    return items.some((item: any) => /sword|axe|bow|crossbow|trident/.test(item.name));
+  }
+
+  /**
+   * Check if bot is currently holding a ranged weapon (bow, crossbow, trident).
+   */
+  private botHasRangedWeapon(): boolean {
+    const held = this.bot.heldItem;
+    if (held && /bow|crossbow|trident/.test(held.name)) return true;
+    const items = this.bot.inventory?.items() ?? [];
+    return items.some((item: any) => /bow|crossbow|trident/.test(item.name));
   }
 
   private shouldLogLos(entityId: string, now: number): boolean {

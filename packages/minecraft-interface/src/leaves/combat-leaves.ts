@@ -84,16 +84,21 @@ function isHostileEntity(entityType: string): boolean {
  */
 function findBestWeapon(bot: Bot): any {
   const weapons = [
+    'netherite_sword',
     'diamond_sword',
     'iron_sword',
+    'copper_sword',
     'stone_sword',
     'wooden_sword',
+    'netherite_axe',
     'diamond_axe',
     'iron_axe',
+    'copper_axe',
     'stone_axe',
     'wooden_axe',
     'bow',
     'crossbow',
+    'trident',
   ];
 
   const items = bot.inventory.items();
@@ -288,48 +293,95 @@ export class AttackEntityLeaf implements LeafImpl {
 
       // Attack the target
       try {
-        // Move towards the target if needed
-        if (target.position.distanceTo(bot.entity.position) > 3) {
-          await bot.lookAt(target.position);
-          // Simple movement towards target - in practice, would use pathfinding
-          const direction = target.position
-            .minus(bot.entity.position)
-            .normalize();
-          await bot.setControlState('forward', true);
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          await bot.setControlState('forward', false);
+        // Lazy-load mineflayer-pvp plugin if not already loaded
+        const hasPvp = !!(bot as any).pvp;
+        if (!hasPvp) {
+          try {
+            const pvpModule = await import('mineflayer-pvp');
+            const pvpPlugin = pvpModule.plugin ?? (pvpModule as any).default?.plugin ?? (pvpModule as any).default;
+            if (pvpPlugin) {
+              bot.loadPlugin(pvpPlugin);
+            }
+          } catch {
+            // PVP plugin not available — fall back to manual combat
+          }
         }
 
-        // Attack the target
-        await bot.attack(target);
+        const pvp = (bot as any).pvp;
 
-        // Monitor combat for specified duration or until conditions change
-        const combatEnd = combatStart + duration;
-        const checkInterval = 500; // Check every 500ms
+        if (pvp) {
+          // Configure PVP plugin
+          pvp.followRange = radius;
+          pvp.attackRange = 3;
 
-        while (ctx.now() < combatEnd) {
-          // Check if target is still alive
-          if (!target.isValid || (target.health && target.health <= 0)) {
-            break;
+          // Use PVP plugin for sustained combat (handles cooldowns, pathfinding)
+          const combatPromise = new Promise<void>((resolve) => {
+            pvp.attack(target);
+            // pvp.attack is fire-and-forget; resolve when 'stoppedAttacking' fires
+            // (event is added by mineflayer-pvp, not in base BotEvents type)
+            (bot as any).once('stoppedAttacking', () => resolve());
+          });
+
+          const timeoutPromise = new Promise<void>((resolve) =>
+            setTimeout(resolve, duration),
+          );
+
+          // Health monitoring during combat
+          const healthCheck = new Promise<void>((resolve) => {
+            const interval = setInterval(() => {
+              if (bot.health <= retreatHealth) {
+                retreated = true;
+                retreatReason = 'low_health';
+                pvp.stop();
+                clearInterval(interval);
+                resolve();
+              }
+              if (!target.isValid || (target.health != null && target.health <= 0)) {
+                pvp.stop();
+                clearInterval(interval);
+                resolve();
+              }
+            }, 500);
+            // Clean up on timeout
+            timeoutPromise.then(() => {
+              clearInterval(interval);
+              pvp.stop();
+              resolve();
+            });
+          });
+
+          await Promise.race([combatPromise, timeoutPromise, healthCheck]);
+        } else {
+          // Fallback: manual combat loop (no PVP plugin available)
+          if (target.position.distanceTo(bot.entity.position) > 3) {
+            await bot.lookAt(target.position);
+            await bot.setControlState('forward', true);
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            await bot.setControlState('forward', false);
           }
 
-          // Check if bot needs to retreat
-          if (bot.health <= retreatHealth) {
-            retreated = true;
-            retreatReason = 'low_health';
-            break;
-          }
-
-          // Check if target got too far
-          if (target.position.distanceTo(bot.entity.position) > radius * 1.5) {
-            retreated = true;
-            retreatReason = 'target_too_far';
-            break;
-          }
-
-          // Continue attacking
           await bot.attack(target);
-          await new Promise((resolve) => setTimeout(resolve, checkInterval));
+
+          const combatEnd = combatStart + duration;
+          const checkInterval = 500;
+
+          while (ctx.now() < combatEnd) {
+            if (!target.isValid || (target.health != null && target.health <= 0)) {
+              break;
+            }
+            if (bot.health <= retreatHealth) {
+              retreated = true;
+              retreatReason = 'low_health';
+              break;
+            }
+            if (target.position.distanceTo(bot.entity.position) > radius * 1.5) {
+              retreated = true;
+              retreatReason = 'target_too_far';
+              break;
+            }
+            await bot.attack(target);
+            await new Promise((resolve) => setTimeout(resolve, checkInterval));
+          }
         }
 
         // Calculate damage dealt
@@ -365,6 +417,8 @@ export class AttackEntityLeaf implements LeafImpl {
           },
         };
       } catch (error) {
+        // Ensure PVP is stopped on error
+        if ((bot as any).pvp) (bot as any).pvp.stop();
         return {
           status: 'failure',
           error: {
@@ -459,9 +513,9 @@ export class EquipWeaponLeaf implements LeafImpl {
       } else {
         // Find weapon of specific type
         const typeWeapons = {
-          sword: ['diamond_sword', 'iron_sword', 'stone_sword', 'wooden_sword'],
-          axe: ['diamond_axe', 'iron_axe', 'stone_axe', 'wooden_axe'],
-          bow: ['bow', 'crossbow'],
+          sword: ['netherite_sword', 'diamond_sword', 'iron_sword', 'copper_sword', 'stone_sword', 'wooden_sword'],
+          axe: ['netherite_axe', 'diamond_axe', 'iron_axe', 'copper_axe', 'stone_axe', 'wooden_axe'],
+          bow: ['bow', 'crossbow', 'trident'],
         };
 
         const items = bot.inventory.items();
