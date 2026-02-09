@@ -1,0 +1,124 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "d088ee33-cd86-4877-ba11-c344879735b6",
+  "created_at": 1770613336620,
+  "updated_at": 1770613399873,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "args": {
+          "retreatDistance": 10
+        },
+        "dispatched_at": 1770613378848,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "args": {
+          "retreatDistance": 10
+        },
+        "dispatched_at": 1770613398869,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "reason": "dispatch",
+        "ts": 1770613393851
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "reason": "dispatch",
+        "ts": 1770613399873
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "retreat_from_threat"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770613328835,
+      "tick_count": 45,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_retreat_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_d088ee33-cd86-4877-ba11-c344879735b6",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_retreat_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770613336620_p0q9uy",
+    "requested_at": 1770613336640
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770613336620_p0q9uy",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_retreat_v1_static",
+    "resolved_at": 1770613336640,
+    "elapsed_ms": 0,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770613336620_p0q9uy"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770613336620_p0q9uy",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_retreat_v1_static",
+    "executor_plan_digest": "4713ca524d68b7ef2dde80e6fe4c4b4cbf104a53f2e5304c9c5eff92fbb50c65",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "order": 1,
+        "args": {
+          "retreatDistance": 10
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-d088ee33-cd86-4877-ba11-c344879735b6",
+    "dedupe_key": "1.1.0:smoke_retreat_v1",
+    "status": "pending"
+  }
+}

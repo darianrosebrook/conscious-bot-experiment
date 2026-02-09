@@ -1,0 +1,140 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "904a92c1-e3e2-4b9a-a78e-f54c8410d2e9",
+  "created_at": 1770617063306,
+  "updated_at": 1770617165334,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "args": {
+          "radius": 8
+        },
+        "dispatched_at": 1770617110300,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "args": {
+          "radius": 8
+        },
+        "dispatched_at": 1770617130303,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "args": {
+          "radius": 8
+        },
+        "dispatched_at": 1770617150326,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "reason": "dispatch",
+        "ts": 1770617125303
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "reason": "dispatch",
+        "ts": 1770617145306
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "reason": "dispatch",
+        "ts": 1770617165328
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770617165334
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770617060292,
+      "tick_count": 21,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_till_soil_v1_8f3abcfbd99a",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_904a92c1-e3e2-4b9a-a78e-f54c8410d2e9",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_till_soil_v1_8f3abcfbd99a",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770617063306_zoslw4",
+    "requested_at": 1770617063325
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770617063306_zoslw4",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_till_soil_v1_static_62e1493940b2",
+    "resolved_at": 1770617063326,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770617063306_zoslw4"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770617063306_zoslw4",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_till_soil_v1_static_62e1493940b2",
+    "executor_plan_digest": "397b755ca7b12e900a983ff90ffeea5237a55a94644b83363cadcfec326b0153",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "till_soil",
+        "order": 1,
+        "args": {
+          "radius": 8
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-904a92c1-e3e2-4b9a-a78e-f54c8410d2e9",
+    "dedupe_key": "1.1.0:smoke_till_soil_v1_8f3abcfbd99a",
+    "status": "pending"
+  }
+}

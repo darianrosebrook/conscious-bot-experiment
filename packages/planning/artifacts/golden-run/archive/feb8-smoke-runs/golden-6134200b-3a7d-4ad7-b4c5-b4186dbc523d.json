@@ -1,0 +1,140 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "6134200b-3a7d-4ad7-b4c5-b4186dbc523d",
+  "created_at": 1770617401445,
+  "updated_at": 1770617525317,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "args": {
+          "retreatDistance": 10
+        },
+        "dispatched_at": 1770617430303,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "args": {
+          "retreatDistance": 10
+        },
+        "dispatched_at": 1770617470305,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "args": {
+          "retreatDistance": 10
+        },
+        "dispatched_at": 1770617510308,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "reason": "dispatch",
+        "ts": 1770617445304
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "reason": "dispatch",
+        "ts": 1770617485307
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "reason": "dispatch",
+        "ts": 1770617525311
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770617525316
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770617400297,
+      "tick_count": 55,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_retreat_v1_f078faf80fc9",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_6134200b-3a7d-4ad7-b4c5-b4186dbc523d",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_retreat_v1_f078faf80fc9",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770617401445_maxn3a",
+    "requested_at": 1770617401470
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770617401445_maxn3a",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_retreat_v1_static_c843b6e3502d",
+    "resolved_at": 1770617401471,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770617401445_maxn3a"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770617401445_maxn3a",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_retreat_v1_static_c843b6e3502d",
+    "executor_plan_digest": "4713ca524d68b7ef2dde80e6fe4c4b4cbf104a53f2e5304c9c5eff92fbb50c65",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "retreat_from_threat",
+        "order": 1,
+        "args": {
+          "retreatDistance": 10
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-6134200b-3a7d-4ad7-b4c5-b4186dbc523d",
+    "dedupe_key": "1.1.0:smoke_retreat_v1_f078faf80fc9",
+    "status": "pending"
+  }
+}

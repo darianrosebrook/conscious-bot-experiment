@@ -1,0 +1,140 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "9b4fdd35-ef12-45bc-9c68-5672ba1c724c",
+  "created_at": 1770617002680,
+  "updated_at": 1770617105309,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "args": {
+          "workstation": "crafting_table"
+        },
+        "dispatched_at": 1770617050295,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "args": {
+          "workstation": "crafting_table"
+        },
+        "dispatched_at": 1770617070298,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "args": {
+          "workstation": "crafting_table"
+        },
+        "dispatched_at": 1770617090300,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "reason": "dispatch",
+        "ts": 1770617065297
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "reason": "dispatch",
+        "ts": 1770617085301
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "reason": "dispatch",
+        "ts": 1770617105303
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770617105309
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770617000288,
+      "tick_count": 15,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_place_workstation_v1_278dbb5cfe02",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_9b4fdd35-ef12-45bc-9c68-5672ba1c724c",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_place_workstation_v1_278dbb5cfe02",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770617002680_r9o1sy",
+    "requested_at": 1770617002700
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770617002680_r9o1sy",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_place_workstation_v1_static_a5a2baacd789",
+    "resolved_at": 1770617002701,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770617002680_r9o1sy"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770617002680_r9o1sy",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_place_workstation_v1_static_a5a2baacd789",
+    "executor_plan_digest": "b4729107d8c13ea3cbd03afd8c83be2c4d91bb82b1cb712dec5664e643f0cbcc",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "order": 1,
+        "args": {
+          "workstation": "crafting_table"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-9b4fdd35-ef12-45bc-9c68-5672ba1c724c",
+    "dedupe_key": "1.1.0:smoke_place_workstation_v1_278dbb5cfe02",
+    "status": "pending"
+  }
+}

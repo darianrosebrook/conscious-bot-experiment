@@ -1,0 +1,106 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "085ea705-9ecb-4c75-8f4a-6d885ddf2124",
+  "created_at": 1770631077363,
+  "updated_at": 1770631087218,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "args": {
+          "food_type": "bread"
+        },
+        "dispatched_at": 1770631085076,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "reason": "dispatch",
+        "ts": 1770631087216
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "consume_food"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=800fcc90 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770631075070,
+      "tick_count": 96,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_consume_food_v1_aeb4db63a939",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_085ea705-9ecb-4c75-8f4a-6d885ddf2124",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_consume_food_v1_aeb4db63a939",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770631077363_0mwvc8",
+    "requested_at": 1770631077381
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770631077363_0mwvc8",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_consume_food_v1_static_94fab542f0a6",
+    "resolved_at": 1770631077381,
+    "elapsed_ms": 0,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770631077363_0mwvc8"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770631077363_0mwvc8",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_consume_food_v1_static_94fab542f0a6",
+    "executor_plan_digest": "7bd1377dba4bf56c906d7bb7fd197d91e87a967c1b03199fdd196357b7798591",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "consume_food",
+        "order": 1,
+        "args": {
+          "food_type": "bread"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-085ea705-9ecb-4c75-8f4a-6d885ddf2124",
+    "dedupe_key": "1.1.0:smoke_consume_food_v1_aeb4db63a939",
+    "status": "pending"
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "bb893313-f2e3-41b8-9c81-4d7bf2859098",
+  "created_at": 1770616198500,
+  "updated_at": 1770616245946,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "args": {
+          "food_type": "bread"
+        },
+        "dispatched_at": 1770616205936,
+        "result": {
+          "status": "error",
+          "error": "No food available in inventory"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "args": {
+          "food_type": "bread"
+        },
+        "dispatched_at": 1770616235938,
+        "result": {
+          "status": "error",
+          "error": "No food available in inventory"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "args": {
+          "food_type": "bread"
+        },
+        "dispatched_at": 1770616245939,
+        "result": {
+          "status": "error",
+          "error": "No food available in inventory"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "reason": "dispatch",
+        "ts": 1770616205938
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "reason": "dispatch",
+        "ts": 1770616235940
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "consume_food",
+        "reason": "dispatch",
+        "ts": 1770616245940
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770616245946
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770616195933,
+      "tick_count": 68,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_consume_food_v1_930fd9334425",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_bb893313-f2e3-41b8-9c81-4d7bf2859098",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_consume_food_v1_930fd9334425",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770616198500_mhj6oh",
+    "requested_at": 1770616198520
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770616198500_mhj6oh",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_consume_food_v1_static_086483ea3018",
+    "resolved_at": 1770616198520,
+    "elapsed_ms": 0,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770616198500_mhj6oh"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770616198500_mhj6oh",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_consume_food_v1_static_086483ea3018",
+    "executor_plan_digest": "7bd1377dba4bf56c906d7bb7fd197d91e87a967c1b03199fdd196357b7798591",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "consume_food",
+        "order": 1,
+        "args": {
+          "food_type": "bread"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-bb893313-f2e3-41b8-9c81-4d7bf2859098",
+    "dedupe_key": "1.1.0:smoke_consume_food_v1_930fd9334425",
+    "status": "pending"
+  }
+}

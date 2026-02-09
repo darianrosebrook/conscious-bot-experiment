@@ -1,0 +1,178 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "9ccbcd63-821b-4e9e-a139-4b813d81daa4",
+  "created_at": 1770613141471,
+  "updated_at": 1770613328883,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "args": {
+          "lightThreshold": 15
+        },
+        "dispatched_at": 1770613168830,
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "args": {
+          "lightThreshold": 15
+        },
+        "dispatched_at": 1770613218831,
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "args": {
+          "lightThreshold": 15
+        },
+        "dispatched_at": 1770613248835,
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "args": {
+          "lightThreshold": 15
+        },
+        "dispatched_at": 1770613278836,
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "args": {
+          "lightThreshold": 15
+        },
+        "dispatched_at": 1770613318840,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "reason": "dispatch",
+        "ts": 1770613168833
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "reason": "dispatch",
+        "ts": 1770613218833
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "reason": "dispatch",
+        "ts": 1770613248837
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "reason": "dispatch",
+        "ts": 1770613278839
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "reason": "dispatch",
+        "ts": 1770613318842
+      }
+    ],
+    "verification": {
+      "status": "failed",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "place_torch_if_needed",
+        "actualResult": {
+          "error": "Leaf verification failed",
+          "leaf": "place_torch_if_needed"
+        }
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770613138821,
+      "tick_count": 26,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_place_torch_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_9ccbcd63-821b-4e9e-a139-4b813d81daa4",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_place_torch_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770613141471_9l4a4m",
+    "requested_at": 1770613141489
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770613141471_9l4a4m",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_place_torch_v1_static",
+    "resolved_at": 1770613141490,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770613141471_9l4a4m"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770613141471_9l4a4m",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_place_torch_v1_static",
+    "executor_plan_digest": "ca48f3415e4b1ba05b75d220411e6a66636b19ced731df147a6645ed9a74e519",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "place_torch_if_needed",
+        "order": 1,
+        "args": {
+          "lightThreshold": 15
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-9ccbcd63-821b-4e9e-a139-4b813d81daa4",
+    "dedupe_key": "1.1.0:smoke_place_torch_v1",
+    "status": "pending"
+  }
+}

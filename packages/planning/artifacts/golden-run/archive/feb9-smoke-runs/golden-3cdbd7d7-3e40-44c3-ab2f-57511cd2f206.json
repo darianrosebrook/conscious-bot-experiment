@@ -1,0 +1,115 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "3cdbd7d7-3e40-44c3-ab2f-57511cd2f206",
+  "created_at": 1770631139290,
+  "updated_at": 1770631169220,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        },
+        "dispatched_at": 1770631165084,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "reason": "dispatch",
+        "ts": 1770631165216
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "inventory_delta",
+      "detail": {
+        "leaf": "craft_recipe",
+        "item": "oak_planks",
+        "acceptedNames": [
+          "oak_planks"
+        ],
+        "before": 32,
+        "after": 48,
+        "delta": 16
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=800fcc90 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770631135078,
+      "tick_count": 102,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_craft_recipe_v1_779475e75138",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_3cdbd7d7-3e40-44c3-ab2f-57511cd2f206",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_craft_recipe_v1_779475e75138",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770631139290_t2da79",
+    "requested_at": 1770631139309
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770631139290_t2da79",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_craft_recipe_v1_static_d1f830b82c33",
+    "resolved_at": 1770631139310,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770631139290_t2da79"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770631139290_t2da79",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_craft_recipe_v1_static_d1f830b82c33",
+    "executor_plan_digest": "08392d878f9a3e6d5d2267c535e070903717409f7672cfcacd8dc52557b68cf1",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "order": 1,
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-3cdbd7d7-3e40-44c3-ab2f-57511cd2f206",
+    "dedupe_key": "1.1.0:smoke_craft_recipe_v1_779475e75138",
+    "status": "pending"
+  }
+}

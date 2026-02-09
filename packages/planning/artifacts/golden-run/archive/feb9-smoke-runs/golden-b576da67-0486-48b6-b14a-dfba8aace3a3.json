@@ -1,0 +1,106 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "b576da67-0486-48b6-b14a-dfba8aace3a3",
+  "created_at": 1770631503510,
+  "updated_at": 1770631516215,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "args": {
+          "workstation": "crafting_table"
+        },
+        "dispatched_at": 1770631515119,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "reason": "dispatch",
+        "ts": 1770631516214
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "place_workstation"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=800fcc90 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770631495113,
+      "tick_count": 138,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_place_workstation_v1_7c134a2738e5",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_b576da67-0486-48b6-b14a-dfba8aace3a3",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_place_workstation_v1_7c134a2738e5",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770631503510_lkk67u",
+    "requested_at": 1770631503529
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770631503510_lkk67u",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_place_workstation_v1_static_bff560b87dc0",
+    "resolved_at": 1770631503530,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770631503510_lkk67u"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770631503510_lkk67u",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_place_workstation_v1_static_bff560b87dc0",
+    "executor_plan_digest": "b4729107d8c13ea3cbd03afd8c83be2c4d91bb82b1cb712dec5664e643f0cbcc",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "place_workstation",
+        "order": 1,
+        "args": {
+          "workstation": "crafting_table"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-b576da67-0486-48b6-b14a-dfba8aace3a3",
+    "dedupe_key": "1.1.0:smoke_place_workstation_v1_7c134a2738e5",
+    "status": "pending"
+  }
+}

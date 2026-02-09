@@ -1,0 +1,148 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "3f23b31e-aa53-4612-954f-44cd33544025",
+  "created_at": 1770615949810,
+  "updated_at": 1770616010916,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1,
+          "radius": 64
+        },
+        "dispatched_at": 1770615955904,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1,
+          "radius": 64
+        },
+        "dispatched_at": 1770615975906,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "args": {
+          "item": "oak_log",
+          "count": 1,
+          "radius": 64
+        },
+        "dispatched_at": 1770615995908,
+        "result": {
+          "status": "error",
+          "error": "This operation was aborted"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "reason": "dispatch",
+        "ts": 1770615970907
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "reason": "dispatch",
+        "ts": 1770615990907
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "reason": "dispatch",
+        "ts": 1770616010909
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770616010916
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770615945899,
+      "tick_count": 43,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_acquire_material_v1_f218015331ec",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_3f23b31e-aa53-4612-954f-44cd33544025",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_acquire_material_v1_f218015331ec",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770615949810_twrnyg",
+    "requested_at": 1770615949830
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770615949810_twrnyg",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_acquire_material_v1_static_d9ff1d260163",
+    "resolved_at": 1770615949831,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770615949810_twrnyg"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770615949810_twrnyg",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_acquire_material_v1_static_d9ff1d260163",
+    "executor_plan_digest": "5dd9ab9b510d8ff3ae5d59d492feabc928b2ffb588924f69111470bd755671f3",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "acquire_material",
+        "order": 1,
+        "args": {
+          "item": "oak_log",
+          "count": 1,
+          "radius": 64
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-3f23b31e-aa53-4612-954f-44cd33544025",
+    "dedupe_key": "1.1.0:smoke_acquire_material_v1_f218015331ec",
+    "status": "pending"
+  }
+}

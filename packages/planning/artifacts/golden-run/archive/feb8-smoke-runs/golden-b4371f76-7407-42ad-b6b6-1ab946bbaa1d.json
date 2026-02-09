@@ -1,0 +1,144 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "b4371f76-7407-42ad-b6b6-1ab946bbaa1d",
+  "created_at": 1770615698835,
+  "updated_at": 1770615745900,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        },
+        "dispatched_at": 1770615725881,
+        "result": {
+          "status": "error",
+          "error": "No available recipe for oak_planks (inputs missing or not near table)"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        },
+        "dispatched_at": 1770615735880,
+        "result": {
+          "status": "error",
+          "error": "No available recipe for oak_planks (inputs missing or not near table)"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        },
+        "dispatched_at": 1770615745882,
+        "result": {
+          "status": "error",
+          "error": "No available recipe for oak_planks (inputs missing or not near table)"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "reason": "dispatch",
+        "ts": 1770615725890
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "reason": "dispatch",
+        "ts": 1770615735892
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "reason": "dispatch",
+        "ts": 1770615745892
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770615745900
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770615695869,
+      "tick_count": 18,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_craft_recipe_v1_02d02ebbc9c8",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_b4371f76-7407-42ad-b6b6-1ab946bbaa1d",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_craft_recipe_v1_02d02ebbc9c8",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770615698835_sjrrt7",
+    "requested_at": 1770615698855
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770615698835_sjrrt7",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_craft_recipe_v1_static_e4c816c4cff5",
+    "resolved_at": 1770615698856,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770615698835_sjrrt7"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770615698835_sjrrt7",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_craft_recipe_v1_static_e4c816c4cff5",
+    "executor_plan_digest": "08392d878f9a3e6d5d2267c535e070903717409f7672cfcacd8dc52557b68cf1",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "craft_recipe",
+        "order": 1,
+        "args": {
+          "recipe": "oak_planks",
+          "qty": 4
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-b4371f76-7407-42ad-b6b6-1ab946bbaa1d",
+    "dedupe_key": "1.1.0:smoke_craft_recipe_v1_02d02ebbc9c8",
+    "status": "pending"
+  }
+}

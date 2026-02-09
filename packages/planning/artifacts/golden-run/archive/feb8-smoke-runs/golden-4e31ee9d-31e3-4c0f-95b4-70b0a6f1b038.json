@@ -1,0 +1,144 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "4e31ee9d-31e3-4c0f-95b4-70b0a6f1b038",
+  "created_at": 1770615075247,
+  "updated_at": 1770615097690,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "args": {
+          "radius": 16,
+          "duration": 10000
+        },
+        "dispatched_at": 1770615077677,
+        "result": {
+          "status": "error",
+          "error": "No hostile entities found within 16 blocks"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "args": {
+          "radius": 16,
+          "duration": 10000
+        },
+        "dispatched_at": 1770615087677,
+        "result": {
+          "status": "error",
+          "error": "No hostile entities found within 16 blocks"
+        }
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "args": {
+          "radius": 16,
+          "duration": 10000
+        },
+        "dispatched_at": 1770615097680,
+        "result": {
+          "status": "error",
+          "error": "No hostile entities found within 16 blocks"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "reason": "dispatch",
+        "ts": 1770615077679
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "reason": "dispatch",
+        "ts": 1770615087679
+      },
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "reason": "dispatch",
+        "ts": 1770615097684
+      },
+      {
+        "reason": "regen_failed",
+        "ts": 1770615097690
+      }
+    ]
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770615067671,
+      "tick_count": 66,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_attack_entity_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_4e31ee9d-31e3-4c0f-95b4-70b0a6f1b038",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_attack_entity_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770615075247_ysj6g3",
+    "requested_at": 1770615075268
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770615075247_ysj6g3",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_attack_entity_v1_static",
+    "resolved_at": 1770615075269,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770615075247_ysj6g3"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770615075247_ysj6g3",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_attack_entity_v1_static",
+    "executor_plan_digest": "7914d7bf43fd10053c61ad589d1134c9dd91707e7fad2942cd2572e7bd95f008",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "attack_entity",
+        "order": 1,
+        "args": {
+          "radius": 16,
+          "duration": 10000
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-4e31ee9d-31e3-4c0f-95b4-70b0a6f1b038",
+    "dedupe_key": "1.1.0:smoke_attack_entity_v1",
+    "status": "pending"
+  }
+}

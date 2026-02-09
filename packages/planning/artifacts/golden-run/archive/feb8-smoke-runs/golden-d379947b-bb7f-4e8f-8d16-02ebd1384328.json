@@ -1,0 +1,106 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "d379947b-bb7f-4e8f-8d16-02ebd1384328",
+  "created_at": 1770614428063,
+  "updated_at": 1770614437626,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "sense_hostiles",
+        "args": {
+          "radius": 16
+        },
+        "dispatched_at": 1770614437621,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "sense_hostiles",
+        "reason": "dispatch",
+        "ts": 1770614437624
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "sense_hostiles"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770614427570,
+      "tick_count": 2,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_sense_hostiles_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_d379947b-bb7f-4e8f-8d16-02ebd1384328",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_sense_hostiles_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770614428063_h3h5dc",
+    "requested_at": 1770614428082
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770614428063_h3h5dc",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_sense_hostiles_v1_static",
+    "resolved_at": 1770614428083,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770614428063_h3h5dc"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770614428063_h3h5dc",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_sense_hostiles_v1_static",
+    "executor_plan_digest": "74d2d5b3d3bdd46e3745b7ad2ce5d1f64d148896578e0deaf4402181322f84a3",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "sense_hostiles",
+        "order": 1,
+        "args": {
+          "radius": 16
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-d379947b-bb7f-4e8f-8d16-02ebd1384328",
+    "dedupe_key": "1.1.0:smoke_sense_hostiles_v1",
+    "status": "pending"
+  }
+}

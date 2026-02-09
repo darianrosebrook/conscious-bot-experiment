@@ -89,6 +89,12 @@ pids
 *.pid.lock
 artifacts/golden-run/**
 
+# Planning golden-run: ignore top-level accumulation, archive subdirs are committed
+packages/planning/artifacts/golden-run/*.json
+
+# Ephemeral debug / run logs
+run.debug.log
+
 # Optional npm cache directory
 .npm
 

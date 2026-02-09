@@ -1,0 +1,35 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "208da1e9-2a58-4761-aa61-7e8a756c56c3",
+  "created_at": 1770611688724,
+  "updated_at": 1770611688726,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "idle_episode": {
+    "client_request_id": "idle_208da1e9-2a58-4761-aa61-7e8a756c56c3",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "6ae5d13f7d0b5322",
+    "duration_ms": 2
+  }
+}

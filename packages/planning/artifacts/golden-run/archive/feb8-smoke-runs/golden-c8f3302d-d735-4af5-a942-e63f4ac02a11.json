@@ -1,0 +1,71 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "c8f3302d-d735-4af5-a942-e63f4ac02a11",
+  "created_at": 1770618881272,
+  "updated_at": 1770618891281,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "idle_episode": {
+    "client_request_id": "idle_c8f3302d-d735-4af5-a942-e63f4ac02a11",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "fa74a633bea105a1",
+    "duration_ms": 1
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "sterling_expand_requested": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "fa74a633bea105a1",
+    "request_id": "sterling_exec_1770618891260_l3p5g6",
+    "requested_at": 1770618891280
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770618891260_l3p5g6",
+    "status": "blocked",
+    "blocked_reason": "blocked_envelope_id_mismatch",
+    "resolved_at": 1770618891281,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770618891260_l3p5g6"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770618891260_l3p5g6",
+    "status": "blocked",
+    "blocked_reason": "blocked_envelope_id_mismatch",
+    "ingest_retries": 0
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-c8f3302d-d735-4af5-a942-e63f4ac02a11-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770618891281,
+      "reason": "blocked_envelope_id_mismatch",
+      "classification": "contract_broken"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "f013c033-45ce-4c67-8fed-fdd1042ae74a",
+  "created_at": 1770613021610,
+  "updated_at": 1770613028817,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "equip_tool",
+        "args": {
+          "toolType": "pickaxe"
+        },
+        "dispatched_at": 1770613028812,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "equip_tool",
+        "reason": "dispatch",
+        "ts": 1770613028816
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "equip_tool"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770613018807,
+      "tick_count": 14,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_equip_tool_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_f013c033-45ce-4c67-8fed-fdd1042ae74a",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_equip_tool_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770613021610_k8t1n2",
+    "requested_at": 1770613021632
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770613021610_k8t1n2",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_equip_tool_v1_static",
+    "resolved_at": 1770613021633,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770613021610_k8t1n2"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770613021610_k8t1n2",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_equip_tool_v1_static",
+    "executor_plan_digest": "e5154d66abae460324e77033635a06f4b399bdd6ca6d9fd20d179c0a9754bdcf",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "equip_tool",
+        "order": 1,
+        "args": {
+          "toolType": "pickaxe"
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-f013c033-45ce-4c67-8fed-fdd1042ae74a",
+    "dedupe_key": "1.1.0:smoke_equip_tool_v1",
+    "status": "pending"
+  }
+}

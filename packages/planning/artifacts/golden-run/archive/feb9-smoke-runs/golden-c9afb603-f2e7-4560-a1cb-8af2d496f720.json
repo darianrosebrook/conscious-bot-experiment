@@ -1,0 +1,108 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "c9afb603-f2e7-4560-a1cb-8af2d496f720",
+  "created_at": 1770630136348,
+  "updated_at": 1770630145028,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "find_resource",
+        "args": {
+          "blockType": "oak_log",
+          "radius": 16
+        },
+        "dispatched_at": 1770630145019,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "find_resource",
+        "reason": "dispatch",
+        "ts": 1770630145027
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "find_resource"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=800fcc90 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770630135013,
+      "tick_count": 2,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_find_resource_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_c9afb603-f2e7-4560-a1cb-8af2d496f720",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_find_resource_v1",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770630136348_lsshav",
+    "requested_at": 1770630136370
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770630136348_lsshav",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_find_resource_v1_static",
+    "resolved_at": 1770630136371,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770630136348_lsshav"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770630136348_lsshav",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_find_resource_v1_static",
+    "executor_plan_digest": "8fdd36d92b318768fee0d8eca8595d6e0b159312a7ee5212d0efa8ce30a2b17f",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "find_resource",
+        "order": 1,
+        "args": {
+          "blockType": "oak_log",
+          "radius": 16
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-c9afb603-f2e7-4560-a1cb-8af2d496f720",
+    "dedupe_key": "1.1.0:smoke_find_resource_v1",
+    "status": "pending"
+  }
+}

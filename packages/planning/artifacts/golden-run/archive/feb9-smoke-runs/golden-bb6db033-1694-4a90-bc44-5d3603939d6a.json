@@ -1,0 +1,106 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "bb6db033-1694-4a90-bc44-5d3603939d6a",
+  "created_at": 1770631549795,
+  "updated_at": 1770631576136,
+  "execution": {
+    "dispatched_steps": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "args": {
+          "radius": 8
+        },
+        "dispatched_at": 1770631575125,
+        "result": {
+          "status": "ok"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "step_id": "sterling-step-1",
+        "leaf": "till_soil",
+        "reason": "dispatch",
+        "ts": 1770631576135
+      }
+    ],
+    "verification": {
+      "status": "verified",
+      "kind": "trace_only",
+      "detail": {
+        "leaf": "till_soil"
+      }
+    }
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=800fcc90 supports_expand_by_digest_v1_versioned_key=true",
+  "planning_banner": "PLANNING_SERVER_BANNER file=planning git=unknown run_mode=dev executor_mode=live capabilities=none config_digest=9d87ecaad61e7fe0",
+  "config_digest": "9d87ecaad61e7fe0",
+  "runtime": {
+    "bridge_enabled": false,
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "interval_registered": false,
+      "last_tick_at": 1770631545118,
+      "tick_count": 143,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "injection": {
+    "committed_ir_digest": "smoke_till_soil_v1_df41b3a1c823",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "smoke_bb6db033-1694-4a90-bc44-5d3603939d6a",
+    "source": "dev_sterling_smoke"
+  },
+  "sterling_expand_requested": {
+    "committed_ir_digest": "smoke_till_soil_v1_df41b3a1c823",
+    "schema_version": "1.1.0",
+    "envelope_id": null,
+    "request_id": "sterling_exec_1770631549795_by8qmq",
+    "requested_at": 1770631549817
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770631549795_by8qmq",
+    "status": "ok",
+    "step_count": 1,
+    "plan_bundle_digest": "smoke_till_soil_v1_static_8c54622aa359",
+    "resolved_at": 1770631549818,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770631549795_by8qmq"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770631549795_by8qmq",
+    "status": "ok",
+    "plan_bundle_digest": "smoke_till_soil_v1_static_8c54622aa359",
+    "executor_plan_digest": "397b755ca7b12e900a983ff90ffeea5237a55a94644b83363cadcfec326b0153",
+    "schema_version": "1.1.0",
+    "steps": [
+      {
+        "id": "sterling-step-1",
+        "leaf": "till_soil",
+        "order": 1,
+        "args": {
+          "radius": 8
+        }
+      }
+    ]
+  },
+  "task": {
+    "task_id": "sterling-ir-bb6db033-1694-4a90-bc44-5d3603939d6a",
+    "dedupe_key": "1.1.0:smoke_till_soil_v1_df41b3a1c823",
+    "status": "pending"
+  }
+}

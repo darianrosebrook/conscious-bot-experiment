@@ -1,0 +1,105 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "b8a99172-e2df-438d-891f-979b003e7210",
+  "created_at": 1770615565870,
+  "updated_at": 1770616065933,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": []
+  },
+  "runtime": {
+    "executor": {
+      "enabled": true,
+      "mode": "live",
+      "loop_started": true,
+      "enable_planning_executor_env": "1",
+      "executor_live_confirm_env": "YES"
+    },
+    "certifiable": true
+  },
+  "idle_episode": {
+    "client_request_id": "idle_b8a99172-e2df-438d-891f-979b003e7210",
+    "status": "ok",
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "4ae47d67d3b44bf5",
+    "duration_ms": 3
+  },
+  "server_banner": "STERLING_SERVER_BANNER file=/Users/darianrosebrook/Desktop/Projects/sterling/scripts/utils/sterling_unified_server.py git=b6ddd889 supports_expand_by_digest_v1_versioned_key=true",
+  "sterling_expand_requested": {
+    "committed_ir_digest": "ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "schema_version": "1.1.0",
+    "envelope_id": "4ae47d67d3b44bf5",
+    "request_id": "sterling_exec_1770616065910_djphpb",
+    "requested_at": 1770616065932
+  },
+  "sterling_expand_result": {
+    "request_id": "sterling_exec_1770616065910_djphpb",
+    "status": "blocked",
+    "blocked_reason": "blocked_invalid_ir_bundle",
+    "resolved_at": 1770616065933,
+    "elapsed_ms": 1,
+    "attempt_count": 0,
+    "final_request_id": "sterling_exec_1770616065910_djphpb"
+  },
+  "expansion": {
+    "request_id": "sterling_exec_1770616065910_djphpb",
+    "status": "blocked",
+    "blocked_reason": "blocked_invalid_ir_bundle",
+    "ingest_retries": 0
+  },
+  "task": {
+    "task_id": "cognitive-task-idle-episode-b8a99172-e2df-438d-891f-979b003e7210-ling_ir:d543",
+    "dedupe_key": "1.1.0:ling_ir:d5437f26a2e15f933739bf3709d483d1",
+    "status": "pending_planning"
+  },
+  "expansion_retries": [
+    {
+      "attempt": 1,
+      "ts": 1770615575880,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 30000,
+      "next_eligible_at": 1770615605879
+    },
+    {
+      "attempt": 2,
+      "ts": 1770615615881,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 60000,
+      "next_eligible_at": 1770615675881
+    },
+    {
+      "attempt": 3,
+      "ts": 1770615685907,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 120000,
+      "next_eligible_at": 1770615805907
+    },
+    {
+      "attempt": 4,
+      "ts": 1770615815918,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 240000,
+      "next_eligible_at": 1770616055918
+    },
+    {
+      "attempt": 5,
+      "ts": 1770616065933,
+      "reason": "blocked_executor_error",
+      "classification": "transient",
+      "backoff_ms": 300000,
+      "next_eligible_at": 1770616365933
+    }
+  ]
+}
