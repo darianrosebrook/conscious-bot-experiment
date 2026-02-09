@@ -8,7 +8,7 @@
  *   4. spec_predicate            — evaluation returns boolean
  *   5. bounded_motifs            — motif instantiation bounded; MAX_MOTIFS reserved
  *
- * 38 tests across 9 describe blocks.
+ * 37 tests across 9 describe blocks.
  */
 
 import { describe, expect, it } from 'vitest';

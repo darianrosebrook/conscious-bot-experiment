@@ -86,6 +86,8 @@ Per-rig checklist: what each document set provides. Use this to identify gaps be
 
 **Enrichment status (2026-01-31):** All 12 rigs are ENRICHED. Each has: verified investigation outcomes and code anchors (section 4a/4b), conscious-bot vs Sterling split, implementation pivots, transfer surfaces, 5 concrete certification tests, definition of done, implementation files summary. See `RIG_ENRICHMENT_STATUS.md` for status.
 
+**Implementation note (2026-02-09):** Rigs H, J, K are CONTRACT-CERTIFIED (TS-local, E2E: NONE). P08 `bounded_motifs`: enforcement applies to instantiation via design-size bounds; `MAX_MOTIFS` is reserved for a future persistent motif library. Evidence manifest: `sterling/__tests__/rig-evidence.json`.
+
 ---
 
 ## Dependency graph

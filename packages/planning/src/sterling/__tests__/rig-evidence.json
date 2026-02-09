@@ -1,10 +1,21 @@
 {
-  "generatedAt": "2026-02-09T08:20:00Z",
-  "baseCommitSHA": "1c270aa (capsule code + tests + docs)",
-  "auditCommitSHA": "this commit (bounded_motifs fix + evidence manifest)",
+  "generatedAt": "2026-02-09T08:22:14Z",
+  "baseCommitSHA": "1c270aa541f9fffc7da8f5c671b7e61069b01ab4",
+  "auditCommitSHA": "97db5659fb2def4b8828945a56e67621a04f8e4f",
   "platform": "darwin-arm64",
   "nodeVersion": "v22.19.0",
   "vitestVersion": "3.2.4",
+  "repoDirty": false,
+  "repoDirtyNote": "git status --short for rig-relevant paths returned empty at generation time",
+  "combinedRun": {
+    "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-h.test.ts packages/planning/src/sterling/__tests__/certification-rig-j.test.ts packages/planning/src/sterling/__tests__/certification-rig-k.test.ts",
+    "result": "pass",
+    "totalTests": 112,
+    "totalPassed": 112,
+    "totalFailed": 0,
+    "wallDurationMs": 918,
+    "testDurationMs": 41
+  },
   "suites": {
     "rig-h": {
       "file": "packages/planning/src/sterling/__tests__/certification-rig-h.test.ts",
@@ -12,7 +23,7 @@
       "tests": 37,
       "passed": 37,
       "failed": 0,
-      "durationMs": 477,
+      "durationMs": 25,
       "invariants": [
         "deterministic_evaluation",
         "bounded_design",
@@ -30,7 +41,7 @@
       "tests": 39,
       "passed": 39,
       "failed": 0,
-      "durationMs": 403,
+      "durationMs": 8,
       "invariants": [
         "metric_buckets",
         "deterministic_drift",
@@ -46,7 +57,7 @@
       "tests": 36,
       "passed": 36,
       "failed": 0,
-      "durationMs": 379,
+      "durationMs": 8,
       "invariants": [
         "explicit_reversibility",
         "verify_before_commit",
@@ -95,5 +106,6 @@
     "rig-h": "NONE — no Python design domain",
     "rig-j": "NONE — no Python maintenance domain",
     "rig-k": "NONE — no Python commitment domain"
-  }
+  },
+  "evidenceLevel": "Contract certification only. No claim is made about planner search optimality or Python solve performance."
 }
