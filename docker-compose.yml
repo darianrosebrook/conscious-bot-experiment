@@ -39,7 +39,7 @@ services:
       ENABLE_COMMAND_BLOCK: "false"
       ALLOW_CHEATS: "true"
       EXISTING_OPS_FILE: SYNCHRONIZE
-      SEED: "-5040105890"
+      SEED: "conscious-2026"
       LEVEL_TYPE: DEFAULT
     ports:
       - "25565:25565"
