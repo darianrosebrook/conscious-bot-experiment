@@ -20,8 +20,16 @@ Endpoints:
 
 import argparse
 import hashlib
+import os
 import threading
 import time
+
+# Limit threading in numba/BLAS to avoid Metal command buffer races
+# when UMAP runs alongside MLX embedding generation
+os.environ['NUMBA_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
 
 import mlx.core as mx
 import numpy as np
@@ -237,21 +245,35 @@ def reduce_embeddings():
         _log(f"[UMAP] Cache hit for hash {content_hash}")
         return jsonify(umap_reduction_cache[content_hash])
 
-    # Lazy import umap to avoid startup delay if not used
-    import umap
+    # Acquire GPU lock to prevent Metal command buffer races with
+    # concurrent /api/embeddings or /api/generate calls
+    with _gpu_lock:
+        method_used = "umap"
+        try:
+            # Lazy import umap to avoid startup delay if not used
+            import umap
 
-    # Fit UMAP reducer with appropriate n_neighbors
-    n_neighbors = min(15, max(2, len(embeddings) - 1))
-    reducer = umap.UMAP(
-        n_components=3,
-        n_neighbors=n_neighbors,
-        min_dist=0.1,
-        metric="cosine",
-        random_state=42,  # Deterministic for reproducibility
-    )
+            # Fit UMAP reducer with appropriate n_neighbors
+            n_neighbors = min(15, max(2, len(embeddings) - 1))
+            reducer = umap.UMAP(
+                n_components=3,
+                n_neighbors=n_neighbors,
+                min_dist=0.1,
+                metric="cosine",
+                random_state=42,
+                n_jobs=1,  # Single-threaded to avoid crashes on Python 3.13 + Apple Silicon
+                low_memory=True,
+            )
 
-    _log(f"[UMAP] Reducing {len(embeddings)} embeddings to 3D...")
-    coords_3d = reducer.fit_transform(embeddings)
+            _log(f"[UMAP] Reducing {len(embeddings)} embeddings to 3D...")
+            coords_3d = reducer.fit_transform(embeddings)
+        except Exception as e:
+            # Fallback to PCA if UMAP crashes (common on Python 3.13 + Apple Silicon)
+            _log(f"[UMAP] UMAP failed ({e}), falling back to PCA")
+            method_used = "pca"
+            from sklearn.decomposition import PCA
+            reducer = PCA(n_components=3, random_state=42)
+            coords_3d = reducer.fit_transform(embeddings)
 
     # Normalize to [-1, 1] range for Three.js
     mins = coords_3d.min(axis=0)
@@ -271,9 +293,9 @@ def reduce_embeddings():
         for i in range(len(coords_3d))
     ]
 
-    result = {"points": points, "hash": content_hash, "count": len(points)}
+    result = {"points": points, "hash": content_hash, "count": len(points), "method": method_used}
     umap_reduction_cache[content_hash] = result
-    _log(f"[UMAP] Reduction complete: {len(points)} points, cached as {content_hash}")
+    _log(f"[UMAP] Reduction complete ({method_used}): {len(points)} points, cached as {content_hash}")
 
     return jsonify(result)
 
@@ -324,7 +346,9 @@ def main():
 
     # Bind immediately so /health is reachable (returns 503 until models load)
     def run_server():
-        app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+        # threaded=False ensures requests are handled sequentially,
+        # preventing Metal command buffer races between concurrent GPU ops
+        app.run(host=args.host, port=args.port, debug=False, use_reloader=False, threaded=False)
 
     server_thread = threading.Thread(target=run_server, daemon=False)
     server_thread.start()
