@@ -17,10 +17,13 @@ The conscious-bot project relies on the **prismarine ecosystem** for Minecraft p
 - ✅ **Replaced**: Sky dome (procedural sun/moon/stars)
 - ✅ **Replaced**: Weather effects (rain, snow, lightning)
 - ✅ **Replaced**: Browser client (standalone Vite-built viewer, no webpack patches)
+- ✅ **Replaced**: Entity equipment rendering (armor, held items, bone-attached)
+- ✅ **Replaced**: Tone mapping and vibrance (ACES filmic + saturation boost)
 - ✅ **Working**: Player skins (via Microsoft auth + ONLINE_MODE)
 - ✅ **Working**: Custom asset server for MC 1.21.5-1.21.9 textures
 - ✅ **Working**: Minecraft 1.21.9 (no version rollback needed)
-- ❌ **Not Started**: Physics simulation replacement (keeping prismarine-physics)
+- ⏳ **Not Started**: Per-block lighting (torch glow, redstone, skylight/blocklight)
+- ❌ **Not Replacing**: Physics simulation (keeping prismarine-physics)
 
 ---
 
@@ -241,7 +244,7 @@ The standalone viewer in `src/viewer/` has eliminated the need for pnpm patches 
 - Face culling optimization (only render visible faces)
 - Biome color interpolation (smooth transitions)
 
-### 3.2 Entity Rendering (Mostly Complete)
+### 3.2 Entity Rendering ✅ Complete
 
 **Current**: Standalone viewer with full entity pipeline
 
@@ -256,20 +259,11 @@ The standalone viewer in `src/viewer/` has eliminated the need for pnpm patches 
 - Frustum culling for entity visibility
 - Name tag rendering (canvas-based sprites with distance scaling)
 - Shadow projection (simple disc shadow)
-- Cape rendering
-
-**What Still Needs Work**:
-- Equipment rendering (armor, held items)
-
-**What's Now Working** ✅:
+- Cape rendering (model-based + shader cloth fallback)
+- Equipment rendering (armor slots, held items, material color mapping, bone attachment)
 - Player skins (via Microsoft auth + ONLINE_MODE)
 - 30+ entity types with correct 3D geometry
 - Entities verified on Minecraft 1.21.9
-
-**Remaining Estimate**:
-- Lines of code: 200-400 (equipment only)
-- Time: 2-3 days
-- Complexity: Medium
 
 ### 3.3 World Renderer Integration (Medium Effort)
 
@@ -320,7 +314,7 @@ The standalone viewer in `src/viewer/` has eliminated the need for pnpm patches 
 - [x] POV toggle (1st/3rd person)
 - [x] Orbit controls for 3rd person view
 
-### Phase 3: Enhanced Rendering (Mostly Complete)
+### Phase 3: Enhanced Rendering ✅ Complete
 - [x] Animated textures (water, lava, fire, sea lantern, etc.)
 - [x] Day/night lighting cycle with smooth transitions
 - [x] Player skins (via Microsoft auth)
@@ -331,18 +325,23 @@ The standalone viewer in `src/viewer/` has eliminated the need for pnpm patches 
 - [x] Entity cube rotation fix (pivot-centered rotation for 39 cubes/13 entity types)
 - [x] Standalone Vite-built viewer (no webpack patches)
 - [x] Worker bundle optimization (255MB→525KB via minecraft-data shim)
-- [ ] Block lighting (torch light, redstone)
-- [ ] Entity equipment rendering (armor, held items)
+- [x] Entity equipment rendering (armor, held items, bone-attached)
+- [x] Tone mapping (ACES filmic) and vibrance boost in fragment shader
+- [x] Softened ambient occlusion (floor raised from 0.25→0.4)
 
-### Phase 4: Chunk Meshing (Future)
-- [ ] WebWorker-based mesh generation
-- [ ] Face culling algorithm
-- [ ] Ambient occlusion calculation
-- [ ] Multipart model resolver
-- [ ] Biome tinting system
+### Phase 4: Block Lighting (Next)
+- [ ] Per-block light levels (skylight + blocklight from chunk data)
+- [ ] Light-emitting blocks (torch=14, glowstone=15, redstone=variable)
+- [ ] Skylight attenuation (caves get dark, overhangs cast shadow)
+- [ ] Vertex color integration (multiply AO × light level in meshing worker)
 
-### Phase 5: Full Independence (Long-term)
-- [ ] Remove prismarine-viewer dependency entirely
+### Phase 5: Chunk Meshing Independence (Future)
+- [x] WebWorker-based mesh generation (4-worker pool, hash-based dispatch)
+- [x] Face culling algorithm (neighbor block checks, isCube occlusion)
+- [x] Ambient occlusion calculation (vertex AO from side1/side2/corner neighbors)
+- [x] Multipart model resolver (blockstates with variants + multipart)
+- [x] Biome tinting system (grass/water/foliage vertex colors from biome data)
+- [ ] Remove prismarine-viewer dependency entirely (still using server-side WS relay)
 - [ ] Custom WebSocket protocol for viewer communication
 - [ ] Standalone viewer package (`@conscious-bot/viewer`)
 
@@ -365,7 +364,7 @@ packages/minecraft-interface/src/
 │   │   ├── entities.js                # Entity manager, animation, fallbacks, culling
 │   │   ├── entities.json              # Bedrock-format entity geometry (30+ types)
 │   │   ├── entity-extras.js           # Name tags, shadows, capes
-│   │   └── equipment-renderer.js      # (in progress)
+│   │   └── equipment-renderer.js      # Armor, held items, bone-attached
 │   ├── meshing/
 │   │   ├── worker.js                  # Web Worker for chunk meshing
 │   │   ├── minecraft-data-shim.js     # Stubs unused data (255MB→525KB)
@@ -456,7 +455,9 @@ No patch regeneration is needed — edit files directly in `src/viewer/` and reb
 | Entity cube rotation | ✅ Done | Pivot-centered rotation (13 entity types) |
 | Standalone viewer | ✅ Done | Vite-built, no webpack patches needed |
 | Worker optimization | ✅ Done | 255MB→525KB via minecraft-data shim |
-| Entity equipment | ⏳ Next | Armor, held items needed |
+| Entity equipment | ✅ Done | Armor, held items, bone-attached |
+| Tone mapping + vibrance | ✅ Done | ACES filmic, saturation boost, softened AO |
+| Block lighting | ⏳ Next | Per-block skylight/blocklight from chunk data |
 | Physics | ❌ Keep | Pathfinding depends on it |
 | Protocol handling | ❌ Keep | mineflayer is excellent |
 | World storage | ❌ Keep | prismarine-world is solid |
