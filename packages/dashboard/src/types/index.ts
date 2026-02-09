@@ -387,3 +387,17 @@ export interface EmbeddingVizResponse {
   count: number;
   message?: string;
 }
+
+// Building designer types
+export type {
+  Vec3,
+  PlacedBlock,
+  BuildMode,
+  BlockCategory,
+} from './building';
+export {
+  BLOCK_CATEGORIES,
+  ALL_BLOCKS,
+  DEFAULT_BLOCK_TYPE,
+  DEFAULT_GRID_SIZE,
+} from './building';

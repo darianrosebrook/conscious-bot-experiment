@@ -42,6 +42,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InventoryDisplay } from '@/components/inventory-display';
 import { EvaluationTab } from '@/components/evaluation-tab';
 import { DatabasePanel } from '@/components/database-panel';
+import { BuildingTab } from '@/components/building/building-tab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -667,6 +668,7 @@ export default function Dashboard() {
                 <TabsTrigger value="live">Live</TabsTrigger>
                 <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
                 <TabsTrigger value="database">Database</TabsTrigger>
+                <TabsTrigger value="building">Building</TabsTrigger>
               </TabsList>
             </Tabs>
           </nav>
@@ -734,6 +736,7 @@ export default function Dashboard() {
             <TabsTrigger value="live">Live</TabsTrigger>
             <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
             <TabsTrigger value="database">Database</TabsTrigger>
+            <TabsTrigger value="building">Building</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -1350,6 +1353,11 @@ export default function Dashboard() {
           {/* Database Tab Content */}
           <TabsContent value="database" className={styles.tabContentFull}>
             <DatabasePanel />
+          </TabsContent>
+
+          {/* Building Tab Content */}
+          <TabsContent value="building" className={styles.tabContentFull}>
+            <BuildingTab />
           </TabsContent>
         </Tabs>
       </div>

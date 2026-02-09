@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import textureAtlasPlugin from './vite-plugin-texture-atlas';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), textureAtlasPlugin()],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {
@@ -183,6 +184,25 @@ export default defineConfig({
         target: 'http://localhost:3005',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/evaluation/, '/evaluation'),
+      },
+
+      // =====================================================================
+      // Building solve with prerequisites (planning service → Sterling)
+      // =====================================================================
+      '/api/building-solve': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/building-solve/, '/sterling/building/solve-with-prerequisites'),
+      },
+
+      // =====================================================================
+      // Sterling reasoning service (port 8766 — WebSocket)
+      // =====================================================================
+      '/api/sterling': {
+        target: 'ws://localhost:8766',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/api\/sterling/, ''),
       },
     },
   },
