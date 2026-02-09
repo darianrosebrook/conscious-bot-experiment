@@ -103,6 +103,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/stream/, '/stream'),
       },
+      '/api/intero': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api/, ''),
+      },
       // Events and notes served by memory service (same source as memory-updates SSE)
       '/api/events': {
         target: 'http://localhost:3001',

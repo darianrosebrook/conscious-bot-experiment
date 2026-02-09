@@ -26,7 +26,19 @@ export interface BotStateSSEMessage {
       stamina?: number;
       sleep?: number;
     } | null;
-    intero?: { stress?: number; focus?: number; curiosity?: number };
+    intero?: {
+      stress?: number;
+      focus?: number;
+      curiosity?: number;
+      stressAxes?: {
+        time: number;
+        situational: number;
+        healthHunger: number;
+        resource: number;
+        protection: number;
+        locationDistance: number;
+      };
+    };
     mood?: string;
     environment?: unknown;
     cognition?: unknown;

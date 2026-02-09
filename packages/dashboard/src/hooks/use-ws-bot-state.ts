@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -54,6 +54,34 @@ export function useWsBotState() {
     },
   ]);
   const [dwellCounts, setDwellCounts] = useState<Record<string, number>>({});
+
+  // Seed dwell counts from persisted intero history on mount
+  const dwellSeeded = useRef(false);
+  useEffect(() => {
+    if (dwellSeeded.current) return;
+    dwellSeeded.current = true;
+    fetch('/api/intero/history?limit=1800')
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: { snapshots?: Array<{ stress?: number; focus?: number; curiosity?: number; stressAxes?: { time: number; situational: number; healthHunger: number; resource: number; protection: number; locationDistance: number } }> }) => {
+        if (!data.snapshots?.length) return;
+        const counts: Record<string, number> = {};
+        for (const snap of data.snapshots) {
+          const key = getHexKey(snap);
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+        setDwellCounts((prev) => {
+          const merged = { ...counts };
+          for (const [k, v] of Object.entries(prev)) {
+            merged[k] = (merged[k] ?? 0) + v;
+          }
+          return merged;
+        });
+      })
+      .catch(() => {}); // Silent fail preserves current behavior
+  }, []);
 
   // Use a ref for hud so the callback identity stays stable across renders.
   // Without this, every health_changed event updates hud → recreates the callback →

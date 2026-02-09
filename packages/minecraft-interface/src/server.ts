@@ -569,6 +569,14 @@ function setupBotStateWebSocket() {
                 stress?: number;
                 focus?: number;
                 curiosity?: number;
+                stressAxes?: {
+                  time: number;
+                  situational: number;
+                  healthHunger: number;
+                  resource: number;
+                  protection: number;
+                  locationDistance: number;
+                };
               }
             | undefined;
           try {
@@ -581,6 +589,14 @@ function setupBotStateWebSocket() {
                   stress?: number;
                   focus?: number;
                   curiosity?: number;
+                  stressAxes?: {
+                    time: number;
+                    situational: number;
+                    healthHunger: number;
+                    resource: number;
+                    protection: number;
+                    locationDistance: number;
+                  };
                 };
               };
               if (c?.intero) intero = c.intero;
