@@ -741,6 +741,102 @@ describe('audit events (A1.10)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// FF-C: Combat exemption (combatExempt flag)
+// ---------------------------------------------------------------------------
+
+describe('FF-C: combatExempt flag', () => {
+  it('task with combatExempt: true is NOT paused on high threat', async () => {
+    const task = makeGoalTask('t1', 'active');
+    // Set combatExempt on the binding
+    (task.metadata.goalBinding as GoalBinding).combatExempt = true;
+
+    const deps = makeDeps({
+      fetchSignal: async () => makeSignal('critical', [
+        { type: 'zombie', distance: 3, threatLevel: 90 },
+      ]),
+      getTasksToEvaluate: () => [task],
+    });
+
+    const event = await evaluateThreatHolds(deps);
+
+    expect(event.holdDecision).toBe(true);  // Signal says hold
+    expect(event.tasksHeld).toEqual([]);     // But exempt task not held
+    expect(deps.statusUpdates).toEqual([]);  // No status change
+
+    const binding = task.metadata.goalBinding as GoalBinding;
+    expect(binding.hold).toBeUndefined();    // No hold applied
+  });
+
+  it('task without combatExempt IS paused (existing behavior preserved)', async () => {
+    const task = makeGoalTask('t1', 'active');
+    // combatExempt is undefined by default
+
+    const deps = makeDeps({
+      fetchSignal: async () => makeSignal('critical'),
+      getTasksToEvaluate: () => [task],
+    });
+
+    const event = await evaluateThreatHolds(deps);
+
+    expect(event.tasksHeld).toEqual(['t1']);
+    const binding = task.metadata.goalBinding as GoalBinding;
+    expect(binding.hold!.reason).toBe('unsafe');
+  });
+
+  it('mixed: exempt + non-exempt tasks, only non-exempt is held', async () => {
+    const combatTask = makeGoalTask('combat', 'active');
+    (combatTask.metadata.goalBinding as GoalBinding).combatExempt = true;
+
+    const buildTask = makeGoalTask('build', 'active');
+    // buildTask has no combatExempt
+
+    const deps = makeDeps({
+      fetchSignal: async () => makeSignal('high'),
+      getTasksToEvaluate: () => [combatTask, buildTask],
+    });
+
+    const event = await evaluateThreatHolds(deps);
+
+    expect(event.tasksHeld).toEqual(['build']);
+    // combat task not held
+    const combatBinding = combatTask.metadata.goalBinding as GoalBinding;
+    expect(combatBinding.hold).toBeUndefined();
+  });
+
+  it('combatExempt task is still released normally when combat ends (low threat)', async () => {
+    // Simulate a combat task that was somehow held (e.g. from a previous non-combat hold)
+    const task = makeGoalTask('t1', 'paused');
+    (task.metadata.goalBinding as GoalBinding).combatExempt = true;
+    requestHold(task, 'unsafe');
+    (task.metadata as any).threatHoldPrevStatus = 'active';
+
+    const deps = makeDeps({
+      fetchSignal: async () => makeSignal('low'),
+      getTasksToEvaluate: () => [task],
+    });
+
+    const event = await evaluateThreatHolds(deps);
+
+    // Release still works for combat-exempt tasks (exemption only affects hold path)
+    expect(event.tasksReleased).toEqual(['t1']);
+  });
+
+  it('combatExempt: false behaves like undefined (not exempt)', async () => {
+    const task = makeGoalTask('t1', 'active');
+    (task.metadata.goalBinding as GoalBinding).combatExempt = false;
+
+    const deps = makeDeps({
+      fetchSignal: async () => makeSignal('high'),
+      getTasksToEvaluate: () => [task],
+    });
+
+    const event = await evaluateThreatHolds(deps);
+
+    expect(event.tasksHeld).toEqual(['t1']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Replay determinism (A1.12)
 // ---------------------------------------------------------------------------
 

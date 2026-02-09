@@ -105,6 +105,13 @@ export interface GoalBinding {
   /** Hold state — present iff task.status === 'paused' */
   hold?: GoalHold;
 
+  /**
+   * When true, this task is exempt from threat-hold pausing.
+   * Used for combat goals that exist *because* of the threat — pausing
+   * them would create a paradox where the threat suppresses its own remedy.
+   */
+  combatExempt?: boolean;
+
   /** Completion verifier reference */
   completion: GoalCompletion;
 

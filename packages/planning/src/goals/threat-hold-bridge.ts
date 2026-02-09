@@ -185,6 +185,9 @@ export async function evaluateThreatHolds(
       const binding = task.metadata?.goalBinding as GoalBinding | undefined;
       if (!binding) continue; // non-goal tasks out of scope
 
+      // Combat-exempt goals exist *because* of the threat — don't pause them
+      if (binding.combatExempt === true) continue;
+
       // A1.13: Non-interference — skip if already held for any reason
       if (binding.hold) continue;
 
