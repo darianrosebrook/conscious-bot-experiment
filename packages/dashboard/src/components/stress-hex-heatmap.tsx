@@ -175,9 +175,9 @@ function getHexKey(intero: InteroState): string {
   const numInRing = ring * 6;
 
   if (intero.stressAxes) {
-    // Map dominant axis (0-5) to sector in ring
+    // Map dominant axis (0-5) to the matching sector in this ring.
     const axisIdx = dominantAxisIndex(intero.stressAxes);
-    const sector = Math.floor((axisIdx / 6) * numInRing) % numInRing;
+    const sector = axisIdxToSector(ring, axisIdx);
     return `${ring},${sector}`;
   }
 
@@ -208,13 +208,30 @@ function stressRangeForRing(ring: number): string {
   return `${lo}-${hi}`;
 }
 
+/**
+ * Map a sector index within a ring to the axis label index (0-5).
+ *
+ * hexRing() starts at DIRS[4] (150°, lower-left) and walks counter-clockwise,
+ * but axis labels are placed clockwise from -90° (top = Time, idx 0).
+ * The conversion is: axisIdx = (4 - floor(sector / numInRing * 6) + 6) % 6.
+ */
+function sectorToAxisIdx(ring: number, sector: number): number {
+  const numInRing = ring * 6;
+  return ((4 - Math.round((sector / numInRing) * 6)) % 6 + 6) % 6;
+}
+
+/** Inverse: convert axis index to sector position within a ring. */
+function axisIdxToSector(ring: number, axisIdx: number): number {
+  const numInRing = ring * 6;
+  const dirIdx = ((4 - axisIdx) % 6 + 6) % 6;
+  return Math.floor((dirIdx / 6) * numInRing) % numInRing;
+}
+
 /** Sector label: axis name when stressAxes available, else focus percentage. */
 function sectorLabel(ring: number, sector: number, hasAxes: boolean): string {
   if (ring === 0) return 'center';
   if (hasAxes) {
-    const numInRing = ring * 6;
-    const axisIdx = Math.round((sector / numInRing) * 6) % 6;
-    return AXIS_LABELS[axisIdx];
+    return AXIS_LABELS[sectorToAxisIdx(ring, sector)];
   }
   const numInRing = ring * 6;
   const pctLo = Math.round((sector / numInRing) * 100);
@@ -226,8 +243,7 @@ function sectorLabel(ring: number, sector: number, hasAxes: boolean): string {
 function feelingLabel(ring: number, sector: number, hasAxes: boolean): string {
   if (ring === 0) return FEELING_BY_RING_ONLY[0];
   if (hasAxes) {
-    const numInRing = ring * 6;
-    const axisIdx = Math.round((sector / numInRing) * 6) % 6;
+    const axisIdx = sectorToAxisIdx(ring, sector);
     const row = FEELING_BY_RING_AND_AXIS[ring as keyof typeof FEELING_BY_RING_AND_AXIS];
     return row ? row[axisIdx] : FEELING_BY_RING_ONLY[ring] ?? 'Stressed';
   }
