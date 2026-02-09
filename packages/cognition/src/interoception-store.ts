@@ -152,6 +152,27 @@ export function resetIntero(): void {
 }
 
 /**
+ * Restore intero state from a persisted snapshot (startup).
+ * Composite stress is recomputed from axes (not trusted from snapshot).
+ */
+export function restoreInteroState(snapshot: {
+  focus?: number;
+  curiosity?: number;
+  stressAxes?: Partial<StressAxes>;
+}): void {
+  if (snapshot.stressAxes) {
+    for (const key of Object.keys(AXIS_DEFAULTS) as (keyof StressAxes)[]) {
+      if (typeof snapshot.stressAxes[key] === 'number') {
+        state.stressAxes[key] = clamp(snapshot.stressAxes[key]!);
+      }
+    }
+  }
+  state.stress = computeComposite(state.stressAxes);
+  if (typeof snapshot.focus === 'number') state.focus = clamp(snapshot.focus);
+  if (typeof snapshot.curiosity === 'number') state.curiosity = clamp(snapshot.curiosity);
+}
+
+/**
  * Halve all 6 axes after sleep/respawn. Time and healthHunger get
  * a stronger reset (0.3x) since sleep directly addresses those.
  * Focus and curiosity get a recovery boost.

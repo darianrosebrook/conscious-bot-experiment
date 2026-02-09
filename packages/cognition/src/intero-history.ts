@@ -11,6 +11,7 @@
 
 import * as fs from 'fs';
 import type { InteroState, StressAxes } from './interoception-store';
+import { restoreInteroState } from './interoception-store';
 import { createServerLogger } from './server-utils/server-logger';
 
 export interface InteroSnapshot {
@@ -131,6 +132,19 @@ export function loadInteroHistory(): void {
       tags: ['intero-history', 'loaded'],
       fields: { loaded, path: PERSIST_PATH },
     });
+    if (history.length > 0) {
+      const latest = history[history.length - 1];
+      restoreInteroState({
+        focus: latest.focus,
+        curiosity: latest.curiosity,
+        stressAxes: latest.stressAxes,
+      });
+      interoLogger.info('Restored intero state from latest snapshot', {
+        event: 'intero_state_restored',
+        tags: ['intero-history', 'restored'],
+        fields: { ts: latest.ts, stress: latest.stress },
+      });
+    }
   } catch (err) {
     interoLogger.warn('Failed to load intero history', {
       event: 'intero_history_load_failed',

@@ -93,6 +93,7 @@ const LIFECYCLE_EVENTS = new Set([
   'llm_health_unreachable',
   'intero_history_loaded',
   'intero_history_load_failed',
+  'intero_state_restored',
   'social_memory_init_failed',
   'process_uncaught_exception',
   'process_unhandled_rejection',

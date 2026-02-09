@@ -11,6 +11,7 @@ import {
   halveStressAxes,
   updateStressFromIntrusion,
   resetIntero,
+  restoreInteroState,
   type StressAxes,
 } from '../interoception-store';
 
@@ -220,6 +221,56 @@ describe('interoception-store', () => {
       expect(state.curiosity).toBe(75);
       expect(state.stressAxes.time).toBe(15);
       expect(state.stressAxes.situational).toBe(10);
+    });
+  });
+
+  describe('restoreInteroState', () => {
+    it('restores axes from snapshot and recomputes composite', () => {
+      restoreInteroState({
+        stressAxes: { situational: 80, time: 60 },
+      });
+      const state = getInteroState();
+      expect(state.stressAxes.situational).toBe(80);
+      expect(state.stressAxes.time).toBe(60);
+      // Untouched axes keep defaults
+      expect(state.stressAxes.healthHunger).toBe(10);
+      // Composite recomputed from axes
+      expect(state.stress).toBeGreaterThan(13);
+    });
+
+    it('restores focus and curiosity', () => {
+      restoreInteroState({ focus: 42, curiosity: 63 });
+      const state = getInteroState();
+      expect(state.focus).toBe(42);
+      expect(state.curiosity).toBe(63);
+    });
+
+    it('clamps out-of-range values', () => {
+      restoreInteroState({
+        focus: 150,
+        curiosity: -10,
+        stressAxes: { situational: 200 },
+      });
+      const state = getInteroState();
+      expect(state.focus).toBe(100);
+      expect(state.curiosity).toBe(0);
+      expect(state.stressAxes.situational).toBe(100);
+    });
+
+    it('ignores non-number fields in stressAxes', () => {
+      restoreInteroState({
+        stressAxes: { situational: undefined as unknown as number },
+      });
+      // Should keep default, not crash
+      expect(getInteroState().stressAxes.situational).toBe(10);
+    });
+
+    it('with empty snapshot keeps defaults', () => {
+      restoreInteroState({});
+      const state = getInteroState();
+      expect(state.focus).toBe(80);
+      expect(state.curiosity).toBe(75);
+      expect(state.stressAxes.time).toBe(15);
     });
   });
 
