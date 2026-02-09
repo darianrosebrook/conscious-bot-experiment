@@ -210,7 +210,7 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 | **K**: Irreversibility | CB-P13, 19, 20 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling commitment domain). P13 capsule types, reference adapter, reference fixtures (2 domains), Minecraft commitment module (tags, verifications, constraints). 36 certification tests pass. | Track 3 |
 | **L**: Contingency planning | CB-P9, 18, 19 | NOT STARTED | NONE | — | Later |
 | **M**: Risk-aware planning | CB-P10, 17, 18, 19 | NOT STARTED | NONE | — | Later |
-| **N**: Fault diagnosis | CB-P11, 15, 19 | NOT STARTED | NONE | — | Later |
+| **N**: Fault diagnosis | CB-P11, 15, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling diagnosis domain). P15 capsule types (wraps P11), reference adapter, reference fixtures (2 domains), Minecraft farm faults module. 45 certification tests pass. | Track 4 |
 
 ### Python solver domain inventory
 
@@ -878,9 +878,39 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 
 ---
 
-## Rigs L–N: Not started
+## Rig N — Fault Diagnosis & Repair (P15)
 
-These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Later (L–N) priority ordering.
+**Primitive**: CB-P15 (wraps CB-P11 epistemic planning)
+**Contract**: CONTRACT-CERTIFIED — P15 capsule + reference adapter (wraps P11 via DI) + 2-domain fixtures + Minecraft farm faults module + 45 certification tests
+**E2E**: NONE — no fault diagnosis domain in Python. All repair/validation sequencing, episode control, and bounded diagnosis are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P15 capsule contract types (domain-agnostic) | `sterling/primitives/p15/p15-capsule-types.ts` | `P15RepairActionV1`, `P15ValidationProbeV1`, `P15DiagnosisParamsV1`, `P15DiagnosisEpisodeV1`, `P15FaultDiagnosisAdapter`; 6 invariants; delegates to P11 for epistemic computation |
+| Reference adapter (wraps P11) | `sterling/primitives/p15/p15-reference-adapter.ts` | `P15ReferenceAdapter` takes `P11EpistemicAdapter` via constructor injection. Delegates selectProbe, updateBelief, calculateEntropy, expectedInfoGain to P11. Adds selectRepair (lowest cost + lexicographic), requiresValidation (1:1 mapping), evaluateValidation, runDiagnosisLoop |
+| Reference fixtures (2 domains) | `sterling/primitives/p15/p15-reference-fixtures.ts` | CI Pipeline Faults (4 hypotheses, 4 probes, 6 repairs, 6 validations) + Farm Hydration Faults (4 hypotheses, 4 probes, 5 repairs, 5 validations) for portability |
+| Minecraft farm faults module | `diagnosis/minecraft-farm-faults.ts` | `MINECRAFT_FARM_FAULT_HYPOTHESES` (4), `MINECRAFT_FARM_FAULT_PROBES` (4), `MINECRAFT_FARM_FAULT_REPAIRS` (5), `MINECRAFT_FARM_FAULT_VALIDATIONS` (5), `MINECRAFT_FARM_DIAGNOSIS_PARAMS` |
+| Certification test suite | `sterling/__tests__/certification-rig-n.test.ts` | 45 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **N.1 — P15 capsule types**: Domain-agnostic types for repair actions, validation probes, diagnosis parameters, episode records, termination reasons. 6 invariants defined. `P15FaultDiagnosisAdapter` interface with 7 methods + defaultParams. `MAX_DIAGNOSIS_STEPS = 20`. `DEFAULT_DIAGNOSIS_THRESHOLD = 0.8`. `DEFAULT_MIN_INFO_GAIN = 0.01`. Imports from P11: `P11BeliefStateV1`, `P11HypothesisV1`, `P11ProbeOperatorV1`, `P11ObservedEvidenceV1`, `ProbBucket`.
+
+- [x] **N.2 — Reference adapter (P11 delegation)**: `P15ReferenceAdapter` wraps `P11EpistemicAdapter` via constructor injection. `selectDiagnosticProbe()` delegates to P11 `selectProbe` + `expectedInfoGain`, gates on `minInfoGain`. `updateDiagnosticBelief()` delegates to P11 `updateBelief`, unwraps `.belief`. `selectRepair()` deterministic: lowest cost then lexicographic ID, skips already-applied. `requiresValidation()` 1:1 repair→validation lookup. `evaluateValidation()` checks evidence type + value match. `runDiagnosisLoop()` bounded state machine: probe → update → confidence check → repair → validate → resolved/re-enter.
+
+- [x] **N.3 — Reference fixtures (2 domains)**: CI Pipeline domain (fault_auth/fault_db/fault_network/fault_config hypotheses; run_unit_test/check_error_log/inspect_config/network_probe diagnostic probes; 6 repairs with 6 validations; `makeCIObservationProvider` oracle). Farm Hydration domain (fault_dry_soil/fault_low_light/fault_wrong_crop/fault_trampled hypotheses; check_moisture/check_light/check_crop_type/check_blockstate probes; 5 repairs with 5 validations; `makeFarmObservationProvider` oracle). CI fixture overrides `confidenceThreshold` to 0.7 (domain parameterization, not capability limitation); P11 ProbBucket discretization limits achievable confidence with this fixture's 4 hypotheses. Farm domain uses capsule default 0.8. Both thresholds exercise diagnose-repair-validate sequencing.
+
+- [x] **N.4 — Minecraft farm faults module**: `MINECRAFT_FARM_FAULT_HYPOTHESES` (4: dry_soil, low_light, wrong_crop, trampled). `MINECRAFT_FARM_FAULT_PROBES` (4: check_moisture, check_light, check_crop_type, check_blockstate). `MINECRAFT_FARM_FAULT_REPAIRS` (5: add_water, add_torch, replant, retill, fence). `MINECRAFT_FARM_FAULT_VALIDATIONS` (5: validate_water, validate_torch, validate_replant, validate_retill, validate_fence).
+
+- [x] **N.5 — Certification suite**: `certification-rig-n.test.ts` — 45 tests covering: deterministic probe scoring (Pivot 1, 4 tests), belief update deterministic (Pivot 2, 4 tests), entropy decreases when discriminative (Pivot 3, 4 tests), bounded hypothesis set (Pivot 4, 3 tests), diagnose-repair-validate order (Pivot 5, 5 tests), bounded episode (Pivot 6, 6 tests), repair selection (4 tests), multi-domain portability (6 tests), Minecraft domain module (5 tests), contract metadata (4 tests).
+
+---
+
+## Rigs L–M: Not started
+
+These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Later (L–M) priority ordering.
 
 ### Post-certification order (remaining rigs):
 
@@ -902,10 +932,11 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 5. **Rig J** — Invariant maintenance (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
 6. **Rig K** — Irreversibility (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
 
+7. **Rig N** — Fault diagnosis (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
+
 ### Later (requires A–K contract-certified):
-7. **Rig L** — Contingency planning (nightfall/hunger)
-8. **Rig M** — Risk-aware planning (lava, nether)
-9. **Rig N** — Fault diagnosis (jammed systems)
+8. **Rig L** — Contingency planning (nightfall/hunger)
+9. **Rig M** — Risk-aware planning (lava, nether)
 
 ---
 
