@@ -355,6 +355,34 @@ describe('KNOWN_LEAVES', () => {
       'wait',
       'step_forward_safely',
       'move_to',
+      // Sensing / read-only
+      'sense_hostiles',
+      'get_light_level',
+      'get_block_at',
+      'find_resource',
+      'introspect_recipe',
+      // Survival / consumable
+      'consume_food',
+      'sleep',
+      // Torch / lighting
+      'place_torch_if_needed',
+      'place_torch',
+      // Combat
+      'attack_entity',
+      'equip_weapon',
+      'retreat_from_threat',
+      'retreat_and_block',
+      // Equipment
+      'equip_tool',
+      // Item / inventory
+      'use_item',
+      'manage_inventory',
+      // Farming
+      'till_soil',
+      'manage_farm',
+      'harvest_crop',
+      // World interaction
+      'interact_with_block',
     ];
     expect(KNOWN_LEAVES.size).toBe(expected.length);
     for (const leaf of expected) {
@@ -656,6 +684,7 @@ describe('requirementToFallbackPlan', () => {
 function stubValue(fieldType: string, fieldName: string): unknown {
   // Value-constrained fields need domain-valid stubs
   if (fieldName === 'workstation') return 'crafting_table';
+  if (fieldName === 'action') return 'sort'; // manage_inventory enum
   switch (fieldType) {
     case 'string': return 'test_value';
     case 'number': return 1;
@@ -847,7 +876,6 @@ describe('KNOWN_LEAVES ↔ action-mapping alignment', () => {
     'place_feature',
     'building_step',
     'interact_with_entity',
-    'open_container',
   ]);
 
   for (const leaf of KNOWN_LEAVES) {
@@ -900,6 +928,35 @@ function getMinimalValidArgs(leaf: string): Record<string, unknown> {
     wait: { duration: 1000 },
     step_forward_safely: { distance: 1 },
     move_to: { target: { x: 0, y: 64, z: 0 } },
+    // Sensing / read-only
+    sense_hostiles: {},
+    get_light_level: {},
+    get_block_at: { position: { x: 0, y: 64, z: 0 } },
+    find_resource: { blockType: 'oak_log' },
+    introspect_recipe: { output: 'crafting_table' },
+    // Survival / consumable
+    consume_food: {},
+    sleep: {},
+    // Torch / lighting
+    place_torch_if_needed: {},
+    place_torch: {},
+    // Combat
+    attack_entity: {},
+    equip_weapon: {},
+    retreat_from_threat: {},
+    retreat_and_block: {},
+    // Equipment
+    equip_tool: {},
+    // Item / inventory
+    use_item: { item: 'bread' },
+    manage_inventory: { action: 'sort' },
+    open_container: { containerType: 'chest' },
+    // Farming
+    till_soil: {},
+    manage_farm: {},
+    harvest_crop: {},
+    // World interaction
+    interact_with_block: { position: { x: 0, y: 64, z: 0 } },
   };
   return table[leaf] ?? {};
 }

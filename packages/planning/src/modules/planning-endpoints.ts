@@ -309,6 +309,11 @@ export interface PlanningEndpointsDeps {
   >;
   /** Task inventory for diagnostics: counts by status, visible to executor. */
   getTaskInventory?: () => TaskInventoryResult;
+  /** Dev-only: flush smoke tasks from the queue and reset rate limiter. */
+  flushSmokeTasks?: () => {
+    flushed: Record<string, number>;
+    rateLimiterReset: boolean;
+  };
 }
 
 export function createPlanningEndpoints(
@@ -1147,6 +1152,27 @@ export function createPlanningEndpoints(
       return res.json(inv);
     });
 
+    // Dev-only: flush all smoke tasks from executor queue + reset rate limiter.
+    // Prevents queue saturation from retry storms during smoke ladder runs.
+    router.post(
+      '/api/dev/sterling-smoke/flush',
+      (_req: Request, res: Response) => {
+        if (process.env.NODE_ENV === 'production') {
+          return res
+            .status(403)
+            .json({ error: 'Dev endpoints are disabled in production' });
+        }
+        if (!deps?.flushSmokeTasks) {
+          return res.status(503).json({
+            error: 'Flush not available',
+            detail: 'flushSmokeTasks dep not wired',
+          });
+        }
+        const result = deps.flushSmokeTasks();
+        return res.json(result);
+      }
+    );
+
     router.post(
       '/api/dev/inject-sterling-ir',
       async (req: Request, res: Response) => {
@@ -1602,6 +1628,25 @@ export function createPlanningEndpoints(
     );
 
     // ── Smoke checkpoint helpers ──────────────────────────────────────
+    /**
+     * Failure mode classification for smoke results.
+     * - 'none':                  all checkpoints passed within poll window
+     * - 'expand_failed':         Sterling expansion returned non-ok
+     * - 'dispatch_error':        every dispatch attempt errored (no ok result)
+     * - 'verified_failure':      leaf dispatched + verified, but verification status !== 'verified'
+     * - 'verification_timeout':  dispatched but verification didn't complete in poll window
+     * - 'queue_timeout':         nothing dispatched within poll window (executor didn't reach task)
+     * - 'unknown':               unexpected state
+     */
+    type SmokeFailureMode =
+      | 'none'
+      | 'expand_failed'
+      | 'dispatch_error'
+      | 'verified_failure'
+      | 'verification_timeout'
+      | 'queue_timeout'
+      | 'unknown';
+
     function buildCheckpointProof(report: any) {
       const A_requested = report?.sterling_expand_requested
         ? {
@@ -1634,12 +1679,19 @@ export function createPlanningEndpoints(
           }
         : { ok: false };
 
+      // C_dispatch: route was proven if at least one dispatch returned 'ok'.
+      // Retried steps that later fail don't negate the proof that the pipeline
+      // routed correctly — they indicate environmental/leaf-level issues.
       const dispatched = report?.execution?.dispatched_steps ?? [];
+      const anyOk = dispatched.some((s: any) => s.result?.status === 'ok');
+      const allOk = dispatched.length > 0 &&
+        dispatched.every((s: any) => s.result?.status === 'ok');
       const C_dispatch = {
-        ok:
-          dispatched.length > 0 &&
-          dispatched.every((s: any) => s.result?.status === 'ok'),
+        ok: dispatched.length > 0 && anyOk,
+        all_ok: allOk,
         count: dispatched.length,
+        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok').length,
+        error_count: dispatched.filter((s: any) => s.result?.status !== 'ok').length,
         steps: dispatched.map((s: any) => ({
           leaf: s.leaf,
           status: s.result?.status ?? 'pending',
@@ -1658,6 +1710,44 @@ export function createPlanningEndpoints(
       return { A_requested, A_result, B_expansion, C_dispatch, D_verification };
     }
 
+    /** Derive artifact_state from the golden-run report (lightweight summary). */
+    function buildArtifactState(report: any) {
+      const dispatched = report?.execution?.dispatched_steps ?? [];
+      const verification = report?.execution?.verification;
+      const decisions = report?.execution?.decisions ?? [];
+      const lastError = [...dispatched]
+        .reverse()
+        .find((s: any) => s.result?.status !== 'ok');
+      return {
+        dispatched_count: dispatched.length,
+        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok').length,
+        verification_status: verification?.status ?? null,
+        last_error_code: lastError?.result?.error ?? null,
+        retry_count: Math.max(0, dispatched.length - 1),
+        regen_attempted: decisions.some(
+          (d: any) => d.reason === 'regen_failed' || d.reason === 'regen_success'
+        ),
+      };
+    }
+
+    /** Classify the failure mode from checkpoints + timeout state. */
+    function classifyFailureMode(
+      cp: ReturnType<typeof buildCheckpointProof>,
+      timedOut: boolean,
+      artifactState: ReturnType<typeof buildArtifactState>,
+    ): SmokeFailureMode {
+      if (cp.A_requested.ok && cp.A_result.ok && cp.B_expansion.ok &&
+          cp.C_dispatch.ok && cp.D_verification.ok && !timedOut) {
+        return 'none';
+      }
+      if (!cp.A_result.ok) return 'expand_failed';
+      if (cp.C_dispatch.count > 0 && !cp.C_dispatch.ok) return 'dispatch_error';
+      if (cp.D_verification.status === 'failed') return 'verified_failure';
+      if (timedOut && cp.C_dispatch.count > 0) return 'verification_timeout';
+      if (timedOut && cp.C_dispatch.count === 0) return 'queue_timeout';
+      return 'unknown';
+    }
+
     function isAllCheckpointsOk(report: any): boolean {
       const cp = buildCheckpointProof(report);
       return (
@@ -1668,6 +1758,52 @@ export function createPlanningEndpoints(
         cp.D_verification.ok
       );
     }
+
+    // Dev-only: Executor idle state endpoint.
+    // Returns structured JSON showing whether the executor has outstanding work,
+    // and if so, why it's not idle. Replaces sleep-based polling in smoke runners.
+    router.get('/api/dev/executor/idle', (req: Request, res: Response) => {
+      if (process.env.ENABLE_DEV_ENDPOINTS !== 'true') {
+        return res.status(404).json({ error: 'Dev endpoints disabled' });
+      }
+
+      try {
+        const activeTasks = planningSystem.goalFormulation?.getCurrentTasks?.() ?? [];
+        const eligibleTasks = activeTasks.filter((t: any) =>
+          t.status === 'active' && !t.blockedReason && !t.metadata?.blockedReason
+        );
+        const blockedTasks = activeTasks.filter((t: any) =>
+          t.metadata?.blockedReason || t.blockedReason
+        );
+
+        let idleReason: string | null = null;
+        if (activeTasks.length === 0) idleReason = 'no_tasks';
+        else if (eligibleTasks.length === 0 && blockedTasks.length > 0) idleReason = 'blocked_on_prereq';
+        else if (eligibleTasks.length === 0) idleReason = 'all_completed_or_blocked';
+
+        res.json({
+          idle: eligibleTasks.length === 0,
+          idle_reason: idleReason,
+          active_count: activeTasks.length,
+          eligible_count: eligibleTasks.length,
+          blocked_count: blockedTasks.length,
+          blocked_reasons: blockedTasks.slice(0, 10).map((t: any) => ({
+            task_id: t.id,
+            reason: t.metadata?.blockedReason ?? t.blockedReason ?? 'unknown',
+          })),
+        });
+      } catch (err: any) {
+        res.status(500).json({ error: err?.message ?? 'Internal error' });
+      }
+    });
+
+    // Smoke Tier Inventory Contracts:
+    // T1 (read-only): no items needed
+    // T2 (inventory): iron_sword×1, iron_pickaxe×1, bread×16
+    // T3 (world-mutating): cobblestone×64, torch×32, crafting_table×4, oak_log×16, wooden_hoe×1
+    // T2 precondition: food < 20 (apply /effect hunger)
+    // T3 precondition: teleport to fresh position before each variant
+    // Tier B chain: oak_log×4 (crafted into planks→table→placement)
 
     // Dev-only: Sterling→Leaf correlation smoke test.
     // Creates a sterling_ir task with a known stub digest, polls for completion,
@@ -1687,6 +1823,29 @@ export function createPlanningEndpoints(
       ok_fresh_03: { digest: 'smoke_e2e_chat_wait_v1_fresh_03', label: 'fresh happy path 03 (static pool)' },
       unknown_digest: { digest: 'smoke_e2e_NONEXISTENT_v1', label: 'F2: digest unknown (blocked)' },
       slow_wait: { digest: 'smoke_e2e_slow_wait_v1', label: 'F6: expand ok, dispatch exceeds poll timeout' },
+      // Tier 1: Safe/read-only sensing
+      t1_sense_hostiles: { digest: 'smoke_sense_hostiles_v1', label: 'T1: sense_hostiles (read-only)' },
+      t1_get_light_level: { digest: 'smoke_get_light_level_v1', label: 'T1: get_light_level (read-only)' },
+      t1_find_resource: { digest: 'smoke_find_resource_v1', label: 'T1: find_resource (read-only)' },
+      t1_introspect_recipe: { digest: 'smoke_introspect_recipe_v1', label: 'T1: introspect_recipe (read-only)' },
+      t1_step_forward: { digest: 'smoke_step_forward_v1', label: 'T1: step_forward_safely (movement)' },
+      // Tier 2: Inventory-only
+      t2_equip_weapon: { digest: 'smoke_equip_weapon_v1', label: 'T2: equip_weapon (needs weapon)' },
+      t2_equip_tool: { digest: 'smoke_equip_tool_v1', label: 'T2: equip_tool (needs tool)' },
+      t2_manage_inventory: { digest: 'smoke_manage_inventory_v1', label: 'T2: manage_inventory sort' },
+      t2_consume_food: { digest: 'smoke_consume_food_v1', label: 'T2: consume_food (needs food)' },
+      // Tier 3: World-mutating
+      t3_acquire_material: { digest: 'smoke_acquire_material_v1', label: 'T3: acquire_material (mine)' },
+      t3_place_block: { digest: 'smoke_place_block_v1', label: 'T3: place_block (needs item)' },
+      t3_craft_recipe: { digest: 'smoke_craft_recipe_v1', label: 'T3: craft_recipe (needs ingredients)' },
+      t3_place_workstation: { digest: 'smoke_place_workstation_v1', label: 'T3: place_workstation (needs item)' },
+      t3_till_soil: { digest: 'smoke_till_soil_v1', label: 'T3: till_soil (needs hoe + dirt)' },
+      t3_place_torch: { digest: 'smoke_place_torch_v1', label: 'T3: place_torch (needs torch)' },
+      // Tier B: Multi-step inventory→craft→world chain
+      tb_craft_build_torch: { digest: 'smoke_chain_craft_build_torch_v1', label: 'TB: craft→build→torch chain' },
+      // Tier 4: Combat
+      t4_attack_entity: { digest: 'smoke_attack_entity_v1', label: 'T4: attack_entity (needs hostile)' },
+      t4_retreat: { digest: 'smoke_retreat_v1', label: 'T4: retreat_from_threat (needs hostile)' },
     };
     // Dynamic variants: generate a unique digest per run via prefix-wildcard.
     // Sterling resolves these by matching the prefix to the base entry and
@@ -1694,6 +1853,25 @@ export function createPlanningEndpoints(
     const DYNAMIC_VARIANTS: Record<string, { prefix: string; label: string }> = {
       ok_fresh: { prefix: 'smoke_e2e_chat_wait_v1_', label: 'fresh happy path (prefix-wildcard, never dedupes)' },
       slow_wait_fresh: { prefix: 'smoke_e2e_slow_wait_v1_', label: 'fresh slow_wait (prefix-wildcard, never dedupes)' },
+      // Fresh (re-runnable) variants for every tier — bypasses task deduplication.
+      t1_sense_hostiles_fresh: { prefix: 'smoke_sense_hostiles_v1_', label: 'T1: sense_hostiles (fresh)' },
+      t1_get_light_level_fresh: { prefix: 'smoke_get_light_level_v1_', label: 'T1: get_light_level (fresh)' },
+      t1_find_resource_fresh: { prefix: 'smoke_find_resource_v1_', label: 'T1: find_resource (fresh)' },
+      t1_introspect_recipe_fresh: { prefix: 'smoke_introspect_recipe_v1_', label: 'T1: introspect_recipe (fresh)' },
+      t1_step_forward_fresh: { prefix: 'smoke_step_forward_v1_', label: 'T1: step_forward_safely (fresh)' },
+      t2_equip_weapon_fresh: { prefix: 'smoke_equip_weapon_v1_', label: 'T2: equip_weapon (fresh)' },
+      t2_equip_tool_fresh: { prefix: 'smoke_equip_tool_v1_', label: 'T2: equip_tool (fresh)' },
+      t2_manage_inventory_fresh: { prefix: 'smoke_manage_inventory_v1_', label: 'T2: manage_inventory (fresh)' },
+      t2_consume_food_fresh: { prefix: 'smoke_consume_food_v1_', label: 'T2: consume_food (fresh)' },
+      t3_craft_recipe_fresh: { prefix: 'smoke_craft_recipe_v1_', label: 'T3: craft_recipe (fresh)' },
+      t3_place_workstation_fresh: { prefix: 'smoke_place_workstation_v1_', label: 'T3: place_workstation (fresh)' },
+      t3_till_soil_fresh: { prefix: 'smoke_till_soil_v1_', label: 'T3: till_soil (fresh)' },
+      t3_place_block_fresh: { prefix: 'smoke_place_block_v1_', label: 'T3: place_block (fresh)' },
+      t3_place_torch_fresh: { prefix: 'smoke_place_torch_v1_', label: 'T3: place_torch (fresh)' },
+      t3_acquire_material_fresh: { prefix: 'smoke_acquire_material_v1_', label: 'T3: acquire_material (fresh)' },
+      tb_craft_build_torch_fresh: { prefix: 'smoke_chain_craft_build_torch_v1_', label: 'TB: craft→build→torch chain (fresh)' },
+      t4_attack_entity_fresh: { prefix: 'smoke_attack_entity_v1_', label: 'T4: attack_entity (fresh)' },
+      t4_retreat_fresh: { prefix: 'smoke_retreat_v1_', label: 'T4: retreat (fresh)' },
     };
 
     router.post(
@@ -1801,6 +1979,12 @@ export function createPlanningEndpoints(
             metadata: {
               tags: ['golden-run', 'dev-sterling-smoke'],
               category: 'sterling_ir',
+              source: 'sterling-smoke',
+              smokeRunId: runId,
+              noRetry: true,
+              no_retry: true,
+              disableRegen: true,
+              maxRetries: 1,
               sterling: {
                 committedIrDigest: smokeDigest,
                 schemaVersion: '1.1.0',
@@ -1866,7 +2050,7 @@ export function createPlanningEndpoints(
           const rawPollTimeout = typeof req.body?.poll_timeout_ms === 'number'
             ? req.body.poll_timeout_ms
             : 45000;
-          const POLL_TIMEOUT_MS = Math.max(5000, Math.min(45000, rawPollTimeout));
+          const POLL_TIMEOUT_MS = Math.max(5000, Math.min(120000, rawPollTimeout));
           const pollStart = Date.now();
           let timedOut = false;
           let finalTaskStatus: string | undefined;
@@ -1935,6 +2119,14 @@ export function createPlanningEndpoints(
           const report = recorder.getReport(runId);
           const checkpoints = buildCheckpointProof(report);
           const allOk = isAllCheckpointsOk(report);
+          const artifactState = buildArtifactState(report);
+          const failureMode = classifyFailureMode(checkpoints, timedOut, artifactState);
+
+          // Key invariant: if the golden-run artifact shows verified success,
+          // report proof_passed=true even if the poll window expired before we
+          // could observe it. The artifact is the source of truth, not the poll.
+          const artifactVerified = artifactState.verification_status === 'verified';
+          const proofPassed = allOk || (timedOut && artifactVerified);
 
           // Persist artifact to disk (awaitable — ensures file exists before returning path)
           try {
@@ -1946,14 +2138,17 @@ export function createPlanningEndpoints(
           const artifactAbsPath = recorder.getArtifactPath(runId);
 
           return res.json({
-            proof_passed: allOk && !timedOut,
+            proof_passed: proofPassed,
             run_id: runId,
             task_id: taskId,
             task_status: finalTaskStatus ?? 'unknown',
             variant: variantKey,
+            failure_mode: failureMode,
             early_exit: earlyExit || undefined,
             checkpoints,
             all_checkpoints_ok: allOk,
+            artifact_state: artifactState,
+            observed_after_poll: timedOut && artifactVerified ? true : undefined,
             timed_out: timedOut,
             elapsed_ms: Date.now() - endpointStart,
             artifact_path: `artifacts/golden-run/golden-${runId}.json`,

@@ -145,6 +145,8 @@ export type GoldenRunReport = {
         failureCode?: string;
         attempts?: number;
         reason?: string;
+        /** Placement receipt: position + block for receipt-anchored verification audit trail. */
+        receipt?: Record<string, unknown>;
       };
     }>;
     shadow_steps?: Array<{
@@ -206,7 +208,18 @@ export function toDispatchResult(
 ): GoldenRunDispatchResult | undefined {
   if (!actionResult) return undefined;
   if (actionResult.ok === true) {
-    return { status: 'ok' };
+    const base: GoldenRunDispatchResult = { status: 'ok' };
+    // Preserve placement receipt for audit trail
+    const data = actionResult.data as Record<string, unknown> | undefined;
+    if (data?.position) {
+      base.receipt = {
+        position: data.position,
+        ...(data.blockPlaced ? { blockPlaced: data.blockPlaced } : {}),
+        ...(data.torchPlaced !== undefined ? { torchPlaced: data.torchPlaced } : {}),
+        ...(data.workstation ? { workstation: data.workstation } : {}),
+      };
+    }
+    return base;
   }
   const meta = actionResult.metadata as Record<string, unknown> | undefined;
   const reason = meta?.reason as string | undefined;

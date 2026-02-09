@@ -37,7 +37,7 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
   acquire_material: {
     leafName: 'acquire_material',
     aliases: { blockType: 'item' },
-    defaults: { count: 1 },
+    defaults: { count: 1, radius: 32 },
     requiredKeys: ['item'],
   },
   place_block: {
@@ -91,7 +91,7 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     defaults: {},
   },
   sleep: { leafName: 'sleep', aliases: {}, defaults: {} },
-  find_resource: { leafName: 'find_resource', aliases: {}, defaults: {} },
+  find_resource: { leafName: 'find_resource', aliases: {}, defaults: { radius: 32 } },
   equip_tool: { leafName: 'equip_tool', aliases: {}, defaults: {} },
   introspect_recipe: {
     leafName: 'introspect_recipe',
@@ -106,6 +106,106 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
   prepare_site: { leafName: 'prepare_site', aliases: {}, defaults: {} },
   build_module: { leafName: 'build_module', aliases: {}, defaults: {} },
   place_feature: { leafName: 'place_feature', aliases: {}, defaults: {} },
+
+  // ── Sensing / read-only ──
+  sense_hostiles: {
+    leafName: 'sense_hostiles',
+    aliases: {},
+    defaults: { radius: 16 },
+  },
+  get_light_level: {
+    leafName: 'get_light_level',
+    aliases: {},
+    defaults: {},
+  },
+  get_block_at: {
+    leafName: 'get_block_at',
+    aliases: {},
+    defaults: {},
+    requiredKeys: ['position'],
+  },
+
+  // ── Movement / liveness ──
+  chat: { leafName: 'chat', aliases: {}, defaults: {} },
+  wait: { leafName: 'wait', aliases: {}, defaults: {} },
+  step_forward_safely: {
+    leafName: 'step_forward_safely',
+    aliases: {},
+    defaults: { distance: 1 },
+  },
+
+  // ── Combat ──
+  attack_entity: {
+    leafName: 'attack_entity',
+    aliases: {},
+    defaults: { radius: 16, duration: 30000 },
+  },
+  equip_weapon: {
+    leafName: 'equip_weapon',
+    aliases: {},
+    defaults: { preferredType: 'any' },
+  },
+  retreat_from_threat: {
+    leafName: 'retreat_from_threat',
+    aliases: {},
+    defaults: { retreatDistance: 16 },
+  },
+  retreat_and_block: {
+    leafName: 'retreat_and_block',
+    aliases: {},
+    defaults: { retreatDistance: 10 },
+  },
+
+  // ── Items / inventory ──
+  use_item: {
+    leafName: 'use_item',
+    aliases: {},
+    defaults: { quantity: 1 },
+    requiredKeys: ['item'],
+  },
+  manage_inventory: {
+    leafName: 'manage_inventory',
+    aliases: {},
+    defaults: {},
+    requiredKeys: ['action'],
+  },
+
+  // ── Torch / lighting ──
+  place_torch_if_needed: {
+    leafName: 'place_torch_if_needed',
+    aliases: {},
+    defaults: { lightThreshold: 7 },
+  },
+  place_torch: {
+    leafName: 'place_torch',
+    aliases: {},
+    defaults: {},
+  },
+
+  // ── Farming ──
+  till_soil: {
+    leafName: 'till_soil',
+    aliases: {},
+    defaults: { radius: 8 },
+  },
+  manage_farm: {
+    leafName: 'manage_farm',
+    aliases: {},
+    defaults: { radius: 16 },
+  },
+  harvest_crop: {
+    leafName: 'harvest_crop',
+    aliases: {},
+    defaults: { radius: 8 },
+  },
+
+  // ── World interaction ──
+  interact_with_block: {
+    leafName: 'interact_with_block',
+    aliases: {},
+    defaults: {},
+    requiredKeys: ['position'],
+  },
 };
 
 /**

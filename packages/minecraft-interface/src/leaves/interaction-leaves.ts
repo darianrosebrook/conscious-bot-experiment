@@ -383,6 +383,190 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
 }
 
 // ============================================================================
+// Place Torch Leaf (Unconditional)
+// ============================================================================
+
+/**
+ * Unconditionally place a torch — no light level checks.
+ * Proves multi-step inventory→world chain without ambient light dependency.
+ * Reuses findTorchPlacementPosition from PlaceTorchIfNeededLeaf.
+ */
+export class PlaceTorchLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'place_torch',
+    version: '1.0.0',
+    description: 'Unconditionally place a torch at or near the given position',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        torchPlaced: { type: 'boolean' },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+        },
+      },
+    },
+    timeoutMs: 5000,
+    retries: 1,
+    permissions: ['place'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const startTime = ctx.now();
+    const { position } = args;
+
+    try {
+      const bot = ctx.bot;
+      const botPos = bot.entity?.position;
+
+      if (!botPos) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'world.invalidPosition',
+            retryable: false,
+            detail: 'Bot position not available',
+          },
+          metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+        };
+      }
+
+      const targetPos = position
+        ? new Vec3(position.x, position.y, position.z)
+        : botPos;
+
+      // Check for torches in inventory
+      const torchItem = bot.inventory
+        .items()
+        .find((item: any) => item.name === 'torch');
+      if (!torchItem) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'inventory.missingItem',
+            retryable: false,
+            detail: 'No torches available',
+          },
+          metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Find placement position
+      const placement = await this.findTorchPlacementPosition(
+        bot as BotWithPathfinder,
+        targetPos
+      );
+      if (!placement) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'place.invalidFace',
+            retryable: false,
+            detail: 'No suitable torch placement position found',
+          },
+          metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+        };
+      }
+
+      const { torchPos: placementPos, refBlock, faceVec } = placement;
+
+      // Equip and place
+      await bot.equip(torchItem, 'hand');
+      await bot.placeBlock(refBlock, faceVec);
+
+      // Verify placement
+      const placedBlock = bot.blockAt(placementPos);
+      const torchPlaced = placedBlock?.name === 'torch';
+
+      ctx.emitMetric('place_torch_unconditional_duration', ctx.now() - startTime);
+      ctx.emitMetric('place_torch_unconditional_placed', torchPlaced ? 1 : 0);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          torchPlaced,
+          position: {
+            x: placementPos.x,
+            y: placementPos.y,
+            z: placementPos.z,
+          },
+        },
+        metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+      };
+    } catch (error) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'place.invalidFace',
+          retryable: false,
+          detail: error instanceof Error ? error.message : 'Unknown torch placement error',
+        },
+        metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+
+  /**
+   * Find a suitable position to place a torch, returning the air position,
+   * the solid reference block, and the face vector for bot.placeBlock().
+   */
+  private async findTorchPlacementPosition(
+    bot: BotWithPathfinder,
+    targetPos: Vec3
+  ): Promise<{ torchPos: Vec3; refBlock: any; faceVec: Vec3 } | null> {
+    const placements: Array<{ refOffset: Vec3; faceVec: Vec3 }> = [
+      { refOffset: new Vec3(0, -1, 0), faceVec: new Vec3(0, 1, 0) },  // floor
+      { refOffset: new Vec3(1, 0, 0), faceVec: new Vec3(-1, 0, 0) },  // wall
+      { refOffset: new Vec3(-1, 0, 0), faceVec: new Vec3(1, 0, 0) },
+      { refOffset: new Vec3(0, 0, 1), faceVec: new Vec3(0, 0, -1) },
+      { refOffset: new Vec3(0, 0, -1), faceVec: new Vec3(0, 0, 1) },
+    ];
+
+    const searchPositions = [
+      targetPos,
+      targetPos.offset(1, 0, 0),
+      targetPos.offset(-1, 0, 0),
+      targetPos.offset(0, 0, 1),
+      targetPos.offset(0, 0, -1),
+    ];
+
+    for (const torchPos of searchPositions) {
+      const airBlock = bot.blockAt(torchPos);
+      if (!airBlock || airBlock.boundingBox !== 'empty') continue;
+
+      for (const { refOffset, faceVec } of placements) {
+        const refPos = torchPos.plus(refOffset);
+        const refBlock = bot.blockAt(refPos);
+        if (refBlock && refBlock.boundingBox === 'block') {
+          return { torchPos, refBlock, faceVec };
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+// ============================================================================
 // Retreat and Block Leaf
 // ============================================================================
 

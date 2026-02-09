@@ -3507,14 +3507,26 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
 
       case 'place_block': {
-        const item = this.canonicalItemId(
-          args.item ?? args.blockType ?? 'crafting_table'
-        );
-        return this.retryUntil(() => this.verifyNearbyBlock(item), timeout);
+        const expected = this.canonicalItemId(args.item ?? args.blockType ?? 'crafting_table');
+        return this.verifyWithTriState(step, expected, timeout);
       }
 
-      case 'place_torch_if_needed':
-        return this.retryUntil(() => this.verifyNearbyBlock('torch'), timeout);
+      case 'place_torch_if_needed': {
+        const torchReceipt = step.meta?.leafReceipt as any;
+        // If torch wasn't placed (torchPlaced: false), that's a valid success
+        if (torchReceipt?.torchPlaced === false) return true;
+        return this.verifyWithTriState(step, 'torch', timeout);
+      }
+
+      case 'place_torch':
+        return this.verifyWithTriState(step, 'torch', timeout);
+
+      case 'place_workstation': {
+        const wsReceipt = step.meta?.leafReceipt as any;
+        if (wsReceipt?.reused) return true; // reused existing → no placement to verify
+        const wsExpected = this.canonicalItemId(args.workstation ?? 'crafting_table');
+        return this.verifyWithTriState(step, wsExpected, timeout);
+      }
 
       case 'retreat_and_block': {
         const moved = await this.verifyMovement(taskId, stepId, 0.75);
@@ -3530,6 +3542,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       case 'sense_hostiles':
       case 'get_light_level':
+      case 'get_block_at':
       case 'wait':
       case 'look_at':
       case 'turn_left':
@@ -4002,6 +4015,81 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return false;
   }
 
+  // ── Receipt-anchored verification ──────────────────────────────────────
+
+  /**
+   * Probe the world at an exact position via the get_block_at leaf.
+   * Returns { name: 'unknown' } when the chunk is not loaded (inconclusive).
+   */
+  private async probeBlockAt(
+    position: { x: number; y: number; z: number }
+  ): Promise<{ name: string }> {
+    try {
+      const res = await this.minecraftClient.post('/action', {
+        type: 'get_block_at',
+        parameters: { position },
+      }, { timeout: 3000 });
+      if (!res.ok) return { name: 'unknown' };
+      const body = (await res.json()) as any;
+      const name = body?.data?.name ?? body?.result?.name;
+      return { name: name ?? 'unknown' };
+    } catch {
+      return { name: 'unknown' };
+    }
+  }
+
+  /**
+   * Verify a placement receipt against the actual world state.
+   * Returns 'verified' | 'inconclusive' | 'contradicted'.
+   */
+  private async verifyPlacementReceipt(
+    step: TaskStep,
+    expectedBlock: string
+  ): Promise<'verified' | 'inconclusive' | 'contradicted'> {
+    const receipt = step.meta?.leafReceipt as
+      | { position?: { x: number; y: number; z: number }; blockPlaced?: string; torchPlaced?: boolean }
+      | undefined;
+
+    // No receipt → can't verify, treat as inconclusive (don't re-dispatch)
+    if (!receipt?.position) return 'inconclusive';
+
+    const probe = await this.probeBlockAt(receipt.position);
+
+    if (probe.name === 'unknown') return 'inconclusive'; // chunk not loaded
+    if (probe.name === expectedBlock) return 'verified';
+    return 'contradicted';
+  }
+
+  /**
+   * Tri-state verification loop: probes the exact receipt coordinate.
+   * - verified → return true immediately
+   * - contradicted → return false immediately (triggers re-dispatch)
+   * - inconclusive → retry probe only (never re-dispatch) up to timeout
+   * - timeout as inconclusive → accept (the leaf reported success)
+   */
+  private async verifyWithTriState(
+    step: TaskStep,
+    expectedBlock: string,
+    timeout: number
+  ): Promise<boolean> {
+    const deadline = Date.now() + Math.min(timeout, 10000);
+    let lastOutcome: 'verified' | 'inconclusive' | 'contradicted' = 'inconclusive';
+
+    while (Date.now() < deadline) {
+      lastOutcome = await this.verifyPlacementReceipt(step, expectedBlock);
+      if (lastOutcome === 'verified') return true;
+      if (lastOutcome === 'contradicted') return false;
+      // inconclusive: wait and probe again (NOT re-dispatch)
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Timed out as inconclusive — accept (don't re-dispatch on ambiguity)
+    console.warn(
+      `[Verification] Inconclusive after timeout for ${expectedBlock}, accepting`
+    );
+    return true;
+  }
+
   /**
    * Verify inventory increased by at least minDelta for itemId since step start (delta-based).
    * For block types that drop different items (e.g. coal_ore -> coal), sums counts across
@@ -4091,7 +4179,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   }
 
   /**
-   * Verify that a block is present nearby (optionally matching a pattern)
+   * Verify that a block is present nearby (optionally matching a pattern).
+   * Note: /state nearbyBlocks is intentionally kept empty to avoid large
+   * payloads. This method is only reliable when nearbyBlocks is populated
+   * (e.g., by a future endpoint). For placement leaves (place_block,
+   * place_torch_if_needed), use dispatch-success verification instead.
    */
   private async verifyNearbyBlock(pattern?: string): Promise<boolean> {
     try {

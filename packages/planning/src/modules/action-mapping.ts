@@ -385,18 +385,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'place_torch':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: 'torch',
-          count: 1,
-          placement:
-            args.position === 'center_wall'
-              ? 'specific_position'
-              : 'around_player',
-          position: args.position || 'around_player',
-        },
-      };
+      return { type: normalizedTool, parameters: { ...args }, timeout: 5000 };
     case 'wait':
       return { type: 'wait', parameters: { duration: args.duration || 2000 } };
     case 'step_forward_safely':
@@ -455,6 +444,52 @@ export function mapBTActionToMinecraft(
         },
         timeout: 5000,
       };
+
+    // ── Passthrough leaves ──────────────────────────────────────────
+    // These cases exist solely to prove the mapping exists (strict mode).
+    // Parameters pass through as-is; the action-contract-registry owns
+    // defaults, aliases, and required-key enforcement at runtime.
+    // Timeouts are leaf-appropriate caps for the planning-side poll.
+    case 'sense_hostiles':
+    case 'get_light_level':
+    case 'get_block_at':
+    case 'find_resource':
+    case 'introspect_recipe':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
+
+    case 'consume_food':
+    case 'sleep':
+    case 'place_torch_if_needed':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
+
+    case 'attack_entity':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 60000 };
+
+    case 'equip_weapon':
+    case 'equip_tool':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 5000 };
+
+    case 'retreat_from_threat':
+    case 'retreat_and_block':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
+
+    case 'use_item':
+    case 'open_container':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
+
+    case 'manage_inventory':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
+
+    case 'till_soil':
+    case 'harvest_crop':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
+
+    case 'manage_farm':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 30000 };
+
+    case 'interact_with_block':
+      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
+
     default:
       if (strict) return null;
       return { type: normalizedTool, parameters: args, debug: debugInfo };

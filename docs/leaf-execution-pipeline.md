@@ -148,7 +148,7 @@ All normalization is data-driven — no switch statements.
 
 | Mode | Behavior | Actions |
 |------|----------|---------|
-| `'leaf'` (default) | Route directly to leaf via `dispatchToLeaf` | `acquire_material`, `consume_food`, `collect_items`, `sleep`, `find_resource`, `equip_tool`, `introspect_recipe`, `place_workstation` |
+| `'leaf'` (default) | Route directly to leaf via `dispatchToLeaf` | `acquire_material`, `consume_food`, `collect_items`, `sleep`, `find_resource`, `equip_tool`, `introspect_recipe`, `place_workstation`, `place_torch`, `get_block_at` |
 | `'handler'` | Always route to dedicated handler method | `craft`, `craft_item`, `smelt`, `smelt_item` |
 | `'guarded'` | Check semantic guards; if none fire, dispatch to leaf | `place_block`, `collect_items_enhanced` |
 
@@ -290,6 +290,17 @@ All normalization is data-driven — no switch statements.
 - **Status**: Real implementation
 - **confirmed_working**: 2026-02-01 — lightLevel=15, torchPlaced=false (correct: no torch needed in daylight). Leaf functional, needs nighttime test for actual placement.
 
+#### place_torch
+- **Class**: `PlaceTorchLeaf` (interaction-leaves.ts)
+- **Spec**: timeout=5000ms, retries=1, permissions=[place]
+- **Args**: `{ position? }` — optional, defaults to bot position
+- **Bot actions**: `bot.equip()`, `bot.placeBlock()` — unconditional (no light level checks)
+- **Design rationale**: Proves multi-step inventory→world chain without ambient light dependency. Used in Tier B smoke chain (`tb_craft_build_torch`).
+- **Task Prerequisites:** [bot connected, torch in inventory, solid block nearby]
+- **Docker Command to set situation:** `give Sterling torch 32`
+- **Status**: Real implementation (new)
+- **Receipt-verified**: Yes — returns `{ torchPlaced, position }` for receipt-anchored verification
+
 #### retreat_and_block
 - **Class**: `RetreatAndBlockLeaf` (line 385)
 - **Spec**: timeout=15000ms, retries=1, permissions=[movement, place]
@@ -375,6 +386,16 @@ All normalization is data-driven — no switch statements.
 - **Docker Command to set situation:** `# no setup needed — read-only`
 - **Status**: Real implementation
 - **confirmed_working**: 2026-02-01 — returned lightLevel=15 (daylight), isSafe=true at bot position
+
+#### get_block_at
+- **Class**: `GetBlockAtLeaf` (sensing-leaves.ts)
+- **Spec**: timeout=1000ms, retries=0, permissions=[sense]
+- **Args**: `{ position: { x, y, z } }` — required
+- **Bot actions**: Read-only `bot.blockAt(Vec3)`. Returns `{ name: 'unknown' }` for unloaded chunks (inconclusive signal).
+- **Design rationale**: Sensing primitive for receipt-anchored verification. After a placement leaf reports success, the verifier probes the exact claimed coordinate to confirm the block is actually there.
+- **Task Prerequisites:** [bot connected]
+- **Docker Command to set situation:** `# no setup needed — read-only`
+- **Status**: Real implementation (new)
 
 #### find_resource
 - **Class**: `FindResourceLeaf` (line 660)
@@ -789,6 +810,46 @@ details for the executor. The new fields capture the request-response pair for e
 
 Timeout classification: the WS client resolves timeouts as `{ status: 'error', error: 'Expand timeout after Nms' }`.
 The recording layer detects this pattern and sets `status: 'timeout'` for accurate classification.
+
+---
+
+## Receipt-Anchored Verification
+
+### Architecture
+
+Placement leaves (`place_block`, `place_torch`, `place_torch_if_needed`, `place_workstation`) return rich receipts in `actionResult.data` containing the exact position and block type placed. The executor extracts these receipts via `extractLeafReceipt()` and stores them on `step.meta.leafReceipt` before `toDispatchResult()` strips the data.
+
+The verifier (`verifyByLeaf` in `task-integration.ts`) then uses `get_block_at` to probe the exact coordinate from the receipt, producing a **tri-state outcome**:
+
+| Outcome | Meaning | Action |
+|---------|---------|--------|
+| `verified` | Probe returns expected block at receipt position | Accept step, move to next |
+| `inconclusive` | `blockAt` returns null (chunk not loaded) or no receipt available | Retry probe only (never re-dispatch) |
+| `contradicted` | Probe returns different block than expected | Fail verification, trigger re-dispatch |
+
+### Why tri-state matters
+
+The old binary model (pass/fail) caused the "5 cobblestones" bug: when verification was inconclusive (chunk not loaded), it returned `false`, which triggered re-dispatch. Each re-dispatch placed another block, corrupting the world state. The tri-state model ensures **probe-only retries** on inconclusive results — the leaf is never called again unless the world state actively contradicts the claim.
+
+### Receipt flow
+
+```
+PlaceBlockLeaf.run() → { ok: true, data: { blockPlaced: 'cobblestone', position: {x,y,z} } }
+    ↓
+extractLeafReceipt('place_block', data) → { blockPlaced: 'cobblestone', position: {x,y,z} }
+    ↓
+step.meta.leafReceipt = receipt  (stored before toDispatchResult strips data)
+    ↓
+verifyByLeaf('place_block', args, step)
+    ↓
+probeBlockAt(receipt.position) → get_block_at leaf → { name: 'cobblestone' | 'unknown' }
+    ↓
+verifyWithTriState(step, 'cobblestone', timeout) → verified | inconclusive | contradicted
+```
+
+### Timeout policy
+
+Inconclusive timeout → **accept** (not reject). Rationale: the leaf already confirmed success; inability to observe the result is not evidence of failure. Re-dispatching on "can't observe" is worse than accepting an unverified success.
 
 ---
 

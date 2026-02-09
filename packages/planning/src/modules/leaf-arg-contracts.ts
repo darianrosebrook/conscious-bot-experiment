@@ -210,6 +210,145 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+
+  // ── Sensing / read-only leaves ──
+  sense_hostiles: {
+    leafName: 'sense_hostiles',
+    fields: ['?radius:number', '?includePassive:any'],
+    validate: () => null,
+  },
+  get_light_level: {
+    leafName: 'get_light_level',
+    fields: ['?position:any'],
+    validate: () => null,
+  },
+  get_block_at: {
+    leafName: 'get_block_at',
+    fields: ['position:any'],
+    validate: (args) => args.position ? null : 'get_block_at requires position',
+  },
+  find_resource: {
+    leafName: 'find_resource',
+    fields: ['blockType:string', '?radius:number', '?maxResults:number', '?partialMatch:any'],
+    validate: (args) => {
+      if (!args.blockType || typeof args.blockType !== 'string')
+        return 'find_resource requires blockType (string)';
+      return null;
+    },
+  },
+  introspect_recipe: {
+    leafName: 'introspect_recipe',
+    fields: ['output:string'],
+    validate: (args) => {
+      if (!args.output || typeof args.output !== 'string')
+        return 'introspect_recipe requires output (string)';
+      return null;
+    },
+  },
+
+  // ── Survival / consumable leaves ──
+  consume_food: {
+    leafName: 'consume_food',
+    fields: ['?food_type:string', '?amount:number'],
+    validate: () => null,
+  },
+  sleep: {
+    leafName: 'sleep',
+    fields: [],
+    validate: () => null,
+  },
+
+  // ── Torch / lighting ──
+  place_torch_if_needed: {
+    leafName: 'place_torch_if_needed',
+    fields: ['?lightThreshold:number', '?position:any'],
+    validate: () => null,
+  },
+  place_torch: {
+    leafName: 'place_torch',
+    fields: ['?position:any'],
+    validate: () => null,
+  },
+
+  // ── Combat leaves ──
+  attack_entity: {
+    leafName: 'attack_entity',
+    fields: ['?entityId:string', '?radius:number', '?duration:number', '?retreatHealth:number'],
+    validate: () => null,
+  },
+  equip_weapon: {
+    leafName: 'equip_weapon',
+    fields: ['?preferredType:string', '?fallbackToHand:any'],
+    validate: () => null,
+  },
+  retreat_from_threat: {
+    leafName: 'retreat_from_threat',
+    fields: ['?retreatDistance:number', '?safeRadius:number'],
+    validate: () => null,
+  },
+  retreat_and_block: {
+    leafName: 'retreat_and_block',
+    fields: ['?retreatDistance:number', '?blockType:string'],
+    validate: () => null,
+  },
+
+  // ── Equipment leaves ──
+  equip_tool: {
+    leafName: 'equip_tool',
+    fields: ['?material:string', '?toolType:string', '?fallbackToHand:any'],
+    validate: () => null,
+  },
+
+  // ── Item / inventory leaves ──
+  use_item: {
+    leafName: 'use_item',
+    fields: ['item:string', '?quantity:number', '?hand:string'],
+    validate: (args) => {
+      if (!args.item || typeof args.item !== 'string')
+        return 'use_item requires item (string)';
+      return null;
+    },
+  },
+  manage_inventory: {
+    leafName: 'manage_inventory',
+    fields: ['action:string', '?keepItems:any'],
+    validate: (args) => {
+      if (!args.action || typeof args.action !== 'string')
+        return 'manage_inventory requires action (string)';
+      const validActions = ['sort', 'compact', 'drop_unwanted', 'keep_essentials', 'organize'];
+      if (!validActions.includes(args.action as string))
+        return `manage_inventory: action must be one of ${validActions.join(', ')}`;
+      return null;
+    },
+  },
+
+  // ── Farming leaves ──
+  till_soil: {
+    leafName: 'till_soil',
+    fields: ['?position:any', '?radius:number'],
+    validate: () => null,
+  },
+  manage_farm: {
+    leafName: 'manage_farm',
+    fields: ['?action:string', '?cropType:string', '?radius:number'],
+    validate: () => null,
+  },
+  harvest_crop: {
+    leafName: 'harvest_crop',
+    fields: ['?position:any', '?radius:number'],
+    validate: () => null,
+  },
+
+  // ── World interaction ──
+  interact_with_block: {
+    leafName: 'interact_with_block',
+    fields: ['position:any', '?interactionType:string', '?radius:number'],
+    validate: (args) => {
+      if (args.position === undefined || args.position === null)
+        return 'interact_with_block requires position';
+      return null;
+    },
+  },
 };
 
 /** Canonical set of executable leaves the executor may dispatch. Unknown leaves are rejected in strict mode.

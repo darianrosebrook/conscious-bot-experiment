@@ -115,6 +115,39 @@ export type BlockReason =
   | TaskTypeBridgeReason;
 
 // ============================================================================
+// Smoke policy types
+// ============================================================================
+
+/**
+ * Narrow enum-like type for smoke_policy_reason metadata values.
+ * Prevents silent typo → silent observability loss.
+ */
+export type SmokePolicyReason = 'skip_verification' | 'fail_no_regen';
+
+/** Typed patch for verify-skip smoke guard. Compiler-checked — no casts needed at call site.
+ *  Index signature allows assignment to Record<string, unknown> (updateTaskMetadata). */
+export interface SmokeVerifySkipPatch {
+  [key: string]: unknown;
+  verifyFailCount: number;
+  lastSkippedStep: string;
+  smokeVerifySkipped: true;
+  smoke_policy_applied: true;
+  /** "skip_verification" = verification was attempted but failed; smoke policy
+   *  prevents the verify→retry loop, not the verification attempt itself. */
+  smoke_policy_reason: SmokePolicyReason;
+}
+
+/** Typed patch for dispatch-error smoke guard. Compiler-checked — no casts needed at call site.
+ *  Index signature allows assignment to Record<string, unknown> (updateTaskMetadata). */
+export interface SmokeFailNoRegenPatch {
+  [key: string]: unknown;
+  retryCount: number;
+  smokeNoRetry: true;
+  smoke_policy_applied: true;
+  smoke_policy_reason: SmokePolicyReason;
+}
+
+// ============================================================================
 // Blocked-state lifecycle helpers
 // ============================================================================
 
@@ -212,6 +245,38 @@ function isSafetyPreemptedError(error: string | undefined | null): boolean {
 }
 
 /**
+ * Extract a minimal placement receipt from leaf action result data.
+ * Only placement leaves that need world-state verification get receipts.
+ * The receipt is small (position + block name) and stored on step.meta.leafReceipt
+ * so verifyByLeaf can probe the exact coordinate without re-dispatching.
+ */
+function extractLeafReceipt(
+  leafName: string,
+  data: Record<string, unknown>
+): Record<string, unknown> | null {
+  switch (leafName) {
+    case 'place_block':
+      if (data.position && data.blockPlaced)
+        return { position: data.position, blockPlaced: data.blockPlaced };
+      return null;
+    case 'place_torch_if_needed':
+      if (data.position)
+        return { position: data.position, torchPlaced: data.torchPlaced ?? false };
+      return null;
+    case 'place_torch':
+      if (data.position)
+        return { position: data.position, torchPlaced: data.torchPlaced ?? data.success ?? false };
+      return null;
+    case 'place_workstation':
+      if (data.position)
+        return { position: data.position, workstation: data.workstation, reused: data.reused };
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Execute one Sterling step for a task.
  * All side effects go through the injected context.
  */
@@ -244,6 +309,16 @@ export async function executeSterlingStep(
     reason: BlockReason,
     opts?: { nextEligibleAt?: number; now?: number }
   ) => blockTaskPatch(reason, { ...opts, existingMetadata: meta });
+
+  // ── Smoke task detection ──
+  // INVARIANT: Smoke policy is determined from the initial task metadata snapshot.
+  // These flags are NOT re-read if metadata is mutated mid-function. This is
+  // intentional — smoke policy should be a static, one-shot decision based on
+  // how the task was injected, not on any runtime metadata changes.
+  // Read both key shapes for forward compatibility (injection writes both).
+  const isSmoke = meta.source === 'sterling-smoke';
+  const noRetry = !!(meta.noRetry === true || meta.no_retry === true);
+  const disableRegen = !!(meta.disableRegen === true);
 
   // Planning-incomplete: normalizer could not materialize Option A for at least one step (deterministic: condition does not clear without plan mutation). Check before leaf resolution so unknown-leaf steps also get backoff (no hot-loop).
   if ((task.metadata as Record<string, unknown>)?.planningIncomplete === true) {
@@ -691,6 +766,19 @@ export async function executeSterlingStep(
     ctx.getGoldenRunRecorder().recordDispatch(runId, dispatchPayload);
   }
 
+  // Store placement receipt on step metadata for receipt-anchored verification.
+  // The receipt captures the exact position + block the leaf claims it placed,
+  // so verifyByLeaf can probe that coordinate instead of guessing.
+  if (actionResult?.ok && actionResult?.data) {
+    const receipt = extractLeafReceipt(
+      leafExec.leafName,
+      actionResult.data as Record<string, unknown>
+    );
+    if (receipt) {
+      nextStep.meta = { ...nextStep.meta, leafReceipt: receipt };
+    }
+  }
+
   const actionMeta = (actionResult as Record<string, unknown> | null | undefined)
     ?.metadata as Record<string, unknown> | undefined;
   const noMappedAction = actionMeta?.reason === BLOCK_REASONS.NO_MAPPED_ACTION;
@@ -722,6 +810,23 @@ export async function executeSterlingStep(
         ctx.updateTaskMetadata(task.id, { verifyFailCount: 0 });
       }
     } else {
+      // Smoke tasks with noRetry: skip verification and finalize immediately.
+      // This prevents verify→retry loops from consuming rate-limiter budget.
+      if (isSmoke && noRetry) {
+        await ctx.completeTaskStep(task.id, nextStep.id, {
+          skipVerification: true,
+        } as Record<string, unknown>);
+        const verifySkipPatch: SmokeVerifySkipPatch = {
+          verifyFailCount: 1,
+          lastSkippedStep: nextStep.id,
+          smokeVerifySkipped: true,
+          smoke_policy_applied: true,
+          smoke_policy_reason: 'skip_verification',
+        };
+        ctx.updateTaskMetadata(task.id, verifySkipPatch);
+        return;
+      }
+
       const verifyFails = ((task.metadata?.verifyFailCount as number) || 0) + 1;
       const maxVerifyFails = 5;
       const backoffMs = Math.min(5000 * verifyFails, 30_000);
@@ -802,8 +907,26 @@ export async function executeSterlingStep(
   }
 
   const newRetryCount = ((task.metadata?.retryCount as number) || 0) + 1;
+  // Smoke tasks respect metadata.maxRetries (set to 1 at injection);
+  // non-smoke tasks fall back to the existing default of 3.
   const maxRetries = (task.metadata?.maxRetries as number) || 3;
   const backoffMs = Math.min(1000 * Math.pow(2, newRetryCount), 30_000);
+
+  // Smoke no-retry: fail immediately on first error. No regen, no retry storm.
+  if (isSmoke && noRetry) {
+    const failNoRegenPatch: SmokeFailNoRegenPatch = {
+      retryCount: newRetryCount,
+      smokeNoRetry: true,
+      smoke_policy_applied: true,
+      smoke_policy_reason: 'fail_no_regen',
+    };
+    ctx.updateTaskMetadata(task.id, {
+      ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
+      ...failNoRegenPatch,
+    });
+    ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
+    return;
+  }
 
   if (newRetryCount >= maxRetries) {
     const repairCount =
@@ -814,6 +937,7 @@ export async function executeSterlingStep(
       ?.regenDisabledUntil as number | undefined;
     const now = Date.now();
     const mayAttemptRegen =
+      !disableRegen &&
       repairCount < 2 &&
       (regenDisabledUntil == null || now >= regenDisabledUntil);
 

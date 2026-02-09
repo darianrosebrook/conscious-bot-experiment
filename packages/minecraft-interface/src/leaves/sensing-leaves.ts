@@ -650,6 +650,114 @@ export class GetLightLevelLeaf implements LeafImpl {
 }
 
 // ============================================================================
+// Get Block At Leaf
+// ============================================================================
+
+/**
+ * Get block info at a specific position. Returns 'unknown' for unloaded chunks.
+ * Used by receipt-anchored verification to probe exact placement coordinates.
+ */
+export class GetBlockAtLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'get_block_at',
+    version: '1.0.0',
+    description: 'Get block info at a specific world position',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+          required: ['x', 'y', 'z'],
+        },
+      },
+      required: ['position'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+        },
+        type: { type: 'number' },
+        boundingBox: { type: 'string' },
+      },
+    },
+    timeoutMs: 1000,
+    retries: 0,
+    permissions: ['sense'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const { position } = args;
+
+    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number' || typeof position.z !== 'number') {
+      return {
+        status: 'failure',
+        error: {
+          code: 'sense.invalidInput',
+          retryable: false,
+          detail: 'position with x, y, z is required',
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    try {
+      const bot = ctx.bot;
+      const targetPos = new Vec3(position.x, position.y, position.z);
+      const block = bot.blockAt(targetPos);
+
+      if (!block) {
+        // Chunk not loaded — inconclusive signal
+        return {
+          status: 'success',
+          result: {
+            name: 'unknown',
+            position: { x: position.x, y: position.y, z: position.z },
+            type: -1,
+            boundingBox: 'unknown',
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      return {
+        status: 'success',
+        result: {
+          name: block.name,
+          position: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+          type: block.type,
+          boundingBox: block.boundingBox,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    } catch (e: any) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'sense.apiError',
+          retryable: false,
+          detail: e?.message ?? String(e),
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+}
+
+// ============================================================================
 // Find Resource Leaf
 // ============================================================================
 

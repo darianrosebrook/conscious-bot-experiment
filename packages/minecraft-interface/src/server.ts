@@ -68,6 +68,7 @@ import {
   AcquireMaterialLeaf,
   PlaceBlockLeaf,
   PlaceTorchIfNeededLeaf,
+  PlaceTorchLeaf,
   RetreatAndBlockLeaf,
   ConsumeFoodLeaf,
   SleepLeaf,
@@ -78,6 +79,7 @@ import {
   ChatLeaf,
   WaitLeaf,
   GetLightLevelLeaf,
+  GetBlockAtLeaf,
   FindResourceLeaf,
 } from './leaves/sensing-leaves';
 import {
@@ -1032,6 +1034,7 @@ async function registerCoreLeaves() {
       new AcquireMaterialLeaf(),
       new PlaceBlockLeaf(),
       new PlaceTorchIfNeededLeaf(),
+      new PlaceTorchLeaf(),
       new RetreatAndBlockLeaf(),
       new ConsumeFoodLeaf(),
       new SleepLeaf(),
@@ -1044,6 +1047,7 @@ async function registerCoreLeaves() {
       new ChatLeaf(),
       new WaitLeaf(),
       new GetLightLevelLeaf(),
+      new GetBlockAtLeaf(),
       new FindResourceLeaf(),
     ];
 
@@ -2058,6 +2062,189 @@ app.post('/action', async (req, res) => {
       message: 'Failed to execute action',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+// ── Dev: Packet-truth placement probe ──────────────────────────────────
+// Instruments a single block placement attempt with raw packet logging
+// to discriminate "server not sending block_change" vs "mineflayer not
+// processing it." This endpoint is diagnostic-only and should not be
+// used in production.
+app.post('/dev/packet-probe-placement', async (req, res) => {
+  if (!process.env.ENABLE_DEV_ENDPOINTS) {
+    return res.status(404).json({ error: 'Dev endpoints disabled. Set ENABLE_DEV_ENDPOINTS=1' });
+  }
+  try {
+    if (!minecraftInterface) {
+      return res.status(503).json({ error: 'Interface not initialized' });
+    }
+    const bot = minecraftInterface.botAdapter.getBot();
+    if (!bot) {
+      return res.status(503).json({ error: 'Bot not available' });
+    }
+
+    const { item = 'cobblestone' } = req.body || {};
+    const { Vec3 } = await import('vec3');
+    const packets: Array<{ ts: number; name: string; data: any }> = [];
+    const startTs = Date.now();
+
+    // ── Attach raw packet listener for ALL inbound packets ──
+    const packetFilter = new Set([
+      'block_change',
+      'multi_block_change',
+      'acknowledge_player_digging',
+      'block_break_animation',
+      'block_action',
+      'map_chunk',
+    ]);
+    const MAX_CAPTURED_PACKETS = 50;
+    const rawPacketListener = (data: any, meta: any) => {
+      if (packetFilter.has(meta.name) && packets.length < MAX_CAPTURED_PACKETS) {
+        packets.push({
+          ts: Date.now() - startTs,
+          name: meta.name,
+          data: JSON.parse(JSON.stringify(data)),
+        });
+      }
+    };
+    (bot as any)._client.on('packet', rawPacketListener);
+
+    // ── Also listen for mineflayer-level blockUpdate events ──
+    const blockUpdates: Array<{ ts: number; pos: string; old: string; new: string }> = [];
+    const MAX_BLOCK_UPDATES = 50;
+    const blockUpdateListener = (oldBlock: any, newBlock: any) => {
+      if (blockUpdates.length < MAX_BLOCK_UPDATES) {
+        blockUpdates.push({
+          ts: Date.now() - startTs,
+          pos: newBlock?.position?.toString() || 'unknown',
+          old: oldBlock?.name || 'null',
+          new: newBlock?.name || 'null',
+        });
+      }
+    };
+    (bot as any).on('blockUpdate', blockUpdateListener);
+
+    // ── Snapshot world state before placement ──
+    const botPos = bot.entity.position.clone();
+    const belowPos = botPos.offset(0, -1, 0).floored();
+    const blockBelow = bot.blockAt(belowPos);
+    const preState = {
+      botPosition: { x: botPos.x, y: botPos.y, z: botPos.z },
+      blockBelow: blockBelow?.name || 'null',
+      blockBelowPos: { x: belowPos.x, y: belowPos.y, z: belowPos.z },
+      heldItem: bot.heldItem?.name || 'none',
+    };
+
+    // ── Equip the item ──
+    let equipError: string | null = null;
+    try {
+      const itemToEquip = bot.inventory.items().find(
+        (i: any) => i.name === item
+      );
+      if (!itemToEquip) {
+        throw new Error(`Item '${item}' not in inventory`);
+      }
+      await bot.equip(itemToEquip, 'hand');
+    } catch (e: any) {
+      equipError = e.message;
+    }
+
+    // ── Find reference block and attempt placement ──
+    let placementResult: any = { status: 'not_attempted' };
+    if (!equipError) {
+      // Find a solid block adjacent to an air block near the bot
+      const searchRadius = 3;
+      let refBlock: any = null;
+      let faceVec: any = null;
+      let targetPos: any = null;
+
+      const offsets = [
+        [0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+      ];
+
+      // Place on top of the block directly below the bot's feet (offset by 1)
+      const candidateTarget = botPos.offset(1, 0, 0).floored();
+      const candidateRef = candidateTarget.offset(0, -1, 0);
+      const candidateRefBlock = bot.blockAt(candidateRef);
+      const candidateTargetBlock = bot.blockAt(candidateTarget);
+
+      if (
+        candidateRefBlock &&
+        candidateRefBlock.boundingBox === 'block' &&
+        candidateTargetBlock &&
+        candidateTargetBlock.name === 'air'
+      ) {
+        refBlock = candidateRefBlock;
+        faceVec = new Vec3(0, 1, 0);
+        targetPos = candidateTarget;
+      }
+
+      if (!refBlock) {
+        placementResult = {
+          status: 'no_reference_block',
+          candidateRef: candidateRef?.toString(),
+          candidateRefBlock: candidateRefBlock?.name,
+          candidateTarget: candidateTarget?.toString(),
+          candidateTargetBlock: candidateTargetBlock?.name,
+        };
+      } else {
+        placementResult = {
+          status: 'attempting',
+          refBlock: { pos: refBlock.position.toString(), name: refBlock.name },
+          faceVec: faceVec.toString(),
+          targetPos: targetPos.toString(),
+        };
+
+        try {
+          // Use a race: placement vs hard timeout
+          const placementPromise = bot.placeBlock(refBlock, faceVec);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('PROBE_TIMEOUT_8S')), 8000)
+          );
+          await Promise.race([placementPromise, timeoutPromise]);
+
+          // Check if block was placed
+          const placed = bot.blockAt(targetPos);
+          placementResult.outcome = 'resolved';
+          placementResult.placedBlock = placed?.name || 'null';
+          placementResult.success = placed?.name === item;
+        } catch (e: any) {
+          placementResult.outcome = 'error';
+          placementResult.error = e.message;
+        }
+      }
+    }
+
+    // ── Cleanup listeners ──
+    (bot as any)._client.removeListener('packet', rawPacketListener);
+    (bot as any).removeListener('blockUpdate', blockUpdateListener);
+
+    // ── Post-placement world snapshot ──
+    const postBlockBelow = bot.blockAt(belowPos);
+
+    res.json({
+      probe: 'packet-truth-placement',
+      elapsed_ms: Date.now() - startTs,
+      preState,
+      equipError,
+      placementResult,
+      postState: {
+        blockBelow: postBlockBelow?.name || 'null',
+        heldItem: bot.heldItem?.name || 'none',
+      },
+      packets_received: packets,
+      block_updates_received: blockUpdates,
+      diagnosis: {
+        packets_total: packets.length,
+        block_change_count: packets.filter((p) => p.name === 'block_change').length,
+        multi_block_change_count: packets.filter((p) => p.name === 'multi_block_change').length,
+        ack_count: packets.filter((p) => p.name === 'acknowledge_player_digging').length,
+        mineflayer_block_updates: blockUpdates.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('Packet probe error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -48,6 +48,10 @@ const ACCEPTED_ACTION_TYPES = new Set([
   'smelt_item',
   // Workstation placement (via LeafFactory)
   'place_workstation',
+  // Torch placement (unconditional, via LeafFactory)
+  'place_torch',
+  // Block probe (sensing, via LeafFactory)
+  'get_block_at',
   // Collection
   'pickup_item',
   'collect_items_enhanced',

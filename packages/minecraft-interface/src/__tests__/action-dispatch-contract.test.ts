@@ -75,27 +75,61 @@ function setupMockLeafFactory(
 ) {
   const leaves = new Map<string, ReturnType<typeof createMockLeaf>>();
 
-  // Register standard leaves
+  // Register standard leaves — must include every leaf registered by registerCoreLeaves()
   const defaultLeaves = [
+    // crafting
     'craft_recipe',
     'smelt',
+    'place_workstation',
+    'introspect_recipe',
+    // interaction
     'dig_block',
+    'acquire_material',
     'place_block',
+    'place_torch_if_needed',
+    'place_torch',
+    'retreat_and_block',
+    'consume_food',
+    'sleep',
+    'collect_items',
+    // sensing
+    'sense_hostiles',
+    'chat',
+    'wait',
+    'get_light_level',
+    'get_block_at',
+    'find_resource',
+    // movement
     'move_to',
+    'step_forward_safely',
+    'follow_entity',
+    'sterling_navigate',
+    // combat
+    'attack_entity',
+    'equip_weapon',
+    'retreat_from_threat',
+    'use_item',
+    'equip_tool',
+    // container
+    'open_container',
+    'transfer_items',
+    'close_container',
+    'manage_inventory',
+    // farming
+    'till_soil',
+    'plant_crop',
+    'harvest_crop',
+    'manage_farm',
+    // world interaction
+    'interact_with_block',
+    'operate_piston',
+    'control_redstone',
+    'build_structure',
+    'control_environment',
+    // construction (stubs)
     'prepare_site',
     'build_module',
     'place_feature',
-    'wait',
-    'attack_entity',
-    'chat',
-    'acquire_material',
-    'consume_food',
-    'collect_items',
-    'sleep',
-    'find_resource',
-    'equip_tool',
-    'introspect_recipe',
-    'place_workstation',
   ];
 
   for (const name of defaultLeaves) {
@@ -1008,6 +1042,98 @@ describe('action dispatch contract', () => {
       // Should have a default AbortSignal (from new AbortController().signal)
       expect(context.abortSignal).toBeDefined();
       expect(context.abortSignal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // 4th Gate: Handler alignment — every ACTION_CONTRACTS leaf has a
+  // registered leaf handler in the leaf factory
+  // -------------------------------------------------------------------
+
+  describe('4th Gate: handler alignment', () => {
+    it('every ACTION_CONTRACTS leafName has a registered leaf in the factory', () => {
+      const factory = setupMockLeafFactory();
+      const missingLeaves: string[] = [];
+
+      for (const [actionType, contract] of Object.entries(ACTION_CONTRACTS)) {
+        const leaf = factory.get(contract.leafName);
+        if (!leaf) {
+          missingLeaves.push(`${actionType} → ${contract.leafName}`);
+        }
+      }
+
+      expect(missingLeaves).toEqual([]);
+    });
+
+    it('every ACTION_CONTRACTS leafName resolves to a non-placeholder leaf', () => {
+      const factory = setupMockLeafFactory();
+      const placeholderLeaves: string[] = [];
+
+      for (const [actionType, contract] of Object.entries(ACTION_CONTRACTS)) {
+        const leaf = factory.get(contract.leafName);
+        if (leaf && leaf.spec.placeholder) {
+          placeholderLeaves.push(`${actionType} → ${contract.leafName} (placeholder)`);
+        }
+      }
+
+      expect(placeholderLeaves).toEqual([]);
+    });
+
+    it('dispatching every ACTION_CONTRACTS type does not produce "Unknown action type"', async () => {
+      setupMockLeafFactory();
+      const unknownTypes: string[] = [];
+
+      // Minimal valid args per action type for dispatch testing
+      const minimalArgs: Record<string, Record<string, unknown>> = {
+        acquire_material: { item: 'oak_log' },
+        place_block: { block_type: 'cobblestone' },
+        consume_food: {},
+        collect_items_enhanced: { item: 'oak_log', radius: 10 },
+        craft: { item: 'stick' },
+        craft_item: { item: 'stick' },
+        smelt: { item: 'raw_iron' },
+        smelt_item: { item: 'raw_iron' },
+        collect_items: {},
+        sleep: {},
+        find_resource: { blockType: 'oak_log' },
+        equip_tool: {},
+        introspect_recipe: { output: 'crafting_table' },
+        place_workstation: { workstation: 'crafting_table' },
+        prepare_site: { blockType: 'stone' },
+        build_module: { blockType: 'stone' },
+        place_feature: { blockType: 'stone' },
+        sense_hostiles: {},
+        get_light_level: {},
+        get_block_at: { position: { x: 0, y: 64, z: 0 } },
+        place_torch: {},
+        chat: { message: 'test' },
+        wait: { duration: 100 },
+        step_forward_safely: { distance: 1 },
+        attack_entity: {},
+        equip_weapon: {},
+        retreat_from_threat: {},
+        retreat_and_block: {},
+        use_item: { item: 'bread' },
+        manage_inventory: { action: 'sort' },
+        till_soil: {},
+        manage_farm: {},
+        harvest_crop: {},
+        interact_with_block: { position: { x: 0, y: 64, z: 0 } },
+      };
+
+      for (const actionType of Object.keys(ACTION_CONTRACTS)) {
+        const result = await translator.executeAction({
+          type: actionType,
+          parameters: minimalArgs[actionType] ?? {},
+          timeout: 1000,
+        });
+
+        if (result.error && result.error.includes('Unknown action type')) {
+          unknownTypes.push(actionType);
+        }
+      }
+
+      expect(unknownTypes).toEqual([]);
     });
   });
 });
