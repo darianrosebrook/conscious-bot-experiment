@@ -172,6 +172,14 @@ const animatedFragmentShader = `
 
     vec3 finalColor = ambient + diffuse;
 
+    // Vibrance boost — lift saturation on muted colors more than already-vivid ones
+    float luminance = dot(finalColor, vec3(0.299, 0.587, 0.114));
+    float saturation = length(finalColor - vec3(luminance));
+    // Boost factor: stronger for desaturated colors, gentler for already-vivid ones
+    float vibranceAmount = 0.18;
+    float boost = vibranceAmount * (1.0 - saturation);
+    finalColor = mix(vec3(luminance), finalColor, 1.0 + boost);
+
     gl_FragColor = vec4(finalColor, texColor.a);
   }
 `
@@ -326,10 +334,10 @@ function createAnimatedMaterial (map, animationMap, options = {}) {
       nightDirectionalColor: { value: NIGHT_DIRECTIONAL_COLOR.clone() },
       twilightDirectionalColor: { value: TWILIGHT_DIRECTIONAL_COLOR.clone() },
       ambientLightColor: { value: options.ambientLightColor || new THREE.Color(0xffffff) },
-      ambientLightIntensity: { value: options.ambientLightIntensity || 0.6 },
+      ambientLightIntensity: { value: options.ambientLightIntensity || 0.75 },
       directionalLightColor: { value: options.directionalLightColor || new THREE.Color(0xffffff) },
       directionalLightDirection: { value: options.directionalLightDirection || new THREE.Vector3(1, 1, 0.5).normalize() },
-      directionalLightIntensity: { value: options.directionalLightIntensity || 0.5 },
+      directionalLightIntensity: { value: options.directionalLightIntensity || 0.55 },
       alphaTest: { value: options.alphaTest || 0.1 }
     },
     vertexShader: animatedVertexShader,

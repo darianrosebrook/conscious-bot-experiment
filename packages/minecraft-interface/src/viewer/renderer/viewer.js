@@ -25,10 +25,10 @@ class Viewer {
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color('lightblue')
 
-    this.ambientLight = new THREE.AmbientLight(0xcccccc)
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.9)
     this.scene.add(this.ambientLight)
 
-    this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.5)
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.6)
     this.directionalLight.position.set(1, 1, 0.5).normalize()
     this.directionalLight.castShadow = true
     this.scene.add(this.directionalLight)

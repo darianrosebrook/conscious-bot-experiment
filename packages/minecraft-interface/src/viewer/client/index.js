@@ -256,6 +256,9 @@ let botVelocity = 0 // For cape animation
 const renderer = new WebGLRenderer()
 renderer.setPixelRatio(window.devicePixelRatio || 1)
 renderer.setSize(window.innerWidth, window.innerHeight)
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 1.1
+renderer.outputColorSpace = THREE.SRGBColorSpace
 document.body.appendChild(renderer.domElement)
 
 const viewer = new Viewer(renderer)
@@ -505,11 +508,20 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
   if (viewMode === 'third') {
     initOrbitControls()
     const headY = pos.y + THIRD_PERSON_HEAD_OFFSET
-    controls.target.set(pos.x, headY, pos.z)
     if (firstPositionUpdate && pos.y > 0) {
+      controls.target.set(pos.x, headY, pos.z)
       viewer.camera.position.set(pos.x, headY + 6, pos.z + 6)
       controls.update()
       firstPositionUpdate = false
+    } else {
+      // Translate camera by the same delta so orbit angle/distance is preserved
+      const dx = pos.x - controls.target.x
+      const dy = headY - controls.target.y
+      const dz = pos.z - controls.target.z
+      controls.target.set(pos.x, headY, pos.z)
+      viewer.camera.position.x += dx
+      viewer.camera.position.y += dy
+      viewer.camera.position.z += dz
     }
   } else if (yaw !== undefined && pitch !== undefined) {
     destroyOrbitControls()
@@ -541,13 +553,13 @@ function handlePosition ({ pos, addMesh, yaw, pitch }) {
       botVelocity = Math.sqrt(dx * dx + dz * dz) / 0.05 // Approximate velocity
     }
 
-    new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 50).start()
+    new TWEEN.Tween(botMesh.position).to({ x: pos.x, y: pos.y, z: pos.z }, 100).start()
     if (yaw !== undefined) {
       // Mineflayer yaw: 0=north(-Z), PI=south(+Z). Model face points -Z at rotation.y=0.
       // Conventions match — apply yaw directly.
       const da = (yaw - botMesh.rotation.y) % (Math.PI * 2)
       const dy = 2 * da % (Math.PI * 2) - da
-      new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 50).start()
+      new TWEEN.Tween(botMesh.rotation).to({ y: botMesh.rotation.y + dy }, 100).start()
     }
   }
 }

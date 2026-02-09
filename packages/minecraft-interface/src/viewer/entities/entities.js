@@ -832,7 +832,7 @@ class Entities {
       // Calculate velocity for animation
       const state = this.entityStates.get(entity.id);
       if (state) {
-        const deltaTime = 0.05; // 50ms update interval
+        const deltaTime = 0.1; // 100ms tween interval
         state.velocity
           .subVectors(newPos, state.lastPos)
           .divideScalar(deltaTime);
@@ -859,7 +859,7 @@ class Entities {
       }
 
       new TWEEN.Tween(e.position)
-        .to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 50)
+        .to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 100)
         .start();
     }
     if (entity.yaw) {
@@ -867,7 +867,7 @@ class Entities {
       // Conventions match — apply yaw directly.
       const da = (entity.yaw - e.rotation.y) % (Math.PI * 2);
       const dy = ((2 * da) % (Math.PI * 2)) - da;
-      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start();
+      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 100).start();
     }
   }
 
