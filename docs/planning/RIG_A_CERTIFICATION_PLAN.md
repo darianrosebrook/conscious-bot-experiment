@@ -2,8 +2,8 @@
 
 **Primitive**: P1 — Deterministic transformation planning (resource → product)
 
-**Status**: Implemented baseline; needs certification hardening
-**Implementation**: Partial — crafting solver baseline exists, certification hardening not yet applied
+**Status**: Certification hardening implemented
+**Implementation**: Complete — validation gate, trace hashing, credit manager, explanation builder all wired into crafting solver. 23 certification tests passing.
 
 ---
 
@@ -24,8 +24,13 @@ The system must:
 ## 2. Current state (baseline)
 
 - **Working**: Crafting solver produces valid plans for resource → product goals
-- **Missing**: Strict rule validation, trace bundle hashing, execution-based credit, explanations
-- **Risk**: Rules with invalid preconditions/effects can slip through; learning on planned success
+- **Implemented (2026-02-09)**:
+  - Strict rule validation via Zod schema + semantic checks (`packages/planning/src/validation/rule-validator.ts`)
+  - Trace bundle hashing with `computeTraceHash()` excluding non-deterministic fields (`solve-bundle.ts`)
+  - Execution-based credit assignment with `CreditManager` class (`packages/planning/src/credit/credit-manager.ts`)
+  - Audit-grade explanations via `buildExplanation()` (`packages/planning/src/audit/explanation-builder.ts`)
+  - Validation gate wired into `minecraft-crafting-solver.ts` before Sterling call
+  - 23 certification tests across 3 test files (9 rule validation, 6 credit, 8 trace+integration+e2e)
 
 ---
 
@@ -870,48 +875,51 @@ Total: 12 test cases covering all pivots and gates.
 
 ## 12. Implementation files summary
 
-### New files to create
+### New files created (2026-02-09)
 
-1. **`packages/planning/src/validation/rule-validator.ts`**
-   - `validateRules(rules: unknown)` — schema + semantic validation
+1. **`packages/planning/src/validation/rule-validator.ts`** ✅
+   - `validateRules(rules: unknown)` — Zod schema + semantic validation (fail-closed)
    - `ValidationError` type, `ValidationReport` type
-   - Zod schemas for `MinecraftCraftingRule`
+   - Constants: `MAX_RULE_COUNT=1000`, `MAX_BASE_COST=1000`, `MAX_ITEM_DELTA=64`
+   - Semantic checks: `DUPLICATE_ACTION`, `INVALID_PRODUCTION`, `CONSUME_EXCEEDS_REQUIRE`, `SELF_LOOP` (warning), `UNBOUNDED_DELTA`
 
-2. **`packages/planning/src/credit/credit-manager.ts`**
-   - `CreditManager` class with `reportExecutionOutcome()`, `getPrior()`, `applyCreditUpdates()`
-   - `ExecutionReport` type, `CreditUpdate` type
+2. **`packages/planning/src/credit/credit-manager.ts`** ✅
+   - `CreditManager` class with `reportExecutionOutcome()`, `getPrior()`, `getPriors()`, `getAuditLog()`
+   - `computeCreditUpdates()` pure function
+   - `ExecutionReport`, `CreditUpdate`, `CreditAuditEntry` types
+   - Constants: `REINFORCE_MAGNITUDE=0.1`, `PENALIZE_MAGNITUDE=-0.2`, `DEFAULT_PRIOR=1.0`, `MIN_PRIOR=0.01`, `MAX_PRIOR=10.0`
 
-3. **`packages/planning/src/audit/explanation-builder.ts`**
-   - `buildExplanation()` function
-   - `SolveExplanation` type with constraints, validation, solution summary
+3. **`packages/planning/src/audit/explanation-builder.ts`** ✅
+   - `buildExplanation()` — generates audit explanation from solve metadata
+   - `buildRejectionExplanation()` — for validation-rejected solves
+   - `SolveExplanation` type with constraintsSummary, validationReport, solutionSummary, compatSummary
 
-### Files to modify
+### Files modified (2026-02-09)
 
-1. **`packages/planning/src/sterling/minecraft-crafting-solver.ts`**
-   - Add validation gate after `buildCraftingRules()` (line 63)
-   - Add trace hash computation after `bundleOutput` (line 119)
-   - Add explanation generation
-   - Return explanation in `solveMeta`
+1. **`packages/planning/src/sterling/minecraft-crafting-solver.ts`** ✅
+   - Added validation gate after `buildCraftingRules()`, before Sterling call
+   - Added trace hash computation after `bundleOutput`
+   - Added explanation generation on both success and failure paths
+   - Returns explanation in `solveMeta: { bundles, explanation }`
 
-2. **`packages/planning/src/sterling/solve-bundle.ts`**
-   - Add `computeTraceHash()` function
-   - Extend `SolveBundleOutput` type with `traceHash` field
-   - Ensure `hashDefinition()` sorts rules before hashing
+2. **`packages/planning/src/sterling/solve-bundle.ts`** ✅
+   - Added `computeTraceHash()` function (excludes non-deterministic fields)
+   - Trace hash includes: definitionHash, initialStateHash, goalHash, solved, stepsDigest
 
-3. **`packages/planning/src/sterling/solve-bundle-types.ts`**
-   - Add `SolveExplanation` type
-   - Add `traceHash` to `SolveBundleOutput`
-   - Add `explanation` to solve result metadata
+3. **`packages/planning/src/sterling/solve-bundle-types.ts`** ✅
+   - Added `traceHash?: ContentHash` to `SolveBundleOutput`
 
-### Test files to create
+4. **`packages/planning/src/sterling/minecraft-crafting-types.ts`** ✅
+   - Added `explanation?: SolveExplanation` to `solveMeta`
+   - Added `validationErrors?: ValidationError[]` to result type
 
-1. **`packages/planning/src/validation/__tests__/rule-validator.test.ts`**
-   - Test 1: Rule validation rejection (3 cases)
+### Test files created (2026-02-09)
 
-2. **`packages/planning/src/credit/__tests__/credit-manager.test.ts`**
-   - Test 3: Credit assignment semantics (3 cases)
+1. **`packages/planning/src/validation/__tests__/rule-validator.test.ts`** ✅ — 9 tests
+   - Invalid schema (negative cost), CONSUME_EXCEEDS_REQUIRE, accepts valid rules, INVALID_PRODUCTION, UNBOUNDED_DELTA, DUPLICATE_ACTION, SELF_LOOP (warning), invalid action type, non-array input
 
-3. **`packages/planning/src/sterling/__tests__/certification-e2e.test.ts`**
-   - Test 2: Deterministic trace hashing (3 cases)
-   - Test 4: Solver integration (2 cases)
-   - Test 5: End-to-end certification (1 case)
+2. **`packages/planning/src/credit/__tests__/credit-manager.test.ts`** ✅ — 6 tests
+   - No priors on plan success, reinforce on execution, penalize on failure, clamp to [MIN, MAX], audit log, computeCreditUpdates is pure
+
+3. **`packages/planning/src/sterling/__tests__/certification-rig-a.test.ts`** ✅ — 8 tests
+   - Trace determinism (4 cases), Validation gate (3 cases), End-to-end certification (1 case)

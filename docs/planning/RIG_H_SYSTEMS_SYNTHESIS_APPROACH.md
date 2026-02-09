@@ -1,6 +1,6 @@
 # Rig H: Systems Synthesis — Companion Approach
 
-**Implementation**: Not started — spec only
+**Implementation**: HARDENING-COMPLETE (2026-02-09) — P08 capsule types, reference adapter, 2-domain fixtures, Minecraft synthesis module, 37 certification tests
 
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_H_SYSTEMS_SYNTHESIS_PLAN.md`.
 

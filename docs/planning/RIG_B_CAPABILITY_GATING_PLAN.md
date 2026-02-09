@@ -2,8 +2,8 @@
 
 **Primitive**: P2 — Capability gating and legality (what actions are permitted)
 
-**Status**: Planned (natural next after Rig A certification)
-**Implementation**: Not started — spec only
+**Status**: CONTRACT-CERTIFIED | HARDENING-COMPLETE (2026-02-09)
+**Implementation**: Capability gating implemented within tool-progression solver (embedded, not standalone framework). `cap:` token system, `TIER_GATE_MATRIX`, tier detection, capability-gated rules, invariant-pattern enforcement — all proven with 51 golden-master tests + 5 transfer tests (approval ladder) + 24 certification tests (`certification-rig-b.test.ts`). Rig A gates (validation, trace hashing, explanations) fully wired. See [tracker](./sterling-capability-tracker.md#rig-b-capability-gating-and-legality) for evidence.
 
 ---
 
@@ -32,19 +32,30 @@ The system must:
 
 ## 3. Problem being solved
 
-### 3.1 Current state (no capability gating)
+### 3.1 Current state (implemented — embedded in tool-progression solver)
 
-Without capability gating:
-- Planner can propose "mine iron ore" when bot has wooden pickaxe (will fail at execution)
-- No explicit model of tool tiers or station requirements
-- Execution failures are blamed on "world state" rather than "capability violation"
+Capability gating is implemented within the tool-progression domain:
+- **`cap:` token system**: Virtual inventory tokens (`cap:has_wooden_pickaxe`, `cap:can_mine_iron_ore`, etc.) model capabilities as search-state-only items
+- **`TIER_GATE_MATRIX`**: Frozen constant mapping each pickaxe tier to blocks it unlocks (Minecraft 1.20 harvest levels)
+- **Invariant-pattern enforcement**: Mine rules compile `requires` into consume+reproduce pairs because Sterling's `_can_apply()` skips requires for mine rules
+- **Tier decomposition**: Multi-tier progression solved as sequential single-tier sub-problems with capability accumulation
+- **Missing-blocks early exit**: Honest partial-observability signal when required blocks aren't observed
+- **Cap token hygiene**: `validateInventoryInput()` rejects cap: tokens in input; `filterCapTokens()` strips them from output
 
-### 3.2 With capability gating
+### 3.2 Architecture decision: embedded vs standalone
 
-With proper capability gating:
-- Planner knows iron ore requires stone+ tier tool
-- Capability acquisition becomes a subgoal: "need iron pickaxe → need iron ingot → need furnace + iron ore"
-- Illegal operators are rejected at plan time, not execution time
+The plan originally proposed a standalone `capabilities/` module. The actual implementation embeds capability gating inside the tool-progression solver. This is pragmatic — capability semantics are tightly coupled to Sterling's `_can_apply()` behavior (which skips requires for mine rules), making a general-purpose framework premature. The invariant-pattern workaround is domain-specific.
+
+### 3.3 What was done (hardening — completed 2026-02-09)
+
+- **Rig A gates applied to tool-progression**: `validateRules()` fail-closed gate, `computeTraceHash()`, and `buildExplanation()` wired to all solver return paths (success, failure, degraded)
+- **Capability-consistency validation**: `checkCapabilityConsistency` option in `validateRules()` enables MINE_TIERGATED_NO_CAP and UNKNOWN_CAP_ATOM checks (fail-closed, not advisory)
+- **`ToolProgressionSolveResult.solveMeta`**: Extended with `explanation?` field for audit-grade explanations
+- **24 certification tests**: `certification-rig-b.test.ts` covers invariant-pattern, adversarial rules, tier detection determinism, cap hygiene, validation gate integration, TIER_GATE_MATRIX integrity
+
+### 3.4 What remains (future)
+
+- **No post-solve legality check**: Defense-in-depth validation of Sterling's returned plan not yet implemented (pre-filter is primary gate)
 
 ---
 

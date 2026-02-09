@@ -204,10 +204,10 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 | **E**: Hierarchical planning | CB-P5, 16, 17, 19 | CONTRACT-CERTIFIED | NONE | No hierarchical macro planner in Python. World graph, edge decomposition, feedback loop all TS-only. | Track 2 |
 | **F**: Valuation under scarcity | CB-P6, 16, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling backend). Pure decision module with content-addressed hashing. | Track 2 |
 | **G**: Feasibility + partial order | CB-P7, 16, 17, 19 | CONTRACT-CERTIFIED | PARTIAL | {building via module sequencing}. Python `building_domain.py` exists; E2E building test in `solver-class-e2e.test.ts`. DAG builder, constraint model, partial-order plan are TS additions not exercised by Python search. | Track 2 |
-| **H**: Systems synthesis | CB-P8, 14, 16, 19 | NOT STARTED | NONE | — | Track 2 |
-| **I**: Epistemic planning | CB-P11, 13, 17, 19 | NOT STARTED | NONE | — | Track 2 |
-| **J**: Invariant maintenance | CB-P12, 17, 18, 19 | NOT STARTED | NONE | — | Track 2 |
-| **K**: Irreversibility | CB-P13, 19, 20 | NOT STARTED | NONE | — | Track 2 |
+| **H**: Systems synthesis | CB-P8, 14, 16, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling design domain). P08 capsule types, reference adapter, reference fixtures (2 domains), Minecraft synthesis module (farm specs). 37 certification tests pass. | Track 3 |
+| **I**: Epistemic planning | CB-P11, 13, 17, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling epistemic domain). P11 capsule types, reference adapter, reference fixtures (2 domains), Minecraft epistemic module (hypotheses, probes, evidence). 36 certification tests pass. | Track 2 |
+| **J**: Invariant maintenance | CB-P12, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling maintenance domain). P12 capsule types, reference adapter, reference fixtures (2 domains), Minecraft invariant module (metrics, operators). 39 certification tests pass. | Track 2 |
+| **K**: Irreversibility | CB-P13, 19, 20 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling commitment domain). P13 capsule types, reference adapter, reference fixtures (2 domains), Minecraft commitment module (tags, verifications, constraints). 36 certification tests pass. | Track 3 |
 | **L**: Contingency planning | CB-P9, 18, 19 | NOT STARTED | NONE | — | Later |
 | **M**: Risk-aware planning | CB-P10, 17, 18, 19 | NOT STARTED | NONE | — | Later |
 | **N**: Fault diagnosis | CB-P11, 15, 19 | NOT STARTED | NONE | — | Later |
@@ -468,6 +468,12 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 | Recipe variant rules | `solver-golden-master.test.ts` | `buildCraftingRules` generates variant rules, both appear in wire payload |
 | Transfer test (BOM assembly) | `transfer-bom-assembly.test.ts` | Non-Minecraft domain: linter, hashing, bundle capture, canonicalization (5 tests) |
 | Explanation skeleton | `solve-bundle-types.ts`, `solve-bundle.ts` | `SolveRationale` populated when maxNodes provided (4 tests) |
+| Fail-closed rule validation gate | `validation/rule-validator.ts` | Zod schema + semantic checks. 9 unit tests. Wired before Sterling call in crafting solver |
+| Deterministic trace hashing | `solve-bundle.ts` (`computeTraceHash`) | Content-addressed hash from deterministic fields only. 4 tests in `certification-rig-a.test.ts` |
+| Execution-based credit manager | `credit/credit-manager.ts` | `CreditManager` class. Priors update only via execution reports. 6 tests |
+| Audit-grade explanations | `audit/explanation-builder.ts` | `buildExplanation()` + `buildRejectionExplanation()`. Wired into solver success + failure paths |
+| Solver validation gate wiring | `minecraft-crafting-solver.ts` | Validation before Sterling, trace hash after solve, explanation on both paths |
+| End-to-end certification suite | `certification-rig-a.test.ts` | 8 tests covering all 5 certification gates |
 
 ### What's needed for certification
 
@@ -477,12 +483,17 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 - [x] **A.4 — Explanation skeleton**: `SolveRationale` type, `computeBundleOutput` populates it when `maxNodes` provided. Backward-compatible (undefined without maxNodes). 4 tests.
 - [x] **A.5 — Performance baseline**: `performance-baseline-e2e.test.ts` — 6 E2E tests (gated `STERLING_E2E=1`) recording nodesExpanded, frontierPeak, terminationReason, solutionPathLength, branchingEstimate for stick (raw WS), wooden_pickaxe, and stone_pickaxe (per-tier, both solver-class). Learning **stability** tests prove `nodesExpanded2 <= nodesExpanded1 * 1.05` after episode report. Note: convergence ratios of exactly 1.0 demonstrate stability (no regression), not efficacy (learning improves search). Learning efficacy requires a separate learning-sensitive benchmark. Artifact JSONs committed to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json` with full `ArtifactMeta` (gitSha, clientPathway, solverId, executionMode, contractVersion, maxNodes, objectiveWeights).
 - [x] **A.6 — Transfer test skeleton**: `transfer-bom-assembly.test.ts` — non-Minecraft BOM domain (gadget_assembled, widget_refined, widget_raw). Linter, hashing, bundle capture all work. 5 tests.
+- [x] **A.7 — Fail-closed rule validation gate (Rig A hardening)**: `rule-validator.ts` — Zod schema + semantic checks (DUPLICATE_ACTION, INVALID_PRODUCTION, CONSUME_EXCEEDS_REQUIRE, SELF_LOOP warning, UNBOUNDED_DELTA). Wired into `minecraft-crafting-solver.ts` before Sterling call. Invalid rules return `validationErrors` without reaching Sterling. 9 unit tests in `rule-validator.test.ts`.
+- [x] **A.8 — Deterministic trace hashing (Rig A hardening)**: `computeTraceHash()` in `solve-bundle.ts` — content-addressed hash from deterministic fields only (definitionHash, initialStateHash, goalHash, solved, stepsDigest). Excludes totalNodes, durationMs, planId, timestamp. `traceHash` field added to `SolveBundleOutput`. 4 determinism tests in `certification-rig-a.test.ts`.
+- [x] **A.9 — Execution-based credit assignment (Rig A hardening)**: `CreditManager` in `credit-manager.ts` — priors update ONLY via `reportExecutionOutcome()`, never on plan success. Reinforce +0.1, penalize -0.2 (asymmetric bias toward caution). Clamped to [0.01, 10.0]. Audit log. `computeCreditUpdates()` pure function. 6 tests in `credit-manager.test.ts`.
+- [x] **A.10 — Audit-grade explanations (Rig A hardening)**: `buildExplanation()` in `explanation-builder.ts` — generates `SolveExplanation` with constraintsSummary, validationReport, solutionSummary, compatSummary. Also `buildRejectionExplanation()` for validation failures. Wired into solver on both success and failure paths. Tested in `certification-rig-a.test.ts`.
+- [x] **A.11 — End-to-end certification (Rig A hardening)**: `certification-rig-a.test.ts` — 8 tests covering all 5 gates: validation rejection, deterministic trace hashing (4 cases), validation gate integration (3 cases), end-to-end certification (1 case exercising all gates in sequence).
 
 ---
 
 ## Rig B: Capability gating and legality
 
-**Contract**: CONTRACT-CERTIFIED — full tier progression with certification tests
+**Contract**: CONTRACT-CERTIFIED | HARDENING-COMPLETE — full tier progression with certification tests + Rig A gates (validation, trace hash, explanations)
 **E2E**: PARTIAL — `{crafting via per-tier delegation}`. Each tier's crafting solve hits Python `minecraft_domain.py`. Tier decomposition logic is TS-only. `solver-class-e2e.test.ts` iron-tier test exercises 3 bundles with distinct goalHash and searchHealth per tier.
 
 ### What's done
@@ -507,12 +518,15 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 - [x] **B.1 — Adversarial negative test**: Wrong cap token (stone instead of wooden) — structural linter satisfied, semantic error not caught. Documented limitation.
 - [x] **B.2 — Solver never proposes illegal transition**: Path-walk accumulates inventory, asserts all requires/consumes have sufficient counts at every step. Final inventory contains target tool.
 - [x] **B.3 — Transfer test**: `transfer-approval-ladder.test.ts` — clearance levels (intern → associate) using cap: tokens. 5 tests.
+- [x] **B.4 — Validation gate (Rig A hardening)**: `validateRules()` gate added to tool-progression solver before Sterling call. `checkCapabilityConsistency: true` enables MINE_TIERGATED_NO_CAP and UNKNOWN_CAP_ATOM checks. 6 tests in `certification-rig-b.test.ts`.
+- [x] **B.5 — Trace hashing + explanations**: `computeTraceHash()` and `buildExplanation()` wired to all tool-progression solver return paths (success, failure, degraded). `ToolProgressionSolveResult.solveMeta` extended with `explanation?` field.
+- [x] **B.6 — Cap token integrity**: `certification-rig-b.test.ts` — 24 tests covering invariant-pattern correctness, MINE_TIERGATED_NO_CAP, UNKNOWN_CAP_ATOM, tier detection determinism, cap hygiene, validation gate integration, TIER_GATE_MATRIX integrity.
 
 ---
 
 ## Rig C: Temporal planning with durations, batching, and capacity
 
-**Contract**: CONTRACT-CERTIFIED — P03 capsule + temporal enrichment layer + FurnaceSchedulingSolver (C.1–C.7) all certified
+**Contract**: CONTRACT-CERTIFIED | HARDENING-COMPLETE — P03 capsule + temporal enrichment layer + FurnaceSchedulingSolver (C.1–C.7) all certified + Rig A gates (C.8–C.10)
 **E2E**: NONE — no furnace/temporal domain in Python. All temporal enrichment, batching, parallel slot, and deadlock proofs are TS-only with mocked Sterling.
 
 ### What's done
@@ -557,6 +571,102 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 - [x] **C.6 — Golden-master snapshot**: `solver-golden-master.test.ts` furnace section + dedicated `furnace-golden-master.test.ts`. R3 canonical payload snapshot. R3 byte-equivalent payloads. R4 deterministic bundleHash.
 
 - [x] **C.7 — Transfer test**: `transfer-job-shop.test.ts` — generic job shop domain (welders, lathes) with slot occupancy semantics. P03TemporalAdapter + SolveBundle infrastructure. Zero Minecraft imports.
+
+- [x] **C.8 — Validation gate (Rig A hardening)**: `validateRules()` gate added to furnace solver before Sterling call. Invalid rules rejected fail-closed. 3 tests in `certification-rig-c.test.ts`.
+
+- [x] **C.9 — Trace hashing + explanations**: `computeTraceHash()` and `buildExplanation()` wired to all furnace solver return paths (success, error). `FurnaceSchedulingSolveResult.solveMeta` extended with `explanation?` field. 4 tests in `certification-rig-c.test.ts`.
+
+- [x] **C.10 — Certification suite**: `certification-rig-c.test.ts` — 24 tests covering: furnace rule validation, trace hash determinism, duration model integrity, deadlock prevention, batch preference, temporal state determinism, furnace solve explanations, smeltable items registry.
+
+---
+
+## Rig I: Epistemic planning (belief-state and active sensing)
+
+**Contract**: CONTRACT-CERTIFIED — P11 capsule + reference adapter + 2-domain fixtures + Minecraft epistemic module + 36 certification tests
+**E2E**: NONE — no epistemic planning domain in Python. All belief state, probe selection, and entropy tracking are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P11 capsule contract types (domain-agnostic) | `sterling/primitives/p11/p11-capsule-types.ts` | `P11BeliefStateV1`, `P11EpistemicAdapter`, `P11ProbeOperatorV1`, `P11HypothesisV1`; 5 invariants (discrete_buckets, bounded_hypotheses, discriminative_probe, confidence_gate, deterministic_update); `ProbBucket` discrete quantization; `toProbBucket()` |
+| Reference adapter (domain-agnostic) | `sterling/primitives/p11/p11-reference-adapter.ts` | `P11ReferenceAdapter` satisfying all 5 invariants. Shannon entropy, Bayesian update with normalization, information gain via simulated posteriors, deterministic tie-breaking |
+| Reference fixtures (2 domains) | `sterling/primitives/p11/p11-reference-fixtures.ts` | Structure localization domain (4 hypotheses + 4 probes) + fault diagnosis domain (4 hypotheses + 4 probes) for portability |
+| Minecraft hypothesis definitions | `epistemic/minecraft-hypotheses.ts` | `VILLAGE_HYPOTHESES`, `TEMPLE_HYPOTHESES`, `DIAMOND_DEPTH_HYPOTHESES` — domain-specific hypothesis sets |
+| Minecraft probe operators | `epistemic/minecraft-probes.ts` | `MINECRAFT_STRUCTURE_PROBES` (4), `MINECRAFT_MINING_PROBES` (3) — sensing actions with cost vectors |
+| Minecraft evidence extraction | `epistemic/minecraft-evidence.ts` | `makeBiomeEvidence()`, `makeMobMixEvidence()`, `makeVantageEvidence()`, `makeDepthCheckEvidence()`, etc. |
+| Certification test suite | `sterling/__tests__/certification-rig-i.test.ts` | 36 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **I.1 — P11 capsule types**: Domain-agnostic types for belief state, hypotheses, probes, evidence, confidence check, belief update. 5 invariants defined. `ProbBucket` type (11 discrete values: 0.0–1.0). `toProbBucket()` deterministic snapping. `MAX_HYPOTHESES = 32`. Capability descriptor with contract version `p11.v1`.
+
+- [x] **I.2 — Reference adapter**: `P11ReferenceAdapter` implements all `P11EpistemicAdapter` methods. `initializeBelief()` with uniform distribution + cap enforcement. `calculateEntropy()` (Shannon). `computeLikelihood()` feature-matching. `updateBelief()` with Bayesian normalization + `toProbBucket()`. `expectedInfoGain()` via simulated posteriors. `selectProbe()` with net score + lexicographic tie-break. `checkConfidence()` with deterministic best-hypothesis selection.
+
+- [x] **I.3 — Reference fixtures (2 domains)**: Structure localization domain (villages, 4 hypotheses, 4 probes, evidence factory). Fault diagnosis domain (component failures, 4 hypotheses, 4 probes, evidence factory). Proves P11 capsule portability across domains.
+
+- [x] **I.4 — Minecraft epistemic module**: `VILLAGE_HYPOTHESES` (5 hypotheses), `TEMPLE_HYPOTHESES` (4), `DIAMOND_DEPTH_HYPOTHESES` (3). `MINECRAFT_STRUCTURE_PROBES` (4 operators), `MINECRAFT_MINING_PROBES` (3 operators). Evidence extraction helpers for biome, mob mix, vantage, terrain, depth, ore.
+
+- [x] **I.5 — Certification suite**: `certification-rig-i.test.ts` — 36 tests covering: discrete probability buckets (Pivot 1, 5 tests), bounded hypothesis set (Pivot 2, 4 tests), discriminative probe selection (Pivot 3, 5 tests), confidence threshold gate (Pivot 4, 4 tests), deterministic belief update (Pivot 5, 3 tests), entropy reduction (4 tests), multi-domain portability (5 tests), Minecraft module integration (3 tests), P11 invariants registry (3 tests).
+
+---
+
+## Rig J: Invariant maintenance (receding-horizon control)
+
+**Contract**: CONTRACT-CERTIFIED — P12 capsule + reference adapter + 2-domain fixtures + Minecraft invariant module + 39 certification tests
+**E2E**: NONE — no invariant-maintenance domain in Python. All drift projection, horizon scheduling, and metric bucketing are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P12 capsule contract types (domain-agnostic) | `sterling/primitives/p12/p12-capsule-types.ts` | `P12InvariantVectorV1`, `P12InvariantAdapter`, `P12MetricSlotV1`, `P12MaintenanceOperatorV1`; 5 invariants (metric_buckets, deterministic_drift, hazard_exclusion, bounded_horizon, proactive_emission); `MetricBucket` discrete type; `toMetricBucket()` |
+| Reference adapter (domain-agnostic) | `sterling/primitives/p12/p12-reference-adapter.ts` | `P12ReferenceAdapter` satisfying all 5 invariants. Deterministic drift projection, violation projection with bounded horizon, operator application with clamping, proactive scheduling at 80% of warn time, deterministic tie-breaking |
+| Reference fixtures (2 domains) | `sterling/primitives/p12/p12-reference-fixtures.ts` | Minecraft survival domain (6 slots + 6 operators + 6 drift rates) + vehicle maintenance domain (4 slots + 4 operators + 4 drift rates) for portability |
+| Minecraft metric definitions | `invariant/minecraft-metrics.ts` | `MINECRAFT_METRIC_SLOTS` (6 slots: food, health, tool, light, threat, night), `MINECRAFT_DRIFT_RATES` (per-metric decay) |
+| Minecraft maintenance operators | `invariant/minecraft-operators.ts` | `MINECRAFT_MAINTENANCE_OPERATORS` (6 operators: eat, heal, repair, torches, retreat, shelter) |
+| Certification test suite | `sterling/__tests__/certification-rig-j.test.ts` | 39 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **J.1 — P12 capsule types**: Domain-agnostic types for invariant vector, metric slots, drift rates, violation projections, maintenance operators, scheduled maintenance, maintenance schedule. 5 invariants defined. `MetricBucket` type (5 integer buckets: 0–4). `toMetricBucket()` deterministic snapping. `MAX_HORIZON_TICKS = 600`. `NUM_BUCKETS = 5`. Capability descriptor with contract version `p12.v1`.
+
+- [x] **J.2 — Reference adapter**: `P12ReferenceAdapter` implements all `P12InvariantAdapter` methods. `initializeVector()` at full bucket. `toBucket()` with range-based conversion. `projectDrift()` with hazard exclusion and horizon bounding. `projectViolations()` with warn/critical threshold computation. `applyOperator()` with clamped restore. `scheduleMaintenance()` with proactive scheduling (80% of warn time), deterministic operator selection (lowest cost + lexicographic tie-break).
+
+- [x] **J.3 — Reference fixtures (2 domains)**: Minecraft survival domain (6 slots: food_level, health_level, tool_durability, light_coverage, threat_exposure, time_to_night; 6 operators; 6 drift rates). Vehicle maintenance domain (4 slots: fuel_level, oil_quality, tire_pressure, engine_temp; 4 operators; 4 drift rates). Proves P12 capsule portability across domains.
+
+- [x] **J.4 — Minecraft invariant module**: `MINECRAFT_METRIC_SLOTS` (6 metrics with ranges, thresholds, drift flags). `MINECRAFT_DRIFT_RATES` (per-metric decay; threat_exposure = 0 for external). `MINECRAFT_MAINTENANCE_OPERATORS` (6 restore actions with cost vectors).
+
+- [x] **J.5 — Certification suite**: `certification-rig-j.test.ts` — 39 tests covering: metric buckets (Pivot 1, 5 tests), deterministic drift (Pivot 2, 4 tests), hazard exclusion (Pivot 3, 4 tests), bounded horizon (Pivot 4, 4 tests), proactive emission (Pivot 5, 4 tests), operator application (4 tests), multi-domain portability (5 tests), Minecraft module integration (4 tests), P12 contract metadata (5 tests).
+
+---
+
+## Rig H: Systems synthesis (design-space search)
+
+**Contract**: CONTRACT-CERTIFIED — P08 capsule + reference adapter + 2-domain fixtures + Minecraft synthesis module + 37 certification tests
+**E2E**: NONE — no design-synthesis domain in Python. All design state, spec evaluation, motif extraction, and symmetry canonicalization are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P08 capsule contract types (domain-agnostic) | `sterling/primitives/p08/p08-capsule-types.ts` | `P08DesignStateV1`, `P08SynthesisAdapter`, `P08DesignOperatorV1`, `P08BehavioralSpecV1`, `P08MotifV1`; 5 invariants (deterministic_evaluation, bounded_design, symmetry_canonicalization, spec_predicate, bounded_motifs); `MAX_DESIGN_NODES = 100`; `MAX_MOTIFS = 50` |
+| Reference adapter (domain-agnostic) | `sterling/primitives/p08/p08-reference-adapter.ts` | `P08ReferenceAdapter` satisfying all 5 invariants. Grid-based design state, 90° rotation canonicalization via FNV-1a hash, deterministic spec evaluation, relative-coordinate motif extraction, bounded instantiation |
+| Reference fixtures (2 domains) | `sterling/primitives/p08/p08-reference-fixtures.ts` | Farm layout domain (4 operators + 2 specs) + circuit design domain (4 operators + 1 spec) for portability |
+| Minecraft farm specifications | `synthesis/minecraft-farm-spec.ts` | `MINECRAFT_FARM_OPERATORS` (4 operators), `MINECRAFT_FARM_SPECS` (3 specs: basic 9x9, compact 5x5, double farm) |
+| Certification test suite | `sterling/__tests__/certification-rig-h.test.ts` | 37 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **H.1 — P08 capsule types**: Domain-agnostic types for design state, grid cells, operators, behavioral specs, spec results, motifs. 5 invariants defined. `P08SynthesisAdapter` interface with 7 methods. `MAX_DESIGN_NODES = 100`. `MAX_MOTIFS = 50`. Capability descriptor with contract version `p08.v1`.
+
+- [x] **H.2 — Reference adapter**: `P08ReferenceAdapter` implements all methods. `createEmptyDesign()`. `applyOperator()` with footprint and node-count bounds. `evaluateSpec()` returning boolean predicate + violations + metrics. `hashDesign()` with 4-rotation canonicalization. `extractMotif()` with relative coordinates. `instantiateMotif()` with offset placement and bound enforcement.
+
+- [x] **H.3 — Reference fixtures (2 domains)**: Farm layout domain (water, farmland, torch, hopper operators; basic and small specs). Circuit design domain (source, wire, gate, output operators; basic circuit spec). Proves P08 capsule portability across design domains.
+
+- [x] **H.4 — Minecraft synthesis module**: `MINECRAFT_FARM_OPERATORS` (4 operators: water_source, farmland, torch, path). `MINECRAFT_FARM_SPECS` (3 specs: basic 9x9 with water+16 farmland+4 torches, compact 5x5, double-farm 9x18).
+
+- [x] **H.5 — Certification suite**: `certification-rig-h.test.ts` — 37 tests covering: deterministic evaluation (Pivot 1, 4 tests), bounded design (Pivot 2, 4 tests), symmetry canonicalization (Pivot 3, 4 tests), spec predicate (Pivot 4, 4 tests), bounded motifs (Pivot 5, 6 tests), multi-domain portability (5 tests), Minecraft module (3 tests), operator/design integration (3 tests), P08 contract metadata (4 tests).
 
 ---
 
@@ -739,9 +849,38 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 
 ---
 
-## Rigs H–N: Not started
+## Rig K: Irreversibility and commitment planning
 
-These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
+**Contract**: CONTRACT-CERTIFIED — P13 capsule + reference adapter + 2-domain fixtures + Minecraft commitment module + 36 certification tests
+**E2E**: NONE — no commitment/irreversibility domain in Python. All verification sequencing, commitment state, option value, and one-way constraints are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P13 capsule contract types (domain-agnostic) | `sterling/primitives/p13/p13-capsule-types.ts` | `P13IrreversibilityTagV1`, `P13CommitmentAdapter`, `P13VerificationStateV1`, `P13CommitmentStateV1`, `P13CommitmentCostV1`; 5 invariants (explicit_reversibility, verify_before_commit, deterministic_verification, bounded_option_value, monotonic_commitment); `OPTION_VALUE_MAX = 10`; `DEFAULT_CONFIDENCE_THRESHOLD = 0.8` |
+| Reference adapter (domain-agnostic) | `sterling/primitives/p13/p13-reference-adapter.ts` | `P13ReferenceAdapter` satisfying all 5 invariants. Confidence accumulation clamped to [0,1], commit checking (blocked + threshold), monotonic commitment state, bounded option value, commitment cost breakdown |
+| Reference fixtures (2 domains) | `sterling/primitives/p13/p13-reference-fixtures.ts` | Villager trading domain (5 tags + 3 verifications + 3 constraints) + deployment pipeline domain (5 tags + 3 verifications + 3 constraints) for portability |
+| Minecraft commitment definitions | `commitment/minecraft-commitment.ts` | `MINECRAFT_IRREVERSIBILITY_TAGS` (6 tags), `MINECRAFT_VERIFICATIONS` (3 operators), `MINECRAFT_COMMITMENT_CONSTRAINTS` (4 constraints) |
+| Certification test suite | `sterling/__tests__/certification-rig-k.test.ts` | 36 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **K.1 — P13 capsule types**: Domain-agnostic types for irreversibility tags, verification operators, verification state, commitment state, commitment constraints, option value state, commit check results, commitment cost breakdown. 5 invariants defined. `P13CommitmentAdapter` interface with 9 methods. `OPTION_VALUE_MAX = 10`. `DEFAULT_CONFIDENCE_THRESHOLD = 0.8`. Capability descriptor with contract version `p13.v1`.
+
+- [x] **K.2 — Reference adapter**: `P13ReferenceAdapter` implements all methods. `initializeVerification()` / `initializeCommitment()` / `initializeOptionValue()`. `applyVerification()` with confidence accumulation clamped to [0,1]. `canCommit()` checking blocked, already-committed, and confidence threshold. `executeCommitment()` monotonic (adds to committed set, never removes). `calculateOptionValue()` bounded to OPTION_VALUE_MAX. `calculateCommitmentCost()` returns baseCost + commitmentPenalty + optionValueLoss breakdown.
+
+- [x] **K.3 — Reference fixtures (2 domains)**: Villager trading domain (pick_up, place_workstation, lock_trade, level_up, break_workstation tags; inspect_trade_offers, check_emerald_cost, preview_next_level verifications; lock_trade, level_up, break_workstation constraints). Deployment pipeline domain (write_code, merge_branch, deploy_to_prod, apply_migration, cut_release tags; run_tests, canary_deploy, review_migration verifications; deploy_to_prod, apply_migration, cut_release constraints). Proves P13 capsule portability across commitment domains.
+
+- [x] **K.4 — Minecraft commitment module**: `MINECRAFT_IRREVERSIBILITY_TAGS` (6 tags: pick_up fully_reversible, place_block costly_reversible, lock_trade/level_up/consume_totem/break_workstation irreversible). `MINECRAFT_VERIFICATIONS` (3: inspect_trade_offers, check_emerald_cost, preview_next_level). `MINECRAFT_COMMITMENT_CONSTRAINTS` (4: lock_trade@0.8, level_up@0.7, break_workstation@0.5, consume_totem@0.9).
+
+- [x] **K.5 — Certification suite**: `certification-rig-k.test.ts` — 36 tests covering: explicit reversibility (Pivot 1, 4 tests), verify before commit (Pivot 2, 5 tests), deterministic verification (Pivot 3, 4 tests), bounded option value (Pivot 4, 4 tests), monotonic commitment (Pivot 5, 4 tests), multi-domain portability (4 tests), Minecraft module (3 tests), commitment cost integration (4 tests), P13 contract metadata (4 tests).
+
+---
+
+## Rigs L–N: Not started
+
+These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Later (L–N) priority ordering.
 
 ### Post-certification order (remaining rigs):
 
@@ -758,10 +897,10 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 2. **Rig F** — Valuation under scarcity (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
    - Requires contract: D
    - Requires E2E: D `{mine}` if delegating acquisition
-3. **Rig H** — Systems synthesis (farm layout first)
-4. **Rig I** — Epistemic planning (structure localization)
-5. **Rig J** — Invariant maintenance (base upkeep loops)
-6. **Rig K** — Irreversibility (villager trades)
+3. **Rig H** — Systems synthesis (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
+4. **Rig I** — Epistemic planning (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
+5. **Rig J** — Invariant maintenance (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
+6. **Rig K** — Irreversibility (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
 
 ### Later (requires A–K contract-certified):
 7. **Rig L** — Contingency planning (nightfall/hunger)

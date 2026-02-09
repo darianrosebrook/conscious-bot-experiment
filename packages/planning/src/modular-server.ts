@@ -215,6 +215,9 @@ import {
   type BuildTaskInput,
 } from './task-integration/build-task-from-requirement';
 import { isDeterministicFailure } from './server/task-action-resolver';
+import { HungerDriveshaftController } from './goal-formulation/hunger-driveshaft-controller';
+import { RecordingLifecycleEmitter } from './goal-formulation/reflex-lifecycle-events';
+import { translateBotState } from './goal-formulation/bot-state-translator';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -225,6 +228,9 @@ declare global {
   var lastMcpBotWarnLog: number | undefined;
   var lastConvertedStateLog: number | undefined;
   var lastStateLog: number | undefined;
+  /** Hunger driveshaft controller instance (gated by ENABLE_AUTONOMY_REFLEXES) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var hungerDriveshaft: any;
 }
 
 // Import existing components
@@ -1797,6 +1803,63 @@ async function autonomousTaskExecutor() {
       circuitBreakerOpen
     );
 
+    // Critical hunger preemption: evaluate BEFORE the idle gate so that
+    // critically low food can inject a task even when the executor has
+    // eligible tasks in the backlog. The controller's isCritical() check
+    // determines whether this is a true emergency (food <= criticalThreshold).
+    if (global.hungerDriveshaft && idleReason === null) {
+      try {
+        const preemptBotState = await getBotState().catch(() => null);
+        if (
+          preemptBotState &&
+          preemptBotState.food !== undefined &&
+          global.hungerDriveshaft.isCritical({
+            food: preemptBotState.food,
+            inventory: preemptBotState.inventory ?? [],
+          })
+        ) {
+          const executorMode = process.env.EXECUTOR_MODE || 'shadow';
+          const isDryRun = executorMode !== 'live';
+          const reflexResult = await global.hungerDriveshaft.evaluate(
+            {
+              food: preemptBotState.food,
+              inventory: preemptBotState.inventory ?? [],
+            },
+            'no_tasks', // Critical preemption bypasses idle reason
+            { dryRun: isDryRun }
+          );
+          if (reflexResult) {
+            if (!isDryRun) {
+              const reflexTask = await taskIntegration.addTask({
+                ...reflexResult.taskData,
+                metadata: {
+                  taskProvenance: {
+                    builder: 'hunger-driveshaft-controller',
+                    source: 'reflex',
+                    goalKey: reflexResult.goalKey,
+                    reflexInstanceId: reflexResult.reflexInstanceId,
+                  },
+                  goalKey: reflexResult.goalKey,
+                  reflexInstanceId: reflexResult.reflexInstanceId,
+                },
+              });
+              console.log(
+                `[Reflex:CRITICAL] Hunger preemption injected task: ${reflexTask?.id ?? 'unknown'} ` +
+                  `(food=${preemptBotState.food}, reflexId=${reflexResult.reflexInstanceId.slice(0, 8)})`
+              );
+            } else {
+              console.log(
+                `[Reflex:shadow:CRITICAL] Would preempt (food=${preemptBotState.food}, reflexId=${reflexResult.reflexInstanceId.slice(0, 8)})`
+              );
+            }
+          }
+        }
+      } catch (error) {
+        // Fail-closed: preemption failure must never break the executor cycle
+        console.warn('[Reflex] Critical hunger preemption failed:', error);
+      }
+    }
+
     if (idleReason !== null) {
       // Only log once per minute to avoid spam
       if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
@@ -1865,6 +1928,65 @@ async function autonomousTaskExecutor() {
           }
         } catch (error) {
           console.error('[AUTONOMOUS EXECUTOR] Keep-alive tick failed:', error);
+        }
+      }
+
+      // Hunger driveshaft: evaluate reflex on idle (gated by ENABLE_AUTONOMY_REFLEXES)
+      // The controller handles hysteresis, thresholds, and the full goal-formulation
+      // pipeline internally. We only wire the integration seam here.
+      // NOTE: Critical preemption is handled BEFORE the idle gate (above).
+      if (global.hungerDriveshaft) {
+        try {
+          const driveshaftBotState = await getBotState().catch(() => null);
+          if (driveshaftBotState && driveshaftBotState.food !== undefined) {
+            // Translate bot state to homeostasis vector for debug observability.
+            if (process.env.DEBUG_HOMEOSTASIS === 'true') {
+              const homeostasisSignals = translateBotState(driveshaftBotState);
+              console.log(
+                `[Reflex:debug] Homeostasis vector:`,
+                JSON.stringify(homeostasisSignals)
+              );
+            }
+
+            const executorMode = process.env.EXECUTOR_MODE || 'shadow';
+            const isDryRun = executorMode !== 'live';
+            const reflexResult = await global.hungerDriveshaft.evaluate(
+              {
+                food: driveshaftBotState.food,
+                inventory: driveshaftBotState.inventory ?? [],
+              },
+              idleReason,
+              { dryRun: isDryRun }
+            );
+            if (reflexResult) {
+              if (!isDryRun) {
+                const reflexTask = await taskIntegration.addTask({
+                  ...reflexResult.taskData,
+                  metadata: {
+                    taskProvenance: {
+                      builder: 'hunger-driveshaft-controller',
+                      source: 'reflex',
+                      goalKey: reflexResult.goalKey,
+                      reflexInstanceId: reflexResult.reflexInstanceId,
+                    },
+                    goalKey: reflexResult.goalKey,
+                    reflexInstanceId: reflexResult.reflexInstanceId,
+                  },
+                });
+                console.log(
+                  `[Reflex] Hunger driveshaft injected task: ${reflexTask?.id ?? 'unknown'} ` +
+                    `(reflexId=${reflexResult.reflexInstanceId.slice(0, 8)}, food=${driveshaftBotState.food})`
+                );
+              } else {
+                console.log(
+                  `[Reflex:shadow] Would inject task (reflexId=${reflexResult.reflexInstanceId.slice(0, 8)}, food=${driveshaftBotState.food})`
+                );
+              }
+            }
+          }
+        } catch (error) {
+          // Fail-closed: never break existing idle behavior
+          console.warn('[Reflex] Hunger driveshaft evaluation failed:', error);
         }
       }
 
@@ -3261,6 +3383,66 @@ taskIntegration.on(
   }
 );
 
+// Hunger driveshaft: assemble proof bundle on task completion.
+// This is the event-driven join — the task carries reflexInstanceId,
+// which is used to look up the per-emission accumulator.
+// Observational only: never affects task completion semantics.
+taskIntegration.on(
+  'taskLifecycleEvent',
+  async (event: { type: string; taskId: string; task?: any; reason?: string }) => {
+    if (!global.hungerDriveshaft) return;
+    if (event.type !== 'completed' && event.type !== 'failed') return;
+
+    const task = event.task;
+    if (!task?.metadata?.taskProvenance) return;
+    if (task.metadata.taskProvenance.builder !== 'hunger-driveshaft-controller') return;
+
+    // Use reflexInstanceId (per-emission UUID) as the join key, not goalKey.
+    // This avoids the conflation bug where content-addressed goalKey could
+    // match the wrong accumulator on retries or duplicate injections.
+    const reflexInstanceId = task.metadata.reflexInstanceId as string | undefined;
+    if (!reflexInstanceId) return;
+
+    try {
+      const accumulator = global.hungerDriveshaft.getAccumulator(reflexInstanceId);
+      if (!accumulator) {
+        console.warn(
+          `[Reflex] No accumulator found for reflexId=${reflexInstanceId.slice(0, 8)} — TTL evicted or duplicate completion`
+        );
+        return;
+      }
+
+      // Fetch post-execution state for verification
+      const afterState = await getBotState().catch(() => null);
+
+      const bundle = global.hungerDriveshaft.buildProofBundle(accumulator, {
+        result: event.type === 'completed' ? 'ok' : 'error',
+        receipt: task.metadata?.executionReceipt ?? {},
+        taskId: event.taskId,
+      }, {
+        food_after: afterState?.food ?? -1,
+        inventory_after: afterState?.inventory ?? [],
+      });
+
+      // Record to golden run if active
+      const recorder = getGoldenRunRecorder();
+      const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
+      if (goldenRunId) {
+        recorder.recordReflexProof(goldenRunId, bundle);
+      }
+
+      console.log(
+        `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
+          `result=${bundle.identity.execution.result}, ` +
+          `verified=${bundle.identity.verification.delta > 0}`
+      );
+    } catch (error) {
+      // Proof assembly failure must never affect task completion
+      console.warn('[Reflex] Failed to assemble proof bundle:', error);
+    }
+  }
+);
+
 // Expose world state manager data for world server
 serverConfig.addEndpoint('get', '/world-state', (req, res) => {
   try {
@@ -3288,6 +3470,28 @@ serverConfig.addEndpoint('get', '/keep-alive/status', (_req, res) => {
     initialized: true,
     active: integration.isActive(),
     state,
+  });
+});
+
+// Hunger driveshaft diagnostics endpoint
+serverConfig.addEndpoint('get', '/reflexes/hunger/status', (_req, res) => {
+  const driveshaft = global.hungerDriveshaft;
+  if (!driveshaft) {
+    res.json({
+      initialized: false,
+      reason: 'ENABLE_AUTONOMY_REFLEXES not set or initialization failed',
+    });
+    return;
+  }
+  res.json({
+    initialized: true,
+    armed: driveshaft.isArmed(),
+    config: {
+      triggerThreshold: Number(process.env.HUNGER_TRIGGER_THRESHOLD || 12),
+      resetThreshold: Number(process.env.HUNGER_RESET_THRESHOLD || 16),
+      criticalThreshold: Number(process.env.HUNGER_CRITICAL_THRESHOLD || 5),
+    },
+    executorMode: process.env.EXECUTOR_MODE || 'shadow',
   });
 });
 
@@ -3740,6 +3944,22 @@ async function startServer() {
       console.log('[Planning] Keep-alive integration initialized');
     } catch (error) {
       console.warn('⚠️ Failed to initialize keep-alive integration:', error);
+    }
+
+    // Initialize hunger driveshaft controller (gated by ENABLE_AUTONOMY_REFLEXES)
+    if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {
+      try {
+        const reflexEmitter = new RecordingLifecycleEmitter();
+        global.hungerDriveshaft = new HungerDriveshaftController({
+          triggerThreshold: Number(process.env.HUNGER_TRIGGER_THRESHOLD || 12),
+          resetThreshold: Number(process.env.HUNGER_RESET_THRESHOLD || 16),
+          criticalThreshold: Number(process.env.HUNGER_CRITICAL_THRESHOLD || 5),
+          emitter: reflexEmitter,
+        });
+        console.log('[Planning] Hunger driveshaft controller initialized');
+      } catch (error) {
+        console.warn('[Planning] Failed to initialize hunger driveshaft:', error);
+      }
     }
 
     // Initialize Sterling reasoning service (optional external dependency)

@@ -25,9 +25,12 @@ import {
   buildDefaultRationaleContext,
   parseSterlingIdentity,
   attachSterlingIdentity,
+  computeTraceHash,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 import { extractSolveJoinKeys } from './episode-classification';
+import { validateRules } from '../validation/rule-validator';
+import { buildExplanation } from '../audit/explanation-builder';
 
 import type { TaskStep } from '../types/task-step';
 
@@ -159,6 +162,19 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       };
     }
 
+    // 1a. Rig A validation gate — fail-closed before Sterling
+    const validation = validateRules(rules);
+    if (!validation.valid) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        error: `Rule validation failed: ${validation.error}`,
+        validationErrors: validation.details,
+      };
+    }
+
     // 2. Convert inventory to record format
     const inventory = inventoryToRecord(currentInventory);
 
@@ -238,6 +254,10 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         searchHealth: parseSearchHealth(result.metrics),
         ...rationaleCtx,
       });
+      // Rig A: trace hash + explanation
+      bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
+      const explanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
+
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
       attachSterlingIdentity(solveBundle, sterlingIdentity);
 
@@ -248,7 +268,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         durationMs: result.durationMs,
         error: result.error || 'No solution found',
         planId,
-        solveMeta: { bundles: [solveBundle] },
+        solveMeta: { bundles: [solveBundle], explanation },
         solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       };
     }
@@ -265,6 +285,10 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       searchHealth: parseSearchHealth(result.metrics),
       ...rationaleCtx,
     });
+    // Rig A: trace hash + explanation
+    bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
+    const explanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
+
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
     attachSterlingIdentity(solveBundle, sterlingIdentity);
 
@@ -283,7 +307,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         totalNodes: result.discoveredNodes.length,
         durationMs: result.durationMs,
         planId,
-        solveMeta: { bundles: [solveBundle] },
+        solveMeta: { bundles: [solveBundle], explanation },
         solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
         mappingDegraded: true,
         noActionLabelEdges: mapping.noLabelEdges,
@@ -301,7 +325,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       totalNodes: result.discoveredNodes.length,
       durationMs: result.durationMs,
       planId,
-      solveMeta: { bundles: [solveBundle] },
+      solveMeta: { bundles: [solveBundle], explanation },
       solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       mappingDegraded: mapping?.degraded,
       noActionLabelEdges: mapping?.noLabelEdges,

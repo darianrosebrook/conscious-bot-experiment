@@ -74,6 +74,18 @@ export interface SolveBundleOutput {
   rationale?: SolveRationale;
   /** Opaque Sterling-provided identities. NOT included in bundleHash. */
   sterlingIdentity?: SterlingIdentity;
+  /**
+   * Content-addressed trace hash proving determinism (Rig A, P1).
+   *
+   * Computed from only deterministic fields: input hashes (definitionHash,
+   * initialStateHash, goalHash) + output signals (solved, stepsDigest).
+   * Excludes non-deterministic fields: timestamp, planId, checkedAt,
+   * durationMs, totalNodes (can vary with server load).
+   *
+   * Same request (inventory, goal, rules) + same Sterling version →
+   * identical traceHash across runs.
+   */
+  traceHash?: ContentHash;
 }
 
 /** Content-addressed audit trail for a single solve round-trip */

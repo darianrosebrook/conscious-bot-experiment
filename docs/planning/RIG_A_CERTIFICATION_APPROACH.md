@@ -1,6 +1,6 @@
 # Rig A: Certification Hardening — Companion Approach
 
-**Implementation**: Partial — crafting solver baseline exists, certification hardening not yet applied
+**Implementation**: Complete (2026-02-09) — validation gate, trace hashing, credit manager, explanation builder all implemented and wired into crafting solver. 23 certification tests passing.
 
 This companion document distills the implementation plan with explicit design decisions, boundaries, code references, and implementation construction constraints. Read alongside `RIG_A_CERTIFICATION_PLAN.md`.
 

@@ -249,6 +249,12 @@ export interface ToolProgressionSolveResult extends BaseSolveResult {
   totalNodes: number;
   durationMs: number;
   error?: string;
+  /** Observability metadata — does not affect solve behavior */
+  solveMeta?: {
+    bundles: import('./solve-bundle-types').SolveBundle[];
+    /** Rig A audit-grade explanation (P1 certification) */
+    explanation?: import('../audit/explanation-builder').SolveExplanation;
+  };
   /** Target tier the bot was trying to reach */
   targetTier?: ToolTier;
   /** Bot's tier at solve time */

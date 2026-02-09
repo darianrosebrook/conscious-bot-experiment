@@ -2,8 +2,8 @@
 
 **Primitive**: P13 — Irreversibility and commitment planning
 
-**Status**: ENRICHED (2026-01-31)
-**Implementation**: Not started — spec only
+**Status**: HARDENING-COMPLETE (2026-02-09)
+**Implementation**: CONTRACT-CERTIFIED — P13 capsule types, reference adapter, 2-domain fixtures, Minecraft commitment module, 36 certification tests. All 5 pivots proven.
 
 ---
 

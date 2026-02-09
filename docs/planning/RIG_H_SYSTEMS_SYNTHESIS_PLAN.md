@@ -2,8 +2,8 @@
 
 **Primitive**: P8 — Systems synthesis (compose components to satisfy a behavioral spec)
 
-**Status**: ENRICHED (2026-01-31)
-**Implementation**: Not started — spec only
+**Status**: HARDENING-COMPLETE (2026-02-09)
+**Implementation**: CONTRACT-CERTIFIED — P08 capsule types, reference adapter, 2-domain fixtures, Minecraft synthesis module, 37 certification tests. All 5 pivots proven.
 
 ---
 

@@ -133,7 +133,11 @@ export interface FurnaceSchedulingSolveResult {
   /** Sterling planId for episode reporting. */
   planId?: string | null;
   /** Observability metadata — does not affect solve behavior. */
-  solveMeta?: { bundles: SolveBundle[] };
+  solveMeta?: {
+    bundles: SolveBundle[];
+    /** Rig A audit-grade explanation (P1 certification) */
+    explanation?: import('../audit/explanation-builder').SolveExplanation;
+  };
   /** Total makespan in buckets (if temporal scheduling). */
   makespanBuckets?: number;
   /** Whether batch operators were used. */

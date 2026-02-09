@@ -125,7 +125,7 @@ Rigs are grouped as “minimal proving suites.” Each rig targets one or more p
 
 ### Rig A: Inventory transformation planning
 Proves primitives: Deterministic transformation planning (1), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
-Status: CONTRACT-CERTIFIED | E2E-PROVEN `{crafting}`. See [tracker](./sterling-capability-tracker.md) for evidence.
+Status: CONTRACT-CERTIFIED | HARDENING-COMPLETE | E2E-PROVEN `{crafting}`. Certification hardening (A.7-A.11) implemented: fail-closed validation gate, deterministic trace hashing, execution-based credit, audit explanations. 23 certification tests. See [tracker](./sterling-capability-tracker.md) for evidence.
 
 ### Rig B: Capability gating and legality
 Proves primitives: Capability gating and legality (2), Representation invariance and state canonicalization (16), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
@@ -247,7 +247,7 @@ Re-run the same primitive with a non-Minecraft surface representation (e.g., “
 H) Footguns avoided
 State explosion via unbounded counts; learning on planned success; untrusted rule injection; implicit station semantics.
 
-Status: CONTRACT-CERTIFIED | E2E-PROVEN `{crafting}`. All certification items complete. See [tracker](./sterling-capability-tracker.md#rig-a-inventory-transformation-planning) for evidence.
+Status: CONTRACT-CERTIFIED | HARDENING-COMPLETE | E2E-PROVEN `{crafting}`. All certification items complete (A.1-A.11). Hardening (A.7-A.11) adds: fail-closed validation gate (`rule-validator.ts`), deterministic trace hashing (`computeTraceHash`), execution-based credit (`CreditManager`), audit explanations (`explanation-builder.ts`). 23 certification tests. See [tracker](./sterling-capability-tracker.md#rig-a-inventory-transformation-planning) for evidence.
 
 ---
 

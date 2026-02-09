@@ -2,8 +2,8 @@
 
 **Primitive**: P11 — Epistemic planning (belief-state and active sensing)
 
-**Status**: ENRICHED (2025-01-31)
-**Implementation**: Partial — P21/Rig I-ext evidence capsule types exist in `planning/sterling/primitives/p21/`
+**Status**: HARDENING-COMPLETE (2026-02-09)
+**Implementation**: CONTRACT-CERTIFIED — P11 capsule types, reference adapter, 2-domain fixtures, Minecraft epistemic module, 36 certification tests. All 5 pivots proven.
 
 ---
 

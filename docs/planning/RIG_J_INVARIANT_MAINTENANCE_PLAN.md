@@ -2,8 +2,8 @@
 
 **Primitive**: P12 — Invariant maintenance (non-terminal goals; control-by-receding-horizon)
 
-**Status**: ENRICHED (2025-01-31)
-**Implementation**: Partial — goal-hold-manager, periodic-review, preemption-budget exist in `planning/goals/`
+**Status**: HARDENING-COMPLETE (2026-02-09)
+**Implementation**: CONTRACT-CERTIFIED — P12 capsule types, reference adapter, 2-domain fixtures, Minecraft invariant module, 39 certification tests. All 5 pivots proven.
 
 ---
 

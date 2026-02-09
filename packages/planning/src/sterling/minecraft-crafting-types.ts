@@ -105,7 +105,11 @@ export interface MinecraftCraftingSolveResult {
   /** Sterling planId for episode reporting — store in task metadata, not on solver */
   planId?: string | null;
   /** Observability metadata — does not affect solve behavior */
-  solveMeta?: { bundles: import('./solve-bundle-types').SolveBundle[] };
+  solveMeta?: {
+    bundles: import('./solve-bundle-types').SolveBundle[];
+    /** Rig A audit-grade explanation (P1 certification) */
+    explanation?: import('../audit/explanation-builder').SolveExplanation;
+  };
   /** True when step mapping encountered edges that could not be mapped to rules. */
   mappingDegraded?: boolean;
   /** Number of solution path edges with no action label from either source. */
@@ -116,4 +120,6 @@ export interface MinecraftCraftingSolveResult {
   searchEdgeCollisions?: number;
   /** Solve-time join keys for deferred episode reporting */
   solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
+  /** Rig A: validation errors when rules fail certification (Sterling never called) */
+  validationErrors?: import('../validation/rule-validator').ValidationError[];
 }

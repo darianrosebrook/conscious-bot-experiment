@@ -40,9 +40,12 @@ import {
 import type { SolveBundle } from './solve-bundle-types';
 import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { lintRules } from './compat-linter';
+import { validateRules } from '../validation/rule-validator';
+import { buildExplanation } from '../audit/explanation-builder';
 import {
   computeBundleInput,
   computeBundleOutput,
+  computeTraceHash,
   createSolveBundle,
   buildDefaultRationaleContext,
   parseSterlingIdentity,
@@ -181,6 +184,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     let totalNoLabelEdges = 0;
     let totalUnmatchedRuleEdges = 0;
     let totalSearchEdgeCollisions = 0;
+    let lastExplanation: ReturnType<typeof buildExplanation> | undefined;
 
     for (let i = startIdx; i <= endIdx; i++) {
       const tierGoal = TOOL_TIERS[i];
@@ -221,6 +225,26 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           totalNodes,
           durationMs: totalDurationMs,
           error: `No rules generated for ${tierToolName}`,
+          targetTier,
+          currentTier,
+          targetTool,
+          planId: lastPlanId,
+          solveMeta: tierBundles.length > 0 ? { bundles: tierBundles } : undefined,
+          solveJoinKeys: lastPlanId && tierBundles.length > 0
+            ? extractSolveJoinKeys(tierBundles[0], lastPlanId)
+            : undefined,
+        };
+      }
+
+      // Rig A+B validation gate — fail-closed before Sterling
+      const validation = validateRules(rules, { checkCapabilityConsistency: true });
+      if (!validation.valid) {
+        return {
+          solved: false,
+          steps: allSteps,
+          totalNodes,
+          durationMs: totalDurationMs,
+          error: `Rule validation failed for ${tierToolName}: ${validation.error}`,
           targetTier,
           currentTier,
           targetTool,
@@ -304,6 +328,8 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           searchHealth: parseSearchHealth(result.metrics),
           ...rationaleCtx,
         });
+        bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
+        const failExplanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
         const failBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
         attachSterlingIdentity(failBundle, sterlingIdentity);
         tierBundles.push(failBundle);
@@ -318,7 +344,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           currentTier,
           targetTool,
           planId: lastPlanId,
-          solveMeta: { bundles: tierBundles },
+          solveMeta: { bundles: tierBundles, explanation: failExplanation },
           solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
         };
       }
@@ -343,9 +369,13 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         searchHealth: parseSearchHealth(result.metrics),
         ...rationaleCtx,
       });
+      bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
       const tierBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
       attachSterlingIdentity(tierBundle, sterlingIdentity);
       tierBundles.push(tierBundle);
+
+      // Build explanation for the last tier (carried to final return)
+      lastExplanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
 
       // Update running state for next tier
       runningTier = tierGoal;
@@ -373,7 +403,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         currentTier,
         targetTool,
         planId: lastPlanId,
-        solveMeta: { bundles: tierBundles },
+        solveMeta: { bundles: tierBundles, explanation: lastExplanation },
         solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
         mappingDegraded: true,
         noActionLabelEdges: totalNoLabelEdges,
@@ -394,7 +424,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       currentTier,
       targetTool,
       planId: lastPlanId,
-      solveMeta: { bundles: tierBundles },
+      solveMeta: { bundles: tierBundles, explanation: lastExplanation },
       solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
       ...(anyDegraded ? {
         mappingDegraded: true,

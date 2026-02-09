@@ -112,16 +112,48 @@ export enum EffectType {
 // Homeostasis Types
 // =========================================================================
 
+/**
+ * Normalized agent state for goal formulation.
+ *
+ * ┌────────────────────────────────────────────────────────────────────┐
+ * │  POLARITY CONTRACT (must be followed by all translators)          │
+ * │                                                                    │
+ * │  All values are 0-1. Polarity is PER-FIELD, not uniform:          │
+ * │                                                                    │
+ * │  SATISFACTION fields (1 = good, 0 = deprived):                    │
+ * │    health, energy, safety, shelterStability, farmHealth,          │
+ * │    environmentalComfort, defensiveReadiness                        │
+ * │    → Need urgency = 1 - field (need-generator.ts inverts these)   │
+ * │                                                                    │
+ * │  DEFICIT/DRIVE fields (1 = urgent, 0 = satisfied):                │
+ * │    hunger, curiosity, social, achievement, creativity,            │
+ * │    resourceManagement, inventoryOrganization, worldKnowledge,     │
+ * │    redstoneProficiency, constructionSkill, mechanicalAptitude,    │
+ * │    agriculturalKnowledge                                           │
+ * │    → Need urgency = field (need-generator.ts uses directly)       │
+ * │                                                                    │
+ * │  When adding new fields, document which polarity they use.        │
+ * │  bot-state-translator.ts must match these conventions exactly.     │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
 export interface HomeostasisState {
+  /** 0 = dead, 1 = full health (SATISFACTION) */
   health: number;
+  /** 0 = not hungry, 1 = starving (DEFICIT) */
   hunger: number;
+  /** 0 = exhausted, 1 = full energy (SATISFACTION) */
   energy: number;
+  /** 0 = in danger, 1 = completely safe (SATISFACTION) */
   safety: number;
+  /** 0 = not curious, 1 = highly curious (DEFICIT/DRIVE) */
   curiosity: number;
+  /** 0 = socially satisfied, 1 = isolated (DEFICIT/DRIVE) */
   social: number;
+  /** 0 = no drive, 1 = strong drive (DEFICIT/DRIVE) */
   achievement: number;
+  /** 0 = no drive, 1 = strong drive (DEFICIT/DRIVE) */
   creativity: number;
-  // New homeostasis states for primitive operations
+  // Primitive operation states
   resourceManagement: number;
   shelterStability: number;
   farmHealth: number;

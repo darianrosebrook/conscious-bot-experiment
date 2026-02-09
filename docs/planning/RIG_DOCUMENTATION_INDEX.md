@@ -42,23 +42,23 @@ Each rig must explicitly address six questions to keep implementations aligned:
 
 ## Documentation status
 
-| Rig | Primitive(s) | Status | Plan | Companion |
-|-----|--------------|--------|------|-----------|
-| **Rig A** | P1 (Deterministic transformation) | Detailed | `RIG_A_CERTIFICATION_PLAN.md` | `RIG_A_CERTIFICATION_APPROACH.md` |
-| **Rig B** | P2 (Capability gating) | Detailed | `RIG_B_CAPABILITY_GATING_PLAN.md` | `RIG_B_CAPABILITY_GATING_APPROACH.md` |
-| **Rig C** | P3 (Temporal planning) | Detailed | `RIG_C_TEMPORAL_PLANNING_PLAN.md` | `RIG_C_TEMPORAL_PLANNING_APPROACH.md` |
-| **Rig D** | P4 (Multi-strategy) | Detailed | `RIG_D_MULTI_STRATEGY_PLAN.md` | `RIG_D_MULTI_STRATEGY_APPROACH.md` |
-| **Rig E** | P5 (Hierarchical) | Detailed | `RIG_E_HIERARCHICAL_PLANNING_PLAN.md` | `RIG_E_HIERARCHICAL_PLANNING_APPROACH.md` |
-| **Rig F** | P6 (Valuation under scarcity) | Detailed | `RIG_F_VALUATION_SCARCITY_PLAN.md` | `RIG_F_VALUATION_SCARCITY_APPROACH.md` |
-| **Rig G** | P7 (Partial-order) | Detailed | `RIG_G_PARTIAL_ORDER_PLAN.md` | `RIG_G_PARTIAL_ORDER_APPROACH.md` |
-| **Rig H** | P8 (Systems synthesis) | Detailed | `RIG_H_SYSTEMS_SYNTHESIS_PLAN.md` | `RIG_H_SYSTEMS_SYNTHESIS_APPROACH.md` |
-| **Rig I** | P11 (Epistemic planning) | Detailed | `RIG_I_EPISTEMIC_PLANNING_PLAN.md` | `RIG_I_EPISTEMIC_PLANNING_APPROACH.md` |
-| **Rig I-ext** | P21 (Entity belief + saliency) | Detailed (priority) | `P21_RIG_I_EXT_IMPLEMENTATION_PLAN.md` | `P21_RIG_I_EXT_COMPANION_APPROACH.md` |
-| **Rig J** | P12 (Invariant maintenance) | Detailed | `RIG_J_INVARIANT_MAINTENANCE_PLAN.md` | `RIG_J_INVARIANT_MAINTENANCE_APPROACH.md` |
-| **Rig K** | P13 (Irreversibility) | Detailed | `RIG_K_IRREVERSIBILITY_PLAN.md` | `RIG_K_IRREVERSIBILITY_APPROACH.md` |
-| Rig L | P9 (Contingency) | Later | — | — |
-| Rig M | P10 (Risk-aware) | Later | — | — |
-| Rig N | P15 (Fault diagnosis) | Later | — | — |
+| Rig | Primitive(s) | Status | Plan | Companion | Implementation |
+|-----|--------------|--------|------|-----------|----------------|
+| **Rig A** | P1 (Deterministic transformation) | Detailed | `RIG_A_CERTIFICATION_PLAN.md` | `RIG_A_CERTIFICATION_APPROACH.md` | **Implemented** (2026-02-09) |
+| **Rig B** | P2 (Capability gating) | Detailed | `RIG_B_CAPABILITY_GATING_PLAN.md` | `RIG_B_CAPABILITY_GATING_APPROACH.md` | **Hardened** (2026-02-09) |
+| **Rig C** | P3 (Temporal planning) | Detailed | `RIG_C_TEMPORAL_PLANNING_PLAN.md` | `RIG_C_TEMPORAL_PLANNING_APPROACH.md` | **Hardened** (2026-02-09) |
+| **Rig D** | P4 (Multi-strategy) | Detailed | `RIG_D_MULTI_STRATEGY_PLAN.md` | `RIG_D_MULTI_STRATEGY_APPROACH.md` | — |
+| **Rig E** | P5 (Hierarchical) | Detailed | `RIG_E_HIERARCHICAL_PLANNING_PLAN.md` | `RIG_E_HIERARCHICAL_PLANNING_APPROACH.md` | — |
+| **Rig F** | P6 (Valuation under scarcity) | Detailed | `RIG_F_VALUATION_SCARCITY_PLAN.md` | `RIG_F_VALUATION_SCARCITY_APPROACH.md` | — |
+| **Rig G** | P7 (Partial-order) | Detailed | `RIG_G_PARTIAL_ORDER_PLAN.md` | `RIG_G_PARTIAL_ORDER_APPROACH.md` | — |
+| **Rig H** | P8 (Systems synthesis) | Detailed | `RIG_H_SYSTEMS_SYNTHESIS_PLAN.md` | `RIG_H_SYSTEMS_SYNTHESIS_APPROACH.md` | **Implemented** (2026-02-09) |
+| **Rig I** | P11 (Epistemic planning) | Detailed | `RIG_I_EPISTEMIC_PLANNING_PLAN.md` | `RIG_I_EPISTEMIC_PLANNING_APPROACH.md` | **Implemented** (2026-02-09) |
+| **Rig I-ext** | P21 (Entity belief + saliency) | Detailed (priority) | `P21_RIG_I_EXT_IMPLEMENTATION_PLAN.md` | `P21_RIG_I_EXT_COMPANION_APPROACH.md` | **Certified** (p21.a: 2 surfaces, p21.b: 1 surface) |
+| **Rig J** | P12 (Invariant maintenance) | Detailed | `RIG_J_INVARIANT_MAINTENANCE_PLAN.md` | `RIG_J_INVARIANT_MAINTENANCE_APPROACH.md` | **Implemented** (2026-02-09) |
+| **Rig K** | P13 (Irreversibility) | Detailed | `RIG_K_IRREVERSIBILITY_PLAN.md` | `RIG_K_IRREVERSIBILITY_APPROACH.md` | **Implemented** (2026-02-09) |
+| Rig L | P9 (Contingency) | Later | — | — | — |
+| Rig M | P10 (Risk-aware) | Later | — | — | — |
+| Rig N | P15 (Fault diagnosis) | Later | — | — | — |
 
 **Detailed**: Plan + Companion with pivots, acceptance checks, conscious-bot vs Sterling split.
 **Later**: Deferred until Tracks 1-2 are solid.

@@ -22,12 +22,15 @@ import type { LintContext } from './compat-linter';
 import {
   computeBundleInput,
   computeBundleOutput,
+  computeTraceHash,
   createSolveBundle,
   buildDefaultRationaleContext,
   parseSterlingIdentity,
   attachSterlingIdentity,
 } from './solve-bundle';
 import type { SolveBundle, CompatReport } from './solve-bundle-types';
+import { validateRules } from '../validation/rule-validator';
+import { buildExplanation } from '../audit/explanation-builder';
 import { getLeafContractEntries } from '../modules/leaf-arg-contracts';
 import { parseSearchHealth } from './search-health';
 import { extractSolveJoinKeys } from './episode-classification';
@@ -81,6 +84,18 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
 
     // Build rules
     const rules = buildFurnaceRules(items, furnaceSlots);
+
+    // Rig A validation gate — fail-closed before Sterling
+    const validation = validateRules(rules);
+    if (!validation.valid) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        error: `Rule validation failed: ${validation.error}`,
+      };
+    }
 
     // Lint rules
     const lintContext: LintContext = {
@@ -149,6 +164,8 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         ...rationaleCtx,
       });
 
+      bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
+      const explanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
       const bundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
       attachSterlingIdentity(bundle, parseSterlingIdentity(sterlingResult.metrics));
 
@@ -158,7 +175,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         totalNodes: sterlingResult.discoveredNodes?.length ?? 0,
         durationMs: sterlingResult.durationMs ?? 0,
         planId,
-        solveMeta: { bundles: [bundle] },
+        solveMeta: { bundles: [bundle], explanation },
         solveJoinKeys: planId ? extractSolveJoinKeys(bundle, planId) : undefined,
       };
     } catch (err) {
@@ -172,6 +189,8 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         solutionPathLength: 0,
       });
 
+      bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
+      const errorExplanation = buildExplanation(bundleInput, bundleOutput, validation.report, compatReport);
       const bundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
       return {
@@ -180,7 +199,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         totalNodes: 0,
         durationMs: 0,
         error: err instanceof Error ? err.message : String(err),
-        solveMeta: { bundles: [bundle] },
+        solveMeta: { bundles: [bundle], explanation: errorExplanation },
         // No solveJoinKeys — planId is null in error path
       };
     }

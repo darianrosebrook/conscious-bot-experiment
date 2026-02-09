@@ -258,6 +258,48 @@ export function computeLeafContractRequiredDigest(
 }
 
 // ============================================================================
+// Trace Hashing (Rig A — Determinism Proof)
+// ============================================================================
+
+/**
+ * Compute a content-addressed trace hash proving determinism (P1).
+ *
+ * Selects only the fields that MUST be identical when the same request
+ * (inventory, goal, rules) is solved by the same Sterling version:
+ *
+ *   Input side:  definitionHash, initialStateHash, goalHash
+ *   Output side: solved, stepsDigest
+ *
+ * Explicitly excluded (non-deterministic or variable):
+ *   - timestamp, checkedAt (wall-clock)
+ *   - planId (UUID, different each solve)
+ *   - durationMs, totalNodes (vary with server load / timing)
+ *   - searchHealth (may not be emitted yet)
+ *   - sterlingIdentity (excluded from bundleHash by policy)
+ *   - rationale (derived from searchHealth, not core determinism signal)
+ *
+ * Determinism contract: same request payload + same Sterling engine version
+ * → identical traceHash across runs, even with different timestamps.
+ */
+export function computeTraceHash(
+  bundleInput: SolveBundleInput,
+  bundleOutput: SolveBundleOutput
+): ContentHash {
+  const deterministicTrace = {
+    input: {
+      definitionHash: bundleInput.definitionHash,
+      initialStateHash: bundleInput.initialStateHash,
+      goalHash: bundleInput.goalHash,
+    },
+    output: {
+      solved: bundleOutput.solved,
+      stepsDigest: bundleOutput.stepsDigest,
+    },
+  };
+  return contentHash(canonicalize(deterministicTrace));
+}
+
+// ============================================================================
 // Bundle Computation
 // ============================================================================
 

@@ -1,6 +1,6 @@
 # Rig B: Capability Gating and Legality — Companion Approach
 
-**Implementation**: Not started — spec only
+**Implementation**: CONTRACT-CERTIFIED | HARDENING-COMPLETE (2026-02-09). Rig A gates (validation, trace hashing, explanations) applied to tool-progression solver. 24 certification tests in `certification-rig-b.test.ts`.
 
 This companion document distills the implementation plan into a recommended approach, with explicit design decisions, boundaries, **concrete code references and signatures**, and implementation construction constraints so that implementers cannot easily implement the boundary incorrectly. Read alongside `RIG_B_CAPABILITY_GATING_PLAN.md`.
 

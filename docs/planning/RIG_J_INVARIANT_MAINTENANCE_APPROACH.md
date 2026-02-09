@@ -1,6 +1,6 @@
 # Rig J: Invariant Maintenance — Companion Approach
 
-**Implementation**: Partial — goal-hold-manager, periodic-review, preemption-budget exist in `planning/goals/`
+**Implementation**: HARDENING-COMPLETE (2026-02-09) — P12 capsule types, reference adapter, 2-domain fixtures, Minecraft invariant module, 39 certification tests
 
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_J_INVARIANT_MAINTENANCE_PLAN.md`.
 

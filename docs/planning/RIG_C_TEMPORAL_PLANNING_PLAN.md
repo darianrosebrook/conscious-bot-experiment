@@ -2,8 +2,8 @@
 
 **Primitive**: P3 — Temporal planning with durations, batching, and capacity
 
-**Status**: ENRICHED (2025-01-31)
-**Implementation**: Partial — temporal enrichment, time-state, duration-model, capacity-manager, batch-operators exist in `planning/temporal/`
+**Status**: CONTRACT-CERTIFIED | HARDENING-COMPLETE (2026-02-09)
+**Implementation**: Full temporal planning stack implemented. P03 capsule types (domain-agnostic), temporal enrichment orchestrator (3 modes), FurnaceSchedulingSolver, duration model, capacity manager, deadlock prevention, batch operators, makespan objective. Rig A gates (validation, trace hashing, explanations) wired into furnace solver. 114+ temporal tests + 38 furnace tests + certification tests. See [tracker](./sterling-capability-tracker.md#rig-c-temporal-planning-with-durations-batching-and-capacity) for evidence.
 
 ---
 
