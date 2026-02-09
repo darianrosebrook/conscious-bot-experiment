@@ -243,21 +243,14 @@ export class AttackEntityLeaf implements LeafImpl {
         }
       }
 
-      // For testing, if target doesn't have isValid property, return success immediately
-      if (!target.isValid) {
+      // Skip destroyed/despawned entities (isValid is explicitly false)
+      if (target.isValid === false) {
         return {
-          status: 'success',
-          result: {
-            success: true,
-            targetEntity: {
-              id: target.id,
-              type: target.name || target.type,
-              health: target.health || 20,
-            },
-            combatDuration: 100,
-            damageDealt: 0,
-            retreated: false,
-            retreatReason: '',
+          status: 'failure',
+          error: {
+            code: 'world.invalidPosition',
+            retryable: true,
+            detail: `Entity ${target.id} is no longer valid (despawned)`,
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -316,10 +309,17 @@ export class AttackEntityLeaf implements LeafImpl {
 
           // Use PVP plugin for sustained combat (handles cooldowns, pathfinding)
           const combatPromise = new Promise<void>((resolve) => {
-            pvp.attack(target);
+            try {
+              pvp.attack(target);
+            } catch (pvpErr) {
+              resolve(); // fall through to result
+              return;
+            }
             // pvp.attack is fire-and-forget; resolve when 'stoppedAttacking' fires
             // (event is added by mineflayer-pvp, not in base BotEvents type)
-            (bot as any).once('stoppedAttacking', () => resolve());
+            (bot as any).once('stoppedAttacking', () => {
+              resolve();
+            });
           });
 
           const timeoutPromise = new Promise<void>((resolve) =>
@@ -336,7 +336,13 @@ export class AttackEntityLeaf implements LeafImpl {
                 clearInterval(interval);
                 resolve();
               }
-              if (!target.isValid || (target.health != null && target.health <= 0)) {
+              // Target dead/despawned: isValid set to false, health dropped to 0,
+              // or entity removed from bot.entities (despawn without isValid update)
+              const targetGone =
+                target.isValid === false ||
+                (target.health != null && target.health <= 0) ||
+                !bot.entities[target.id];
+              if (targetGone) {
                 pvp.stop();
                 clearInterval(interval);
                 resolve();
@@ -366,7 +372,7 @@ export class AttackEntityLeaf implements LeafImpl {
           const checkInterval = 500;
 
           while (ctx.now() < combatEnd) {
-            if (!target.isValid || (target.health != null && target.health <= 0)) {
+            if (target.isValid === false || (target.health != null && target.health <= 0)) {
               break;
             }
             if (bot.health <= retreatHealth) {

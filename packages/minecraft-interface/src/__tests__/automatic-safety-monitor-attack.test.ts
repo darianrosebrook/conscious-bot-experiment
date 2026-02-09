@@ -181,6 +181,40 @@ describe('FF-A: AutomaticSafetyMonitor attack path', () => {
     expect(attackCall![0].parameters.entityId).toBe(2);
   });
 
+  it('attackNearestThreat blocks re-entry while combat in progress', async () => {
+    const bot = makeBot();
+    const translator = makeActionTranslator();
+
+    // Make attack_entity take a while (simulate ongoing combat)
+    translator.executeAction
+      .mockResolvedValueOnce({ status: 'success' }) // equip succeeds quickly
+      .mockImplementationOnce(
+        () => new Promise((resolve) => setTimeout(() => resolve({ status: 'success' }), 100)),
+      ); // attack takes 100ms
+
+    const monitor = new AutomaticSafetyMonitor(bot, translator);
+    const assessment = {
+      threatLevel: 'high' as const,
+      threats: [{ type: 'zombie', distance: 5, threatLevel: 70 }],
+      recommendedAction: 'attack' as const,
+    };
+
+    // Start first attack (don't await yet)
+    const firstAttack = (monitor as any).attackNearestThreat(assessment);
+
+    // Yield to let the first attack start (equip phase)
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Second call should be blocked by combatInProgress guard
+    await (monitor as any).attackNearestThreat(assessment);
+
+    await firstAttack;
+
+    // Only 2 executeAction calls (equip + attack from first call)
+    // The second call was blocked entirely
+    expect(translator.executeAction).toHaveBeenCalledTimes(2);
+  });
+
   it('attackNearestThreat ignores entities beyond 16 blocks', async () => {
     const bot = makeBot({
       entities: {

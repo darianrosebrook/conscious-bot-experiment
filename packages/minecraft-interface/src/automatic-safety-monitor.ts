@@ -59,6 +59,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private fleeFailCount = 0;
   private lastFleePos: Vec3 | null = null;
   private fleeBackoffUntil = 0;
+  private combatInProgress = false;
 
   constructor(
     bot: Bot,
@@ -231,22 +232,32 @@ export class AutomaticSafetyMonitor extends EventEmitter {
         const snapshot = this.beliefBus.getCurrentSnapshot();
         const reflexResult = assessReflexThreats(snapshot);
 
-        // Check for high-or-above threats (not just critical)
+        // Check for actionable threats: high/critical always, medium if close
         const hasHighOrAbove = reflexResult.threats.some(
           (t) => t.threatLevel === 'critical' || t.threatLevel === 'high'
         );
+        // Medium threats in melee range (distBucket ≤ 2 ≈ ≤4 blocks) also
+        // need evaluation — the fight decision logic handles medium+melee.
+        const hasMediumMelee = !hasHighOrAbove && reflexResult.threats.some(
+          (t) => t.threatLevel === 'medium' && t.distBucket <= 2
+        );
 
-        if (hasHighOrAbove) {
+        if (hasHighOrAbove || hasMediumMelee) {
           const threatLevel = reflexResult.hasCriticalThreat
             ? 'critical'
-            : 'high';
+            : hasHighOrAbove
+              ? 'high'
+              : 'medium';
           const reason = reflexResult.hasCriticalThreat
             ? 'critical_threat'
-            : 'high_threat';
+            : hasHighOrAbove
+              ? 'high_threat'
+              : 'medium_melee_threat';
 
           if (this.shouldLog(`${threatLevel}-threat`, this.logThrottleMs)) {
+            const icon = threatLevel === 'critical' ? '🚨' : threatLevel === 'high' ? '⚠️' : '⚔️';
             console.log(
-              `[SafetyMonitor] ${threatLevel === 'critical' ? '🚨' : '⚠️'} ${threatLevel} threat from belief snapshot`
+              `[SafetyMonitor] ${icon} ${threatLevel} threat from belief snapshot`
             );
           }
           await this.triggerEmergencyResponse(reason, {
@@ -483,6 +494,16 @@ export class AutomaticSafetyMonitor extends EventEmitter {
    * Falls back to flee if no valid target found or combat fails.
    */
   private async attackNearestThreat(assessment: ThreatAssessment): Promise<void> {
+    // Prevent re-entry: calling pvp.attack() while already attacking resets the
+    // PVP plugin and fires stoppedAttacking on the previous engagement, causing
+    // 0ms duration combat.
+    if (this.combatInProgress) {
+      if (this.shouldLog('attack-reentry', this.logThrottleMs)) {
+        console.log('[SafetyMonitor] ⚔️ Combat already in progress, skipping re-entry');
+      }
+      return;
+    }
+
     if (this.shouldLog('attack', this.logThrottleMs)) {
       console.log('[SafetyMonitor] Engaging nearest threat...');
     }
@@ -507,6 +528,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       return;
     }
 
+    this.combatInProgress = true;
     try {
       // Equip best weapon first
       await this.actionTranslator.executeAction({
@@ -528,11 +550,13 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       });
 
       if (this.shouldLog('attack-complete', this.logThrottleMs)) {
-        console.log('[SafetyMonitor] Combat engagement completed');
+        console.log('[SafetyMonitor] ✅ Combat engagement completed');
       }
     } catch (error) {
       console.error('Combat engagement failed, falling back to flee:', error);
       if (this.config.autoFleeEnabled) await this.fleeFromThreats();
+    } finally {
+      this.combatInProgress = false;
     }
   }
 
