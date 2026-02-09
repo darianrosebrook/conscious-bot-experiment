@@ -666,7 +666,7 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 
 - [x] **H.4 — Minecraft synthesis module**: `MINECRAFT_FARM_OPERATORS` (4 operators: water_source, farmland, torch, path). `MINECRAFT_FARM_SPECS` (3 specs: basic 9x9 with water+16 farmland+4 torches, compact 5x5, double-farm 9x18).
 
-- [x] **H.5 — Certification suite**: `certification-rig-h.test.ts` — 37 tests covering: deterministic evaluation (Pivot 1, 4 tests), bounded design (Pivot 2, 4 tests), symmetry canonicalization (Pivot 3, 4 tests), spec predicate (Pivot 4, 4 tests), bounded motifs (Pivot 5, 6 tests), multi-domain portability (5 tests), Minecraft module (3 tests), operator/design integration (3 tests), P08 contract metadata (4 tests).
+- [x] **H.5 — Certification suite**: `certification-rig-h.test.ts` — 37 tests covering: deterministic evaluation (Pivot 1, 4 tests), bounded design (Pivot 2, 4 tests), symmetry canonicalization (Pivot 3, 4 tests), spec predicate (Pivot 4, 4 tests), bounded motifs (Pivot 5, 6 tests — instantiation bounds enforced; `MAX_MOTIFS` is a reserved constant for future persistent motif library, not currently enforced as library size), multi-domain portability (5 tests), Minecraft module (3 tests), operator/design integration (3 tests), P08 contract metadata (4 tests).
 
 ---
 

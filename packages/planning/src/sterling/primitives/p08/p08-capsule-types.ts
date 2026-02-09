@@ -12,7 +12,7 @@
  *   2. Design size is bounded (MAX_DESIGN_NODES cap)
  *   3. Symmetry is canonicalized (equivalent designs produce same hash)
  *   4. Spec is a boolean predicate (no raw continuous metrics in state)
- *   5. Motif library is bounded (MAX_MOTIFS cap)
+ *   5. Motif instantiation is bounded (node count enforced; MAX_MOTIFS reserved for future library)
  *
  * Field naming conventions (domain-agnostic):
  *   farmland/resistor/beam  -> component    (abstract design element)
@@ -31,7 +31,12 @@ export const P08_CONTRACT_VERSION: P08ContractVersion = 'p08.v1';
 /** Maximum number of nodes (cells/components) in a single design. */
 export const MAX_DESIGN_NODES = 100;
 
-/** Maximum number of motifs stored in the library. */
+/**
+ * Reserved bound for a future persistent motif library.
+ * Currently no library exists — motifs are stateless (extract/instantiate).
+ * This constant is forward-compat: code that builds a library should
+ * enforce size <= MAX_MOTIFS.
+ */
 export const MAX_MOTIFS = 50;
 
 // -- Grid Cell ---------------------------------------------------------------
@@ -235,7 +240,7 @@ export const P08_INVARIANTS = [
   'symmetry_canonicalization',
   /** Spec evaluation returns boolean predicate, not raw metrics. */
   'spec_predicate',
-  /** Motif library never exceeds MAX_MOTIFS. */
+  /** Motif instantiation respects design bounds; MAX_MOTIFS reserved for future library. */
   'bounded_motifs',
 ] as const;
 

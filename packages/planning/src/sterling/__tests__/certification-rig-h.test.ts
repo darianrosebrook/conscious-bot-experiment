@@ -6,7 +6,7 @@
  *   2. bounded_design           — node count capped
  *   3. symmetry_canonicalization — rotations produce same hash
  *   4. spec_predicate            — evaluation returns boolean
- *   5. bounded_motifs            — motif library bounded
+ *   5. bounded_motifs            — motif instantiation bounded; MAX_MOTIFS reserved
  *
  * 38 tests across 9 describe blocks.
  */
@@ -304,7 +304,10 @@ describe('P08 Invariant: bounded_motifs', () => {
     expect(result).toBeNull();
   });
 
-  it('MAX_MOTIFS is 50', () => {
+  it('MAX_MOTIFS is 50 (reserved for future library)', () => {
+    // MAX_MOTIFS is a forward-compat constant. No persistent motif library
+    // exists yet — motifs are stateless (extract/instantiate). This test
+    // asserts the constant exists so future library code has a bound to enforce.
     expect(MAX_MOTIFS).toBe(50);
   });
 });

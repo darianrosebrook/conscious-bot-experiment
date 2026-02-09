@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-02-09T08:20:00Z",
+  "baseCommitSHA": "1c270aa (capsule code + tests + docs)",
+  "auditCommitSHA": "this commit (bounded_motifs fix + evidence manifest)",
+  "platform": "darwin-arm64",
+  "nodeVersion": "v22.19.0",
+  "vitestVersion": "3.2.4",
+  "suites": {
+    "rig-h": {
+      "file": "packages/planning/src/sterling/__tests__/certification-rig-h.test.ts",
+      "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-h.test.ts",
+      "tests": 37,
+      "passed": 37,
+      "failed": 0,
+      "durationMs": 477,
+      "invariants": [
+        "deterministic_evaluation",
+        "bounded_design",
+        "symmetry_canonicalization",
+        "spec_predicate",
+        "bounded_motifs"
+      ],
+      "deviations": [
+        "bounded_motifs: MAX_MOTIFS is a reserved constant for future persistent motif library. No library exists; only instantiation bounds (MAX_DESIGN_NODES) are enforced."
+      ]
+    },
+    "rig-j": {
+      "file": "packages/planning/src/sterling/__tests__/certification-rig-j.test.ts",
+      "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-j.test.ts",
+      "tests": 39,
+      "passed": 39,
+      "failed": 0,
+      "durationMs": 403,
+      "invariants": [
+        "metric_buckets",
+        "deterministic_drift",
+        "hazard_exclusion",
+        "bounded_horizon",
+        "proactive_emission"
+      ],
+      "deviations": []
+    },
+    "rig-k": {
+      "file": "packages/planning/src/sterling/__tests__/certification-rig-k.test.ts",
+      "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-k.test.ts",
+      "tests": 36,
+      "passed": 36,
+      "failed": 0,
+      "durationMs": 379,
+      "invariants": [
+        "explicit_reversibility",
+        "verify_before_commit",
+        "deterministic_verification",
+        "bounded_option_value",
+        "monotonic_commitment"
+      ],
+      "deviations": []
+    }
+  },
+  "capsuleSurfaces": {
+    "rig-h": {
+      "capsuleTypes": "packages/planning/src/sterling/primitives/p08/p08-capsule-types.ts",
+      "referenceAdapter": "packages/planning/src/sterling/primitives/p08/p08-reference-adapter.ts",
+      "referenceFixtures": "packages/planning/src/sterling/primitives/p08/p08-reference-fixtures.ts",
+      "domainModule": "packages/planning/src/synthesis/minecraft-farm-spec.ts",
+      "certificationSuite": "packages/planning/src/sterling/__tests__/certification-rig-h.test.ts"
+    },
+    "rig-j": {
+      "capsuleTypes": "packages/planning/src/sterling/primitives/p12/p12-capsule-types.ts",
+      "referenceAdapter": "packages/planning/src/sterling/primitives/p12/p12-reference-adapter.ts",
+      "referenceFixtures": "packages/planning/src/sterling/primitives/p12/p12-reference-fixtures.ts",
+      "domainModule": [
+        "packages/planning/src/invariant/minecraft-metrics.ts",
+        "packages/planning/src/invariant/minecraft-operators.ts"
+      ],
+      "certificationSuite": "packages/planning/src/sterling/__tests__/certification-rig-j.test.ts"
+    },
+    "rig-k": {
+      "capsuleTypes": "packages/planning/src/sterling/primitives/p13/p13-capsule-types.ts",
+      "referenceAdapter": "packages/planning/src/sterling/primitives/p13/p13-reference-adapter.ts",
+      "referenceFixtures": "packages/planning/src/sterling/primitives/p13/p13-reference-fixtures.ts",
+      "domainModule": "packages/planning/src/commitment/minecraft-commitment.ts",
+      "certificationSuite": "packages/planning/src/sterling/__tests__/certification-rig-k.test.ts"
+    }
+  },
+  "separationAudit": {
+    "capsuleTypesImportMcModules": false,
+    "adapterImportsNonCapsule": false,
+    "adapterUsesDateNowOrRandom": false,
+    "fixturesImportAdapter": false,
+    "domainModulesImportAdapter": false,
+    "hiddenPythonRouting": false
+  },
+  "e2eStatus": {
+    "rig-h": "NONE — no Python design domain",
+    "rig-j": "NONE — no Python maintenance domain",
+    "rig-k": "NONE — no Python commitment domain"
+  }
+}
