@@ -156,6 +156,46 @@ export class ReadinessMonitor {
     return this._result;
   }
 
+  /**
+   * Trigger an immediate re-probe outside the periodic interval.
+   * Detects state transitions and fires onChange listeners, same as the
+   * periodic body. Guarded by `_probeInFlight` so it won't overlap with
+   * a periodic probe already in progress.
+   */
+  async reprobeNow(): Promise<ReadinessResult | null> {
+    if (this._probeInFlight) return this._result;
+    this._probeInFlight = true;
+    try {
+      const oldResult = this._result;
+      const newResult = await probeServices(this._config);
+
+      let changed = false;
+      for (const [name, newHealth] of Object.entries(newResult.services)) {
+        const oldState = oldResult?.services[name]?.state ?? 'down';
+        if (newHealth.state !== oldState) {
+          console.log(`[readiness] ${name}: ${oldState} → ${newHealth.state}`);
+          changed = true;
+        }
+      }
+
+      this._result = newResult;
+
+      if (changed) {
+        for (const cb of this._listeners) {
+          try {
+            cb(newResult);
+          } catch (e) {
+            console.warn('[readiness] onChange callback error:', (e as Error)?.message);
+          }
+        }
+      }
+
+      return newResult;
+    } finally {
+      this._probeInFlight = false;
+    }
+  }
+
   /** Register a callback fired on every re-probe that detects a state change. */
   onChange(cb: ReadinessChangeCallback): void {
     this._listeners.push(cb);

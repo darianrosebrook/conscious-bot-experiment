@@ -59,6 +59,35 @@ export function isValidMcData(x: unknown): x is McData {
 }
 
 // ============================================================================
+// Smelting recipes (simplified — no furnace scheduling, just input→output)
+// ============================================================================
+
+/**
+ * Common smelting recipes relevant to crafting/building prerequisites.
+ * Maps output item → { input, count } so we can trace backward from a goal.
+ */
+const SMELT_RECIPES: ReadonlyArray<{ input: string; output: string }> = [
+  { input: 'iron_ore', output: 'iron_ingot' },
+  { input: 'raw_iron', output: 'iron_ingot' },
+  { input: 'gold_ore', output: 'gold_ingot' },
+  { input: 'raw_gold', output: 'gold_ingot' },
+  { input: 'raw_copper', output: 'copper_ingot' },
+  { input: 'sand', output: 'glass' },
+  { input: 'cobblestone', output: 'stone' },
+  { input: 'clay_ball', output: 'brick' },
+  { input: 'netherrack', output: 'nether_brick' },
+  { input: 'ancient_debris', output: 'netherite_scrap' },
+];
+
+/** Lookup: output item name → smelting recipes that produce it */
+const SMELT_BY_OUTPUT = new Map<string, Array<{ input: string; output: string }>>();
+for (const recipe of SMELT_RECIPES) {
+  const arr = SMELT_BY_OUTPUT.get(recipe.output) || [];
+  arr.push(recipe);
+  SMELT_BY_OUTPUT.set(recipe.output, arr);
+}
+
+// ============================================================================
 // Rule building
 // ============================================================================
 
@@ -99,9 +128,22 @@ export function buildCraftingRules(
 
     const recipes = mcData.recipes[item.id];
     if (!recipes || recipes.length === 0) {
-      // No recipe — raw material
-      addMineRule(rules, itemName);
+      // No crafting recipe — check if this item can be smelted
+      const smeltRecipes = SMELT_BY_OUTPUT.get(itemName);
+      if (smeltRecipes && smeltRecipes.length > 0) {
+        addSmeltRules(rules, itemName, smeltRecipes, trace, depth);
+      } else {
+        // No recipe at all — raw material that must be mined
+        addMineRule(rules, itemName);
+      }
       return;
+    }
+
+    // Also check for smelting as an alternative path (e.g., stone can be
+    // obtained by smelting cobblestone OR crafting in some modded contexts)
+    const altSmeltRecipes = SMELT_BY_OUTPUT.get(itemName);
+    if (altSmeltRecipes && altSmeltRecipes.length > 0) {
+      addSmeltRules(rules, itemName, altSmeltRecipes, trace, depth);
     }
 
     // Process each recipe variant
@@ -151,29 +193,70 @@ export function buildCraftingRules(
       }
     }
 
-    // If any recipe requires a table, add a place:crafting_table rule
-    const anyNeedsTable = Array.from(rules.values()).some(r => r.needsTable);
-    if (anyNeedsTable && !rules.has('place:crafting_table')) {
-      // IMPORTANT: consumes MUST be empty for place rules. Sterling's apply_rule()
-      // internally decrements the placed item. If we also list it in consumes,
-      // it gets double-decremented — requiring 2 crafting tables to place 1.
-      rules.set('place:crafting_table', {
-        action: 'place:crafting_table',
-        actionType: 'place',
-        produces: [], // doesn't produce inventory items; enables table access
-        consumes: [],
-        requires: [{ name: 'crafting_table', count: 1 }],
-        needsTable: false,
-        needsFurnace: false,
-        baseCost: 1.5,
-      });
-
-      // Ensure we can also craft the crafting_table itself
-      trace('crafting_table', depth + 1);
-    }
   }
 
   trace(goalItem, 0);
+
+  // After all recursive tracing, add workstation placement rules if needed.
+  // These checks must be outside trace() because smelting-only items return
+  // early from trace() before reaching the recipe processing loop.
+
+  // If any rule requires a table, add a place:crafting_table rule
+  const anyNeedsTable = Array.from(rules.values()).some(r => r.needsTable);
+  if (anyNeedsTable && !rules.has('place:crafting_table')) {
+    // IMPORTANT: consumes MUST be empty for place rules. Sterling's apply_rule()
+    // internally decrements the placed item. If we also list it in consumes,
+    // it gets double-decremented — requiring 2 crafting tables to place 1.
+    rules.set('place:crafting_table', {
+      action: 'place:crafting_table',
+      actionType: 'place',
+      produces: [], // doesn't produce inventory items; enables table access
+      consumes: [],
+      requires: [{ name: 'crafting_table', count: 1 }],
+      needsTable: false,
+      needsFurnace: false,
+      baseCost: 1.5,
+    });
+
+    // Ensure we can also craft the crafting_table itself
+    trace('crafting_table', 0);
+  }
+
+  // If any rule requires a furnace, add a place:furnace rule
+  const anyNeedsFurnace = Array.from(rules.values()).some(r => r.needsFurnace);
+  if (anyNeedsFurnace && !rules.has('place:furnace')) {
+    rules.set('place:furnace', {
+      action: 'place:furnace',
+      actionType: 'place',
+      produces: [],
+      consumes: [],
+      requires: [{ name: 'furnace', count: 1 }],
+      needsTable: false,
+      needsFurnace: false,
+      baseCost: 1.5,
+    });
+
+    // Ensure we can also craft the furnace itself
+    trace('furnace', 0);
+  }
+
+  // Second pass: adding furnace/table may have introduced new rules
+  // that themselves need the other workstation. Re-check once.
+  const needsTableAfter = Array.from(rules.values()).some(r => r.needsTable);
+  if (needsTableAfter && !rules.has('place:crafting_table')) {
+    rules.set('place:crafting_table', {
+      action: 'place:crafting_table',
+      actionType: 'place',
+      produces: [],
+      consumes: [],
+      requires: [{ name: 'crafting_table', count: 1 }],
+      needsTable: false,
+      needsFurnace: false,
+      baseCost: 1.5,
+    });
+    trace('crafting_table', 0);
+  }
+
   return Array.from(rules.values());
 }
 
@@ -219,6 +302,35 @@ export function goalFromTaskRequirement(
 // ============================================================================
 // Internal helpers
 // ============================================================================
+
+function addSmeltRules(
+  rules: Map<string, MinecraftCraftingRule>,
+  outputItem: string,
+  smeltRecipes: Array<{ input: string; output: string }>,
+  trace: (itemName: string, depth: number) => void,
+  depth: number,
+): void {
+  for (let i = 0; i < smeltRecipes.length; i++) {
+    const recipe = smeltRecipes[i];
+    const suffix = smeltRecipes.length > 1 ? `:v${i}` : '';
+    const actionKey = `smelt:${outputItem}${suffix}`;
+    if (rules.has(actionKey)) continue;
+
+    rules.set(actionKey, {
+      action: actionKey,
+      actionType: 'smelt',
+      produces: [{ name: outputItem, count: 1 }],
+      consumes: [{ name: recipe.input, count: 1 }],
+      requires: [],
+      needsTable: false,
+      needsFurnace: true,
+      baseCost: 3.0, // Higher than crafting — reflects furnace time
+    });
+
+    // Trace the input material (e.g., sand for glass, iron_ore for iron_ingot)
+    trace(recipe.input, depth + 1);
+  }
+}
 
 function addMineRule(
   rules: Map<string, MinecraftCraftingRule>,

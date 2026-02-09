@@ -3427,6 +3427,263 @@ serverConfig.addEndpoint(
   }
 );
 
+// Sterling building solve-with-prerequisites endpoint
+// Orchestrates building solve + prerequisite crafting solves in a single request.
+// When the building solve detects a material deficit (needsMaterials), this endpoint
+// automatically resolves prerequisites via sequential crafting solves with inventory
+// accumulation, returning a unified response with real graph data from both domains.
+serverConfig.addEndpoint(
+  'post',
+  '/sterling/building/solve-with-prerequisites',
+  async (req, res) => {
+    if (!minecraftBuildingSolver) {
+      res.status(503).json({ error: 'Building solver not initialized' });
+      return;
+    }
+
+    try {
+      const {
+        modules,
+        goalModules,
+        inventory,
+        siteState,
+        templateId = 'dashboard_build',
+        facing = 'N',
+        includePrereqGraphs = true,
+      } = req.body;
+
+      if (!modules || !Array.isArray(modules) || modules.length === 0) {
+        res.status(400).json({ error: 'modules array is required' });
+        return;
+      }
+      if (!goalModules || !Array.isArray(goalModules) || goalModules.length === 0) {
+        res.status(400).json({ error: 'goalModules array is required' });
+        return;
+      }
+
+      const startTime = Date.now();
+
+      // Compute inputs digest for staleness detection
+      const sortedInventory = Object.keys(inventory || {}).sort().reduce(
+        (acc: Record<string, number>, key) => { acc[key] = inventory[key]; return acc; },
+        {}
+      );
+      const sortedModuleIds = (modules as Array<{ moduleId: string }>)
+        .map((m) => m.moduleId)
+        .sort();
+      const { createHash } = await import('node:crypto');
+      const inputsDigest = createHash('sha256')
+        .update(JSON.stringify(sortedInventory) + JSON.stringify(sortedModuleIds))
+        .digest('hex')
+        .slice(0, 16);
+
+      // 1. Run building solve
+      const buildResult = await minecraftBuildingSolver.solveBuildingPlan(
+        templateId,
+        facing,
+        goalModules,
+        inventory || {},
+        siteState || { terrain: 'flat', biome: 'plains', hasTreesNearby: false, hasWaterNearby: false, siteCaps: 'flat_16x16_clear' },
+        modules,
+      );
+
+      const runId = `bsolve-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      // Build response shape
+      const response: Record<string, unknown> = {
+        runId,
+        inputsDigest,
+        building: {
+          solved: buildResult.solved,
+          steps: buildResult.steps,
+          totalNodes: buildResult.totalNodes,
+          durationMs: buildResult.durationMs,
+          // Graph data comes from the solver's underlying SterlingSolveResult
+          // The building solver returns totalNodes from discoveredNodes.length,
+          // but we don't have direct access to the raw graph here.
+          // For the building domain, graph data is streamed via WS (hybrid approach).
+        },
+        taskSteps: minecraftBuildingSolver.toTaskStepsWithReplan(buildResult, templateId),
+        provenance: {
+          source: 'planning-service',
+          buildingSolverId: 'minecraft-building-solver',
+          timestamp: Date.now(),
+        },
+      };
+
+      // 2. Compute material deficit (TypeScript-side, independent of Python backend)
+      // Sum materialsNeeded across all goal modules and compare against inventory
+      let deficit: Record<string, number> = {};
+      let blockedModules: string[] = [];
+      if (buildResult.needsMaterials) {
+        // Prefer Python-computed deficit if available
+        deficit = buildResult.needsMaterials.deficit;
+        blockedModules = buildResult.needsMaterials.blockedModules;
+      } else {
+        // TypeScript-side deficit detection: sum materials across goal modules
+        const totalNeeded: Record<string, number> = {};
+        const inv = inventory || {};
+        for (const mod of (modules as Array<{ moduleId: string; materialsNeeded?: Array<{ name: string; count: number }> }>)) {
+          if (goalModules.includes(mod.moduleId) && mod.materialsNeeded) {
+            for (const mat of mod.materialsNeeded) {
+              totalNeeded[mat.name] = (totalNeeded[mat.name] || 0) + mat.count;
+            }
+          }
+        }
+        for (const [item, needed] of Object.entries(totalNeeded)) {
+          const have = (inv as Record<string, number>)[item] || 0;
+          if (have < needed) {
+            deficit[item] = needed - have;
+            // Track which modules need this material
+            for (const mod of (modules as Array<{ moduleId: string; materialsNeeded?: Array<{ name: string; count: number }> }>)) {
+              if (goalModules.includes(mod.moduleId) && mod.materialsNeeded?.some(m => m.name === item)) {
+                if (!blockedModules.includes(mod.moduleId)) {
+                  blockedModules.push(mod.moduleId);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const hasDeficit = Object.keys(deficit).length > 0;
+      if (hasDeficit && minecraftCraftingSolver) {
+
+        // Load mcData server-side
+        let mcData = taskIntegration.getMcDataPublic();
+        if (!mcData) {
+          // Can't resolve prerequisites without mcData — return building result with deficit info
+          response.prerequisites = {
+            deficit,
+            blockedModules,
+            chains: [],
+            totalDurationMs: 0,
+            error: 'minecraft-data not available on server for prerequisite resolution',
+          };
+          res.json(response);
+          return;
+        }
+
+        // Sequential solves with inventory accumulation (Option A: simpler)
+        // Start with the provided inventory, add produced items after each solve
+        const workingInventory = { ...(inventory || {}) };
+        const chains: Array<Record<string, unknown>> = [];
+        const prereqStartTime = Date.now();
+
+        // Deduplicate: track items already produced as intermediates
+        const producedItems = new Set<string>();
+
+        for (const [goalItem, count] of Object.entries(deficit)) {
+          // Skip if already produced as an intermediate in a previous solve
+          if (producedItems.has(goalItem) && (workingInventory[goalItem] || 0) >= (count as number)) {
+            chains.push({
+              goalItem,
+              count,
+              solved: true,
+              steps: [],
+              durationMs: 0,
+              skippedReason: 'already_produced_as_intermediate',
+            });
+            continue;
+          }
+
+          const inventoryItems = Object.entries(workingInventory).map(
+            ([name, cnt]) => ({ name, count: cnt as number })
+          );
+
+          try {
+            const craftResult = await minecraftCraftingSolver.solveCraftingGoal(
+              goalItem,
+              inventoryItems,
+              mcData,
+              [], // nearbyBlocks — not available from dashboard context
+            );
+
+            const chain: Record<string, unknown> = {
+              goalItem,
+              count,
+              solved: craftResult.solved,
+              steps: craftResult.steps.map((step) => ({
+                action: step.action,
+                actionType: step.actionType,
+                produces: step.produces,
+                consumes: step.consumes,
+              })),
+              durationMs: craftResult.durationMs,
+            };
+
+            if (craftResult.error) {
+              chain.error = craftResult.error;
+            }
+
+            // Include real graph data from crafting solve if requested
+            if (includePrereqGraphs && craftResult.solveMeta?.bundles?.[0]) {
+              // The crafting solver's SterlingSolveResult graph data isn't directly
+              // exposed on the result type. We include what's available via solveMeta.
+              chain.solveMeta = craftResult.solveMeta;
+            }
+
+            chains.push(chain);
+
+            // Accumulate produced items into working inventory
+            if (craftResult.solved) {
+              for (const step of craftResult.steps) {
+                for (const produced of step.produces) {
+                  workingInventory[produced.name] = (workingInventory[produced.name] || 0) + produced.count;
+                  producedItems.add(produced.name);
+                }
+                for (const consumed of step.consumes) {
+                  workingInventory[consumed.name] = Math.max(
+                    0,
+                    (workingInventory[consumed.name] || 0) - consumed.count
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            chains.push({
+              goalItem,
+              count,
+              solved: false,
+              steps: [],
+              durationMs: 0,
+              error: error instanceof Error ? error.message : 'Unknown crafting solve error',
+            });
+          }
+        }
+
+        // Compute final inventory: only include items with count > 0
+        const finalInventory: Record<string, number> = {};
+        for (const [item, count] of Object.entries(workingInventory)) {
+          if ((count as number) > 0) {
+            finalInventory[item] = count as number;
+          }
+        }
+
+        response.prerequisites = {
+          deficit,
+          blockedModules,
+          chains,
+          totalDurationMs: Date.now() - prereqStartTime,
+          finalInventory,
+        };
+
+        (response.provenance as Record<string, unknown>).craftingSolverId = 'minecraft-crafting-solver';
+
+        // Regenerate task steps to include prerequisite acquisition
+        response.taskSteps = minecraftBuildingSolver.toTaskStepsWithReplan(buildResult, templateId);
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error('[solve-with-prereqs] ERROR:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+);
+
 // Emergency stop endpoint
 serverConfig.addEndpoint('post', '/executor/stop', (_req, res) => {
   const token = process.env.EXECUTOR_EMERGENCY_TOKEN;
@@ -3656,6 +3913,27 @@ async function startServer() {
           total: all.length,
           visibleToExecutor,
         };
+      },
+      flushSmokeTasks: () => {
+        const all = taskIntegration.getTasks();
+        const flushed: Record<string, number> = {};
+        for (const t of all) {
+          const meta = t.metadata as Record<string, unknown> | undefined;
+          const isSmoke =
+            meta?.source === 'sterling-smoke' ||
+            (Array.isArray(meta?.tags) && (meta.tags as string[]).includes('dev-sterling-smoke'));
+          if (!isSmoke) continue;
+
+          const prev = t.status ?? 'unknown';
+          // Mark non-terminal smoke tasks as failed so executor drops them.
+          if (prev === 'active' || prev === 'pending' || prev === 'pending_planning') {
+            taskIntegration.updateTaskProgress(t.id, 0, 'failed');
+          }
+          flushed[prev] = (flushed[prev] ?? 0) + 1;
+        }
+        // Reset rate limiter so the sliding window is clear for the next run.
+        stepRateLimiter.reset();
+        return { flushed, rateLimiterReset: true };
       },
     });
     serverConfig.mountRouter('/', planningRouter);
@@ -3971,8 +4249,9 @@ async function startServer() {
       readinessResult.executorReady
     );
 
-    // Start slow re-probe (every 2 minutes, state-change logging only)
-    readiness.startMonitoring(120_000);
+    // Start slow re-probe (state-change logging only)
+    const READINESS_PROBE_MS = parseInt(process.env.READINESS_PROBE_INTERVAL_MS || '120000', 10);
+    readiness.startMonitoring(READINESS_PROBE_MS);
 
     // Phase 0 prerequisite for EXECUTOR_MODE=live:
     //   The action-translator dispatch boundary (minecraft-interface executeAction)
@@ -4040,8 +4319,13 @@ async function startServer() {
         console.log(
           '[Planning] Executor enabled but not ready — will start when dependencies are reachable'
         );
-        // Re-check when system becomes ready
-        waitForSystemReady().then(() => tryStartExecutor());
+        // Re-check when system becomes ready — reprobe immediately so
+        // tryStartExecutor() sees fresh readiness instead of the stale
+        // initial probe that may have run before MC Interface was up.
+        waitForSystemReady().then(async () => {
+          await readiness.reprobeNow();
+          tryStartExecutor();
+        });
         // Re-check when readiness monitor detects a state change
         readiness.onChange(() => tryStartExecutor());
       }

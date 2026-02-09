@@ -12,6 +12,9 @@ import {
   blockTaskPatch,
   clearBlockedState,
   regenSuccessPatch,
+  type SmokePolicyReason,
+  type SmokeVerifySkipPatch,
+  type SmokeFailNoRegenPatch,
 } from '../sterling-step-executor';
 import type { SterlingStepExecutorContext } from '../sterling-step-executor.types';
 import { GoldenRunRecorder } from '../../golden-run-recorder';
@@ -1014,5 +1017,154 @@ describe('loop-closure integration (artifact-level proof)', () => {
     expect(dispatchDecision?.step_id).toBeDefined();
     expect(dispatchDecision?.leaf).toBe('craft_recipe');
     expect(typeof dispatchDecision?.ts).toBe('number');
+  });
+});
+
+describe('smoke policy tripwire (metadata assertion)', () => {
+  const smokeTask = {
+    id: 'task-smoke-tripwire',
+    title: 'Smoke tripwire test',
+    steps: [],
+    metadata: {
+      source: 'sterling-smoke',
+      noRetry: true,
+      no_retry: true,
+      disableRegen: true,
+      maxRetries: 1,
+    } as Record<string, unknown>,
+    progress: 0,
+  };
+
+  const craftStep = {
+    id: 'step-1',
+    order: 1,
+    label: 'Craft planks',
+    done: false,
+    meta: {
+      leaf: 'craft_recipe',
+      args: { recipe: 'oak_planks', qty: 4 },
+      authority: 'sterling',
+    },
+  };
+
+  it('verify-skip path writes smoke_policy_applied + smoke_policy_reason: skip_verification', async () => {
+    // executeTool succeeds (ok: true), but completeTaskStep returns false
+    // → verification failed → smoke guard should skip verification and write tripwire
+    const ctx = createMockContext({
+      executeTool: vi.fn().mockResolvedValue({ ok: true }),
+      completeTaskStep: vi.fn().mockResolvedValue(false),
+    });
+
+    await executeSterlingStep(smokeTask, craftStep, ctx);
+
+    const metaCalls = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls;
+    const tripwireCall = metaCalls.find(
+      (c: unknown[]) => (c[1] as Record<string, unknown>)?.smoke_policy_applied === true
+    );
+    expect(tripwireCall).toBeDefined();
+    expect(tripwireCall![1]).toEqual(expect.objectContaining({
+      smoke_policy_applied: true,
+      smoke_policy_reason: 'skip_verification',
+      smokeVerifySkipped: true,
+    }));
+    // Verify the reason is from the narrow type
+    const reason: SmokePolicyReason = tripwireCall![1].smoke_policy_reason;
+    expect(reason).toBe('skip_verification');
+  });
+
+  it('dispatch-error path writes smoke_policy_applied + smoke_policy_reason: fail_no_regen', async () => {
+    // executeTool fails (ok: false) → dispatch error → smoke guard should fail fast and write tripwire
+    const ctx = createMockContext({
+      executeTool: vi.fn().mockResolvedValue({ ok: false, error: 'craft.missingInput' }),
+    });
+
+    await executeSterlingStep(smokeTask, craftStep, ctx);
+
+    const metaCalls = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls;
+    const tripwireCall = metaCalls.find(
+      (c: unknown[]) => (c[1] as Record<string, unknown>)?.smoke_policy_applied === true
+    );
+    expect(tripwireCall).toBeDefined();
+    expect(tripwireCall![1]).toEqual(expect.objectContaining({
+      smoke_policy_applied: true,
+      smoke_policy_reason: 'fail_no_regen',
+      smokeNoRetry: true,
+    }));
+    // Verify fail fast: updateTaskProgress called with 'failed'
+    expect(ctx.updateTaskProgress).toHaveBeenCalledWith(
+      smokeTask.id,
+      smokeTask.progress,
+      'failed'
+    );
+    // Verify the reason is from the narrow type
+    const reason: SmokePolicyReason = tripwireCall![1].smoke_policy_reason;
+    expect(reason).toBe('fail_no_regen');
+  });
+
+  it('non-smoke task does NOT get smoke_policy_applied on verify failure', async () => {
+    const normalTask = {
+      ...smokeTask,
+      id: 'task-normal',
+      metadata: {} as Record<string, unknown>,
+    };
+    const ctx = createMockContext({
+      executeTool: vi.fn().mockResolvedValue({ ok: true }),
+      completeTaskStep: vi.fn().mockResolvedValue(false),
+    });
+
+    await executeSterlingStep(normalTask, craftStep, ctx);
+
+    const metaCalls = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls;
+    const tripwireCall = metaCalls.find(
+      (c: unknown[]) => (c[1] as Record<string, unknown>)?.smoke_policy_applied === true
+    );
+    expect(tripwireCall).toBeUndefined();
+  });
+
+  it('A/B control: without disableRegen, regen IS attempted on max-retry exhaust', async () => {
+    // Control: identical to treatment below, but disableRegen is absent.
+    // This proves the regen branch IS reachable under these conditions,
+    // so the treatment test's non-occurrence is causally due to disableRegen.
+    const controlTask = {
+      ...smokeTask,
+      metadata: {
+        source: 'sterling-smoke',
+        // disableRegen: intentionally absent
+        maxRetries: 1,
+        retryCount: 0,
+      } as Record<string, unknown>,
+    };
+    const ctx = createMockContext({
+      executeTool: vi.fn().mockResolvedValue({ ok: false, error: 'some_error' }),
+      regenerateSteps: vi.fn().mockResolvedValue({ success: false }),
+    });
+
+    await executeSterlingStep(controlTask, craftStep, ctx);
+
+    // Without disableRegen, the regen branch fires (repairCount=0 < 2, no cooldown)
+    expect(ctx.regenerateSteps).toHaveBeenCalledTimes(1);
+  });
+
+  it('A/B treatment: disableRegen prevents regen even when noRetry is absent', async () => {
+    // Treatment: identical to control above, but disableRegen is true.
+    // regenerateSteps must NOT be called — proving disableRegen has causal impact.
+    const treatmentTask = {
+      ...smokeTask,
+      metadata: {
+        source: 'sterling-smoke',
+        disableRegen: true,
+        maxRetries: 1,
+        retryCount: 0,
+      } as Record<string, unknown>,
+    };
+    const ctx = createMockContext({
+      executeTool: vi.fn().mockResolvedValue({ ok: false, error: 'some_error' }),
+      regenerateSteps: vi.fn().mockResolvedValue({ success: false }),
+    });
+
+    await executeSterlingStep(treatmentTask, craftStep, ctx);
+
+    // With disableRegen, the regen branch is skipped
+    expect(ctx.regenerateSteps).not.toHaveBeenCalled();
   });
 });

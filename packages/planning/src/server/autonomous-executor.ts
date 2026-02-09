@@ -230,6 +230,11 @@ export class StepRateLimiter {
   record(): void {
     this.timestamps.push(Date.now());
   }
+
+  /** Dev-only: clear all recorded timestamps to reset the sliding window. */
+  reset(): void {
+    this.timestamps = [];
+  }
 }
 
 const DEFAULT_OPTIONS: AutonomousExecutorOptions = {

@@ -257,4 +257,94 @@ describe('ReadinessMonitor', () => {
     monitor.stopMonitoring();
     vi.restoreAllMocks();
   });
+
+  describe('reprobeNow()', () => {
+    it('detects down→up transition and fires onChange', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      // Initial probe: minecraft down
+      mockResilientFetch.mockImplementation(async (url: string) => {
+        if (typeof url === 'string' && url.includes('3005')) return null;
+        return makeOkResponse();
+      });
+
+      const monitor = new ReadinessMonitor({
+        executionRequired: ['minecraft'],
+        endpoints: TEST_ENDPOINTS,
+      });
+      await monitor.probe();
+      expect(monitor.executorReady).toBe(false);
+
+      const onChange = vi.fn();
+      monitor.onChange(onChange);
+
+      // Minecraft comes up
+      mockResilientFetch.mockResolvedValue(makeOkResponse());
+      const result = await monitor.reprobeNow();
+
+      expect(result?.executorReady).toBe(true);
+      expect(monitor.isUp('minecraft')).toBe(true);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executorReady: true,
+          services: expect.objectContaining({
+            minecraft: expect.objectContaining({ state: 'up' }),
+          }),
+        }),
+      );
+
+      vi.restoreAllMocks();
+    });
+
+    it('does not fire onChange when state is unchanged', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      mockResilientFetch.mockResolvedValue(makeOkResponse());
+
+      const monitor = new ReadinessMonitor({
+        executionRequired: ['minecraft'],
+        endpoints: TEST_ENDPOINTS,
+      });
+      await monitor.probe();
+
+      const onChange = vi.fn();
+      monitor.onChange(onChange);
+
+      // Reprobe with same state
+      const result = await monitor.reprobeNow();
+
+      expect(result?.executorReady).toBe(true);
+      expect(onChange).not.toHaveBeenCalled();
+
+      vi.restoreAllMocks();
+    });
+
+    it('resolves the startup race — executorReady flips without waiting for periodic probe', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      // Simulate initial probe where MC is still booting
+      mockResilientFetch.mockImplementation(async (url: string) => {
+        if (typeof url === 'string' && url.includes('3005')) return null;
+        return makeOkResponse();
+      });
+
+      const monitor = new ReadinessMonitor({
+        executionRequired: ['minecraft'],
+        endpoints: TEST_ENDPOINTS,
+      });
+      await monitor.probe();
+      expect(monitor.executorReady).toBe(false);
+
+      // Start monitoring with a long interval (simulating production 120s)
+      monitor.startMonitoring(120_000);
+
+      // MC Interface finishes booting (before periodic probe fires)
+      mockResilientFetch.mockResolvedValue(makeOkResponse());
+
+      // reprobeNow() fixes the gap — no need to wait 120s
+      await monitor.reprobeNow();
+      expect(monitor.executorReady).toBe(true);
+
+      monitor.stopMonitoring();
+      vi.restoreAllMocks();
+    });
+  });
 });
