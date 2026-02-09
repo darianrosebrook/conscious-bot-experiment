@@ -5,7 +5,7 @@
 
 import { resilientFetch, TTSClient } from '@conscious-bot/core';
 import { LLMInterface } from '../cognitive-core/llm-interface';
-import { GOAL_TAG_STRIP, TTS_EXCLUDED_TYPES, TTS_STATUS_LIKE } from './constants';
+import { GOAL_TAG_STRIP, TTS_EXCLUDED_TYPES, TTS_EXCLUDED_META_TYPES, TTS_STATUS_LIKE } from './constants';
 import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
 import { broadcastThought } from '../routes/cognitive-stream-routes';
@@ -74,16 +74,20 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
         });
 
         // Speak only genuine thoughts via TTS; exclude status/system/environmental
+        // and meta-narration like "Processing intrusive thought: ..."
         const thoughtType =
           thought.type ?? thought.metadata?.thoughtType ?? 'reflection';
+        const metaType = thought.metadata?.thoughtType ?? '';
         const displayText = (thought.content || '')
           .replace(GOAL_TAG_STRIP, '')
           .trim();
         const isExcludedType = TTS_EXCLUDED_TYPES.has(String(thoughtType));
+        const isExcludedMeta = TTS_EXCLUDED_META_TYPES.has(String(metaType));
         const looksLikeStatus = TTS_STATUS_LIKE.test(displayText);
         if (
           deps.ttsClient.isEnabled &&
           !isExcludedType &&
+          !isExcludedMeta &&
           !looksLikeStatus &&
           isUsableForTTS(displayText)
         ) {

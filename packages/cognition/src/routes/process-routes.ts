@@ -692,17 +692,9 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
             response = `That hurt! I should be more careful in this area.`;
             shouldCreateTask = true;
             taskSuggestion = `Investigate and avoid the source of damage`;
-          } else if (
-            eventType === 'block_break' &&
-            eventData.oldBlock &&
-            eventData.oldBlock !== 'air'
-          ) {
-            shouldRespond = Math.random() < 0.2;
-            if (shouldRespond) {
-              response = `Interesting environmental change detected.`;
-            }
-            shouldCreateTask = false;
           }
+          // block_break events are too noisy — every block update within
+          // observation radius triggers this. Don't respond or speak.
 
           res.json({
             processed: true,

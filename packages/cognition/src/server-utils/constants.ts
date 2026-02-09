@@ -13,6 +13,13 @@ export const TTS_EXCLUDED_TYPES = new Set([
   'environmental',
 ]);
 
+/** Metadata thoughtTypes that are system narration, not the bot's voice. */
+export const TTS_EXCLUDED_META_TYPES = new Set([
+  'processing-start',    // "Processing intrusive thought: ..."
+  'thought-recording',   // "Recorded thought: ... (no immediate action)"
+  'processing-error',    // "Failed to process intrusive thought: ..."
+]);
+
 /** Content that looks like a status line (health/hunger/inventory) — do not send to TTS. */
 export const TTS_STATUS_LIKE = /^(Health|Hunger|Food|Inventory|System status):\s*\d/i;
 
