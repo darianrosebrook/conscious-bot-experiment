@@ -208,7 +208,7 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 | **I**: Epistemic planning | CB-P11, 13, 17, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling epistemic domain). P11 capsule types, reference adapter, reference fixtures (2 domains), Minecraft epistemic module (hypotheses, probes, evidence). 36 certification tests pass. | Track 2 |
 | **J**: Invariant maintenance | CB-P12, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling maintenance domain). P12 capsule types, reference adapter, reference fixtures (2 domains), Minecraft invariant module (metrics, operators). 39 certification tests pass. | Track 2 |
 | **K**: Irreversibility | CB-P13, 19, 20 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling commitment domain). P13 capsule types, reference adapter, reference fixtures (2 domains), Minecraft commitment module (tags, verifications, constraints). 36 certification tests pass. | Track 3 |
-| **L**: Contingency planning | CB-P9, 18, 19 | NOT STARTED | NONE | — | Later |
+| **L**: Contingency planning | CB-P9, 18, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling contingency domain). P09 capsule types (forced transitions + chosen actions as structurally distinct edge classes), reference adapter (BFS policy planner with tick-by-tick simulation), reference fixtures (2 domains: mining trip + SRE traffic spike), Minecraft contingency module. 53 certification tests pass. | Track 4 |
 | **M**: Risk-aware planning | CB-P10, 17, 18, 19 | NOT STARTED | NONE | — | Later |
 | **N**: Fault diagnosis | CB-P11, 15, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling diagnosis domain). P15 capsule types (wraps P11), reference adapter, reference fixtures (2 domains), Minecraft farm faults module. 45 certification tests pass. | Track 4 |
 
@@ -222,7 +222,7 @@ Three Python solver domains exist in `sterling/scripts/eval/`. This is the compl
 | Minecraft building | `building_domain.py` | `MinecraftBuildingSolver` | G |
 | Navigation | `navigation_domain.py` | `MinecraftNavigationSolver` | Certified: R2 bundle evidence, declaration registered (ST-P01), cross-language digest parity proven |
 
-Domains that do **not** exist in Python: furnace/temporal (C), hierarchical macro planner (E), valuation (F), and all later rigs.
+Domains that do **not** exist in Python: furnace/temporal (C), hierarchical macro planner (E), valuation (F), contingency (L), and Rig M.
 
 > **Key finding (2026-02-02)**: `minecraft_domain.py`'s `requires` field is a generic inventory multiset check (line 281–284). Any token name — including `proximity:villager`, `proximity:container:chest` — is checked against `inventory.get(name, 0) >= count` and NOT consumed on rule application. This means `acq:trade:*`, `acq:loot:*`, and `acq:salvage:*` rules (all `actionType: 'craft'`) work natively in the Python solver with zero code changes. Context tokens just need to be injected into the initial inventory dict. No separate "acquisition domain" is needed in Python.
 
@@ -908,9 +908,39 @@ All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`)
 
 ---
 
-## Rigs L–M: Not started
+## Rig L — Contingency Planning with Exogenous Events (P09)
 
-These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Later (L–M) priority ordering.
+**Primitive**: CB-P9 (contingency planning with forced transitions)
+**Contract**: CONTRACT-CERTIFIED — P09 capsule + reference adapter (BFS policy planner with tick-by-tick simulation) + 2-domain fixtures + Minecraft contingency module + 53 certification tests
+**E2E**: NONE — no contingency planning domain in Python. All trigger evaluation, forced transition application, policy branching, and safety verification are TS-only.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P09 capsule contract types (domain-agnostic) | `sterling/primitives/p09/p09-capsule-types.ts` | `P09ChosenActionEdgeV1`, `P09ForcedTransitionEdgeV1` (structurally distinct via `edgeKind` discriminant), `P09TimeIndexedStateV1` (tick is part of canonical identity), `P09TriggerConditionV1` (tick_interval + threshold modes), `P09ActionResultV1` (intermediate forced transitions + safety violation tracking), `P09SafetyInvariantV1`, `P09PolicyNodeV1` (with `forcedAppliedAtTick` structural guard), `P09ContingencyPolicyV1` (tree of nodes + branches), `P09ContingencyAdapter` interface (with injectable `now()` clock); 5 invariants |
+| Reference adapter (BFS policy planner) | `sterling/primitives/p09/p09-reference-adapter.ts` | `P09ReferenceAdapter` — `applyChosenAction` (tick-by-tick simulation: evaluates triggers and applies forced transitions at every intermediate tick during action duration; returns `P09ActionResultV1` with `intermediateForced`, `safetyViolatedDuringAction`, `violatedInvariantIds`; returns null on failed precondition), `applyForcedTransition` (never returns null), `evaluateTriggers` (sorted, deterministic), `checkSafety`/`checkAllSafety`, `planContingency` (BFS with forced-first expansion, MAX_POLICY_NODES cap, injectable `now()` clock) |
+| Reference fixtures (2 domains) | `sterling/primitives/p09/p09-reference-fixtures.ts` | Mining Trip (nightfall at t=200, hunger every 80 ticks, mob damage at light=0, starvation at food=0; 5 chosen actions; 2 safety invariants) + SRE Traffic Spike (spike at t=100, cache expire at t=120, SLA breach on error_rate; 5 chosen actions; 2 safety invariants) |
+| Minecraft contingency module | `contingency/minecraft-contingency.ts` | `MINECRAFT_FORCED_TRANSITIONS` (4), `MINECRAFT_TRIGGERS` (4), `MINECRAFT_CONTINGENCY_ACTIONS` (5), `MINECRAFT_SAFETY_INVARIANTS` (2), `MINECRAFT_MINING_TRIP_INITIAL`, `MINECRAFT_CONTINGENCY_PARAMS` |
+| Certification test suite | `sterling/__tests__/certification-rig-l.test.ts` | 53 tests across 9 describe blocks |
+
+### Certification checklist
+
+- [x] **L.1 — P09 capsule types**: Domain-agnostic types with structurally distinct edge classes (`edgeKind: 'chosen' | 'forced'`). Time-indexed state with tick as part of canonical identity. Trigger conditions with `tick_interval` and `threshold` modes. `P09ActionResultV1` captures intermediate forced transitions, safety violations during action execution, and violated invariant IDs. Policy tree with nodes (including `forcedAppliedAtTick` structural guard), branches, total/depth/branching metrics. Safety invariants as property minimum predicates. 5 invariants defined. `MAX_HORIZON = 1000`, `MAX_BRANCH_FACTOR = 8`, `MAX_POLICY_NODES = 200`.
+
+- [x] **L.2 — Reference adapter**: `P09ReferenceAdapter` with BFS policy planner. `applyChosenAction()` performs tick-by-tick simulation during action duration — evaluates triggers and applies forced transitions at every intermediate tick, returning `P09ActionResultV1` with `intermediateForced`, `safetyViolatedDuringAction`, `violatedInvariantIds`; returns null if preconditions unmet. This is the core P09 guarantee: forced transitions cannot be skipped even when a chosen action spans over their scheduled tick. `applyForcedTransition()` always applies (never null). `evaluateTriggers()` sorted lexicographically for determinism. `planContingency()` processes forced transitions before chosen actions at each node (forced-first expansion), populates `forcedAppliedAtTick` on every policy node, accepts optional `now()` clock for timing (no `Date.now()` nondeterminism), respects all three bounds. `checkSafety()`/`checkAllSafety()` verify state against property minimums.
+
+- [x] **L.3 — Reference fixtures (2 domains)**: Mining Trip domain (nightfall forced at t=200 via tick_interval, hunger forced every 80 ticks, mob damage threshold at light_level=0, starvation threshold at food=0; mine_ore/eat_food/build_shelter/retreat_to_surface/idle chosen actions; stay_alive + no_starvation safety invariants). SRE Traffic Spike domain (traffic_spike at t=100, cache_invalidation at t=120, SLA breach at error_rate threshold; scale_up/warm_cache/enable_rate_limit/rollback_deploy/monitor chosen actions; budget_positive safety invariant). Both prove adapter domain-agnosticism.
+
+- [x] **L.4 — Minecraft contingency module**: `MINECRAFT_FORCED_TRANSITIONS` (mc_hunger_tick, mc_nightfall, mc_mob_damage, mc_starvation). `MINECRAFT_TRIGGERS` (mc_trigger_hunger, mc_trigger_nightfall, mc_trigger_mob_spawn, mc_trigger_starvation). `MINECRAFT_CONTINGENCY_ACTIONS` (mc_mine_ore, mc_eat_bread, mc_build_shelter, mc_craft_torch, mc_return_home). `MINECRAFT_SAFETY_INVARIANTS` (mc_stay_alive, mc_no_starvation). Pure configuration module with barrel export.
+
+- [x] **L.5 — Certification suite**: `certification-rig-l.test.ts` — 53 tests covering: forced transition application (Pivot 1, 7 tests including multi-tick spanning proof), deterministic policy branching (Pivot 2, 4 tests), safety under forced transitions (Pivot 3, 6 tests), bounded contingency plan (Pivot 4, 7 tests), deterministic trigger evaluation (Pivot 5, 6 tests), chosen action mechanics (8 tests including intermediate forced transitions and mid-execution safety violation), multi-domain portability (6 tests), Minecraft contingency module (5 tests), contract metadata (4 tests).
+
+---
+
+## Rig M: Not started
+
+This rig is documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig template. Implementation follows after L.
 
 ### Post-certification order (remaining rigs):
 
@@ -933,9 +963,9 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 6. **Rig K** — Irreversibility (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
 
 7. **Rig N** — Fault diagnosis (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
+8. **Rig L** — Contingency planning (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
 
-### Later (requires A–K contract-certified):
-8. **Rig L** — Contingency planning (nightfall/hunger)
+### Later:
 9. **Rig M** — Risk-aware planning (lava, nether)
 
 ---
