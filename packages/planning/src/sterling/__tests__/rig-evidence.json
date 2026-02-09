@@ -1,23 +1,23 @@
 {
-  "generatedAt": "2026-02-09T10:27:00Z",
+  "generatedAt": "2026-02-09T12:51:00Z",
   "hjkBaselineCommitSHA": "1c270aa541f9fffc7da8f5c671b7e61069b01ab4",
   "baseCommitSHA": "35784172947b114ff7ddb6069f6cefbc2e9aa410",
-  "auditedAgainstCommitSHA": "35784172947b114ff7ddb6069f6cefbc2e9aa410",
+  "auditedAgainstCommitSHA": "edc1a6e",
   "manifestPath": "packages/planning/src/sterling/__tests__/rig-evidence.json",
   "manifestAnchor": "git log -n 1 -- packages/planning/src/sterling/__tests__/rig-evidence.json",
   "platform": "darwin-arm64",
   "nodeVersion": "v22.19.0",
   "vitestVersion": "3.2.4",
   "repoDirty": false,
-  "repoDirtyNote": "Generated after rig code commit (3578417); docs and evidence committed in follow-up commit.",
+  "repoDirtyNote": "Evidence regenerated after Rig L code commit edc1a6e.",
   "combinedRun": {
-    "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-h.test.ts packages/planning/src/sterling/__tests__/certification-rig-j.test.ts packages/planning/src/sterling/__tests__/certification-rig-k.test.ts packages/planning/src/sterling/__tests__/certification-rig-n.test.ts",
+    "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-h.test.ts packages/planning/src/sterling/__tests__/certification-rig-j.test.ts packages/planning/src/sterling/__tests__/certification-rig-k.test.ts packages/planning/src/sterling/__tests__/certification-rig-n.test.ts packages/planning/src/sterling/__tests__/certification-rig-l.test.ts",
     "result": "pass",
-    "totalTests": 157,
-    "totalPassed": 157,
+    "totalTests": 210,
+    "totalPassed": 210,
     "totalFailed": 0,
-    "wallDurationMs": 672,
-    "testDurationMs": 71
+    "wallDurationMs": 610,
+    "testDurationMs": 122
   },
   "suites": {
     "rig-h": {
@@ -26,7 +26,7 @@
       "tests": 37,
       "passed": 37,
       "failed": 0,
-      "durationMs": 20,
+      "durationMs": 21,
       "invariants": [
         "deterministic_evaluation",
         "bounded_design",
@@ -44,7 +44,7 @@
       "tests": 39,
       "passed": 39,
       "failed": 0,
-      "durationMs": 7,
+      "durationMs": 9,
       "invariants": [
         "metric_buckets",
         "deterministic_drift",
@@ -76,7 +76,7 @@
       "tests": 45,
       "passed": 45,
       "failed": 0,
-      "durationMs": 30,
+      "durationMs": 21,
       "invariants": [
         "deterministic_probe_scoring",
         "belief_update_deterministic",
@@ -88,6 +88,22 @@
       "deviations": [
         "CI fixture override: confidenceThreshold 0.7 (capsule default is 0.8). Domain parameterization choice, not a P15 capability limitation. P11 ProbBucket discretization (0.1 increments) limits achievable confidence with this fixture's 4 hypotheses and 4 probes. Farm domain uses full 0.8 default. diagnose_repair_validate_order invariant exercised at both thresholds."
       ]
+    },
+    "rig-l": {
+      "file": "packages/planning/src/sterling/__tests__/certification-rig-l.test.ts",
+      "command": "npx vitest run packages/planning/src/sterling/__tests__/certification-rig-l.test.ts",
+      "tests": 53,
+      "passed": 53,
+      "failed": 0,
+      "durationMs": 63,
+      "invariants": [
+        "forced_transition_application",
+        "deterministic_policy_branching",
+        "safety_under_forced_transitions",
+        "bounded_contingency_plan",
+        "deterministic_trigger_evaluation"
+      ],
+      "deviations": []
     }
   },
   "capsuleSurfaces": {
@@ -122,12 +138,21 @@
       "domainModule": "packages/planning/src/diagnosis/minecraft-farm-faults.ts",
       "certificationSuite": "packages/planning/src/sterling/__tests__/certification-rig-n.test.ts",
       "barrelExport": "packages/planning/src/sterling/primitives/p15/index.ts"
+    },
+    "rig-l": {
+      "capsuleTypes": "packages/planning/src/sterling/primitives/p09/p09-capsule-types.ts",
+      "referenceAdapter": "packages/planning/src/sterling/primitives/p09/p09-reference-adapter.ts",
+      "referenceFixtures": "packages/planning/src/sterling/primitives/p09/p09-reference-fixtures.ts",
+      "domainModule": "packages/planning/src/contingency/minecraft-contingency.ts",
+      "certificationSuite": "packages/planning/src/sterling/__tests__/certification-rig-l.test.ts",
+      "barrelExport": "packages/planning/src/sterling/primitives/p09/index.ts"
     }
   },
   "separationAudit": {
     "capsuleTypesImportMcModules": false,
     "adapterImportsNonCapsule": false,
     "adapterUsesDateNowOrRandom": false,
+    "adapterUsesDateNowOrRandomNote": "P09 adapter accepts an optional now() clock parameter for durationMs metadata. When omitted, durationMs defaults to 0. No nondeterminism in policy output.",
     "fixturesImportAdapter": false,
     "domainModulesImportAdapter": false,
     "hiddenPythonRouting": false
@@ -136,7 +161,8 @@
     "rig-h": "NONE — no Python design domain",
     "rig-j": "NONE — no Python maintenance domain",
     "rig-k": "NONE — no Python commitment domain",
-    "rig-n": "NONE — no Python diagnosis domain"
+    "rig-n": "NONE — no Python diagnosis domain",
+    "rig-l": "NONE — no Python contingency domain"
   },
   "evidenceLevel": "Contract certification only. No claim is made about planner search optimality or Python solve performance."
 }
