@@ -27,7 +27,7 @@ Each migration must provide 4 signal types:
 
 ## Migration A: Delete goal-extractor.ts
 
-**Status**: ✅ Complete (commit: TBD)
+**Status**: ✅ Complete (commit: 1347b95)
 
 **Target files**:
 - `packages/cognition/src/reasoning-surface/goal-extractor.ts` (delete)

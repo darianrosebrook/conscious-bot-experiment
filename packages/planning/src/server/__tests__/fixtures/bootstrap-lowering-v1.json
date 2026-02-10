@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical bootstrap lowering contract fixture — v1. Both Sterling (Python) and Planning (TypeScript) test suites assert against this shape. Changes require updating both sides.",
+  "_comment": "Canonical bootstrap lowering contract fixture — v1. Both Sterling (Python) and Planning (TypeScript) test suites assert against this shape. Changes require updating both sides. See docs/closeouts/autonomy_pipeline_hardening_closeout_2026-02-10.md §C for bump procedure.",
   "schema_version": "bootstrap_lowering_v1",
   "required_step_keys": ["leaf", "args"],
   "required_args_keys": ["lowered_from", "theme"],
