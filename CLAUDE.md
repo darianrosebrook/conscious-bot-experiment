@@ -52,9 +52,19 @@ Important: these tests must drive the solver down the “solved” path. If mock
 
 ### R2. Live-backend end-to-end evidence (integration-level)
 
-At least one integration test must instantiate the actual solver class and call it against a real Sterling backend (WebSocket server), then assert on `solveMeta`.
+At least one integration test must instantiate the actual solver class and call it against the Sterling backend (WebSocket server), then assert on `solveMeta`.
 
 This is different from the existing raw-WebSocket integration tests, which bypass TypeScript solver code entirely.
+
+**Starting Sterling:** Sterling lives at `../sterling` (sibling directory). Start it before running E2E tests:
+
+```bash
+cd ../sterling && source .venv/bin/activate && python scripts/utils/sterling_unified_server.py &
+# Wait for "Waiting for connections..." then return to conscious-bot
+cd ../conscious-bot
+```
+
+Or use the E2E script which starts Sterling automatically: `bash scripts/run-e2e.sh`
 
 Minimum required integration test:
 
@@ -66,9 +76,9 @@ Minimum required integration test:
   - bundle input hashes are non-empty strings
   - bundle output `stepsDigest` matches the returned steps (recompute hash locally and compare)
   - bundle output `durationMs`, `solutionPathLength`, `totalNodes` match (or are consistent with) backend-provided metrics
-  - if `searchHealth` is absent, assert it’s `undefined` (not present), and this is an expected pre-Python-change behavior
+  - if `searchHealth` is absent, assert it's `undefined` (not present), and this is an expected pre-Python-change behavior
 
-If this test is flaky due to environment, it must be gated behind a tag (e.g. `describeIf(process.env.STERLING_E2E)`), but it must exist and be runnable in CI environments that have Sterling available.
+These tests are gated behind `STERLING_E2E=1` so they don't fail in environments where Sterling hasn't been started yet. To run them:
 
 ### R3. Payload-equivalence regression snapshot (contract-level)
 
@@ -154,8 +164,21 @@ Unit (sterling/planning only):
 Typecheck:
 - `npx tsc --noEmit`
 
-E2E (requires Sterling running):
-- `npx vitest run packages/planning/src/sterling/__tests__/tool-progression-solver-e2e.test.ts`
+E2E (start Sterling first, then run with the gate enabled):
+```bash
+# Terminal 1: start Sterling (lives at ../sterling — we own it)
+cd ../sterling && source .venv/bin/activate && python scripts/utils/sterling_unified_server.py
+
+# Terminal 2: run E2E tests
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/tool-progression-solver-e2e.test.ts
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/performance-baseline-e2e.test.ts
+```
+
+Or use the all-in-one script that starts Sterling automatically:
+```bash
+bash scripts/run-e2e.sh
+```
 
 ---
 

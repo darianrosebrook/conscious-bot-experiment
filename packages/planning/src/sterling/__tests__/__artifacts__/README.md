@@ -27,14 +27,22 @@ The stick baseline shows wider heuristic range (`hMin=0, hMax=4, hVariance=3.0`)
 
 ## Regeneration
 
-```bash
-# Start Sterling server
-cd /path/to/sterling
-python scripts/utils/sterling_unified_server.py &
+Sterling lives at `../sterling` (sibling directory — we own it). Start it, then run the E2E tests:
 
-# Run E2E test (generates artifact)
+```bash
+# Terminal 1: start Sterling
+cd ../sterling && source .venv/bin/activate
+python scripts/utils/sterling_unified_server.py
+# Wait for "Waiting for connections..."
+
+# Terminal 2: regenerate artifacts
 cd /path/to/conscious-bot
 STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+```
+
+Or use the all-in-one script (starts Sterling automatically):
+```bash
+bash scripts/run-e2e.sh
 ```
 
 ## Verification Criteria
@@ -56,15 +64,16 @@ These fields vary between runs and are excluded from `bundleHash`:
 
 ## CI Stance
 
-E2E tests are gated behind `STERLING_E2E=1` and require a running Sterling server. Current stance: **local-only execution**.
+E2E tests are gated behind `STERLING_E2E=1`. The `run-e2e.sh` script handles starting Sterling automatically from `../sterling`.
 
-Blocking follow-up: CI integration requires a Sterling Docker container or service. Until then, evidence is the committed artifact from local runs.
+For CI environments: Sterling should be started as a service step before running E2E tests. The `STERLING_DIR` environment variable can override the default `../sterling` path if the CI layout differs.
 
 To verify locally:
 ```bash
-# Solver-class E2E (bundle evidence)
-STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+# All-in-one (starts Sterling, runs all E2E suites):
+bash scripts/run-e2e.sh
 
-# Performance baselines (A.5)
+# Manual (if Sterling is already running):
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
 STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/performance-baseline-e2e.test.ts
 ```

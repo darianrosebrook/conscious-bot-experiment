@@ -433,7 +433,7 @@ describe.skipIf(!SYSTEM_E2E)('System E2E: Cross-service pipelines', () => {
         status: 'skip',
         durationMs: nowMs() - start,
         steps: [{ action: 'skip', detail: 'No task_id from Scenario 2' }],
-        gap: 'Scenario 2 did not produce a task_id (dev endpoints or Sterling not available)',
+        gap: 'Scenario 2 did not produce a task_id (dev endpoints or Sterling not started — start it from ../sterling)',
       });
       return;
     }

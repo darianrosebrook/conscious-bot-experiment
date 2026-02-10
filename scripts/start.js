@@ -11,7 +11,7 @@
  * - Provides health monitoring
  * - Handles graceful shutdown
  *
- * Sterling: set STERLING_DIR or clone Sterling to ../sterling to enable.
+ * Sterling: lives at ../sterling by default. Override with STERLING_DIR env var if needed.
  *
  * Usage:
  *   node scripts/start.js                  # Default (progress bars during boot, streaming after)
@@ -1469,8 +1469,12 @@ async function mainVerbose() {
   log('\nStarting services in dependency order...', colors.cyan);
   if (!sterlingAvailable) {
     log(
-      `  Sterling repo not found at ${sterlingDir}, skipping Sterling service`,
+      `  Sterling not found at ${sterlingDir} — skipping Sterling service`,
       colors.yellow
+    );
+    log(
+      `     Set up: cd ${sterlingDir} && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`,
+      colors.cyan
     );
   }
   log('');
@@ -1859,11 +1863,15 @@ async function mainVerbose() {
     }
   } else {
     log(
-      `  ℹ️  Sterling not started (repo not found at ${sterlingDir})`,
+      `  ℹ️  Sterling not started (not found at ${sterlingDir})`,
       colors.yellow
     );
     log(
-      '     To enable: clone Sterling to ../sterling or set STERLING_DIR',
+      `     Set up: cd ${sterlingDir} && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`,
+      colors.cyan
+    );
+    log(
+      '     Override path: set STERLING_DIR env var',
       colors.cyan
     );
   }

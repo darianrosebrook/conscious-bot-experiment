@@ -16,8 +16,8 @@ const originalFetch = globalThis.fetch;
 beforeAll(() => {
   // Block outbound fetch by default. Tests that need it should mock fetch
   // explicitly via vi.spyOn(globalThis, 'fetch').
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  globalThis.fetch = (async (input: string | URL | Request, _init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as { url: string }).url;
     throw new Error(
       `[HermeticityViolation] Unguarded fetch to "${url}" — ` +
       `tests must not make real network requests. ` +

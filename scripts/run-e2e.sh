@@ -137,9 +137,11 @@ if [[ "$STERLING_RUNNING" == false ]]; then
 
   if [[ ! -x "$STERLING_PYTHON" ]]; then
     warn "Sterling venv not found at $STERLING_PYTHON"
+    warn "Set up: cd $STERLING_DIR && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
     warn "Sterling E2E tests will be skipped"
   elif [[ ! -f "$STERLING_SCRIPT" ]]; then
     warn "Sterling server script not found at $STERLING_SCRIPT"
+    warn "Expected at: $STERLING_DIR/scripts/utils/sterling_unified_server.py"
     warn "Sterling E2E tests will be skipped"
   else
     info "Starting Sterling server..."
@@ -170,7 +172,8 @@ if [[ "$STERLING_RUNNING" == false ]]; then
     if [[ "$STERLING_RUNNING" == true ]]; then
       ok "Sterling server is ready (PID $STERLING_PID)"
     else
-      warn "Sterling did not become ready in time — Sterling E2E tests will be skipped"
+      warn "Sterling did not become ready in 60s — Sterling E2E tests will be skipped"
+      warn "Try starting manually: cd $STERLING_DIR && source .venv/bin/activate && python scripts/utils/sterling_unified_server.py"
       # Kill the hung process
       if [[ -n "$STERLING_PID" ]] && kill -0 "$STERLING_PID" 2>/dev/null; then
         kill "$STERLING_PID" 2>/dev/null || true
@@ -270,24 +273,24 @@ skip_suite() {
   echo ""
 }
 
-# Suite 1: Solver class E2E (requires Sterling)
+# Suite 1: Solver class E2E (needs Sterling — start it above or manually)
 if [[ "$STERLING_RUNNING" == true ]]; then
   run_suite \
     "Solver Class E2E" \
     "STERLING_E2E=1" \
     "packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts"
 else
-  skip_suite "Solver Class E2E" "Sterling not available"
+  skip_suite "Solver Class E2E" "Sterling not started (see setup instructions above)"
 fi
 
-# Suite 2: Performance baseline E2E (requires Sterling)
+# Suite 2: Performance baseline E2E (needs Sterling)
 if [[ "$STERLING_RUNNING" == true ]]; then
   run_suite \
     "Performance Baseline E2E" \
     "STERLING_E2E=1" \
     "packages/planning/src/sterling/__tests__/performance-baseline-e2e.test.ts"
 else
-  skip_suite "Performance Baseline E2E" "Sterling not available"
+  skip_suite "Performance Baseline E2E" "Sterling not started (see setup instructions above)"
 fi
 
 # Suite 3: Tool progression integration (auto-detect)

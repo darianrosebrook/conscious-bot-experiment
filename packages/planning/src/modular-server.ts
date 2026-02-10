@@ -4261,7 +4261,7 @@ async function startServer() {
         sterlingService?.getServerBanner(timeoutMs) ?? Promise.resolve(null),
       sendLanguageIOReduce: (envelope, timeoutMs) =>
         sterlingService?.sendLanguageIOReduce(envelope, timeoutMs) ??
-        Promise.resolve({ success: false, error: 'Sterling not available' }),
+        Promise.resolve({ success: false, error: 'Sterling not connected — start it from ../sterling' }),
       getTaskInventory: () => {
         const all = taskIntegration.getTasks();
         const counts: Record<string, number> = {};

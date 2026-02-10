@@ -28,7 +28,7 @@ Evidence: unit tests, golden-master snapshots, transfer tests, linter hardening,
 | PARTIAL | Python solver domain exists; some paths/strategies tested E2E, others not. Coverage set listed explicitly. |
 | E2E-PROVEN | All primary paths/strategies exercised through real Sterling server with `STERLING_E2E=1` gated tests. SearchHealth flows. |
 
-Evidence: E2E tests gated behind `STERLING_E2E=1`, real server traces, returned SearchHealth metrics.
+Evidence: E2E tests gated behind `STERLING_E2E=1`, real server traces, returned SearchHealth metrics. To run: start Sterling (`cd ../sterling && source .venv/bin/activate && python scripts/utils/sterling_unified_server.py`), then `STERLING_E2E=1 npx vitest run ...`. Or use `bash scripts/run-e2e.sh` which handles Sterling startup automatically.
 
 "PARTIAL" requires an explicit **E2E coverage set** — the list of paths/strategies that are and are not proven. This prevents hand-waving.
 
@@ -986,7 +986,7 @@ CONTRACT-CERTIFIED proves the **contract shape** — wire payload stability, bun
 
 A rig reaches E2E-PROVEN when, in addition to contract certification:
 
-4. **Solver E2E tests** — At least one test (gated behind `STERLING_E2E=1`) instantiates the real TS solver class, connects to a live Sterling Python server, solves a representative problem, and asserts on:
+4. **Solver E2E tests** — At least one test (gated behind `STERLING_E2E=1`) instantiates the real TS solver class, connects to the Sterling Python server (start it from `../sterling`), solves a representative problem, and asserts on:
    - `solveMeta.bundles` shape and content
    - `searchHealth` metrics flowing from Python → TS
    - `stepsDigest` matching returned steps
