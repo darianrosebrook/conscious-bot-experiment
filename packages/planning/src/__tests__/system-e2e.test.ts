@@ -1,7 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import path from 'node:path';
 
-// @ts-expect-error — cross-workspace relative import; resolves at runtime
 import {
   httpGet,
   httpPost,

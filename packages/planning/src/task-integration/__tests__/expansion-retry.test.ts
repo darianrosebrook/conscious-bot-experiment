@@ -241,7 +241,6 @@ import {
   normalizeBlockedReason,
   TRANSIENT_EXPANSION_REASONS as TRANSIENT_SET,
   CONTRACT_BROKEN_REASONS as CONTRACT_BROKEN_SET,
-  BLOCKED_REASON_TTL_POLICY,
 } from '../../task-lifecycle/task-block-evaluator';
 
 describe('unknown Sterling blocked_reason normalization (evidence artifact)', () => {

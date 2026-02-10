@@ -23,6 +23,7 @@ vi.mock('../navigation-bridge', () => ({
 
 import { ActionTranslator } from '../action-translator';
 import { ACTION_CONTRACTS } from '../action-contract-registry';
+import type { MinecraftActionType } from '../types';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -1123,7 +1124,7 @@ describe('action dispatch contract', () => {
 
       for (const actionType of Object.keys(ACTION_CONTRACTS)) {
         const result = await translator.executeAction({
-          type: actionType,
+          type: actionType as MinecraftActionType,
           parameters: minimalArgs[actionType] ?? {},
           timeout: 1000,
         });

@@ -950,7 +950,6 @@ function getMinimalValidArgs(leaf: string): Record<string, unknown> {
     // Item / inventory
     use_item: { item: 'bread' },
     manage_inventory: { action: 'sort' },
-    open_container: { containerType: 'chest' },
     // Farming
     till_soil: {},
     manage_farm: {},

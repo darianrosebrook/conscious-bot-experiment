@@ -293,8 +293,8 @@ describe('Rig C - Temporal state determinism', () => {
     const blocks1 = ['furnace', 'furnace', 'crafting_table'];
     const blocks2 = ['crafting_table', 'furnace', 'furnace'];
 
-    const slots1 = inferSlotsFromBlocks(blocks1);
-    const slots2 = inferSlotsFromBlocks(blocks2);
+    const slots1 = inferSlotsFromBlocks(blocks1, 0);
+    const slots2 = inferSlotsFromBlocks(blocks2, 0);
 
     // Same blocks (regardless of order) → same slot count
     const furnaceSlots1 = slots1.filter(s => s.type === 'furnace');

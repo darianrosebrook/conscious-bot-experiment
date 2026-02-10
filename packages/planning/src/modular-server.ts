@@ -224,9 +224,8 @@ import { BotStateCache } from './goal-formulation/bot-state-cache';
 import { ReflexRegistry } from './goal-formulation/reflex-registry';
 import { ExplorationDriveshaftController } from './goal-formulation/exploration-driveshaft-controller';
 
-// Extend global interface for rate limiting variables
+// Extend global interface for rate limiting variables and reflex system.
 declare global {
-  var lastNoTasksLog: number | undefined;
   var lastTaskCount: number | undefined;
   var lastTaskCountLog: number | undefined;
   var lastMcpWarnLog: number | undefined;
@@ -236,18 +235,18 @@ declare global {
   /** Hunger driveshaft controller instance (gated by ENABLE_AUTONOMY_REFLEXES) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   var hungerDriveshaft: any;
-  /** Reflex registry instance (gated by ENABLE_AUTONOMY_REFLEXES) */
+  /** Reflex registry instance (gated by ENABLE_AUTONOMY_REFLEXES). Typed as `any` to avoid src/ vs dist/ nominal conflicts in `declare global`. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var reflexRegistry: ReflexRegistry | undefined;
+  var reflexRegistry: any;
   /** BotState cache instance (gated by ENABLE_AUTONOMY_REFLEXES) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var botStateCache: BotStateCache | undefined;
+  var botStateCache: any;
   /** Exploration driveshaft controller instance (gated by ENABLE_AUTONOMY_REFLEXES) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var explorationDriveshaft: ExplorationDriveshaftController | undefined;
+  var explorationDriveshaft: any;
   /** Lifecycle emitter shared by all reflexes (gated by ENABLE_AUTONOMY_REFLEXES) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var reflexEmitter: RecordingLifecycleEmitter | undefined;
+  var reflexEmitter: any;
   /** Metadata drop counter for diagnostics (P11) */
   var metadataDropCount: number | undefined;
 }
@@ -1841,8 +1840,8 @@ async function autonomousTaskExecutor() {
         const isDryRun = executorMode !== 'live';
         const tickResult = await global.reflexRegistry.evaluateTick(
           idleReason,
-          (data) => taskIntegration.addTask(data),
-          (filters) => {
+          (data: any) => taskIntegration.addTask(data),
+          (filters: any) => {
             // Adapter: goalkey guard passes { status: ['pending', 'active'] }
             // but taskIntegration.getTasks expects a single status value.
             // Return all tasks from both statuses.
@@ -3485,7 +3484,7 @@ serverConfig.addEndpoint('get', '/reflexes/status', (_req, res) => {
   const registered = global.reflexRegistry.getRegistered();
   res.json({
     initialized: true,
-    reflexes: registered.map((r) => ({
+    reflexes: registered.map((r: any) => ({
       name: r.name,
       priority: r.priority,
       canPreempt: r.canPreempt,
@@ -3996,16 +3995,16 @@ async function startServer() {
           name: 'hunger-critical',
           priority: 0,
           canPreempt: true,
-          evaluate: async (botState, _idleReason, opts) => {
+          evaluate: async (botState: any, _idleReason: any, opts: any) => {
             if (botState.food === undefined) return null;
             const state = { food: botState.food, inventory: botState.inventory ?? [] };
             if (!global.hungerDriveshaft.isCritical(state)) return null;
             const result = await global.hungerDriveshaft.evaluate(state, 'no_tasks', opts);
             return result ? { ...result, builderName: 'hunger-driveshaft-controller' } : null;
           },
-          onEnqueued: (rid, tid, gid) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
-          onSkipped: (rid, gid, reason) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
-          onTaskTerminal: (task, afterState) => {
+          onEnqueued: (rid: string, tid: string, gid: string) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
+          onSkipped: (rid: string, gid: string, reason: string) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
+          onTaskTerminal: (task: any, afterState: any) => {
             const rid = task.metadata?.reflexInstanceId;
             if (!rid) return;
             const acc = global.hungerDriveshaft.getAccumulator(rid);
@@ -4036,7 +4035,7 @@ async function startServer() {
           name: 'hunger',
           priority: 10,
           canPreempt: false,
-          evaluate: async (botState, idleReason, opts) => {
+          evaluate: async (botState: any, idleReason: any, opts: any) => {
             if (botState.food === undefined) return null;
             const result = await global.hungerDriveshaft.evaluate(
               { food: botState.food, inventory: botState.inventory ?? [] },
@@ -4045,9 +4044,9 @@ async function startServer() {
             );
             return result ? { ...result, builderName: 'hunger-driveshaft-controller' } : null;
           },
-          onEnqueued: (rid, tid, gid) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
-          onSkipped: (rid, gid, reason) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
-          onTaskTerminal: (task, afterState) => {
+          onEnqueued: (rid: string, tid: string, gid: string) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
+          onSkipped: (rid: string, gid: string, reason: string) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
+          onTaskTerminal: (task: any, afterState: any) => {
             // Same handler as hunger-critical — shared controller instance
             const rid = task.metadata?.reflexInstanceId;
             if (!rid) return;
@@ -4088,13 +4087,13 @@ async function startServer() {
           name: 'exploration',
           priority: 20,
           canPreempt: false,
-          evaluate: (botState, idleReason, opts) =>
+          evaluate: (botState: any, idleReason: any, opts: any) =>
             global.explorationDriveshaft!.evaluate(botState, idleReason, opts),
-          onEnqueued: (rid, tid, gid) =>
+          onEnqueued: (rid: string, tid: string, gid: string) =>
             global.explorationDriveshaft!.emitTaskEnqueued(rid, tid, gid),
-          onSkipped: (rid, gid, reason, eid) =>
+          onSkipped: (rid: string, gid: string, reason: string, eid?: string) =>
             global.explorationDriveshaft!.emitTaskEnqueueSkipped(rid, gid, reason, eid),
-          onTaskTerminal: (task, afterState) =>
+          onTaskTerminal: (task: any, afterState: any) =>
             global.explorationDriveshaft!.onTaskTerminal(task, afterState),
         });
 

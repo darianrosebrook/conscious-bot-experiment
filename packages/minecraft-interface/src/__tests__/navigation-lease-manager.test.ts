@@ -321,7 +321,7 @@ describe('NavigationLeaseManager', () => {
     manager.acquire('safety', 'emergency');
     // Safety still holds the lease
 
-    const result = await manager.withLease(
+    const result = await manager.withLease<{ success: boolean; error?: string }>(
       'planner',
       'normal',
       async () => ({ success: true }),
@@ -334,7 +334,7 @@ describe('NavigationLeaseManager', () => {
 
   it('withLease returns busyResult when busy but not preempted', async () => {
     manager.acquire('other');
-    const result = await manager.withLease(
+    const result = await manager.withLease<{ success: boolean; error?: string }>(
       'planner',
       'normal',
       async () => ({ success: true }),
