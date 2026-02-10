@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: 30000,
     clearMocks: true,
     restoreMocks: true,
+    setupFiles: ['./vitest.setup.ts'],
   },
   esbuild: {
     target: 'node18',

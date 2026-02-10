@@ -211,6 +211,7 @@ describe('expansion retry — TRANSIENT_EXPANSION_REASONS classification', () =>
     'blocked_missing_schema_version',
     'blocked_routing_disabled',
     'blocked_invalid_steps_bundle',
+    'blocked_invalid_ir_bundle',
     'blocked_envelope_id_mismatch',
   ];
 
@@ -230,67 +231,81 @@ describe('expansion retry — TRANSIENT_EXPANSION_REASONS classification', () =>
 // ============================================================================
 // Unknown Sterling blocked_reason normalization — live evidence artifact
 // ============================================================================
-// This test proves the full normalization path: an unrecognized Sterling reason
-// gets mapped to blocked_executor_error (transient), preserving the original,
-// and is never misclassified as contract-broken or silently auto-failed.
+// This test proves the normalization path for unrecognized Sterling reasons:
+// - Unknown "blocked_*" reasons → contract_broken (fail-fast, 30s TTL).
+//   New Sterling-side blocked reasons are likely deterministic and shouldn't retry.
+// - Unknown non-"blocked_*" reasons → transient (retryable via backoff).
+//   Infrastructure errors that may resolve on retry.
 
-import { normalizeBlockedReason, TRANSIENT_EXPANSION_REASONS as TRANSIENT_SET } from '../../task-lifecycle/task-block-evaluator';
+import {
+  normalizeBlockedReason,
+  TRANSIENT_EXPANSION_REASONS as TRANSIENT_SET,
+  CONTRACT_BROKEN_REASONS as CONTRACT_BROKEN_SET,
+  BLOCKED_REASON_TTL_POLICY,
+} from '../../task-lifecycle/task-block-evaluator';
 
 describe('unknown Sterling blocked_reason normalization (evidence artifact)', () => {
-  // Simulate: Sterling returns a reason we've never seen in TS code
-  const unknownSterlingReason = 'blocked_new_solver_beta_v3_rate_limited';
+  // Unknown "blocked_*" reasons are treated as contract_broken (fail-fast).
+  // This prevents new Sterling-side deterministic failures from being silently retried.
+  const unknownBlockedReason = 'blocked_new_solver_beta_v3_rate_limited';
 
-  it('normalizes unknown reason to blocked_executor_error', () => {
-    const { reason, originalReason } = normalizeBlockedReason(unknownSterlingReason);
-    expect(reason).toBe('blocked_executor_error');
-    expect(originalReason).toBe(unknownSterlingReason);
+  // Unknown non-"blocked_*" reasons remain transient (retryable).
+  const unknownInfraReason = 'new_solver_beta_v3_rate_limited';
+
+  it('normalizes unknown blocked_* reason to contract_broken umbrella', () => {
+    const { reason, originalReason } = normalizeBlockedReason(unknownBlockedReason);
+    expect(reason).toBe('blocked_invalid_steps_bundle');
+    expect(originalReason).toBe(unknownBlockedReason);
   });
 
-  it('normalized reason is classified as transient (retryable)', () => {
-    const { reason } = normalizeBlockedReason(unknownSterlingReason);
-    expect(TRANSIENT_SET.has(reason)).toBe(true);
+  it('unknown blocked_* reason is classified as contract_broken (not transient)', () => {
+    const { reason } = normalizeBlockedReason(unknownBlockedReason);
+    expect(CONTRACT_BROKEN_SET.has(reason)).toBe(true);
+    expect(TRANSIENT_SET.has(reason)).toBe(false);
   });
 
-  it('normalized reason is TTL-exempt (will not auto-fail via timer)', () => {
-    const { reason } = normalizeBlockedReason(unknownSterlingReason);
+  it('unknown blocked_* reason has 30s TTL (fail-fast, not infinite retry)', () => {
+    const { reason } = normalizeBlockedReason(unknownBlockedReason);
     const policy = BLOCKED_REASON_TTL_POLICY[reason];
-    expect(policy).toBe('exempt');
+    expect(policy).toBe(30_000);
   });
 
-  it('task with normalized reason enters managed retry, not premature death', () => {
-    const { reason } = normalizeBlockedReason(unknownSterlingReason);
-    // Simulate: task blocked with the normalized reason for 10 minutes
+  it('task with unknown blocked_* reason is auto-failed after TTL', () => {
+    const { reason } = normalizeBlockedReason(unknownBlockedReason);
+    // Simulate: task blocked for 35s (past 30s TTL)
     const task = makeTask({
       status: 'pending_planning',
       type: 'sterling_ir',
       metadata: {
         blockedReason: reason,
-        blockedAt: Date.now() - 600_000, // 10 min ago
-        originalBlockedReason: unknownSterlingReason,
+        blockedAt: Date.now() - 35_000,
+        originalBlockedReason: unknownBlockedReason,
       },
     });
-    // Should NOT be auto-failed (exempt from TTL)
     const state = evaluateTaskBlockState(task, Date.now());
-    expect(state.shouldFail).toBe(false);
+    expect(state.shouldFail).toBe(true);
   });
 
-  it('full lifecycle trace: unknown reason → normalize → transient → backoff → retry eligible', () => {
-    // Step 1: Sterling returns unknown reason
-    const raw = unknownSterlingReason;
+  it('unknown non-blocked reason is still classified as transient (retryable)', () => {
+    const { reason, originalReason } = normalizeBlockedReason(unknownInfraReason);
+    expect(reason).toBe('blocked_executor_error');
+    expect(originalReason).toBe(unknownInfraReason);
+    expect(TRANSIENT_SET.has(reason)).toBe(true);
+  });
 
-    // Step 2: normalizeBlockedReason maps to umbrella
+  it('full lifecycle: unknown blocked_* → contract_broken → fail-fast', () => {
+    // Step 1: Sterling returns unknown blocked_* reason
+    const raw = unknownBlockedReason;
+
+    // Step 2: normalizeBlockedReason maps to contract_broken umbrella
     const normalized = normalizeBlockedReason(raw);
-    expect(normalized.reason).toBe('blocked_executor_error');
+    expect(normalized.reason).toBe('blocked_invalid_steps_bundle');
     expect(normalized.originalReason).toBe(raw);
 
-    // Step 3: Classification is transient
-    expect(TRANSIENT_SET.has(normalized.reason)).toBe(true);
+    // Step 3: Classification is contract_broken (fail-fast)
+    expect(CONTRACT_BROKEN_SET.has(normalized.reason)).toBe(true);
 
-    // Step 4: Task gets nextEligibleAt with backoff (simulated)
-    const retryCount = 2;
-    const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
-    const nextEligibleAt = Date.now() + backoffMs;
-
+    // Step 4: TTL evaluator will auto-fail after 30s
     const task = makeTask({
       status: 'pending_planning',
       type: 'sterling_ir',
@@ -298,22 +313,15 @@ describe('unknown Sterling blocked_reason normalization (evidence artifact)', ()
         blockedReason: normalized.reason,
         blockedAt: Date.now(),
         originalBlockedReason: normalized.originalReason,
-        nextEligibleAt,
-        expansionRetryCount: retryCount + 1,
       },
     });
 
-    // Step 5: Before backoff expires — not eligible
-    expect(isTaskEligible(task, Date.now())).toBe(false);
+    // Step 5: Before TTL expires — not yet failed
+    const stateEarly = evaluateTaskBlockState(task, Date.now() + 15_000);
+    expect(stateEarly.shouldFail).toBe(false);
 
-    // Step 6: After backoff expires — still not eligible (pending_planning not in allowlist)
-    // but retryExpansion will pick it up via its own filter
-    expect(task.status).toBe('pending_planning');
-    expect(task.metadata.blockedReason).toBe('blocked_executor_error');
-    expect((task.metadata as any).originalBlockedReason).toBe(unknownSterlingReason);
-
-    // Step 7: TTL evaluator does NOT kill it
-    const state = evaluateTaskBlockState(task, Date.now() + 3_600_000); // 1 hour later
-    expect(state.shouldFail).toBe(false);
+    // Step 6: After TTL expires — auto-failed
+    const stateLate = evaluateTaskBlockState(task, Date.now() + 35_000);
+    expect(stateLate.shouldFail).toBe(true);
   });
 });

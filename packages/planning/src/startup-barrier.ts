@@ -36,13 +36,20 @@ export function getSystemReadyState(): {
 }
 
 export function markSystemReady(source?: string): void {
-  if (systemReady) return;
-  systemReady = true;
-  readyAt = new Date().toISOString();
-  readySource = source || 'unknown';
-  while (waiters.length > 0) {
-    const waiter = waiters.shift();
-    if (waiter) waiter();
+  const wasReady = systemReady;
+  if (!wasReady) {
+    systemReady = true;
+    readyAt = new Date().toISOString();
+    readySource = source || 'unknown';
+    while (waiters.length > 0) {
+      const waiter = waiters.shift();
+      if (waiter) waiter();
+    }
+  }
+  // Idempotent: always trigger a reprobe so the executor can recover
+  // from startup-ordering issues (e.g. MC interface started after planning).
+  if (_readinessMonitor) {
+    _readinessMonitor.reprobeNow().catch(() => {});
   }
 }
 

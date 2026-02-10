@@ -55,6 +55,11 @@ export interface KeepAliveIntegrationConfig {
   idleEpisodeCooldownMs: number;
   /** Timeout for idle reduction requests (ms) */
   idleEpisodeTimeoutMs: number;
+  /**
+   * Test-only: inject a controller factory to avoid dynamic import and real LLM calls.
+   * When provided, initialize() calls this instead of importing @conscious-bot/cognition.
+   */
+  _controllerFactory?: () => KeepAliveController;
 }
 
 /**
@@ -71,6 +76,15 @@ export const DEFAULT_KEEPALIVE_INTEGRATION_CONFIG: KeepAliveIntegrationConfig = 
   idleEpisodeCooldownMs: 300_000,
   idleEpisodeTimeoutMs: 12_000,
 };
+
+/**
+ * Summary of a blocked task, passed to Sterling so it can choose alternate goals.
+ */
+export interface BlockedTaskSummary {
+  taskId: string;
+  blockedReason: string;
+  nextEligibleAt?: number;
+}
 
 /**
  * State passed from the executor to the keep-alive integration.
@@ -90,6 +104,8 @@ export interface ExecutorState {
   recentTaskConversions: number;
   /** Count of pending_planning sterling_ir tasks */
   pendingPlanningSterlingIrCount?: number;
+  /** Summaries of blocked tasks (when idleReason is 'blocked_on_prereq') */
+  blockedTasks?: BlockedTaskSummary[];
 }
 
 /**
@@ -152,18 +168,23 @@ export class KeepAliveIntegration {
     if (this.initialized) return;
 
     try {
-      // Dynamically import the keep-alive controller
-      const { KeepAliveController } = await import('@conscious-bot/cognition');
+      if (this.config._controllerFactory) {
+        // Test injection path: use provided factory, no dynamic import or LLM calls.
+        this.controller = this.config._controllerFactory();
+      } else {
+        // Production path: dynamically import the keep-alive controller
+        const { KeepAliveController } = await import('@conscious-bot/cognition');
 
-      // Create LLM generator function
-      const llmGenerator = this.createLLMGenerator();
+        // Create LLM generator function
+        const llmGenerator = this.createLLMGenerator();
 
-      // Create controller with config
-      this.controller = new KeepAliveController(llmGenerator, {
-        baseIntervalMs: this.config.baseIntervalMs,
-        minIntervalMs: this.config.minIntervalMs,
-        maxRefreshesPerMinute: this.config.maxRefreshesPerMinute,
-      });
+        // Create controller with config
+        this.controller = new KeepAliveController(llmGenerator, {
+          baseIntervalMs: this.config.baseIntervalMs,
+          minIntervalMs: this.config.minIntervalMs,
+          maxRefreshesPerMinute: this.config.maxRefreshesPerMinute,
+        });
+      }
 
       // Set up event listeners
       this.controller.on('thought', this.onThought.bind(this));
@@ -198,14 +219,24 @@ export class KeepAliveIntegration {
       return null;
     }
 
-    // Only tick on true idle (no_tasks), not other idle reasons
-    // Other reasons (backoff, blocked, etc.) are transient
-    if (executorState.idleReason !== 'no_tasks') {
+    // Idle episodes fire when:
+    // - 'no_tasks': true cognitive idle (no work exists)
+    // - 'blocked_on_prereq': all tasks are blocked — generate an alternate goal
+    //   that can bypass the blocked prereqs (e.g. explore while craft is waiting)
+    // Other reasons (backoff, circuit_breaker, manual_pause) are transient executor states.
+    const IDLE_EPISODE_ELIGIBLE_REASONS = new Set(['no_tasks', 'blocked_on_prereq']);
+    if (!IDLE_EPISODE_ELIGIBLE_REASONS.has(executorState.idleReason ?? '')) {
       return null;
     }
 
     if (this.config.enableSterlingIdleEpisodes) {
-      if ((executorState.pendingPlanningSterlingIrCount ?? 0) > 0) {
+      // Suppress idle episodes when there are tasks actively being planned —
+      // UNLESS all tasks are blocked (blocked_on_prereq). Blocked tasks are the
+      // *reason* we're idle and need new goals; they shouldn't suppress autonomy.
+      if (
+        (executorState.pendingPlanningSterlingIrCount ?? 0) > 0 &&
+        executorState.idleReason !== 'blocked_on_prereq'
+      ) {
         if (process.env.KEEPALIVE_DEBUG === 'true') {
           console.log('[KeepAliveIntegration] Idle episode suppressed: suppressed_pending_planning');
         }
@@ -371,6 +402,13 @@ export class KeepAliveIntegration {
           count: item.count,
         })) ?? [],
       },
+      // Include blocked task context so Sterling can choose goals that avoid
+      // blocked prereqs (e.g. "explore" when "craft" is blocked on missing mcData)
+      blocked_tasks: executorState.blockedTasks?.map((bt) => ({
+        task_id: bt.taskId,
+        blocked_reason: bt.blockedReason,
+        next_eligible_at: bt.nextEligibleAt,
+      })) ?? [],
       budgets: {
         max_steps: 8,
         max_ms: 2000,

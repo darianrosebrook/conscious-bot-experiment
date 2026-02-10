@@ -2251,25 +2251,88 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         };
       }
 
-      // Guard: only attempt resolution when we have inputs the solver needs.
-      // Without rules (requires requirement.item + mcData), Sterling will
-      // return "blocked: no_rules_provided" — fail-closed, let retryExpansion handle.
+      // ── Intent-type-specific preflight ──
+      // Different intent types have different prerequisites.
+      // Split by category so blocked reasons are specific and debuggable.
       const mcData = this.getMcData();
       const goalItem = (taskData.metadata as any)?.requirement?.item as string | undefined;
-      const canResolve = !!(mcData && goalItem);
 
-      if (!canResolve) {
+      // Classify intent steps by category
+      const craftingIntents = intentSteps.filter((s) =>
+        s.leaf === 'task_type_craft' || s.leaf === 'task_type_build'
+      );
+      const navigationIntents = intentSteps.filter((s) =>
+        s.leaf === 'task_type_explore' || s.leaf === 'task_type_navigate' || s.leaf === 'task_type_find'
+      );
+      const resourceIntents = intentSteps.filter((s) =>
+        s.leaf === 'task_type_gather' || s.leaf === 'task_type_collect' || s.leaf === 'task_type_mine'
+      );
+
+      // Crafting intents require requirement.item + mcData for buildCraftingRules
+      if (craftingIntents.length > 0 && !mcData) {
         console.log(
-          `[Sterling] Cannot resolve intents: ${!mcData ? 'no mcData' : 'no requirement.item'} — blocking ${intentSteps.length} intent step(s)`
+          `[Sterling] Cannot resolve crafting intents: no mcData — blocking ${craftingIntents.length} crafting intent step(s)`
         );
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
-          blocked_reason: 'blocked_intent_resolution_unavailable',
+          blocked_reason: 'blocked_crafting_context_unavailable',
         });
         return {
           outcome: 'blocked',
-          reason: 'blocked_intent_resolution_unavailable',
+          reason: 'blocked_crafting_context_unavailable',
+          requestId,
+          ingestRetry,
+        };
+      }
+      if (craftingIntents.length > 0 && !goalItem) {
+        console.log(
+          `[Sterling] Cannot resolve crafting intents: no requirement.item — blocking ${craftingIntents.length} crafting intent step(s)`
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_crafting_no_goal_item',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_crafting_no_goal_item',
+          requestId,
+          ingestRetry,
+        };
+      }
+
+      // Navigation intents require mcData (for bot position context)
+      if (navigationIntents.length > 0 && !mcData) {
+        console.log(
+          `[Sterling] Cannot resolve navigation intents: no mcData — blocking ${navigationIntents.length} navigation intent step(s)`
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_navigation_context_unavailable',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_navigation_context_unavailable',
+          requestId,
+          ingestRetry,
+        };
+      }
+
+      // Resource intents require mcData (for inventory/nearby block context)
+      if (resourceIntents.length > 0 && !mcData) {
+        console.log(
+          `[Sterling] Cannot resolve resource intents: no mcData — blocking ${resourceIntents.length} resource intent step(s)`
+        );
+        recordExpansion({
+          request_id: requestId,
+          status: 'blocked',
+          blocked_reason: 'blocked_resource_context_unavailable',
+        });
+        return {
+          outcome: 'blocked',
+          reason: 'blocked_resource_context_unavailable',
           requestId,
           ingestRetry,
         };
@@ -2283,7 +2346,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
           : [];
 
-        const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+        // Only build crafting rules when there are crafting intents AND mcData+goalItem
+        // are available (guaranteed by the preflight guards above).
+        const rules: Array<Record<string, unknown>> = craftingIntents.length > 0
+          ? buildCraftingRules(mcData, goalItem!) as unknown as Array<Record<string, unknown>>
+          : [];
 
         const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
           {
@@ -2378,40 +2445,42 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             };
           }
         } else {
-          // Resolution failed/blocked → fail-closed
-          const reason = resolveResponse.status === 'blocked'
+          // Resolution failed/blocked → fail-closed with specific reason
+          const detail = resolveResponse.status === 'blocked'
             ? resolveResponse.blocked_reason
             : resolveResponse.status === 'error'
               ? resolveResponse.error
               : 'unknown';
           console.log(
-            `[Sterling] Intent resolution ${resolveResponse.status}: ${reason} — blocking ${intentSteps.length} intent step(s)`
+            `[Sterling] Intent resolution ${resolveResponse.status}: ${detail} — blocking ${intentSteps.length} intent step(s)`
           );
           recordExpansion({
             request_id: requestId,
             status: 'blocked',
-            blocked_reason: 'blocked_intent_resolution_unavailable',
+            blocked_reason: 'blocked_intent_resolution_failed',
+            resolution_detail: detail,
           });
           return {
             outcome: 'blocked',
-            reason: 'blocked_intent_resolution_unavailable',
+            reason: 'blocked_intent_resolution_failed',
             requestId,
             ingestRetry,
           };
         }
       } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
         console.warn(
-          '[Sterling] Intent resolution error — blocking:',
-          err instanceof Error ? err.message : String(err)
+          '[Sterling] Intent resolution error — blocking:', detail
         );
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
-          blocked_reason: 'blocked_intent_resolution_unavailable',
+          blocked_reason: 'blocked_intent_resolution_error',
+          resolution_detail: detail,
         });
         return {
           outcome: 'blocked',
-          reason: 'blocked_intent_resolution_unavailable',
+          reason: 'blocked_intent_resolution_error',
           requestId,
           ingestRetry,
         };
@@ -2735,21 +2804,40 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         // in the autonomous executor loop (modular-server checks nextEligibleAt ?? 0).
         //
         // blocked_unresolved_intents: has steps but some are intent leaves → retryIntentResolution
-        // blocked_intent_resolution_unavailable: prerequisites missing → full re-materialize
+        // blocked_intent_resolution_unavailable: no executor service → full re-materialize
+        // blocked_crafting_context_unavailable: crafting needs mcData → re-materialize when loaded
+        // blocked_navigation_context_unavailable: navigation needs mcData → re-materialize when loaded
+        // blocked_resource_context_unavailable: resource needs mcData → re-materialize when loaded
+        // blocked_intent_resolution_failed: Sterling returned non-ok → retry with fresh context
+        // blocked_intent_resolution_error: exception during resolution → retry after backoff
+        // blocked_crafting_no_goal_item: no requirement.item → contract-broken (TTL 30s → fail)
         // blocked_intent_resolution_disabled: config-disabled → no retry (TTL 60s → fail)
         // blocked_undispatchable_steps: resolved steps invalid → no retry (TTL 30s → fail)
+        const TRANSIENT_RESOLUTION_REASONS = new Set([
+          'blocked_unresolved_intents',
+          'blocked_intent_resolution_unavailable',
+          'blocked_crafting_context_unavailable',
+          'blocked_navigation_context_unavailable',
+          'blocked_resource_context_unavailable',
+          'blocked_intent_resolution_failed',
+          'blocked_intent_resolution_error',
+        ]);
+        const CONTRACT_BROKEN_RESOLUTION_REASONS = new Set([
+          'blocked_intent_resolution_disabled',
+          'blocked_undispatchable_steps',
+          'blocked_crafting_no_goal_item',
+        ]);
         if (sterlingExpansion.reason === 'blocked_unresolved_intents') {
           (task.metadata as any).unresolvedIntents = true;
           const undispatchableCount = sterlingExpansion.undispatchable?.length ?? 0;
           (task.metadata as any).unresolvedIntentCount = undispatchableCount;
           task.metadata.nextEligibleAt = Date.now() + 60_000; // 60s initial backoff
-        } else if (sterlingExpansion.reason === 'blocked_intent_resolution_unavailable') {
+        } else if (TRANSIENT_RESOLUTION_REASONS.has(sterlingExpansion.reason)) {
           // Transient: prerequisites may appear (mcData loads, Sterling reconnects).
           // Route to full re-materialize (NOT retryIntentResolution — we have no steps).
           // 60s backoff prevents hammering during startup when mcData isn't loaded yet.
           task.metadata.nextEligibleAt = Date.now() + 60_000;
-        } else if (sterlingExpansion.reason === 'blocked_intent_resolution_disabled'
-                || sterlingExpansion.reason === 'blocked_undispatchable_steps') {
+        } else if (CONTRACT_BROKEN_RESOLUTION_REASONS.has(sterlingExpansion.reason)) {
           // Contract-broken: TTL will auto-fail, but set nextEligibleAt to avoid
           // per-tick retry noise until the TTL evaluator catches it.
           task.metadata.nextEligibleAt = Date.now() + 30_000;

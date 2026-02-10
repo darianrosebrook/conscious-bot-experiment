@@ -319,6 +319,7 @@ import {
   waitForSystemReady,
   setReadinessMonitor,
   markSystemReady,
+  getSystemReadyState,
 } from './startup-barrier';
 import { ReadinessMonitor } from './server/execution-readiness';
 
@@ -502,6 +503,11 @@ const stepRateLimiter = new StepRateLimiter(executorConfig.maxStepsPerMinute);
 const geofenceConfig = parseGeofenceConfig();
 
 const executorEventThrottle = new Map<string, number>();
+
+// ── Executor startup state (observable via /executor/health) ──
+type ExecutorStartState = 'disabled' | 'waiting_for_ready' | 'waiting_for_deps' | 'running';
+let executorStartState: ExecutorStartState = 'disabled';
+let executorLastProbeResult: { systemReady: boolean; depsReady: boolean; envEnabled: boolean; at: string } | null = null;
 const BUILDING_LEAVES = new Set([
   'prepare_site',
   'build_module',
@@ -1899,11 +1905,13 @@ async function autonomousTaskExecutor() {
         );
       }
 
-      // Keep-alive integration: trigger intention check on true idle (LF-9)
-      // This provides a non-injective pathway for goal emission
+      // Keep-alive integration: trigger intention check on idle (LF-9)
+      // Fires on 'no_tasks' (true idle) AND 'blocked_on_prereq' (all tasks blocked).
+      // The latter prevents a single blocked task from suppressing autonomy forever.
+      const keepAliveEligibleReasons = new Set(['no_tasks', 'blocked_on_prereq']);
       if (
         global.keepAliveIntegration?.isActive() &&
-        idleReason === 'no_tasks'
+        keepAliveEligibleReasons.has(idleReason ?? '')
       ) {
         try {
           // Get bot state for keep-alive context
@@ -1912,6 +1920,15 @@ async function autonomousTaskExecutor() {
             (task) =>
               task.type === 'sterling_ir' && task.status === 'pending_planning'
           ).length;
+
+          // Build blocked task summaries for Sterling context
+          const blockedTasks = activeTasks
+            .filter((t) => t.metadata?.blockedReason)
+            .map((t) => ({
+              taskId: t.id,
+              blockedReason: t.metadata.blockedReason,
+              nextEligibleAt: t.metadata.nextEligibleAt,
+            }));
 
           const result = await global.keepAliveIntegration.onIdle(
             {
@@ -1922,6 +1939,7 @@ async function autonomousTaskExecutor() {
               lastUserCommand: global.lastUserCommand || 0,
               recentTaskConversions: 0, // Tracked internally by integration
               pendingPlanningSterlingIrCount,
+              blockedTasks,
             },
             botState
           );
@@ -3883,6 +3901,15 @@ serverConfig.addEndpoint(
 );
 
 // Emergency stop endpoint
+serverConfig.addEndpoint('get', '/executor/health', (_req, res) => {
+  const systemReadyState = getSystemReadyState();
+  res.json({
+    executorStartState,
+    lastProbeResult: executorLastProbeResult,
+    systemReady: systemReadyState,
+  });
+});
+
 serverConfig.addEndpoint('post', '/executor/stop', (_req, res) => {
   const token = process.env.EXECUTOR_EMERGENCY_TOKEN;
   if (
@@ -4613,7 +4640,17 @@ async function startServer() {
       let loggedEnvGate = false;
       const tryStartExecutor = () => {
         if (executorStarted) return;
-        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') {
+        const envEnabled = process.env.ENABLE_PLANNING_EXECUTOR === '1';
+        const sysReady = isSystemReady();
+        const depsReady = readiness.executorReady;
+        executorLastProbeResult = {
+          systemReady: sysReady,
+          depsReady,
+          envEnabled,
+          at: new Date().toISOString(),
+        };
+        if (!envEnabled) {
+          executorStartState = 'disabled';
           if (!loggedEnvGate) {
             loggedEnvGate = true;
             console.log(
@@ -4623,9 +4660,22 @@ async function startServer() {
           }
           return;
         }
-        if (!isSystemReady()) return;
-        if (!readiness.executorReady) return;
+        if (!sysReady) {
+          executorStartState = 'waiting_for_ready';
+          console.log(
+            `[Planning] tryStartExecutor: waiting — systemReady=${sysReady}, depsReady=${depsReady}`
+          );
+          return;
+        }
+        if (!depsReady) {
+          executorStartState = 'waiting_for_deps';
+          console.log(
+            `[Planning] tryStartExecutor: waiting — systemReady=${sysReady}, depsReady=${depsReady}`
+          );
+          return;
+        }
         executorStarted = true;
+        executorStartState = 'running';
         console.log(
           '[Planning] Starting executor — system ready and dependencies reachable'
         );
@@ -4664,6 +4714,23 @@ async function startServer() {
         });
         // Re-check when readiness monitor detects a state change
         readiness.onChange(() => tryStartExecutor());
+
+        // Self-healing: fast retry loop probes every 10s until executor starts.
+        // Catches the common case where MC interface starts after planning.
+        // Stops itself once the executor is running to avoid wasted probes.
+        const FAST_RETRY_MS = 10_000;
+        const fastRetryTimer = setInterval(async () => {
+          if (executorStarted) {
+            clearInterval(fastRetryTimer);
+            return;
+          }
+          await readiness.reprobeNow();
+          tryStartExecutor();
+          if (executorStarted) {
+            clearInterval(fastRetryTimer);
+            console.log('[Planning] Self-healing: executor started via fast retry probe');
+          }
+        }, FAST_RETRY_MS);
       }
     } else {
       console.log(

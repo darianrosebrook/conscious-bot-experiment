@@ -60,11 +60,20 @@ export const BLOCKED_REASON_REGISTRY: Record<string, BlockedReasonEntry> = {
   blocked_undispatchable_steps:          { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — resolved steps fail executor dispatch contract' },
   no_mapped_action:                      { classification: 'executor', ttlPolicy: 'default', description: 'Executor leaf has no action mapping — already blocked at execution' },
 
+  // ── Intent-type-specific context reasons (P0-6 refinement) ──
+  blocked_navigation_context_unavailable: { classification: 'transient', ttlPolicy: 'exempt', description: 'Navigation intent needs mcData (bot position) — retry when world state available' },
+  blocked_resource_context_unavailable:   { classification: 'transient', ttlPolicy: 'exempt', description: 'Resource intent needs mcData (inventory/blocks) — retry when world state available' },
+  blocked_crafting_context_unavailable:   { classification: 'transient', ttlPolicy: 'exempt', description: 'Crafting intent needs mcData — retry when world state available' },
+  blocked_crafting_no_goal_item:          { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — crafting intent but task has no requirement.item' },
+  blocked_intent_resolution_failed:       { classification: 'transient', ttlPolicy: 'exempt', description: 'Sterling resolver returned non-ok status — retry with fresh context' },
+  blocked_intent_resolution_error:        { classification: 'transient', ttlPolicy: 'exempt', description: 'Sterling resolver threw an exception — retry after backoff' },
+
   // ── Contract-broken expansion reasons (fail fast, no retry) ──
   blocked_missing_digest:          { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — task data malformed' },
   blocked_missing_schema_version:  { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — task data malformed' },
   blocked_routing_disabled:        { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — config explicitly disabled' },
   blocked_invalid_steps_bundle:    { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — Sterling returned invalid shape' },
+  blocked_invalid_ir_bundle:       { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — committed IR could not materialize steps (deterministic)' },
   blocked_envelope_id_mismatch:    { classification: 'contract_broken', ttlPolicy: 30_000, description: '30s then fail — integrity check failed' },
 
   // ── Terminal expansion reasons ──
@@ -103,11 +112,13 @@ export const CONTRACT_BROKEN_REASONS: ReadonlySet<string> = new Set(
  * Normalize a blocked reason from Sterling to a known registry reason.
  *
  * If the reason is already in the registry, returns it as-is.
- * If unknown, normalizes to 'blocked_executor_error' (transient, retryable)
- * and returns the original as `originalReason` for traceability.
+ * If unknown:
+ *   - "blocked_*" prefix → treat as contract_broken (fail-fast). New Sterling
+ *     blocked reasons are likely deterministic failures that shouldn't be retried.
+ *   - Other → treat as transient (blocked_executor_error). Infrastructure issues
+ *     or error responses that may resolve on retry.
  *
- * This prevents unknown Sterling reasons from falling through to the default
- * 2-min TTL auto-fail — they get treated as transient infrastructure issues instead.
+ * In both cases, preserves the original as `originalReason` for traceability.
  */
 export function normalizeBlockedReason(reason: string): {
   reason: string;
@@ -116,7 +127,12 @@ export function normalizeBlockedReason(reason: string): {
   if (BLOCKED_REASON_REGISTRY[reason]) {
     return { reason };
   }
-  // Unknown reason → normalize to transient umbrella, preserve detail
+  // Unknown "blocked_*" reasons are likely deterministic Sterling-side failures.
+  // Fail-closed: treat as contract_broken (30s then fail) rather than retrying.
+  if (reason.startsWith('blocked_')) {
+    return { reason: 'blocked_invalid_steps_bundle', originalReason: reason };
+  }
+  // Non-blocked unknown reasons are likely transient infrastructure issues.
   return { reason: 'blocked_executor_error', originalReason: reason };
 }
 

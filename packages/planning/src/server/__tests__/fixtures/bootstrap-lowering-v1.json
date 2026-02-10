@@ -1,0 +1,67 @@
+{
+  "_comment": "Canonical bootstrap lowering contract fixture — v1. Both Sterling (Python) and Planning (TypeScript) test suites assert against this shape. Changes require updating both sides.",
+  "schema_version": "bootstrap_lowering_v1",
+  "required_step_keys": ["leaf", "args"],
+  "required_args_keys": ["lowered_from", "theme"],
+  "cases": {
+    "explore_surroundings": {
+      "lemma": "explore",
+      "theme": "surroundings",
+      "steps": [
+        {
+          "leaf": "move_to",
+          "args": {
+            "target": "exploration_target",
+            "distance": 10,
+            "lowered_from": "explore",
+            "theme": "surroundings"
+          }
+        }
+      ]
+    },
+    "navigate_safety": {
+      "lemma": "navigate",
+      "theme": "safety",
+      "steps": [
+        {
+          "leaf": "step_forward_safely",
+          "args": {
+            "distance": 8,
+            "lowered_from": "navigate",
+            "theme": "safety"
+          }
+        }
+      ]
+    },
+    "gather_food": {
+      "lemma": "gather",
+      "theme": "food",
+      "steps": [
+        {
+          "leaf": "find_resource",
+          "args": {
+            "blockType": "sweet_berry_bush",
+            "radius": 32,
+            "maxResults": 1,
+            "lowered_from": "gather",
+            "theme": "food"
+          }
+        },
+        {
+          "leaf": "collect_items",
+          "args": {
+            "lowered_from": "gather",
+            "theme": "food"
+          }
+        },
+        {
+          "leaf": "consume_food",
+          "args": {
+            "lowered_from": "gather",
+            "theme": "food"
+          }
+        }
+      ]
+    }
+  }
+}

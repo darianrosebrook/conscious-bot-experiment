@@ -44,6 +44,14 @@ const STATIC_BLOCKED_REASONS: Record<string, BlockedReasonClassification> = {
   blocked_undispatchable_steps: 'contract_broken',
   no_mapped_action: 'executor',
 
+  // P0-6 refinement: intent-type-specific context
+  blocked_navigation_context_unavailable: 'transient',
+  blocked_resource_context_unavailable: 'transient',
+  blocked_crafting_context_unavailable: 'transient',
+  blocked_crafting_no_goal_item: 'contract_broken',
+  blocked_intent_resolution_failed: 'transient',
+  blocked_intent_resolution_error: 'transient',
+
   // Terminal
   expansion_retries_exhausted: 'terminal',
 };
@@ -211,5 +219,21 @@ describe('normalizeBlockedReason', () => {
     const result = normalizeBlockedReason('blocked_missing_digest');
     expect(result.reason).toBe('blocked_missing_digest');
     expect(CONTRACT_BROKEN_REASONS.has(result.reason)).toBe(true);
+  });
+
+  it('unknown blocked_* reasons are classified as contract_broken (fail-fast)', () => {
+    // New Sterling-side blocked reasons shouldn't be retried as transient
+    const result = normalizeBlockedReason('blocked_some_new_sterling_reason');
+    expect(result.reason).toBe('blocked_invalid_steps_bundle');
+    expect(result.originalReason).toBe('blocked_some_new_sterling_reason');
+    expect(CONTRACT_BROKEN_REASONS.has(result.reason)).toBe(true);
+    expect(TRANSIENT_EXPANSION_REASONS.has(result.reason)).toBe(false);
+  });
+
+  it('unknown non-blocked reasons remain transient (retryable)', () => {
+    // Non-blocked unknown reasons are likely transient infrastructure issues
+    const result = normalizeBlockedReason('some_infra_error');
+    expect(result.reason).toBe('blocked_executor_error');
+    expect(TRANSIENT_EXPANSION_REASONS.has(result.reason)).toBe(true);
   });
 });

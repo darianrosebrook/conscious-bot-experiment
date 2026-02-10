@@ -3644,7 +3644,7 @@ describe('P0-6: Fail-closed intent resolution', () => {
     return { expandByDigest, resolveIntentSteps };
   }
 
-  it('1. Intent resolution fails → blocked_intent_resolution_unavailable (single call, no retry loop)', async () => {
+  it('1. Intent resolution fails → blocked_intent_resolution_failed (single call, no retry loop)', async () => {
     const { resolveIntentSteps } = setupIntentService({
       resolveResponse: { status: 'error', error: 'solver crashed' },
     });
@@ -3659,14 +3659,14 @@ describe('P0-6: Fail-closed intent resolution', () => {
     }));
 
     expect(created.status).toBe('pending_planning');
-    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_unavailable');
+    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_failed');
     // Single call — no retry loop in request path
     expect(resolveIntentSteps).toHaveBeenCalledTimes(1);
     // Backoff set to prevent per-tick retry churn
     expect(created.metadata.nextEligibleAt).toBeGreaterThan(Date.now());
   });
 
-  it('2. No mcData → blocked_intent_resolution_unavailable', async () => {
+  it('2. No mcData → blocked_crafting_context_unavailable', async () => {
     const expandByDigest = vi.fn().mockResolvedValue({
       status: 'ok',
       plan_bundle_digest: 'bundle_intents',
@@ -3690,7 +3690,7 @@ describe('P0-6: Fail-closed intent resolution', () => {
     }));
 
     expect(created.status).toBe('pending_planning');
-    expect(created.metadata.blockedReason).toBe('blocked_intent_resolution_unavailable');
+    expect(created.metadata.blockedReason).toBe('blocked_crafting_context_unavailable');
     // resolveIntentSteps should NOT have been called (prerequisites missing)
     expect(resolveIntentSteps).not.toHaveBeenCalled();
     // Backoff prevents retry churn while mcData loads

@@ -18,6 +18,22 @@ import {
 } from '@conscious-bot/world';
 import { resilientFetch } from '@conscious-bot/core';
 import { NavigationLeaseManager } from './navigation-lease-manager';
+import { createHash } from 'crypto';
+
+/**
+ * Seeded hash for exploration target selection.
+ * Returns a stable value in [0, 1) derived from immutable trace facts.
+ * Replayable: same input string always produces the same output.
+ *
+ * @param input - Seed string built from task scope, target, bot pos, distance
+ * @returns A number in [0, 1) suitable for angle computation
+ */
+export function explorationSeedHash(input: string): number {
+  const hash = createHash('sha256').update(input).digest();
+  // Use first 4 bytes as a uint32, normalize to [0, 1)
+  const uint32 = hash.readUInt32BE(0);
+  return uint32 / 0x100000000;
+}
 
 // Simple inline goal classes for ES modules compatibility
 class SimpleGoalNear {
@@ -192,6 +208,14 @@ export class ActionTranslator {
   private navDebounceMs = 1500;
   private navLogThrottleMs = 5000; // 5 seconds between identical nav logs
   private lastLogAt = new Map<string, number>();
+
+  // ── Exploration loop-avoidance ring buffer ──
+  // Tracks recent exploration targets to prevent "stuck jitter" where the
+  // seeded hash repeatedly selects the same position.
+  private recentExplorationTargets: Array<{ x: number; z: number; at: number }> = [];
+  private readonly EXPLORATION_HISTORY_SIZE = 8;
+  private readonly EXPLORATION_DEDUP_RADIUS = 5; // blocks
+  private readonly EXPLORATION_MAX_RETRIES = 4;
 
   // ── Navigation lease: prevents concurrent pathfinder corruption ──
   private navLeaseManager: NavigationLeaseManager;
@@ -2490,18 +2514,92 @@ export class ActionTranslator {
         };
       }
 
+      // Exploration trace metadata — populated when fallback fires, merged into result.
+      let explorationTrace: {
+        seedInput: string;
+        seed: number;
+        retryCount: number;
+        chosenPos: { x: number; y: number; z: number };
+        botPos: { x: number; y: number; z: number };
+        distance: number;
+        target: string;
+      } | undefined;
+
       targetVec = coerceVec3(params);
       if (!targetVec) {
-        if (this.shouldLog('nav-invalid-target', 1000)) {
-          console.error(
-            `[ActionTranslator] ❌ Invalid navigation target (missing/NaN coordinates)`
+        // Exploration fallback: when Sterling sends target='exploration_target'
+        // (or any non-coordinate target), compute a seeded position within
+        // the requested distance from the bot's current position.
+        //
+        // Seed is derived from immutable trace facts so the decision is
+        // replayable given the same context (audit-grade randomness).
+        const botPos = this.bot.entity?.position;
+        const dist = Number(params.distance) || 10;
+        if (botPos && dist > 0) {
+          const scope = params?.__nav?.scope ?? '';
+          const baseSeedInput = `${scope}:${params.target ?? ''}:${Math.round(botPos.x)}:${Math.round(botPos.z)}:${dist}`;
+
+          // Loop-avoidance: if computed target is near a recently visited
+          // position, rotate deterministically by appending ":retry:N".
+          let seed: number;
+          let candidateX: number;
+          let candidateZ: number;
+          let retryCount = 0;
+          let finalSeedInput = baseSeedInput;
+          do {
+            finalSeedInput = retryCount === 0
+              ? baseSeedInput
+              : `${baseSeedInput}:retry:${retryCount}`;
+            seed = explorationSeedHash(finalSeedInput);
+            const angle = seed * 2 * Math.PI;
+            candidateX = Math.round(botPos.x + Math.cos(angle) * dist);
+            candidateZ = Math.round(botPos.z + Math.sin(angle) * dist);
+
+            const tooClose = this.recentExplorationTargets.some((prev) => {
+              const dx = candidateX - prev.x;
+              const dz = candidateZ - prev.z;
+              return Math.sqrt(dx * dx + dz * dz) < this.EXPLORATION_DEDUP_RADIUS;
+            });
+            if (!tooClose) break;
+            retryCount++;
+          } while (retryCount < this.EXPLORATION_MAX_RETRIES);
+
+          targetVec = new Vec3(candidateX, botPos.y, candidateZ);
+
+          // Record in ring buffer
+          this.recentExplorationTargets.push({ x: candidateX, z: candidateZ, at: Date.now() });
+          if (this.recentExplorationTargets.length > this.EXPLORATION_HISTORY_SIZE) {
+            this.recentExplorationTargets.shift();
+          }
+
+          // Capture trace for audit-grade replayability.
+          // On replay/verification, the recorded pos can be checked directly
+          // instead of recomputing (avoids false mismatch from botPos drift).
+          explorationTrace = {
+            seedInput: finalSeedInput,
+            seed,
+            retryCount,
+            chosenPos: { x: candidateX, y: botPos.y, z: candidateZ },
+            botPos: { x: botPos.x, y: botPos.y, z: botPos.z },
+            distance: dist,
+            target: String(params.target ?? ''),
+          };
+
+          console.log(
+            `[ActionTranslator] Exploration fallback: target=${params.target}, distance=${dist}, seed=${seed.toFixed(4)}, retries=${retryCount} → pos=(${targetVec.x}, ${targetVec.y}, ${targetVec.z})`
           );
+        } else {
+          if (this.shouldLog('nav-invalid-target', 1000)) {
+            console.error(
+              `[ActionTranslator] ❌ Invalid navigation target (missing/NaN coordinates)`
+            );
+          }
+          return {
+            success: false,
+            error: 'Invalid navigation target',
+            data: { targetReached: false },
+          };
         }
-        return {
-          success: false,
-          error: 'Invalid navigation target',
-          data: { targetReached: false },
-        };
       }
 
       const targetKey = `${targetVec.x.toFixed(2)},${targetVec.y.toFixed(
@@ -2602,6 +2700,7 @@ export class ActionTranslator {
             replans: navigationResult.replans,
             obstaclesDetected: navigationResult.obstaclesDetected,
             planningTime: navigationResult.data?.planningTime,
+            ...(explorationTrace ? { explorationTrace } : {}),
           },
         };
       } else {
@@ -2625,6 +2724,7 @@ export class ActionTranslator {
             pathLength: navigationResult.pathLength,
             replans: navigationResult.replans,
             obstaclesDetected: navigationResult.obstaclesDetected,
+            ...(explorationTrace ? { explorationTrace } : {}),
           },
         };
       }
