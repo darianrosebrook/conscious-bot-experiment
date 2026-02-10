@@ -320,6 +320,7 @@ All normalization is data-driven — no switch statements.
 - **Docker Command to set situation:** `give Sterling bread 16 && effect give Sterling minecraft:hunger 30 5`
 - **Status**: Real implementation — returns success but consumed 0 items when food=10/20. May need hunger threshold tuning or the food item naming doesn't match bot's `cooked_beef` inventory name.
 - **confirmed_working**: 2026-02-02 — responds with success but itemsConsumed=0 when food=10. Needs investigation: may not eat unless food < threshold.
+- **Reflex pipeline**: This leaf is the terminal action for the hunger driveshaft reflex (SC-29 in execution proof ledger). The reflex controller injects a single-step task with `{ leaf: 'consume_food', args: {} }` — empty args because the leaf's `isFoodItem()` handles food selection internally. See `hunger-driveshaft-controller.ts` and smoke tests S1–S9.
 
 #### sleep
 - **Class**: `SleepLeaf` (line ~1709)
@@ -927,5 +928,5 @@ Inconclusive timeout → **accept** (not reject). Rationale: the leaf already co
 
 ---
 
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-09*
 *Total leaves: 41 (37 real + 1 simplified + 3 P0 stubs)*

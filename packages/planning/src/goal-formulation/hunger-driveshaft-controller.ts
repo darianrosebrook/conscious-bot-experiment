@@ -30,7 +30,7 @@ import {
   createAutonomyProofBundle,
   deriveGoalId,
 } from './autonomy-proof-bundle';
-import type { ReflexLifecycleEmitter } from './reflex-lifecycle-events';
+import type { ReflexLifecycleEmitter, EnqueueSkipReasonType } from './reflex-lifecycle-events';
 
 // ============================================================================
 // Configuration
@@ -209,6 +209,37 @@ function createWorldStateFromBotState(state: BotHungerState): WorldState {
 // ============================================================================
 
 /**
+ * Closed enum of verification failure/success reasons.
+ *
+ * Each test case must assert the exact reason — no freeform strings.
+ * Operators can query/filter by reason to diagnose proof failures.
+ */
+export const VerificationReason = {
+  /** Leaf receipt explicitly confirmed items were consumed */
+  RECEIPT_CONFIRMS_CONSUMPTION: 'receipt_confirms_consumption',
+  /** Food level increased AND inventory shows food item count decreased */
+  FOOD_INCREASED_AND_CONSUMED: 'food_increased_and_consumed',
+  /** Food level increased but no food items were tracked in before-state inventory */
+  FOOD_INCREASED_BUT_INVENTORY_UNAVAILABLE: 'food_increased_but_inventory_unavailable',
+  /** Food level increased but inventory shows no food decrease and no receipt */
+  FOOD_INCREASED_BUT_NO_CONSUMPTION_EVIDENCE: 'food_increased_but_no_consumption_evidence',
+  /** No food increase and no receipt — no evidence of eating at all */
+  NO_FOOD_INCREASE_OR_CONSUMPTION_EVIDENCE: 'no_food_increase_or_consumption_evidence',
+  /** After-state could not be fetched (getBotState failure at completion time) */
+  AFTER_STATE_UNAVAILABLE: 'after_state_unavailable',
+} as const;
+
+export type VerificationReasonType = typeof VerificationReason[keyof typeof VerificationReason];
+
+/** All valid reason values, for exhaustiveness assertions in tests */
+export const ALL_VERIFICATION_REASONS = Object.values(VerificationReason);
+
+export interface VerificationResult {
+  verified: boolean;
+  reason: VerificationReasonType;
+}
+
+/**
  * Verify that the reflex actually caused food consumption.
  *
  * Stricter than the executor's verifyConsumeFood() — requires corroborating
@@ -227,18 +258,23 @@ function createWorldStateFromBotState(state: BotHungerState): WorldState {
  */
 export function verifyProof(
   before: { food: number; inventory: Record<string, number> },
-  after: { food: number; inventory: Record<string, number> },
+  after: { food: number; inventory: Record<string, number> } | null,
   leafReceipt: {
     foodConsumed?: string;
     hungerRestored?: number;
     itemsConsumed?: number;
   },
-): { verified: boolean; reason: string } {
+): VerificationResult {
+  // Path 0: After-state unavailable (getBotState failed at completion time)
+  if (after === null) {
+    return { verified: false, reason: VerificationReason.AFTER_STATE_UNAVAILABLE };
+  }
+
   const receiptConfirmsEating = (leafReceipt.itemsConsumed ?? 0) > 0;
 
   // Path 1: Receipt is authoritative if present
   if (receiptConfirmsEating) {
-    return { verified: true, reason: 'receipt_confirms_consumption' };
+    return { verified: true, reason: VerificationReason.RECEIPT_CONFIRMS_CONSUMPTION };
   }
 
   const foodIncreased = after.food > before.food;
@@ -252,7 +288,7 @@ export function verifyProof(
 
   // Path 2: Food increased AND inventory shows food was consumed
   if (foodIncreased && anyFoodDecreased) {
-    return { verified: true, reason: 'food_increased_and_consumed' };
+    return { verified: true, reason: VerificationReason.FOOD_INCREASED_AND_CONSUMED };
   }
 
   // Path 3: Food increased but no corroborating evidence → FAIL
@@ -262,13 +298,13 @@ export function verifyProof(
     // Check if inventory data was available at all
     const beforeHasFood = Object.keys(before.inventory).some((k) => isFood(k));
     if (!beforeHasFood) {
-      return { verified: false, reason: 'food_increased_but_inventory_unavailable' };
+      return { verified: false, reason: VerificationReason.FOOD_INCREASED_BUT_INVENTORY_UNAVAILABLE };
     }
-    return { verified: false, reason: 'food_increased_but_no_consumption_evidence' };
+    return { verified: false, reason: VerificationReason.FOOD_INCREASED_BUT_NO_CONSUMPTION_EVIDENCE };
   }
 
   // Path 4: No food increase and no receipt
-  return { verified: false, reason: 'no_food_increase_or_consumption_evidence' };
+  return { verified: false, reason: VerificationReason.NO_FOOD_INCREASE_OR_CONSUMPTION_EVIDENCE };
 }
 
 // ============================================================================
@@ -318,6 +354,54 @@ export class HungerDriveshaftController {
   /** Get a stored proof accumulator by reflexInstanceId (per-emission join key) */
   getAccumulator(reflexInstanceId: string): ProofAccumulator | undefined {
     return this.accumulators.get(reflexInstanceId);
+  }
+
+  /**
+   * Emit task_enqueued event after addTask() returns a real task ID.
+   * Called by the integration layer (modular-server.ts), NOT by the controller.
+   * This bridges the gap between task_planned (pending ID) and real enqueue.
+   */
+  emitTaskEnqueued(reflexInstanceId: string, realTaskId: string, goalId: string): void {
+    this.emitter?.emit({
+      type: 'task_enqueued',
+      reflexInstanceId,
+      task_id: realTaskId,
+      goal_id: goalId,
+      ts: Date.now(),
+    });
+  }
+
+  /**
+   * Emit task_enqueue_skipped event when addTask() does NOT yield a new task.
+   * Called by the integration layer when enqueue fails, deduplicates, or returns null.
+   *
+   * Also evicts the accumulator for this reflexInstanceId, since no completion
+   * event will ever arrive to clean it up.
+   */
+  emitTaskEnqueueSkipped(
+    reflexInstanceId: string,
+    goalId: string,
+    reason: EnqueueSkipReasonType,
+    existingTaskId?: string,
+  ): void {
+    this.emitter?.emit({
+      type: 'task_enqueue_skipped',
+      reflexInstanceId,
+      goal_id: goalId,
+      reason,
+      existing_task_id: existingTaskId,
+      ts: Date.now(),
+    });
+    // Evict accumulator — no completion event will arrive to clean it up
+    this.accumulators.delete(reflexInstanceId);
+  }
+
+  /**
+   * Remove an accumulator by reflexInstanceId.
+   * Used by the integration layer when it knows no completion will arrive.
+   */
+  evictAccumulator(reflexInstanceId: string): void {
+    this.accumulators.delete(reflexInstanceId);
   }
 
   /**
@@ -451,6 +535,12 @@ export class HungerDriveshaftController {
     // 5h. Disarm hysteresis (skip in dryRun — shadow mode shouldn't consume the reflex)
     if (!dryRun) this.armed = false;
 
+    // Per-emission join key — unique to this specific reflex firing.
+    // NOT content-addressed: each evaluate() call gets a new UUID.
+    // This is used to correlate trigger → task → completion in the accumulator map.
+    // Generated early so all lifecycle events can carry it.
+    const reflexInstanceId = randomUUID();
+
     // Content-derived stable IDs
     // food_item is excluded: the leaf chooses which food to consume,
     // so the goal's semantic identity is "eat food" not "eat bread."
@@ -464,9 +554,10 @@ export class HungerDriveshaftController {
 
     const goalFormulatedAt = Date.now();
 
-    // Emit goal_formulated event
+    // Emit goal_formulated event (always — even in dryRun for shadow observability)
     this.emitter?.emit({
       type: 'goal_formulated',
+      reflexInstanceId,
       goal_id: goalId,
       need_type: 'survival',
       trigger_digest: homeostasisDigest,
@@ -505,19 +596,18 @@ export class HungerDriveshaftController {
       ],
     };
 
-    // Per-emission join key — unique to this specific reflex firing.
-    // NOT content-addressed: each evaluate() call gets a new UUID.
-    // This is used to correlate trigger → task → completion in the accumulator map.
-    const reflexInstanceId = randomUUID();
-
-    // Emit task_created at plan time (not completion time) so event ordering
-    // matches causality: goal_formulated → task_created → ... → goal_verified → goal_closed
-    this.emitter?.emit({
-      type: 'task_created',
-      task_id: `pending-${reflexInstanceId.slice(0, 8)}`,
-      goal_id: goalId,
-      ts: taskCreatedAt,
-    });
+    // Emit task_planned only in live mode — in dryRun/shadow, no task will be
+    // enqueued, so emitting task_planned would be misleading. The corresponding
+    // task_enqueued event is emitted by the integration layer after addTask().
+    if (!dryRun) {
+      this.emitter?.emit({
+        type: 'task_planned',
+        reflexInstanceId,
+        task_id: `pending-${reflexInstanceId.slice(0, 8)}`,
+        goal_id: goalId,
+        ts: taskCreatedAt,
+      });
+    }
 
     // Build proof accumulator for event-driven join on completion
     const accumulator: ProofAccumulator = {
@@ -566,7 +656,7 @@ export class HungerDriveshaftController {
     afterState: {
       food_after: number;
       inventory_after: Array<{ name: string; count: number }>;
-    },
+    } | null,
   ): AutonomyProofBundleV1 {
     this.evictStaleAccumulators();
     const completedAt = Date.now();
@@ -577,14 +667,16 @@ export class HungerDriveshaftController {
       beforeInventory[item.name] = (beforeInventory[item.name] ?? 0) + item.count;
     }
     const afterInventory: Record<string, number> = {};
-    for (const item of afterState.inventory_after) {
-      afterInventory[item.name] = (afterInventory[item.name] ?? 0) + item.count;
+    if (afterState) {
+      for (const item of afterState.inventory_after) {
+        afterInventory[item.name] = (afterInventory[item.name] ?? 0) + item.count;
+      }
     }
 
     // Run proof verification (stricter than executor)
     const verification = verifyProof(
       { food: accumulator.triggerState.food, inventory: beforeInventory },
-      { food: afterState.food_after, inventory: afterInventory },
+      afterState ? { food: afterState.food_after, inventory: afterInventory } : null,
       execution.receipt as { foodConsumed?: string; hungerRestored?: number; itemsConsumed?: number },
     );
 
@@ -592,14 +684,17 @@ export class HungerDriveshaftController {
     // Sorted for deterministic hashing — canonicalize() preserves array order,
     // so we must ensure the order is stable regardless of Object.entries iteration.
     const itemsConsumed: string[] = [];
-    for (const [item, count] of Object.entries(beforeInventory)) {
-      if (isFood(item) && (afterInventory[item] ?? 0) < count) {
-        itemsConsumed.push(item);
+    if (afterState) {
+      for (const [item, count] of Object.entries(beforeInventory)) {
+        if (isFood(item) && (afterInventory[item] ?? 0) < count) {
+          itemsConsumed.push(item);
+        }
       }
     }
     itemsConsumed.sort();
 
-    const foodDelta = afterState.food_after - accumulator.triggerState.food;
+    const foodAfter = afterState?.food_after ?? null;
+    const foodDelta = foodAfter !== null ? foodAfter - accumulator.triggerState.food : null;
 
     // Override execution result if proof verification fails
     const proofResult = verification.verified ? execution.result : 'error';
@@ -626,7 +721,7 @@ export class HungerDriveshaftController {
       },
       verification: {
         food_before: accumulator.triggerState.food,
-        food_after: afterState.food_after,
+        food_after: foodAfter,
         delta: foodDelta,
         items_consumed: itemsConsumed,
       },
@@ -651,10 +746,11 @@ export class HungerDriveshaftController {
     });
 
     // Emit completion-time lifecycle events.
-    // NOTE: task_created is emitted during evaluate(), not here.
-    // Event ordering: goal_formulated → task_created → ... → goal_verified → goal_closed
+    // NOTE: task_planned is emitted during evaluate(), not here.
+    // Event ordering: goal_formulated → task_planned → task_enqueued → ... → goal_verified → goal_closed
     this.emitter?.emit({
       type: 'goal_verified',
+      reflexInstanceId: accumulator.reflexInstanceId,
       goal_id: accumulator.goalId,
       verification_digest: contentHash(canonicalize(verification)),
       ts: completedAt,
@@ -662,6 +758,7 @@ export class HungerDriveshaftController {
 
     this.emitter?.emit({
       type: 'goal_closed',
+      reflexInstanceId: accumulator.reflexInstanceId,
       goal_id: accumulator.goalId,
       success: verification.verified,
       reason: verification.reason,

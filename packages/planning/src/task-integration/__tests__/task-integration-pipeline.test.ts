@@ -1941,12 +1941,14 @@ describe('Task origin envelope', () => {
         goalKey: 'collect:oak_log',
         subtaskKey: 'gather-wood-for-crafting',
         taskProvenance: provenance,
+        reflexInstanceId: 'abc12345-reflex-uuid',
       },
     }));
     // Every integration-critical key must survive the addTask() rebuild
     expect(task.metadata.goalKey).toBe('collect:oak_log');
     expect(task.metadata.subtaskKey).toBe('gather-wood-for-crafting');
     expect(task.metadata.taskProvenance).toEqual(provenance);
+    expect(task.metadata.reflexInstanceId).toBe('abc12345-reflex-uuid');
   });
 
   it('addTask does not propagate keys outside the allowlist', async () => {

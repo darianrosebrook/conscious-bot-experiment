@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { AutonomyProofBundleV1 } from './goal-formulation/autonomy-proof-bundle';
+import type { ExplorationEvidence } from './goal-formulation/exploration-driveshaft-controller';
 
 export type GoldenRunVerification = {
   status: 'verified' | 'failed' | 'skipped';
@@ -161,6 +162,8 @@ export type GoldenRunReport = {
     executor_blocked_reason?: string;
     /** Reflex proof bundle — autonomy driveshaft evidence (e.g. hunger reflex). */
     reflex_proof?: AutonomyProofBundleV1;
+    /** Exploration evidence — behavioral bootstrap movement records. */
+    exploration_evidence?: ExplorationEvidence[];
     /** Optional payload when blocked (e.g. leaf/args for unknown_leaf or invalid_args). */
     executor_blocked_payload?: {
       leaf?: string;
@@ -709,6 +712,16 @@ export class GoldenRunRecorder {
     };
     if (taskId) patch.task = { task_id: taskId };
     this.update(runId, patch);
+  }
+
+  /** Record exploration evidence (behavioral bootstrap movement). */
+  recordExplorationEvidence(runId: string, evidence: ExplorationEvidence): void {
+    if (!runId) return;
+    this.update(runId, {
+      execution: {
+        exploration_evidence: [evidence],
+      },
+    });
   }
 
   /** Record an autonomy reflex proof bundle (e.g. hunger driveshaft evidence). */

@@ -2,10 +2,11 @@
 
 Purpose: certify that *both* execution pipelines are not only "working," but "provably working under scrutiny," with reproducible steps and evidence artifacts.
 
-Scope: two pipelines share this ledger.
+Scope: three pipelines share this ledger.
 
 1. **Deliberative pipeline** (Sterling → Planning → Executor → Leaf → Verification): dev-only proof rig centered on `POST /api/dev/sterling-smoke` and golden-run artifacts. Scenario IDs: SC-1 through SC-7 (pipeline mechanics) and SC-12 through SC-28 (per-leaf smoke variants).
 2. **Reactive safety pipeline** (Entity Detection → Threat Perception → Safety Monitor → Emergency Response → Combat/Flee Leaf): real-time fight-or-flight system that bypasses Sterling entirely. Triggered autonomously by entity proximity or belief-bus threat signals. Scenario IDs: SC-8 through SC-11.
+3. **Goal-formulation / reflex pipeline** (Homeostasis → NeedGenerator → GoalGenerator → Task Injection → Proof Verification): autonomous goal generation that sits *upstream* of the deliberative pipeline — it generates tasks the executor later runs. Bypasses Sterling planning for locally-decidable actions. Scenario IDs: SC-29+.
 
 Non-goals: proving reduce→digest selection correctness (separate proof), proving real-world MC semantics beyond the verification rig, benchmarking performance, PVP matchmaking or competitive balance tuning.
 
@@ -52,6 +53,46 @@ If `smoke_policy_applied: true` appears in the golden-run artifact, the smoke no
 * **R_decision**: AutomaticSafetyMonitor selected and initiated emergency response (attack/flee/find_shelter)
 * **R_execution**: combat or flee leaf dispatched and completed (weapon equipped, entity attacked, or position changed)
 * **R_outcome**: threat resolved (entity killed, bot repositioned) or escalated (health critical → flee override)
+
+### Goal-formulation / reflex pipeline (SC-29+)
+
+This checkpoint model covers autonomous "homeostasis → goal → task injection → proof" flows (e.g., hunger driveshaft).
+It is upstream of the deliberative pipeline: it *generates* tasks that the executor later runs.
+
+* **G_trigger** (G0): bot state crosses trigger threshold (e.g., hunger ≤ criticalThreshold). Evidence: captured triggerState snapshot used in proof identity (`food_before`, inventory snapshot).
+* **G_formulate** (G1): goal selected and identity anchored. goalKey chosen; goalId derived deterministically from identity inputs. Evidence: goalKey, goalId, trigger_digest/candidates_digest (content-addressed).
+* **G_plan** (G2): `task_planned` emitted (only in live mode; shadow/dryRun does not emit by current policy). Invariant: every `task_planned` must have exactly one terminal enqueue event (G3).
+* **G_enqueue_terminal** (G3): exactly one of `task_enqueued` | `task_enqueue_skipped` per reflexInstanceId.
+  - Signal (enqueued): `task_enqueued` with real `task_id`.
+  - Signal (skipped): `task_enqueue_skipped` with closed reason enum: `ENQUEUE_FAILED` (exception thrown by addTask boundary), `ENQUEUE_RETURNED_NULL` (addTask returned null/undefined/object-without-id). `DEDUPED_EXISTING_TASK` is reserved for future explicit pre-check dedup and is not emitted today.
+  - Note: `task_enqueue_skipped` is terminal for the reflex lifecycle; no proof bundle exists because no task ran.
+* **G_execute** (G4): executor completes dispatched leaf(s) and produces receipt evidence (even if executor result is "ok"). Evidence: execution receipt used by proof verification (e.g., itemsConsumed).
+* **G_verify** (G5): `goal_verified` emitted with `verified: true|false` and closed reason(s). Rule: proof verification is stricter than executor completion; proof failure overrides execution result to `error`.
+* **G_close** (G6): `goal_closed` emitted with proof bundle. Evidence: content-addressed `bundle_hash` represents semantic identity; runtime join IDs (reflexInstanceId, proof_id) are evidence-layer only.
+
+---
+
+## Integration Bugs Found via Live Validation
+
+Live validation is explicitly a contract test for service boundaries. Mocks must mirror wire format, and any mismatch is an expected output of the live validation process — not churn.
+
+### IB-1: Inventory `type` vs `name` field mismatch
+
+- **Scenario**: SC-29 live validation
+- **Symptom**: Reflex never fires despite food=0 and bread present in inventory
+- **Root cause**: MC interface `/state` returns items as `{ type: 'bread', count: 16 }` but `getBotState()` declared `{ name: string, count: number }`. Controller's `isFood(item.name)` received `undefined`.
+- **Fix**: Extract boundary normalizer `normalizeInventoryItem()` in `modules/normalize-inventory.ts` — `name: item.name ?? item.type ?? 'unknown'`. Imported by `modular-server.ts`.
+- **Regression lock**: `hunger-driveshaft-controller.test.ts` "service boundary contracts" — 5 tests exercise the real `normalizeInventoryItem()` helper and verify controller integration with normalized output.
+
+### IB-2: `reflexInstanceId` dropped by metadata allowlist
+
+- **Scenario**: SC-29 live validation
+- **Symptom**: `[projectIncomingMetadata] Dropped metadata key "reflexInstanceId"` — proof bundle never assembles because task-completion hook can't find the join key.
+- **Root cause**: `PROPAGATED_META_KEYS` in `task-integration.ts` did not include `reflexInstanceId`, and `Task.metadata` type in `types/task.ts` did not declare it.
+- **Fix**: Add `reflexInstanceId?: string` to `types/task.ts` and `'reflexInstanceId'` to `PROPAGATED_META_KEYS`.
+- **Regression lock**: `task-integration-pipeline.test.ts` "addTask propagates all PROPAGATED_META_KEYS" — asserts `reflexInstanceId` survives `addTask()`.
+
+**Pattern**: when adding a new metadata field that must survive `addTask()`, two things are required: (1) declare it in the `Task.metadata` interface, and (2) add it to `PROPAGATED_META_KEYS`. The fail-closed allowlist design is intentional (prevents accidental metadata leakage), but it means new pipelines must explicitly opt in.
 
 ---
 
@@ -2273,6 +2314,286 @@ curl -s -X POST http://localhost:3002/api/dev/sterling-smoke \
 
 * ☐ Promote to "known-good" list
 * ☐ Needs follow-up fix
+
+---
+
+## SC-29: Hunger Driveshaft Reflex (Autonomous Goal → Injected Task → Proof)
+
+**Scenario ID**: SC-29
+**Scenario name**: HUNGER_DRIVESHAFT_REFLEX
+**Component boundary**: HungerDriveshaftController (homeostasis / goal formulation) → modular-server reflex injection sites → TaskIntegration.addTask → Executor dispatch → Proof verification → Bundle closure
+**Intent**: Prove the autonomous hunger reflex is: (1) joinable end-to-end (no "planned but silent" gaps), (2) fail-closed at enqueue boundaries (explicit skipped reasons), (3) content-addressed at identity (bundle_hash stable), and (4) strict at proof (proof overrides executor "ok" when evidence is missing).
+**Risk covered**: Silent goal drops — if homeostasis detects hunger but the task never reaches the executor, or if the task completes but no proof is assembled, the autonomy claim is hollow.
+**Pipeline**: Goal-Formulation / Reflex (G_* model) → TaskIntegration.addTask → Executor dispatch → Proof verification → Bundle closure
+
+**Status (automated)**: [x] OBSERVED_PASS ☐ OBSERVED_FAIL ☐ NOT_RUN
+**Status (live)**: [x] OBSERVED_PASS ☐ OBSERVED_FAIL ☐ BLOCKED_ENV ☐ NOT_RUN
+
+**Last automated run**: 2026-02-09
+**Runner**: Vitest (CI-compatible, no live services required)
+**Commit**: conscious-bot: `16b4b2e` (hunger driveshaft smoke tests S1–S9)
+
+### Preconditions
+
+**Automated** (unit-level, no live services):
+* [x] Vitest available
+* [x] No live MC, Sterling, or executor required (mock addTask boundary)
+
+**Live** (when promoting to OBSERVED_PASS):
+* Restart required: [x] Yes ☐ No
+* Services required UP:
+  * [x] Planning health OK → `curl http://localhost:3002/health`
+  * [x] Executor loop started → log line `Starting executor` (requires `POST /system/ready`)
+  * [x] Minecraft interface reachable → port 3005 healthy, bot spawned
+  * [x] Reflex injection enabled (not shadow mode)
+* MC setup via rcon (bot name is environment-dependent; `BotSterling` is the default):
+```bash
+docker exec conscious-bot-minecraft rcon-cli "give BotSterling bread 32"
+docker exec conscious-bot-minecraft rcon-cli "effect give BotSterling minecraft:hunger 30 5"
+```
+
+### Steps (Automated — what the test suite exercises)
+
+The smoke test file (`smoke-hunger-reflex.test.ts`) exercises 9 scenarios:
+
+| # | Scenario | G_* Checkpoints Exercised | Notes |
+|---|----------|---------------------------|-------|
+| S1 | Full success: hungry → task → food consumed → proof passes → artifact | G0→G1→G2→G3(enqueued)→G4→G5→G6 | Full chain |
+| S2 | Verification failure: executor ok, proof fails (phantom eat) | G0→G1→G2→G5(fails)→G6(error) | Proof-only path: skips G3/G4 (simulates post-execution directly) |
+| S3 | Null after-state: getBotState fails at completion | G0→G1→G2→G5(null delta)→G6(error) | Proof-only path: skips G3/G4 (simulates post-execution directly) |
+| S4 | Enqueue failure: addTask throws → ENQUEUE_FAILED skip | G0→G1→G2→G3(skipped, emitted) | Terminal: no proof bundle (accumulator evicted) |
+| S5 | addTask returns null → ENQUEUE_RETURNED_NULL skip | G0→G1→G2→G3(skipped, helper only) | Tests helper return; does not emit skip event (S4 covers emission) |
+| S6 | Shadow/dryRun: pipeline evaluates, no accumulator, no task_planned | G0→G1 only | dryRun suppresses G2 by design |
+| S7 | Artifact schema: AutonomyProofBundleV1 shape validation | G6 shape | Structural assertion on bundle fields |
+| S8 | Content-addressed determinism: two identical runs → same hash | G6 identity | Two independent controllers, same inputs |
+| S9 | Accounting invariant: task_planned == task_enqueued + task_enqueue_skipped | G2→G3 accounting | Multi-fire: one enqueued + one skipped |
+
+### Steps (Live — to be executed when promoting)
+
+**Preflight:**
+
+1. Ensure `.env` has `ENABLE_AUTONOMY_REFLEXES=true` (added by this milestone).
+2. Confirm existing env: `ENABLE_PLANNING_EXECUTOR=1`, `EXECUTOR_MODE=live`, `EXECUTOR_LIVE_CONFIRM=YES`.
+3. Start services:
+```bash
+# Kill lingering processes
+lsof -ti:3000,3001,3002,3003,3004,3005,3007,5002,8766 | xargs kill -9 2>/dev/null
+# Start all services
+node scripts/start.js --skip-install --skip-build
+```
+4. Wait for bot spawn (watch for `[MINECRAFT INTERFACE] Bot state updated`).
+5. Mark system ready (executor won't tick until this is called):
+```bash
+curl -s -X POST http://localhost:3002/system/ready \
+  -H "Content-Type: application/json" \
+  -d '{"source":"sc29-live-validation"}'
+# Expected: { "ready": true, "readyAt": "...", "accepted": true }
+```
+6. Wait for executor start (watch logs for `[Planning] Starting executor`).
+7. Confirm reflex initialized:
+```bash
+curl -s http://localhost:3002/reflexes/hunger/status | python3 -m json.tool
+# Expected: { "initialized": true, "armed": true, "config": { "triggerThreshold": 12, ... }, "executorMode": "live" }
+```
+
+**Setup (do this BEFORE applying hunger — avoid contamination races):**
+
+8. Clear all residual effects from previous runs (prevents stale hunger/saturation interference):
+```bash
+docker exec conscious-bot-minecraft rcon-cli "effect clear BotSterling"
+```
+9. Ensure bot is at full health and food (so hysteresis is cleanly armed):
+```bash
+docker exec conscious-bot-minecraft rcon-cli "effect give BotSterling minecraft:instant_health 1 5"
+docker exec conscious-bot-minecraft rcon-cli "effect give BotSterling minecraft:saturation 5 5"
+```
+10. Wait 5 seconds for effects to apply, then give bread:
+```bash
+docker exec conscious-bot-minecraft rcon-cli "give BotSterling bread 16"
+```
+11. Capture before-state (verify food=20, bread present):
+```bash
+curl -s http://localhost:3005/state | python3 -m json.tool | tee /tmp/sc29-before-state.json
+```
+
+**Trigger (hands-off after this — do NOT heal/saturate during the window):**
+
+12. Apply hunger effect. Level 40 for 120s drains through saturation in ~30s, reaches food=0 by ~40s:
+```bash
+docker exec conscious-bot-minecraft rcon-cli "effect give BotSterling minecraft:hunger 120 40"
+```
+**Important:** Do not apply saturation, healing, or other effects between this step and evidence capture. Environment changes between reflex evaluation and executor dispatch cause legitimate "Food is full" failures (see FM-29.4). These are real failure modes, not bugs — but they contaminate the evidence for a "clean fire" claim.
+
+**Observe G0→G3:**
+
+13. Watch planning logs for reflex trigger lines:
+   * `[Reflex] Hunger driveshaft injected task: <task_id>` (G3 enqueued) — OR
+   * `[Reflex:CRITICAL] Hunger preemption injected task: <task_id>` (G3 preemption) — OR
+   * `[Reflex] Injection skipped (<reason>)` (G3 skipped)
+
+**Observe G4→G6:**
+
+14. Watch for executor dispatch and proof assembly:
+   * `[toolExecutor] Executing tool: minecraft.consume_food` — G4
+   * `Metric: consume_food_items = 1` — leaf completed
+   * `[Reflex] Proof bundle assembled: hash=..., result=ok, verified=true` — G5/G6
+15. After proof bundle appears (or after 120s), clear effects and capture after-state:
+```bash
+docker exec conscious-bot-minecraft rcon-cli "effect clear BotSterling"
+curl -s http://localhost:3005/state | python3 -m json.tool | tee /tmp/sc29-after-state.json
+```
+
+**Evidence capture:**
+
+16. Diff before/after: `diff /tmp/sc29-before-state.json /tmp/sc29-after-state.json`
+17. Check for golden-run artifact if a golden run was active.
+18. Fill in "Evidence (Live)" section below with artifact paths, log excerpts, and before/after food values.
+
+**Claim scope:** One clean fire with `verified=true` proof is sufficient to claim "pipeline works end-to-end." Multiple fires under sustained drain constitute stress validation of repeated trigger/hysteresis behavior.
+
+### Acceptance Criteria
+
+**Joinability / accounting:**
+
+**AC-29.1**: `task_planned_count == task_enqueued_count + task_enqueue_skipped_count` over the test/run window.
+* Signal: event counts from RecordingLifecycleEmitter (automated) or log grep (live)
+* Source: smoke test S9 / live logs
+* Threshold: exact equality
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: Asserted in S9 — equality holds for the event window captured by the test (commit `16b4b2e`). ✓
+
+**AC-29.2**: For each reflexInstanceId with task_planned, exactly one terminal enqueue event exists (enqueued XOR skipped).
+* Signal: no reflexInstanceId appears in both task_enqueued and task_enqueue_skipped
+* Source: smoke test S4 structural exclusion / reflex-enqueue.test.ts
+* Threshold: exact
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: discriminated union return type makes double-emit structurally impossible ✓
+
+**Skip honesty:**
+
+**AC-29.3**: If enqueue is skipped, reason is one of: `ENQUEUE_FAILED` (exception), `ENQUEUE_RETURNED_NULL` (returned null/no id — honest observation; could be internal dedup, but not inferred). No "dedup" reason emitted unless explicit pre-check exists.
+* Signal: `enqueueResult.reason` matches closed enum
+* Source: smoke tests S4, S5 / reflex-enqueue.test.ts
+* Threshold: exact enum match
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: S4=ENQUEUE_FAILED, S5=ENQUEUE_RETURNED_NULL ✓
+
+**Proof semantics:**
+
+**AC-29.4**: If after-state unavailable, `food_after == null` and `delta == null` (no sentinel values).
+* Signal: bundle.identity.verification.food_after === null, delta === null
+* Source: smoke test S3
+* Threshold: exact (null, not -1)
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: food_after=null, delta=null ✓
+
+**AC-29.5**: Proof verification can override executor "ok" to `error` when evidence is insufficient.
+* Signal: bundle.identity.execution.result === 'error' even when executor result was 'ok'
+* Source: smoke test S2
+* Threshold: exact
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: executor said ok, proof overrode to error (food unchanged, no consumption evidence) ✓
+
+**Content addressing:**
+
+**AC-29.6**: Same identity inputs → same bundle_hash, regardless of evidence-layer UUIDs (proof_id, reflexInstanceId).
+* Signal: two bundles from independent controller instances with identical inputs produce identical hash
+* Source: smoke test S8 / hunger-driveshaft-controller.test.ts hash tests
+* Threshold: exact string equality
+* Must hold: [x] Yes ☐ No
+* **Observed (automated)**: b1.bundle_hash === b2.bundle_hash, b1.evidence.proof_id !== b2.evidence.proof_id ✓
+
+### Evidence (Automated)
+
+Tests (121 total, all passing):
+* `packages/planning/src/goal-formulation/__tests__/hunger-driveshaft-controller.test.ts` — 72 tests
+* `packages/planning/src/goal-formulation/__tests__/reflex-enqueue.test.ts` — 8 tests
+* `packages/planning/src/goal-formulation/__tests__/smoke-hunger-reflex.test.ts` — 9 tests (S1–S9)
+* `packages/planning/src/goal-formulation/__tests__/reflex-lifecycle-events.test.ts` — 32 tests
+
+Artifacts written by smoke tests:
+* `artifacts/golden-run-test-hunger-reflex/golden-hunger-reflex-success.json` (S1)
+* `artifacts/golden-run-test-hunger-reflex/golden-hunger-reflex-verify-fail.json` (S2)
+* `artifacts/golden-run-test-hunger-reflex/golden-hunger-reflex-null-after.json` (S3)
+* `artifacts/golden-run-test-hunger-reflex/golden-hunger-reflex-schema.json` (S7)
+
+Commit: `16b4b2e`
+
+How to rerun:
+```bash
+npx vitest run packages/planning/src/goal-formulation/__tests__/smoke-hunger-reflex.test.ts
+npx vitest run packages/planning/src/goal-formulation/   # full goal-formulation suite (121 tests)
+```
+
+### Evidence (Live) — 2026-02-09
+
+**Integration bug discovered and fixed during live validation:**
+- `getBotState()` in `modular-server.ts` returned inventory items with `type` field but the controller expected `name`. The `isFood()` precondition gate always returned `false`, silently preventing the reflex from firing. Fixed by mapping `item.name ?? item.type` in the inventory projection (line 158).
+- `reflexInstanceId` was dropped by `PROPAGATED_META_KEYS` allowlist, preventing proof bundle assembly via the task-completion join. Fixed by adding `reflexInstanceId` to the Task metadata type (`types/task.ts:81`) and allowlist (`task-integration.ts:295`).
+
+**Test setup:**
+```bash
+docker exec conscious-bot-minecraft rcon-cli "give BotSterling bread 16"
+docker exec conscious-bot-minecraft rcon-cli "effect give BotSterling minecraft:hunger 120 40"
+curl -s -X POST http://localhost:3002/system/ready -H "Content-Type: application/json" -d '{"source":"sc29-live-validation"}'
+```
+
+**Log excerpts (two successful reflex fires):**
+
+Note: `reflexId` in log output is `reflexResult.reflexInstanceId.slice(0, 8)` — the per-emission UUID truncated for readability. All 7 log sites in `modular-server.ts` (lines 1849, 1861, 1866, 1989, 2001, 2006, 3434) use this same pattern. Each fire has a distinct `reflexInstanceId`; the task carries it via `metadata.reflexInstanceId` for proof-join.
+
+**Fire 1** — task `task-17706765647..pbjle`, reflexInstanceId `d0f322b7...`, injected at food=5:
+```
+[Reflex] Hunger driveshaft injected task: task-1770676564707-xpc1pbjle (reflexId=d0f322b7, food=5)
+⚠️ Step verification failed [failed]: Consume food  ← saturation race, retried
+⚠️ Step verification failed [failed]: Consume food  ← saturation still active
+⚠️ Step verification failed [failed]: Consume food  ← saturation wore off
+[toolExecutor] Executing tool: minecraft.consume_food with args: { food_type: 'any', amount: 1 }
+Metric: consume_food_items = 1
+Task progress updated: Eat food (reflex) - 100% (active -> completed)
+[Reflex] Proof bundle assembled: hash=6a082969, result=ok, verified=true
+```
+
+**Fire 2** — task `task-17706766846..onna`, reflexInstanceId `433cea82...`, injected at food=0:
+```
+[Reflex] Hunger driveshaft injected task: task-1770676684694-bokj2onna (reflexId=433cea82, food=0)
+[toolExecutor] Executing tool: minecraft.consume_food with args: { food_type: 'any', amount: 1 }
+Metric: consume_food_items = 1
+Task progress updated: Eat food (reflex) - 100% (active -> completed)
+[Reflex] Proof bundle assembled: hash=3900301b, result=ok, verified=true
+```
+
+Two distinct `reflexInstanceId` values → two distinct proof bundles → two distinct `bundle_hash` values. The join key works.
+
+**Proof signal hierarchy** (see `verifyProof()` in `hunger-driveshaft-controller.ts:259`):
+- **Receipt** (`leafReceipt.itemsConsumed > 0`): if present, treated as authoritative (Path 1, line 276). This is the `consume_food_items` metric from the leaf.
+- **World-truth deltas**: `food_before` / `food_after` from MC `/state` + inventory item count delta. Used when receipt is absent (Paths 2-4, lines 280-307).
+- **Supplemental only**: `consume_food_hunger_restored` and `consume_food_saturation_restored` are Minecraft-internal metrics not consulted by the verifier. The `hunger_restored` value can report negative numbers (meaning large restore); it is telemetry, not proof signal.
+
+**World proof:**
+- Before: food=20, health=20, bread=15
+- After: food=0 (hunger effect still active), health=1, bread=13
+- Delta: 2 bread consumed by 2 reflex fires. Food restored temporarily between fires (visible as food=5 at t+57s in monitoring, then drained again by ongoing hunger effect).
+
+**Observed failure mode (expected, FM-29.4 in action):**
+- Fire 1 experienced 3 verification failures before succeeding. The bot was manually given saturation between the reflex evaluation (food=5) and the executor dispatch — Minecraft server rejected the eat attempt with "Food is full" because saturation had restored food to 20. The executor retried after saturation wore off and food dropped again, at which point `consume_food` succeeded. This demonstrates both the failure mode (executor ok but environment changed) and the recovery path (retry with natural conditions).
+
+**State files:** `/tmp/sc29-before-state-v2.json`, `/tmp/sc29-after-state-v2.json`
+
+### Failure Modes Covered
+
+| # | Failure Mode | How Blocked |
+|---|-------------|-------------|
+| FM-29.1 | "planned but silent" (missing terminal enqueue event) | Structural helper `tryEnqueueReflexTask` returns discriminated union; tests assert accounting invariant |
+| FM-29.2 | Double terminal emission (exception + null-check both fire) | Structurally eliminated by discriminated union return (one call, one result) |
+| FM-29.3 | Sentinel masquerading as evidence (food_after = -1) | Eliminated: null semantics throughout; S3 regression test |
+| FM-29.4 | Executor ok but no real consumption | Proof verification overrides execution result to error; S2 regression test |
+
+### Closeout
+
+* [x] Promote to "known-good" list (live run 2026-02-09, two successful fires with proof bundles)
+* [x] Integration bugs fixed: `getBotState()` inventory `type→name` mapping, `reflexInstanceId` in PROPAGATED_META_KEYS
+* ☐ Follow-up: hunger effect level tuning (level 40 for 120s drains through saturation in ~30s, reaches food=0 by ~40s; level 20 for 45s only reaches food=13)
 
 ---
 

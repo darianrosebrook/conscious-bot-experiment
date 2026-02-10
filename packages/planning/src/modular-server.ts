@@ -108,6 +108,7 @@ import {
   waitForBotConnection,
   getBotPosition,
 } from './modules/mc-client';
+import { normalizeInventory } from './modules/normalize-inventory';
 
 /**
  * Get current bot state for keep-alive context.
@@ -137,7 +138,7 @@ async function getBotState(): Promise<{
           position?: { x: number; y: number; z: number };
           health?: number;
           food?: number;
-          inventory?: { items?: Array<{ name: string; count: number }> };
+          inventory?: { items?: Array<{ type?: string; name?: string; count: number; slot?: number; metadata?: number }> };
           timeOfDay?: number;
           biome?: string;
           nearbyHostiles?: number;
@@ -155,7 +156,7 @@ async function getBotState(): Promise<{
       position: botData.position,
       health: botData.health,
       food: botData.food,
-      inventory: botData.inventory?.items,
+      inventory: normalizeInventory(botData.inventory?.items),
       timeOfDay: botData.timeOfDay,
       biome: botData.biome,
       nearbyHostiles: botData.nearbyHostiles,
@@ -216,8 +217,12 @@ import {
 } from './task-integration/build-task-from-requirement';
 import { isDeterministicFailure } from './server/task-action-resolver';
 import { HungerDriveshaftController } from './goal-formulation/hunger-driveshaft-controller';
-import { RecordingLifecycleEmitter } from './goal-formulation/reflex-lifecycle-events';
+import { RecordingLifecycleEmitter, EnqueueSkipReason } from './goal-formulation/reflex-lifecycle-events';
+import { tryEnqueueReflexTask } from './goal-formulation/reflex-enqueue';
 import { translateBotState } from './goal-formulation/bot-state-translator';
+import { BotStateCache } from './goal-formulation/bot-state-cache';
+import { ReflexRegistry } from './goal-formulation/reflex-registry';
+import { ExplorationDriveshaftController } from './goal-formulation/exploration-driveshaft-controller';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -231,6 +236,20 @@ declare global {
   /** Hunger driveshaft controller instance (gated by ENABLE_AUTONOMY_REFLEXES) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   var hungerDriveshaft: any;
+  /** Reflex registry instance (gated by ENABLE_AUTONOMY_REFLEXES) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var reflexRegistry: ReflexRegistry | undefined;
+  /** BotState cache instance (gated by ENABLE_AUTONOMY_REFLEXES) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var botStateCache: BotStateCache | undefined;
+  /** Exploration driveshaft controller instance (gated by ENABLE_AUTONOMY_REFLEXES) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var explorationDriveshaft: ExplorationDriveshaftController | undefined;
+  /** Lifecycle emitter shared by all reflexes (gated by ENABLE_AUTONOMY_REFLEXES) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var reflexEmitter: RecordingLifecycleEmitter | undefined;
+  /** Metadata drop counter for diagnostics (P11) */
+  var metadataDropCount: number | undefined;
 }
 
 // Import existing components
@@ -1803,60 +1822,47 @@ async function autonomousTaskExecutor() {
       circuitBreakerOpen
     );
 
-    // Critical hunger preemption: evaluate BEFORE the idle gate so that
-    // critically low food can inject a task even when the executor has
-    // eligible tasks in the backlog. The controller's isCritical() check
-    // determines whether this is a true emergency (food <= criticalThreshold).
-    if (global.hungerDriveshaft && idleReason === null) {
+    // Reflex registry: single evaluateTick() replaces both critical preemption
+    // and idle-path reflex evaluation. Handles priority ordering, goalKey dedup,
+    // and "at most one enqueue per tick" internally. (P1)
+    // Also tick exploration's idle counter before evaluation.
+    if (global.explorationDriveshaft) {
+      global.explorationDriveshaft.tick(idleReason !== null);
+    }
+    if (global.reflexRegistry) {
       try {
-        const preemptBotState = await getBotState().catch(() => null);
-        if (
-          preemptBotState &&
-          preemptBotState.food !== undefined &&
-          global.hungerDriveshaft.isCritical({
-            food: preemptBotState.food,
-            inventory: preemptBotState.inventory ?? [],
-          })
-        ) {
-          const executorMode = process.env.EXECUTOR_MODE || 'shadow';
-          const isDryRun = executorMode !== 'live';
-          const reflexResult = await global.hungerDriveshaft.evaluate(
-            {
-              food: preemptBotState.food,
-              inventory: preemptBotState.inventory ?? [],
-            },
-            'no_tasks', // Critical preemption bypasses idle reason
-            { dryRun: isDryRun }
-          );
-          if (reflexResult) {
-            if (!isDryRun) {
-              const reflexTask = await taskIntegration.addTask({
-                ...reflexResult.taskData,
-                metadata: {
-                  taskProvenance: {
-                    builder: 'hunger-driveshaft-controller',
-                    source: 'reflex',
-                    goalKey: reflexResult.goalKey,
-                    reflexInstanceId: reflexResult.reflexInstanceId,
-                  },
-                  goalKey: reflexResult.goalKey,
-                  reflexInstanceId: reflexResult.reflexInstanceId,
-                },
-              });
-              console.log(
-                `[Reflex:CRITICAL] Hunger preemption injected task: ${reflexTask?.id ?? 'unknown'} ` +
-                  `(food=${preemptBotState.food}, reflexId=${reflexResult.reflexInstanceId.slice(0, 8)})`
-              );
-            } else {
-              console.log(
-                `[Reflex:shadow:CRITICAL] Would preempt (food=${preemptBotState.food}, reflexId=${reflexResult.reflexInstanceId.slice(0, 8)})`
-              );
+        const executorMode = process.env.EXECUTOR_MODE || 'shadow';
+        const isDryRun = executorMode !== 'live';
+        const tickResult = await global.reflexRegistry.evaluateTick(
+          idleReason,
+          (data) => taskIntegration.addTask(data),
+          (filters) => {
+            // Adapter: goalkey guard passes { status: ['pending', 'active'] }
+            // but taskIntegration.getTasks expects a single status value.
+            // Return all tasks from both statuses.
+            if (filters?.status && Array.isArray(filters.status)) {
+              const results: any[] = [];
+              for (const s of filters.status) {
+                results.push(...taskIntegration.getTasks({ status: s as any }));
+              }
+              return results;
             }
-          }
+            return taskIntegration.getTasks(filters as any);
+          },
+          { dryRun: isDryRun },
+        );
+        if (tickResult.fired && tickResult.taskId) {
+          console.log(
+            `[Reflex] ${tickResult.reflexName} injected task: ${tickResult.taskId}`
+          );
+        } else if (tickResult.fired) {
+          console.log(
+            `[Reflex:shadow] ${tickResult.reflexName} would fire (dryRun=${isDryRun})`
+          );
         }
       } catch (error) {
-        // Fail-closed: preemption failure must never break the executor cycle
-        console.warn('[Reflex] Critical hunger preemption failed:', error);
+        // Fail-closed: registry failure must never break the executor cycle
+        console.warn('[Reflex] Registry evaluateTick failed:', error);
       }
     }
 
@@ -1931,64 +1937,10 @@ async function autonomousTaskExecutor() {
         }
       }
 
-      // Hunger driveshaft: evaluate reflex on idle (gated by ENABLE_AUTONOMY_REFLEXES)
-      // The controller handles hysteresis, thresholds, and the full goal-formulation
-      // pipeline internally. We only wire the integration seam here.
-      // NOTE: Critical preemption is handled BEFORE the idle gate (above).
-      if (global.hungerDriveshaft) {
-        try {
-          const driveshaftBotState = await getBotState().catch(() => null);
-          if (driveshaftBotState && driveshaftBotState.food !== undefined) {
-            // Translate bot state to homeostasis vector for debug observability.
-            if (process.env.DEBUG_HOMEOSTASIS === 'true') {
-              const homeostasisSignals = translateBotState(driveshaftBotState);
-              console.log(
-                `[Reflex:debug] Homeostasis vector:`,
-                JSON.stringify(homeostasisSignals)
-              );
-            }
-
-            const executorMode = process.env.EXECUTOR_MODE || 'shadow';
-            const isDryRun = executorMode !== 'live';
-            const reflexResult = await global.hungerDriveshaft.evaluate(
-              {
-                food: driveshaftBotState.food,
-                inventory: driveshaftBotState.inventory ?? [],
-              },
-              idleReason,
-              { dryRun: isDryRun }
-            );
-            if (reflexResult) {
-              if (!isDryRun) {
-                const reflexTask = await taskIntegration.addTask({
-                  ...reflexResult.taskData,
-                  metadata: {
-                    taskProvenance: {
-                      builder: 'hunger-driveshaft-controller',
-                      source: 'reflex',
-                      goalKey: reflexResult.goalKey,
-                      reflexInstanceId: reflexResult.reflexInstanceId,
-                    },
-                    goalKey: reflexResult.goalKey,
-                    reflexInstanceId: reflexResult.reflexInstanceId,
-                  },
-                });
-                console.log(
-                  `[Reflex] Hunger driveshaft injected task: ${reflexTask?.id ?? 'unknown'} ` +
-                    `(reflexId=${reflexResult.reflexInstanceId.slice(0, 8)}, food=${driveshaftBotState.food})`
-                );
-              } else {
-                console.log(
-                  `[Reflex:shadow] Would inject task (reflexId=${reflexResult.reflexInstanceId.slice(0, 8)}, food=${driveshaftBotState.food})`
-                );
-              }
-            }
-          }
-        } catch (error) {
-          // Fail-closed: never break existing idle behavior
-          console.warn('[Reflex] Hunger driveshaft evaluation failed:', error);
-        }
-      }
+      // NOTE: Hunger driveshaft + exploration evaluation is now handled by
+      // the reflexRegistry.evaluateTick() call BEFORE the idle gate (above).
+      // The registry handles both preemption (canPreempt=true) and idle contexts
+      // in a single call, with priority ordering and "at most one per tick."
 
       return;
     }
@@ -3383,62 +3335,58 @@ taskIntegration.on(
   }
 );
 
-// Hunger driveshaft: assemble proof bundle on task completion.
-// This is the event-driven join — the task carries reflexInstanceId,
-// which is used to look up the per-emission accumulator.
-// Observational only: never affects task completion semantics.
+// Reflex completion dispatch: route task terminal events to the correct
+// controller via the registry. No builder-specific switch statements.
+// Adding a new reflex requires zero changes here. (P4)
 taskIntegration.on(
   'taskLifecycleEvent',
   async (event: { type: string; taskId: string; task?: any; reason?: string }) => {
-    if (!global.hungerDriveshaft) return;
+    if (!global.reflexRegistry) return;
     if (event.type !== 'completed' && event.type !== 'failed') return;
-
-    const task = event.task;
-    if (!task?.metadata?.taskProvenance) return;
-    if (task.metadata.taskProvenance.builder !== 'hunger-driveshaft-controller') return;
-
-    // Use reflexInstanceId (per-emission UUID) as the join key, not goalKey.
-    // This avoids the conflation bug where content-addressed goalKey could
-    // match the wrong accumulator on retries or duplicate injections.
-    const reflexInstanceId = task.metadata.reflexInstanceId as string | undefined;
-    if (!reflexInstanceId) return;
+    if (!event.task?.metadata?.taskProvenance?.builder) return;
 
     try {
-      const accumulator = global.hungerDriveshaft.getAccumulator(reflexInstanceId);
-      if (!accumulator) {
-        console.warn(
-          `[Reflex] No accumulator found for reflexId=${reflexInstanceId.slice(0, 8)} — TTL evicted or duplicate completion`
-        );
-        return;
+      const afterState = global.botStateCache
+        ? await global.botStateCache.get()
+        : await getBotState().catch(() => null);
+
+      global.reflexRegistry.onTaskTerminal(event.task, afterState);
+
+      // Golden run recording for hunger proof bundles (backward-compatible)
+      if (event.task.metadata.taskProvenance.builder === 'hunger-driveshaft-controller') {
+        const reflexInstanceId = event.task.metadata.reflexInstanceId as string | undefined;
+        if (reflexInstanceId && global.hungerDriveshaft) {
+          // Proof bundle was already built by onTaskTerminal — check if it was recorded
+          // The accumulator is consumed by buildProofBundle, so if it's gone, the bundle was built
+          const accumulator = global.hungerDriveshaft.getAccumulator(reflexInstanceId);
+          if (!accumulator) {
+            // Bundle was built and accumulator consumed — check golden run
+            const goldenRunId = (event.task.metadata as any)?.goldenRun?.runId as string | undefined;
+            if (goldenRunId) {
+              // The proof bundle is built inside onTaskTerminal; we log here for observability
+              console.log(`[Reflex] Proof bundle assembled for reflexId=${reflexInstanceId.slice(0, 8)}`);
+            }
+          }
+        }
       }
 
-      // Fetch post-execution state for verification
-      const afterState = await getBotState().catch(() => null);
-
-      const bundle = global.hungerDriveshaft.buildProofBundle(accumulator, {
-        result: event.type === 'completed' ? 'ok' : 'error',
-        receipt: task.metadata?.executionReceipt ?? {},
-        taskId: event.taskId,
-      }, {
-        food_after: afterState?.food ?? -1,
-        inventory_after: afterState?.inventory ?? [],
-      });
-
-      // Record to golden run if active
-      const recorder = getGoldenRunRecorder();
-      const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
-      if (goldenRunId) {
-        recorder.recordReflexProof(goldenRunId, bundle);
+      // Golden run recording for exploration evidence
+      if (event.task.metadata.taskProvenance.builder === 'exploration-driveshaft-controller') {
+        const reflexInstanceId = event.task.metadata.reflexInstanceId as string | undefined;
+        if (reflexInstanceId && global.explorationDriveshaft) {
+          const evidence = global.explorationDriveshaft.getEvidence(reflexInstanceId);
+          if (evidence) {
+            const goldenRunId = (event.task.metadata as any)?.goldenRun?.runId as string | undefined;
+            if (goldenRunId) {
+              const recorder = getGoldenRunRecorder();
+              recorder.recordExplorationEvidence(goldenRunId, evidence);
+            }
+          }
+        }
       }
-
-      console.log(
-        `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
-          `result=${bundle.identity.execution.result}, ` +
-          `verified=${bundle.identity.verification.delta > 0}`
-      );
     } catch (error) {
-      // Proof assembly failure must never affect task completion
-      console.warn('[Reflex] Failed to assemble proof bundle:', error);
+      // Fail-closed: never affect task completion semantics
+      console.warn('[Reflex] Completion dispatch failed:', error);
     }
   }
 );
@@ -3493,6 +3441,52 @@ serverConfig.addEndpoint('get', '/reflexes/hunger/status', (_req, res) => {
     },
     executorMode: process.env.EXECUTOR_MODE || 'shadow',
   });
+});
+
+// Reflex lifecycle events endpoint (P6) — paginated
+serverConfig.addEndpoint('get', '/reflexes/lifecycle-events', (req, res) => {
+  if (!global.reflexEmitter) {
+    res.json({ events: [], message: 'Reflex system not initialized' });
+    return;
+  }
+  const since = Number(req.query.since || 0);
+  const limit = Math.min(Number(req.query.limit || 100), 500);
+  const events = global.reflexEmitter.getEventsSince(since, limit);
+  res.json({ events, count: events.length });
+});
+
+// Reflex registry status endpoint
+serverConfig.addEndpoint('get', '/reflexes/status', (_req, res) => {
+  if (!global.reflexRegistry) {
+    res.json({
+      initialized: false,
+      reason: 'ENABLE_AUTONOMY_REFLEXES not set or initialization failed',
+    });
+    return;
+  }
+  const registered = global.reflexRegistry.getRegistered();
+  res.json({
+    initialized: true,
+    reflexes: registered.map((r) => ({
+      name: r.name,
+      priority: r.priority,
+      canPreempt: r.canPreempt,
+      ...(r.name === 'exploration' && global.explorationDriveshaft ? {
+        armed: global.explorationDriveshaft.isArmed(),
+        idleTicks: global.explorationDriveshaft.getIdleTicks(),
+      } : {}),
+      ...(r.name.includes('hunger') && global.hungerDriveshaft ? {
+        armed: global.hungerDriveshaft.isArmed(),
+      } : {}),
+    })),
+    registrySize: registered.length,
+    executorMode: process.env.EXECUTOR_MODE || 'shadow',
+  });
+});
+
+// Metadata drops diagnostics endpoint (P11)
+serverConfig.addEndpoint('get', '/reflexes/diagnostics/metadata-drops', (_req, res) => {
+  res.json({ count: global.metadataDropCount ?? 0 });
 });
 
 // Keep-alive force tick endpoint (diagnostic only)
@@ -3946,19 +3940,141 @@ async function startServer() {
       console.warn('⚠️ Failed to initialize keep-alive integration:', error);
     }
 
-    // Initialize hunger driveshaft controller (gated by ENABLE_AUTONOMY_REFLEXES)
+    // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
     if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {
       try {
-        const reflexEmitter = new RecordingLifecycleEmitter();
+        // Shared lifecycle emitter for all reflexes
+        global.reflexEmitter = new RecordingLifecycleEmitter();
+        global.metadataDropCount = 0;
+
+        // BotState cache: at most one HTTP fetch per tick (TTL < tick interval)
+        global.botStateCache = new BotStateCache(
+          () => getBotState() as any,
+          4000,
+        );
+
+        // Registry: single evaluateTick() entry point
+        global.reflexRegistry = new ReflexRegistry(global.botStateCache);
+
+        // Hunger driveshaft controller
         global.hungerDriveshaft = new HungerDriveshaftController({
           triggerThreshold: Number(process.env.HUNGER_TRIGGER_THRESHOLD || 12),
           resetThreshold: Number(process.env.HUNGER_RESET_THRESHOLD || 16),
           criticalThreshold: Number(process.env.HUNGER_CRITICAL_THRESHOLD || 5),
-          emitter: reflexEmitter,
+          emitter: global.reflexEmitter,
         });
+
+        // Register hunger-critical (preemptable, highest priority)
+        global.reflexRegistry.register({
+          name: 'hunger-critical',
+          priority: 0,
+          canPreempt: true,
+          evaluate: async (botState, _idleReason, opts) => {
+            if (botState.food === undefined) return null;
+            const state = { food: botState.food, inventory: botState.inventory ?? [] };
+            if (!global.hungerDriveshaft.isCritical(state)) return null;
+            const result = await global.hungerDriveshaft.evaluate(state, 'no_tasks', opts);
+            return result ? { ...result, builderName: 'hunger-driveshaft-controller' } : null;
+          },
+          onEnqueued: (rid, tid, gid) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
+          onSkipped: (rid, gid, reason) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
+          onTaskTerminal: (task, afterState) => {
+            const rid = task.metadata?.reflexInstanceId;
+            if (!rid) return;
+            const acc = global.hungerDriveshaft.getAccumulator(rid);
+            if (!acc) return;
+            const bundle = global.hungerDriveshaft.buildProofBundle(acc, {
+              result: task.status === 'completed' ? 'ok' : 'error',
+              receipt: task.metadata?.executionReceipt ?? {},
+              taskId: task.id,
+            }, afterState ? {
+              food_after: afterState.food,
+              inventory_after: afterState.inventory ?? [],
+            } : null);
+            console.log(
+              `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
+                `result=${bundle.identity.execution.result}, ` +
+                `verified=${(bundle.identity.verification.delta ?? 0) > 0}`
+            );
+            // Record to golden run if active
+            const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
+            if (goldenRunId) {
+              getGoldenRunRecorder().recordReflexProof(goldenRunId, bundle);
+            }
+          },
+        });
+
+        // Register hunger-idle (not preemptable, medium priority)
+        global.reflexRegistry.register({
+          name: 'hunger',
+          priority: 10,
+          canPreempt: false,
+          evaluate: async (botState, idleReason, opts) => {
+            if (botState.food === undefined) return null;
+            const result = await global.hungerDriveshaft.evaluate(
+              { food: botState.food, inventory: botState.inventory ?? [] },
+              idleReason ?? 'no_tasks',
+              opts,
+            );
+            return result ? { ...result, builderName: 'hunger-driveshaft-controller' } : null;
+          },
+          onEnqueued: (rid, tid, gid) => global.hungerDriveshaft.emitTaskEnqueued(rid, tid, gid),
+          onSkipped: (rid, gid, reason) => global.hungerDriveshaft.emitTaskEnqueueSkipped(rid, gid, reason),
+          onTaskTerminal: (task, afterState) => {
+            // Same handler as hunger-critical — shared controller instance
+            const rid = task.metadata?.reflexInstanceId;
+            if (!rid) return;
+            const acc = global.hungerDriveshaft.getAccumulator(rid);
+            if (!acc) return;
+            const bundle = global.hungerDriveshaft.buildProofBundle(acc, {
+              result: task.status === 'completed' ? 'ok' : 'error',
+              receipt: task.metadata?.executionReceipt ?? {},
+              taskId: task.id,
+            }, afterState ? {
+              food_after: afterState.food,
+              inventory_after: afterState.inventory ?? [],
+            } : null);
+            console.log(
+              `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
+                `result=${bundle.identity.execution.result}, ` +
+                `verified=${(bundle.identity.verification.delta ?? 0) > 0}`
+            );
+            const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
+            if (goldenRunId) {
+              getGoldenRunRecorder().recordReflexProof(goldenRunId, bundle);
+            }
+          },
+        });
+
         console.log('[Planning] Hunger driveshaft controller initialized');
+
+        // Exploration driveshaft controller
+        global.explorationDriveshaft = new ExplorationDriveshaftController({
+          idleTriggerTicks: Number(process.env.EXPLORATION_IDLE_TRIGGER_TICKS || 6),
+          cooldownMs: Number(process.env.EXPLORATION_COOLDOWN_MS || 120000),
+          minHealth: Number(process.env.EXPLORATION_MIN_HEALTH || 14),
+          minFood: Number(process.env.EXPLORATION_MIN_FOOD || 8),
+          emitter: global.reflexEmitter,
+        });
+
+        global.reflexRegistry.register({
+          name: 'exploration',
+          priority: 20,
+          canPreempt: false,
+          evaluate: (botState, idleReason, opts) =>
+            global.explorationDriveshaft!.evaluate(botState, idleReason, opts),
+          onEnqueued: (rid, tid, gid) =>
+            global.explorationDriveshaft!.emitTaskEnqueued(rid, tid, gid),
+          onSkipped: (rid, gid, reason, eid) =>
+            global.explorationDriveshaft!.emitTaskEnqueueSkipped(rid, gid, reason, eid),
+          onTaskTerminal: (task, afterState) =>
+            global.explorationDriveshaft!.onTaskTerminal(task, afterState),
+        });
+
+        console.log('[Planning] Exploration driveshaft controller initialized');
+        console.log(`[Planning] ReflexRegistry: ${global.reflexRegistry.getRegistered().length} reflexes registered`);
       } catch (error) {
-        console.warn('[Planning] Failed to initialize hunger driveshaft:', error);
+        console.warn('[Planning] Failed to initialize reflex system:', error);
       }
     }
 

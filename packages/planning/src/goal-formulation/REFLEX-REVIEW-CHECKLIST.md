@@ -16,17 +16,19 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 ### AC-2: Proof Identity Is Content-Addressed
 - [ ] Same bot state + same outcome = same `bundle_hash`
 - [ ] Different `proof_id` (UUID) does NOT change `bundle_hash`
+- [ ] Different `reflexInstanceId` (UUID) does NOT change `bundle_hash`
 - [ ] Different timing does NOT change `bundle_hash`
 - [ ] Different `task_id` does NOT change `bundle_hash`
 - [ ] Different execution result DOES change `bundle_hash`
 - [ ] `items_consumed` is sorted before hashing
+- [ ] `food_after` and `delta` are `null` (not sentinel `-1`) when after-state unavailable
 
 ### AC-3: Verification Is Stricter Than Executor
 - [ ] Receipt confirms consumption → pass
 - [ ] Food increased AND edible inventory decreased → pass
 - [ ] Food increased but no consumption evidence → **FAIL**
 - [ ] No food increase and no receipt → **FAIL**
-- [ ] After-state fetch failure produces explicit `food_increased_but_inventory_unavailable` reason
+- [ ] After-state fetch failure → **FAIL** with distinct `after_state_unavailable` reason
 
 ### AC-4: Hysteresis Prevents Oscillation
 - [ ] Fires at T_low (food <= 12), disarms
@@ -37,6 +39,8 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 - [ ] `dryRun: true` runs full pipeline (accurate shadow logs)
 - [ ] `dryRun: true` does NOT disarm hysteresis
 - [ ] `dryRun: true` does NOT store accumulators
+- [ ] `dryRun: true` does NOT emit `task_planned` (no task will be enqueued)
+- [ ] `dryRun: true` still emits `goal_formulated` (shadow observability)
 - [ ] Switching from shadow to live does not require food recovery to T_high first
 
 ### AC-6: Join Key Is Not Conflated With Identity Key
@@ -47,7 +51,8 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 
 ### AC-7: Event Ordering Matches Causality
 - [ ] `goal_formulated` emitted during `evaluate()` (trigger time)
-- [ ] `task_created` emitted during `evaluate()` (plan time)
+- [ ] `task_planned` emitted during `evaluate()` (plan time, live mode only)
+- [ ] `task_enqueued` emitted after `addTask()` returns (integration time, real task ID)
 - [ ] `goal_verified` emitted during `buildProofBundle()` (completion time)
 - [ ] `goal_closed` emitted during `buildProofBundle()` (completion time)
 
@@ -62,6 +67,93 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 - [ ] `recordReflexProof()` uses deep merge (does not clobber sibling `execution` fields)
 - [ ] Proof bundle appears at `execution.reflex_proof` in golden-run artifact
 - [ ] Bundle includes both identity (hashed) and evidence (runtime) layers
+
+### AC-10: Traceability / Joinability
+
+Every reflex-emitted lifecycle event includes `reflexInstanceId` so an operator can follow a thread from trigger → queue → dispatch → completion → proof without guessing.
+
+- [ ] Every lifecycle event type carries `reflexInstanceId`
+- [ ] Task metadata includes `reflexInstanceId` and `goalKey` at creation time and remains unchanged through dispatch
+- [ ] Golden-run artifact includes enough information to join:
+  - injected task id
+  - `reflexInstanceId`
+  - dispatched leaf + args digest (or step digest)
+  - proof bundle hash
+- [ ] Event semantics are unambiguous:
+  - `task_planned` at evaluate() — intent, pending ID
+  - `task_enqueued` after `addTask()` returns — fact, real task ID
+  - `task_enqueue_skipped` when `addTask()` fails/dedupes/returns null — explicit failure
+  - `goal_verified` / `goal_closed` at completion — outcome
+- [ ] All events for a single reflex firing share the same `reflexInstanceId` (tested)
+- [ ] `emitTaskEnqueued()` method bridges controller → integration layer
+- [ ] `emitTaskEnqueueSkipped()` emits skip event with reason AND evicts accumulator
+- [ ] `EnqueueSkipReason` enum: `deduped_existing_task` (reserved for future pre-check), `enqueue_failed`, `enqueue_returned_null`
+- [ ] Missing `task_enqueued` after `task_planned` is unambiguous (operator checks for `task_enqueue_skipped`)
+- [ ] `tryEnqueueReflexTask()` returns discriminated `ReflexEnqueueResult`: `{ kind: 'enqueued', taskId }` | `{ kind: 'skipped', reason }` — structural mutual exclusion (no boolean guard needed)
+- [ ] Both injection sites (critical + idle) use `tryEnqueueReflexTask()` — no inline try/catch/if chains
+- [ ] Every `task_planned` is mechanically followed by exactly one of: `task_enqueued` | `task_enqueue_skipped` (7 regression tests in `reflex-enqueue.test.ts`)
+
+### AC-11: Fault Injection Invariants
+
+Failures must not leave sticky state (armed/disarmed, orphan accumulators, or repeated injections).
+
+- [ ] If `getBotState()` returns usable data but pipeline returns null (no food, threshold not met), controller does NOT:
+  - disarm
+  - store accumulators
+  - emit misleading lifecycle events (no `goal_formulated` or `task_planned` unless reflex fires)
+- [ ] If `buildProofBundle` receives null after-state (getBotState failure at completion):
+  - records `after_state_unavailable` reason
+  - overrides execution result to `error`
+  - still cleans up accumulator (not wedged)
+  - still emits `goal_closed` with `success=false`
+- [ ] If proof verification fails:
+  - bundle records `execution.result: 'error'` even if executor step completed
+  - `goal_closed` emits with `success=false` and exact reason from `VerificationReason` enum
+- [ ] Repeated null evaluations (N ticks above threshold) do not leak lifecycle events
+
+### AC-12: Restart / Duplication Safety
+
+- [ ] Hysteresis prevents double-injection within same controller lifecycle (at most 1 result before disarming)
+- [ ] Fresh controller (simulating restart) re-fires — dedup is at integration layer via `findSimilarTask()` title match
+- [ ] Single executor instance constraint is documented; multi-instance is NOT supported
+- [ ] Rapid evaluations at T_low produce exactly 1 result before disarming
+
+**Integration-layer dedup (not controller-level — documented, not unit-tested):**
+- [ ] Before injecting, `addTask()` calls `findSimilarTask()` for exact title match among pending/active tasks
+- [ ] Queue scan guard: check for active tasks with `taskProvenance.builder === 'hunger-driveshaft-controller'` before injection
+- [ ] On `addTask()` exception: `tryEnqueueReflexTask` returns `{ kind: 'skipped', reason: ENQUEUE_FAILED }` → caller emits skip + evicts accumulator
+- [ ] On `addTask()` returning null/no id: `tryEnqueueReflexTask` returns `{ kind: 'skipped', reason: ENQUEUE_RETURNED_NULL }` → caller emits skip + evicts accumulator
+- [ ] Mutual exclusion is structural (discriminated union return), not stateful (no boolean guard) — double-emit is impossible without writing obviously wrong code
+
+**Architectural decisions (documented, not implemented):**
+- [ ] **Dedup key direction:** Current dedup uses title-based `findSimilarTask()` inside `addTask()`. Future direction: add explicit pre-check via `findSimilarTask()` or metadata-based `dedupeKey` (e.g., `taskProvenance.builder + goalKey`) *before* calling `addTask()`, so we can emit `DEDUPED_EXISTING_TASK` with `existing_task_id`. Until implemented, `DEDUPED_EXISTING_TASK` is reserved in `EnqueueSkipReason` but NOT emitted at runtime — only `ENQUEUE_RETURNED_NULL` and `ENQUEUE_FAILED` are used. If `addTask()` internally deduplicates and returns null, it surfaces as `ENQUEUE_RETURNED_NULL` (honest about what we observed, not what we inferred).
+- [ ] **Shadow-mode `task_planned` emit rule:** Current decision: dryRun does NOT emit `task_planned` (no false promises). Alternative: emit with `will_enqueue: false` flag for full shadow observability. Either is defensible; the choice must be consistent across all reflexes.
+- [ ] **Skip as terminal event:** `task_enqueue_skipped` is a terminal event for the reflex lifecycle (no `goal_closed` follows). This is intentional: no proof bundle exists because no task was executed. Future direction: add `goal_aborted` event that mirrors `goal_closed` shape but without `bundle_hash`, for "why did this reflex not produce a proof?" queries. Current contract: a reflex firing is terminal if it either closes (proof built) OR enqueue-skips (no task ran).
+- [ ] **Accounting invariant:** Per time window, `task_planned_count == task_enqueued_count + task_enqueue_skipped_count`. If this breaks, there is a missing terminal event emission. Not yet enforced in code; candidates: runtime assertion in `RecordingLifecycleEmitter`, or a periodic health-check log.
+
+### AC-13: Critical Response SLO (Once Priority Exists)
+
+Deferred until executor supports priority lanes or soft pause. Tracked as Gap-1.
+
+- [ ] When `food <= criticalThreshold`, the reflex task begins execution within X ticks or Y seconds (TBD)
+- [ ] Under backlog, reflex task is ordered ahead of non-critical tasks
+- [ ] If executor is rate-limited or circuit-breaker-open, reflex produces explicit "not executed" evidence reason
+
+### AC-14: Tick Budget + Call Count
+
+Deferred until stacking reflex #2. Tracked as Gap-4.
+
+- [ ] Per executor tick: `getBotState()` is called at most once (snapshot cache), regardless of number of reflexes
+- [ ] Reflex evaluation time budget: p95 < 10ms per reflex on dev hardware
+- [ ] Proof assembly does not block tick loop
+
+### AC-15: Verification Reason Exhaustiveness
+
+- [ ] Verification failure reasons are a closed `VerificationReason` enum (no freeform strings)
+- [ ] Each failure-mode test asserts the exact enum value (not just "fails")
+- [ ] `after_state_unavailable` is distinct from `no_food_increase_or_consumption_evidence`
+- [ ] `ALL_VERIFICATION_REASONS` array covers every enum member
+- [ ] Exhaustiveness test asserts every enum value is exercised by at least one test case
 
 ---
 
@@ -80,16 +172,18 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 
 **Review framing:** "Critical injection is allowed outside the idle gate; true queue preemption is a follow-on."
 
-### Gap-2: task_created Event Uses Placeholder Task ID
+**Related AC:** AC-13 (Critical Response SLO)
 
-**Current behavior:** `task_created` emits `pending-{reflexInstanceId.slice(0,8)}` because the real `taskId` isn't known until `addTask()` returns (which happens in the integration layer, not the controller).
+### Gap-2: task_planned Uses Placeholder Task ID — RESOLVED
 
-**Clean pattern:**
-1. At `evaluate()`: emit `task_planned` with `reflexInstanceId` and `goal_id` (what happens now)
-2. After `addTask()` returns: emit `task_enqueued` with real `taskId` + `reflexInstanceId` (new)
-3. On completion: `goal_verified` / `goal_closed` (what happens now)
+**Status:** Resolved via `task_planned` + `task_enqueued` split.
 
-**Why this matters:** Event consumers that try to join by `task_id` will find `pending-*` doesn't match any real task ID. The join must use `reflexInstanceId` instead.
+- `task_planned` emits at evaluate() time with `pending-{reflexInstanceId.slice(0,8)}`
+- `task_enqueued` emits after `addTask()` returns with real task ID
+- Both carry `reflexInstanceId` for joining
+- In shadow mode, `task_planned` is NOT emitted (no task will be enqueued)
+
+**Related AC:** AC-10 (Traceability / Joinability)
 
 ### Gap-3: No Cross-Process / Restart Dedup
 
@@ -103,6 +197,10 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 1. **Queue scan guard:** Before injecting, check `taskIntegration.getActiveTasks()` for any task with `metadata.taskProvenance.builder === 'hunger-driveshaft-controller'`.
 2. **Dedupe lease:** Store `goalKey` with short TTL in a shared store (if multi-process).
 
+**Constraint documented:** Single executor instance only; multi-instance is unsupported and guarded.
+
+**Related AC:** AC-12 (Restart / Duplication Safety)
+
 ### Gap-4: Multiple getBotState() Calls Per Tick
 
 **Current behavior:** Up to 3 calls per tick: keep-alive, critical preemption check, idle evaluation. Plus another on task completion.
@@ -110,6 +208,8 @@ Review-ready checklist for the hunger driveshaft (merged) and the next two refle
 **Impact:** Performance overhead and I/O flake amplification. Acceptable with 1 reflex, problematic with 3+.
 
 **Mitigation:** Per-tick snapshot cache scoped to the executor loop iteration. Fetch once, reuse for all hooks. Still keep try/catch boundaries.
+
+**Related AC:** AC-14 (Tick Budget + Call Count)
 
 ### Gap-5: Homeostasis Polarity Is Documented But Not Enforced
 
@@ -171,6 +271,16 @@ Evidence: specific hostile entities, positions, timing
 - Accumulator stores: trigger safety, hostile count, position before
 - Proof verification: position delta > 16 blocks OR no hostiles in range after
 
+### Verification Reason Enum (Threat-Specific)
+
+```
+POSITION_DELTA_SUFFICIENT    — moved > 16 blocks from trigger position
+SAFETY_IMPROVED              — safety signal increased after execution
+NO_POSITION_CHANGE           — bot didn't move (flee failed)
+SAFETY_NOT_IMPROVED          — still threatened after execution
+AFTER_STATE_UNAVAILABLE      — getBotState failed at completion
+```
+
 ---
 
 ## Part 4: Torch Reflex — Design Card
@@ -228,15 +338,25 @@ Evidence: position, time_of_day, torch_count_before/after
 - Accumulator stores: trigger light level, torch count before, position
 - Proof verification: torch count decreased AND (light level increased OR receipt confirms placement)
 
+### Verification Reason Enum (Torch-Specific)
+
+```
+TORCH_COUNT_DECREASED        — inventory confirms torch was placed
+LIGHT_LEVEL_IMPROVED         — light level increased after placement
+NO_TORCH_DECREASE            — torch count unchanged (placement failed)
+LIGHT_LEVEL_NOT_IMPROVED     — still dark after execution
+AFTER_STATE_UNAVAILABLE      — getBotState failed at completion
+```
+
 ---
 
 ## Part 5: Shared Reflex Infrastructure Needs
 
 ### Before Stacking Reflex #2
 
-1. **Queue scan guard** — Before any reflex injects a task, scan active tasks for matching `taskProvenance.builder`. Prevents double-injection without requiring external state.
+1. **Queue scan guard** — Before any reflex injects a task, scan active tasks for matching `taskProvenance.builder`. Prevents double-injection without requiring external state. (AC-12)
 
-2. **Per-tick botState cache** — Fetch `getBotState()` once per executor tick, share across all reflex evaluations. Reduces I/O from O(N reflexes) to O(1).
+2. **Per-tick botState cache** — Fetch `getBotState()` once per executor tick, share across all reflex evaluations. Reduces I/O from O(N reflexes) to O(1). (AC-14)
 
 3. **Reflex registry** — Instead of N separate `if (global.reflex_X)` blocks in modular-server.ts, create a `ReflexRegistry` that iterates registered controllers. Each controller implements a common `evaluate(botState, idleReason, opts)` interface (they already do).
 
@@ -268,6 +388,8 @@ ENABLE_AUTONOMY_REFLEXES=true EXECUTOR_MODE=shadow npm start
 2. Force food low (or wait for natural drain)
 3. Confirm logs show `[Reflex:shadow] Would inject task` without disarming
 4. Confirm `GET /reflexes/hunger/status` still shows `armed: true` (dryRun preserved state)
+5. Confirm NO `task_planned` events in shadow mode (dryRun does not emit task events)
+6. Confirm `goal_formulated` events ARE emitted in shadow mode (shadow observability)
 
 ### Live Validation
 
@@ -279,15 +401,27 @@ ENABLE_AUTONOMY_REFLEXES=true EXECUTOR_MODE=live npm start
 2. Confirm `[Reflex] Hunger driveshaft injected task` log appears
 3. Confirm task has `metadata.taskProvenance.builder === 'hunger-driveshaft-controller'`
 4. Confirm task has both `metadata.goalKey` and `metadata.reflexInstanceId`
-5. Wait for task completion
-6. Confirm `[Reflex] Proof bundle assembled` log with hash and verification status
-7. If golden run active: confirm `execution.reflex_proof` in artifact
+5. Confirm lifecycle events follow: `goal_formulated` → `task_planned` → `task_enqueued` → ... → `goal_verified` → `goal_closed`
+6. Confirm all lifecycle events share the same `reflexInstanceId`
+7. Confirm `task_enqueued` carries the real task ID (not `pending-*`)
+8. Wait for task completion
+9. Confirm `[Reflex] Proof bundle assembled` log with hash and verification status
+10. If golden run active: confirm `execution.reflex_proof` in artifact
 
 ### Critical Preemption Validation
 
 1. Start with eligible tasks in backlog + food <= 5
 2. Confirm `[Reflex:CRITICAL] Hunger preemption injected task` log appears
 3. Confirm injected task enters the queue (may not execute immediately — see Gap-1)
+
+### Fault Injection Validation
+
+1. Simulate `getBotState()` returning no food items with food=5
+2. Confirm NO lifecycle events emitted (no `goal_formulated`, no `task_planned`)
+3. Confirm controller remains armed
+4. Simulate task completion with `getBotState()` failure (null after-state)
+5. Confirm proof bundle records `after_state_unavailable` reason
+6. Confirm accumulator is cleaned up (not wedged for future emissions)
 
 ### Rollback
 
@@ -310,3 +444,26 @@ Logs computed homeostasis vector each idle tick:
 ```
 
 Verify that hunger urgency crosses the `eat_immediate` gate exactly when food < 6.
+
+---
+
+## Part 7: Test Coverage Matrix
+
+| AC | Test File | Test Count | Status |
+|----|-----------|------------|--------|
+| AC-1 | hunger-driveshaft-controller.test.ts | 7 | Passing |
+| AC-2 | hunger-driveshaft-controller.test.ts | 9 | Passing |
+| AC-3, AC-15 | hunger-driveshaft-controller.test.ts | 10 | Passing |
+| AC-4 | hunger-driveshaft-controller.test.ts | 2 | Passing |
+| AC-5 | hunger-driveshaft-controller.test.ts | 4 | Passing |
+| AC-6 | hunger-driveshaft-controller.test.ts | 2 | Passing |
+| AC-7, AC-10 | hunger-driveshaft-controller.test.ts | 10 | Passing |
+| AC-8 | modular-server.ts (integration) | — | Manual |
+| AC-9 | golden-run-recorder (existing) | — | Passing |
+| AC-11 | hunger-driveshaft-controller.test.ts | 5 | Passing |
+| AC-12 | hunger-driveshaft-controller.test.ts | 4 | Passing |
+| AC-13 | — | — | Deferred (Gap-1) |
+| AC-14 | — | — | Deferred (Gap-4) |
+| Enqueue | reflex-enqueue.test.ts | 8 | Passing |
+| Translator | bot-state-translator.test.ts | 32 | Passing |
+| **Total** | | **112** | **All passing** |

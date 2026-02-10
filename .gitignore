@@ -88,6 +88,8 @@ pids
 *.seed
 *.pid.lock
 artifacts/golden-run/**
+artifacts/golden-run-test-hunger-reflex/**
+artifacts/soak-milestone2/**
 
 # Planning golden-run: ignore top-level accumulation, archive subdirs are committed
 packages/planning/artifacts/golden-run/*.json

@@ -78,6 +78,8 @@ export interface Task {
     pendingPlanningTicks?: number;
     /** Canonical goal key (action:target) for exact-match idempotency in drive tick */
     goalKey?: string;
+    /** Per-emission UUID for reflex accumulator join-key (links task completion to proof bundle) */
+    reflexInstanceId?: string;
     /** Sterling provenance (opaque semantic artifacts) */
     sterling?: {
       committedIrDigest?: string;

@@ -292,6 +292,7 @@ const PROPAGATED_META_KEYS = [
   'taskProvenance',
   'sterling',
   'goldenRun',
+  'reflexInstanceId',
 ] as const satisfies readonly (keyof Task['metadata'])[];
 
 /** Rate limiter for dev-only dropped-key warnings (one per key per session). */

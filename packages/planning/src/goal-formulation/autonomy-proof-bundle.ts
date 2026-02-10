@@ -53,8 +53,10 @@ export interface AutonomyProofIdentity {
   };
   verification: {
     food_before: number;
-    food_after: number;
-    delta: number;
+    /** null when after-state was unavailable (getBotState failure at completion) */
+    food_after: number | null;
+    /** null when after-state was unavailable */
+    delta: number | null;
     /** From inventory delta, SORTED for deterministic hashing */
     items_consumed: string[];
   };
