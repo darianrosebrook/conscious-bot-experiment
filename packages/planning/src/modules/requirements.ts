@@ -201,10 +201,14 @@ export function resolveRequirement(
   if (
     /\bupgrade\b.*\b(tool|pickaxe|axe|sword)\b|\btool\s*progression\b/.test(ttl)
   ) {
+    // Generic "upgrade tool" without specifying tier — default to next tier up
+    // (iron is a reasonable goal since it unlocks diamond mining)
+    const upgToolMatch = ttl.match(/\b(pickaxe|axe|sword|shovel|hoe)\b/);
+    const upgToolType = upgToolMatch?.[1] || 'pickaxe';
     return {
       kind: 'tool_progression',
-      targetTool: 'iron_pickaxe',
-      toolType: 'pickaxe',
+      targetTool: `iron_${upgToolType}`,
+      toolType: upgToolType,
       targetTier: 'iron',
       quantity: 1,
     };
@@ -214,18 +218,18 @@ export function resolveRequirement(
   if (task.type === 'crafting' || /\bcraft\b|\bmake\b/.test(ttl)) {
     // Detect specific craftable items from title
     const craftableMatch = ttl.match(
-      /\b(wooden[_ ]?pickaxe|wooden[_ ]?axe|wooden[_ ]?shovel|wooden[_ ]?hoe|wooden[_ ]?sword|crafting[_ ]?table|stick|planks?|chest|furnace|torch|boat|bowl|bucket|shield|ladder|fence|door)\b/
+      /\b((?:wooden|stone|iron|diamond|netherite)[_ ]?(?:pickaxe|axe|shovel|hoe|sword)|crafting[_ ]?table|stick|planks?|chest|furnace|torch|boat|bowl|bucket|shield|ladder|fence|door)\b/
     );
     if (craftableMatch) {
       const rawItem = craftableMatch[1].replace(/\s+/g, '_');
       // Normalize common aliases
       const outputPattern =
-        rawItem === 'planks' || rawItem === 'plank' ? 'oak_planks' : rawItem;
+        rawItem === 'planks' || rawItem === 'plank' ? '_planks' : rawItem;
       return {
         kind: 'craft',
         outputPattern,
         quantity: 1,
-        proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
+        proxyPatterns: ['_log', ' log', '_planks', 'plank', 'stick'],
       };
     }
     // Fallback for "craft a pickaxe" without tier qualifier → wooden_pickaxe
@@ -234,7 +238,7 @@ export function resolveRequirement(
         kind: 'craft',
         outputPattern: 'wooden_pickaxe',
         quantity: 1,
-        proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
+        proxyPatterns: ['_log', ' log', '_planks', 'plank', 'stick'],
       };
     }
   }
@@ -256,7 +260,13 @@ export function resolveRequirement(
   }
   if (task.type === 'mining' || /\bmine\b|\biron\b/.test(ttl)) {
     const qty = parseRequiredQuantityFromTitle(task.title, 3);
-    return { kind: 'mine', patterns: ['iron_ore'], quantity: qty };
+    // Infer target ore from title, default to stone (always mineable)
+    const orePatterns: string[] = /diamond/.test(ttl) ? ['diamond_ore']
+      : /gold/.test(ttl) ? ['gold_ore']
+      : /iron/.test(ttl) ? ['iron_ore']
+      : /coal/.test(ttl) ? ['coal_ore']
+      : ['stone', 'coal_ore']; // safe defaults for any pickaxe tier
+    return { kind: 'mine', patterns: orePatterns, quantity: qty };
   }
   // Titles that explicitly mention wood but aren't crafting
   if (/\bwood\b/.test(ttl)) {

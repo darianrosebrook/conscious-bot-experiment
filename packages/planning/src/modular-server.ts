@@ -190,6 +190,9 @@ import {
   hasCobblestone,
   inferRecipeFromTitle,
   inferBlockTypeFromTitle,
+  findWoodPrefix,
+  nextToolUpgrade,
+  bestMineableOre,
 } from './modules/inventory-helpers';
 import {
   TaskRequirement,
@@ -373,12 +376,18 @@ function explorePointNear(
   return { x: pos.x + dx, y: pos.y, z: pos.z + dz };
 }
 
-function resolvedRecipe(task: any) {
-  return (
-    task.parameters?.recipe ||
-    inferRecipeFromTitle(task.title) ||
-    (/pickaxe/i.test(task.title || '') ? 'wooden_pickaxe' : undefined)
-  );
+function resolvedRecipe(task: any, inv?: import('./modules/inventory-helpers').InventoryItem[]) {
+  if (task.parameters?.recipe) return task.parameters.recipe;
+  const fromTitle = inferRecipeFromTitle(task.title);
+  if (fromTitle) return fromTitle;
+  // Tier-aware fallback: if task mentions a tool, infer next upgrade from inventory
+  const toolMatch = (task.title || '').match(/\b(pickaxe|axe|sword|shovel|hoe)\b/i);
+  if (toolMatch && inv) {
+    const toolType = toolMatch[1].toLowerCase() as import('./modules/inventory-helpers').ToolType;
+    return nextToolUpgrade(inv, toolType);
+  }
+  if (toolMatch) return `wooden_${toolMatch[1].toLowerCase()}`;
+  return undefined;
 }
 function resolvedBlock(task: any) {
   return (
@@ -1500,7 +1509,7 @@ async function addResourceGatheringTask(
   const qty = details.neededWood || 4;
   const input: BuildTaskInput = {
     kind: 'collect',
-    outputPattern: 'oak_log',
+    outputPattern: '_log',
     quantity: qty,
   };
 
@@ -1589,7 +1598,7 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
         if (!hasPlanksInv) {
           subtaskDatas.push(
             buildTaskFromRequirement(
-              { kind: 'craft', outputPattern: 'oak_planks', quantity: 4 },
+              { kind: 'craft', outputPattern: '_planks', quantity: 4 },
               { title: 'Craft Wood Planks', parentTask: task }
             )
           );
@@ -2342,8 +2351,9 @@ async function autonomousTaskExecutor() {
     // Task execution handled above - if no MCP option was found, we executed directly
     // If no BT option found, try to use individual leaves directly
     if (!suitableOption && !executionResult) {
-      // Map task types to individual leaves
-      const inferredRecipe = resolvedRecipe(currentTask);
+      // Map task types to individual leaves (inventory-aware where possible)
+      const invForInference = await fetchInventorySnapshot();
+      const inferredRecipe = resolvedRecipe(currentTask, invForInference);
       const inferredBlock = resolvedBlock(currentTask);
       const botPos = await getBotPosition();
       const attempt = currentTask.metadata?.retryCount || 0;
@@ -2402,7 +2412,7 @@ async function autonomousTaskExecutor() {
           leafName: 'dig_block',
           args: {
             blockType:
-              currentTask.parameters?.blockType || inferredBlock || 'iron_ore',
+              currentTask.parameters?.blockType || inferredBlock || 'stone',
             pos: currentTask.parameters?.pos,
           },
         },
@@ -2410,7 +2420,7 @@ async function autonomousTaskExecutor() {
           leafName: 'dig_block',
           args: {
             blockType:
-              currentTask.parameters?.blockType || inferredBlock || 'iron_ore',
+              currentTask.parameters?.blockType || inferredBlock || 'stone',
             pos: currentTask.parameters?.pos,
           },
         },
@@ -2420,7 +2430,7 @@ async function autonomousTaskExecutor() {
             recipe:
               currentTask.parameters?.recipe ||
               inferredRecipe ||
-              'wooden_pickaxe',
+              `${findWoodPrefix([])}_planks`,
             qty: currentTask.parameters?.qty || 1,
           },
         },
@@ -2486,26 +2496,28 @@ async function autonomousTaskExecutor() {
       ).toLowerCase()}`;
       const invForDecision = await fetchInventorySnapshot();
       const haveLogs = hasEnoughLogs(invForDecision, 1);
+      const woodType = findWoodPrefix(invForDecision);
+      const planksRecipe = `${woodType}_planks`;
       const needPlanks = intent.includes('plank') || intent.includes('planks');
       const candidates: Array<{ leafName: string; args: any; reason: string }> =
         [];
       if (needPlanks && availableLeaves.has('craft_recipe')) {
         candidates.push({
           leafName: 'craft_recipe',
-          args: { recipe: 'oak_planks', qty: 4 },
-          reason: 'Intent mentions planks; try crafting directly',
+          args: { recipe: planksRecipe, qty: 4 },
+          reason: `Intent mentions planks; craft ${planksRecipe} from inventory`,
         });
       }
       if (haveLogs && availableLeaves.has('craft_recipe')) {
         candidates.push({
           leafName: 'craft_recipe',
-          args: { recipe: 'oak_planks', qty: 4 },
-          reason: 'Logs available in inventory; craft planks',
+          args: { recipe: planksRecipe, qty: 4 },
+          reason: `Logs available in inventory; craft ${planksRecipe}`,
         });
       }
       if (availableLeaves.has('dig_block')) {
         const blockType =
-          currentTask.parameters?.blockType || inferredBlock || 'oak_log';
+          currentTask.parameters?.blockType || inferredBlock || '_log';
         candidates.push({
           leafName: 'dig_block',
           args: { blockType, pos: currentTask.parameters?.pos },
@@ -2799,7 +2811,7 @@ async function autonomousTaskExecutor() {
           );
           const gather = await serverConfig
             .getMCPIntegration()
-            ?.executeTool('minecraft.dig_block', { blockType: 'oak_log' });
+            ?.executeTool('minecraft.dig_block', { blockType: '_log' });
           if (!gather?.success) {
             console.warn(
               '⚠️ Quick gather attempt failed. Injecting prerequisite steps.'

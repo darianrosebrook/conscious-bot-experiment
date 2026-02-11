@@ -525,9 +525,15 @@ export class SmeltLeaf implements LeafImpl {
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
     const t0 = ctx.now();
+    const bot = ctx.bot;
+    // Auto-detect best available fuel from inventory
+    const FUEL_PRIORITY = ['coal', 'charcoal', 'coal_block', '_log', '_planks', 'stick'];
+    const invFuel = bot.inventory?.items()?.find((i: any) =>
+      FUEL_PRIORITY.some(f => i.name?.includes(f))
+    )?.name;
     const {
       input,
-      fuel = 'coal',
+      fuel = invFuel || 'coal',
       qty = 1,
     } = args;
     // Smelting takes ~10s per item in Minecraft. Scale timeout accordingly:
@@ -536,7 +542,6 @@ export class SmeltLeaf implements LeafImpl {
     const timeoutMs = args.timeoutMs != null
       ? Math.min(Math.max(args.timeoutMs, 1000), 720_000)
       : defaultTimeout;
-    const bot = ctx.bot;
 
     // Get mcData from bot
     const mcData = (bot as any).mcData;

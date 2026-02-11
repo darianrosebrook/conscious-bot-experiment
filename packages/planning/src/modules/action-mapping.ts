@@ -1,4 +1,5 @@
 import { logOptimizer } from './logging';
+import { InventoryItem, findWoodPrefix, nextToolUpgrade, bestToolName } from './inventory-helpers';
 
 /** Nav lease metadata injected via reserved __nav namespace. */
 export interface NavLeaseNav {
@@ -37,27 +38,33 @@ export function withNavLeaseScope<
   } as A;
 }
 
-export function extractItemFromTask(task: any): string {
+export function extractItemFromTask(task: any, inv?: InventoryItem[]): string {
   const title = (task.title || '').toLowerCase();
   const description = (task.description || '').toLowerCase();
   const text = `${title} ${description}`;
+  const wood = inv ? findWoodPrefix(inv) : 'oak';
 
-  if (text.includes('pickaxe')) return 'wooden_pickaxe';
-  if (text.includes('axe')) return 'wooden_axe';
-  if (text.includes('sword')) return 'wooden_sword';
-  if (text.includes('shovel')) return 'wooden_shovel';
-  if (text.includes('hoe')) return 'wooden_hoe';
-  if (text.includes('stick')) return 'stick';
-  if (text.includes('plank')) return 'oak_planks';
+  // Detect explicit tier mentions ("stone pickaxe", "iron sword", etc.)
+  const tierMatch = text.match(/\b(wooden|stone|iron|diamond|netherite)[_ ](pickaxe|axe|sword|shovel|hoe)\b/);
+  if (tierMatch) return `${tierMatch[1]}_${tierMatch[2]}`;
+
+  // Tool mentions without tier → infer next upgrade from inventory
+  if (text.includes('pickaxe')) return inv ? nextToolUpgrade(inv, 'pickaxe') : 'wooden_pickaxe';
+  if (text.includes('axe'))     return inv ? nextToolUpgrade(inv, 'axe') : 'wooden_axe';
+  if (text.includes('sword'))   return inv ? nextToolUpgrade(inv, 'sword') : 'wooden_sword';
+  if (text.includes('shovel'))  return inv ? nextToolUpgrade(inv, 'shovel') : 'wooden_shovel';
+  if (text.includes('hoe'))     return inv ? nextToolUpgrade(inv, 'hoe') : 'wooden_hoe';
+  if (text.includes('stick'))   return 'stick';
+  if (text.includes('plank'))   return `${wood}_planks`;
   if (text.includes('crafting table')) return 'crafting_table';
-  if (text.includes('torch')) return 'torch';
-  if (text.includes('door')) return 'oak_door';
-  if (text.includes('fence')) return 'oak_fence';
-  if (text.includes('chest')) return 'chest';
+  if (text.includes('torch'))   return 'torch';
+  if (text.includes('door'))    return `${wood}_door`;
+  if (text.includes('fence'))   return `${wood}_fence`;
+  if (text.includes('chest'))   return 'chest';
   if (text.includes('furnace')) return 'furnace';
-  if (text.includes('tool')) return 'wooden_pickaxe';
-  if (text.includes('item')) return 'oak_planks';
-  return 'oak_planks';
+  if (text.includes('tool'))    return inv ? nextToolUpgrade(inv, 'pickaxe') : 'wooden_pickaxe';
+  if (text.includes('item'))    return `${wood}_planks`;
+  return `${wood}_planks`;
 }
 
 export function mapTaskTypeToMinecraftAction(task: any) {
@@ -152,17 +159,24 @@ export function mapTaskTypeToMinecraftAction(task: any) {
         parameters: { item: extractItemFromTask(task), quantity: 1 },
         timeout: 15000,
       };
-    case 'mining':
+    case 'mining': {
+      const mineTitle = task.title?.toLowerCase() || '';
+      // If task mentions a specific ore, use it; otherwise infer from title
+      const mineBlock = task.parameters?.blockType
+        || (mineTitle.includes('diamond') ? 'diamond_ore' : undefined)
+        || (mineTitle.includes('iron') ? 'iron_ore' : undefined)
+        || (mineTitle.includes('gold') ? 'gold_ore' : undefined)
+        || (mineTitle.includes('coal') ? 'coal_ore' : undefined)
+        || 'stone';
       return {
         type: 'mine_block',
         parameters: {
-          blockType: task.title.toLowerCase().includes('iron')
-            ? 'iron_ore'
-            : 'stone',
+          blockType: mineBlock,
           position: { x: 0, y: 0, z: 0 },
         },
         timeout: 15000,
       };
+    }
     case 'exploration':
     case 'explore':
       return {

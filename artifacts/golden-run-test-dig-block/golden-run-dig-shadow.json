@@ -8,8 +8,8 @@
     "execution_decisions_v1"
   ],
   "run_id": "run-dig-shadow",
-  "created_at": 1770769292302,
-  "updated_at": 1770769292302,
+  "created_at": 1770776675375,
+  "updated_at": 1770776675375,
   "execution": {
     "dispatched_steps": [],
     "decisions": [
@@ -17,12 +17,12 @@
         "step_id": "step-1",
         "leaf": "acquire_material",
         "reason": "shadow",
-        "ts": 1770769292302
+        "ts": 1770776675374
       },
       {
         "leaf": "acquire_material",
         "reason": "rewrite_used",
-        "ts": 1770769292302
+        "ts": 1770776675375
       }
     ],
     "shadow_steps": [
@@ -33,7 +33,7 @@
           "item": "oak_log",
           "count": 1
         },
-        "observed_at": 1770769292302
+        "observed_at": 1770776675374
       }
     ],
     "verification": {

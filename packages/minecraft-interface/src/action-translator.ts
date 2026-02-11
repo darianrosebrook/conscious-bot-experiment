@@ -599,7 +599,7 @@ export class ActionTranslator {
         return {
           type: 'place_block',
           parameters: {
-            block_type: 'oak_door',
+            block_type: params.block_type || this.bot.inventory.items().find(i => i.name.includes('_door'))?.name || 'oak_door',
             count: 1,
             placement: 'specific_position',
             position: params.position || 'front_center',
@@ -809,7 +809,7 @@ export class ActionTranslator {
           return {
             type: 'craft_item',
             parameters: {
-              item: params.item || 'oak_planks',
+              item: params.item || this.bot.inventory.items().find(i => i.name.includes('_planks'))?.name || 'oak_planks',
               quantity: params.amount || 1,
             },
             timeout: 20000,
@@ -1362,21 +1362,31 @@ export class ActionTranslator {
       inventory.map((item: any) => `${item.name} x${item.count}`)
     );
 
-    // Simple recipe mapping for basic items
+    // Detect which wood variant the bot actually has in inventory
+    const invLog = inventory.find((i: any) => i.name.includes('_log'));
+    const woodPrefix = invLog ? invLog.name.replace('_log', '') : 'oak';
+    const logName = `${woodPrefix}_log`;
+    const planksName = `${woodPrefix}_planks`;
+
+    // Simple recipe mapping for basic items (wood-variant-aware)
     const basicRecipes: Record<
       string,
       { inputs: Record<string, number>; requiresTable: boolean }
     > = {
-      oak_planks: { inputs: { oak_log: 1 }, requiresTable: false },
-      crafting_table: { inputs: { oak_planks: 4 }, requiresTable: false },
+      [planksName]: { inputs: { [logName]: 1 }, requiresTable: false },
+      crafting_table: { inputs: { [planksName]: 4 }, requiresTable: false },
       wooden_pickaxe: {
-        inputs: { oak_planks: 3, stick: 2 },
+        inputs: { [planksName]: 3, stick: 2 },
         requiresTable: false,
       },
-      stick: { inputs: { oak_planks: 2 }, requiresTable: false },
+      stick: { inputs: { [planksName]: 2 }, requiresTable: false },
     };
 
-    const recipe = basicRecipes[item];
+    // Resolve variant: if caller asked for "oak_planks" but we have birch, match by suffix
+    let recipe = basicRecipes[item];
+    if (!recipe && item.includes('_planks')) {
+      recipe = basicRecipes[planksName];
+    }
     if (!recipe) {
       return {
         success: false,
@@ -3242,13 +3252,13 @@ export class ActionTranslator {
     try {
       // Check if we have the required materials
       const inventory = this.bot.inventory.items();
-      const planks = inventory.find((item) => item.name === 'oak_planks');
+      const planks = inventory.find((item) => item.name.includes('_planks'));
       const sticks = inventory.find((item) => item.name === 'stick');
 
       if (!planks || planks.count < 3) {
         return {
           success: false,
-          error: 'Need at least 3 oak planks to craft wooden axe',
+          error: `Need at least 3 planks to craft wooden axe (have ${planks?.name || 'none'})`,
         };
       }
 

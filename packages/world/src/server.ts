@@ -43,6 +43,9 @@ interface WorldState {
     timeOfDay?: number;
     weather?: string;
     biome?: string;
+    biomeTemperature?: number;
+    biomeHumidity?: number;
+    biomeCategory?: string;
   };
   navigation?: {
     currentPath?: any;
@@ -105,6 +108,9 @@ async function fetchWorldStateFromPlanning(): Promise<WorldState | null> {
         timeOfDay: data.timeOfDay,
         weather: data.weather,
         biome: data.biome,
+        biomeTemperature: data.biomeTemperature,
+        biomeHumidity: data.biomeHumidity,
+        biomeCategory: data.biomeCategory,
       },
       navigation: {
         currentPath: data.navigation?.currentPath,

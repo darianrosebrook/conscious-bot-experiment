@@ -24,6 +24,9 @@ export type WorldStateSnapshot = {
   weather?: 'clear' | 'rain' | 'thunder';
   dimension?: string;
   biome?: string;
+  biomeTemperature?: number;
+  biomeHumidity?: number;
+  biomeCategory?: string;
   dangerLevel?: number;
 };
 
@@ -133,6 +136,9 @@ export class WorldStateManager extends EventEmitter {
         weather: worldState.weather,
         dimension: player.dimension || worldState.dimension,
         biome: worldState.biome,
+        biomeTemperature: worldState.biomeTemperature ?? data.biomeTemperature,
+        biomeHumidity: worldState.biomeHumidity ?? data.biomeHumidity,
+        biomeCategory: worldState.biomeCategory ?? data.biomeCategory,
         dangerLevel: 0, // Calculate based on environment
       };
 

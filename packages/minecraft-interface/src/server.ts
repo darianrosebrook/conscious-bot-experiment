@@ -1501,22 +1501,39 @@ app.get('/safety', async (req, res) => {
   }
 });
 
+// Rich biome detail returned from detectBiome
+type BiomeDetail = {
+  name: string;
+  temperature?: number;
+  humidity?: number;
+  category?: string;
+  dimension?: string;
+};
+
 // Detect current biome from mineflayer bot world data
-function detectBiome(bot: any): string {
+function detectBiome(bot: any): BiomeDetail {
   try {
     const pos = bot.entity?.position;
-    if (!pos) return 'unknown';
+    if (!pos) return { name: 'unknown' };
     const biomeId = (bot.world as any).getBiome?.(pos);
     if (typeof biomeId === 'number') {
       const mcDataModule = require('minecraft-data');
       const mcData = (mcDataModule.default || mcDataModule)(bot.version);
       const biomeData = mcData?.biomes?.[biomeId];
-      if (biomeData?.name) return biomeData.name;
+      if (biomeData?.name) {
+        return {
+          name: biomeData.name,
+          temperature: biomeData.temperature,
+          humidity: biomeData.rainfall,
+          category: biomeData.category,
+          dimension: biomeData.dimension,
+        };
+      }
     }
   } catch {
     /* fall through */
   }
-  return 'unknown';
+  return { name: 'unknown' };
 }
 
 // Get bot state
@@ -1718,7 +1735,10 @@ app.get('/state', async (req, res) => {
         environment: {
           timeOfDay: ws.timeOfDay,
           weather: ws.weather,
-          biome,
+          biome: biome.name,
+          biomeTemperature: biome.temperature,
+          biomeHumidity: biome.humidity,
+          biomeCategory: biome.category,
           nearbyLogs: ws.nearbyLogs ?? 0,
           nearbyOres: ws.nearbyOres ?? 0,
           nearbyWater: ws.nearbyWater ?? 0,
@@ -1743,7 +1763,10 @@ app.get('/state', async (req, res) => {
         // Environment data surfaced for cognition to read directly
         timeOfDay: ws.timeOfDay,
         weather: ws.weather,
-        biome,
+        biome: biome.name,
+        biomeTemperature: biome.temperature,
+        biomeHumidity: biome.humidity,
+        biomeCategory: biome.category,
         dimension: ws._minecraftState?.player?.dimension ?? 'overworld',
         nearbyHostiles: ws.nearbyHostiles ?? 0,
         nearbyPassives: ws.nearbyPassives ?? 0,

@@ -430,12 +430,12 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       }
     }
 
-    // Mining iron requires tool readiness; annotate prerequisite if likely missing
+    // Mining iron requires stone+ pickaxe; annotate prerequisite hint for planner
     if (ttype === 'mining' && /iron/i.test(task.title || '')) {
-      // we don't have inventory here; leave a hint for the planner
+      // No inventory here — annotate minimum tier, planner checks actual state
       task.metadata = {
         ...task.metadata,
-        prerequisites: [{ type: 'crafting', recipe: 'stone_pickaxe', qty: 1 }],
+        prerequisites: [{ type: 'tool_progression', minTier: 'stone', toolType: 'pickaxe' }],
       };
     }
 

@@ -133,6 +133,9 @@ export interface Screenshot {
 // Environment types
 export interface Environment {
   biome: string;
+  biomeTemperature?: number;
+  biomeHumidity?: number;
+  biomeCategory?: string;
   weather: string;
   timeOfDay: string;
   nearbyEntities: string[];

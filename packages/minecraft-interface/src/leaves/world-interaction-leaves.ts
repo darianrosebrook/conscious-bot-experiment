@@ -930,16 +930,19 @@ export class BuildStructureLeaf implements LeafImpl {
 
   async run(ctx: LeafContext, args: any = {}): Promise<LeafResult> {
     const startTime = ctx.now();
+    const bot = ctx.bot;
+    const invBuildBlock = bot.inventory?.items()?.find((i: any) =>
+      i.name?.includes('cobblestone') || i.name?.includes('_stone') || i.name?.includes('deepslate')
+    )?.name;
     const {
       structureType = 'house',
       position,
       dimensions = { width: 5, height: 3, depth: 5 },
-      material = 'cobblestone',
+      material = invBuildBlock || 'cobblestone',
       autoGather = true,
     } = args;
 
     try {
-      const bot = ctx.bot;
 
       if (!position) {
         return {

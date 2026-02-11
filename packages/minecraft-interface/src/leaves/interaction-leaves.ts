@@ -185,17 +185,18 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
         };
       }
 
-      // Check if we have torches
+      // Check if we have any light source (torch, soul torch, lantern, etc.)
+      const LIGHT_SOURCES = ['torch', 'soul_torch', 'lantern', 'soul_lantern'];
       const torchItem = bot.inventory
         .items()
-        .find((item: any) => item.name === 'torch');
+        .find((item: any) => LIGHT_SOURCES.some(ls => item.name?.includes(ls)));
       if (!torchItem) {
         return {
           status: 'failure',
           error: {
             code: 'inventory.missingItem',
             retryable: false,
-            detail: 'No torches available',
+            detail: 'No torches or light sources available',
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -620,14 +621,17 @@ export class RetreatAndBlockLeaf implements LeafImpl {
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
     const startTime = ctx.now();
+    const bot = ctx.bot;
+    const invStone = bot.inventory?.items()?.find((i: any) =>
+      i.name?.includes('cobblestone') || i.name?.includes('_stone') || i.name?.includes('deepslate')
+    )?.name;
     const {
       retreatDistance = 3,
-      blockType = 'cobblestone',
+      blockType = invStone || 'cobblestone',
       checkLight = true,
     } = args;
 
     try {
-      const bot = ctx.bot;
       const botPos = bot.entity?.position;
 
       if (!botPos) {

@@ -85,6 +85,9 @@ export function useInitialDataFetch({
         const perception = worldData.perception || {};
         setEnvironment({
           biome: env.biome || 'unknown',
+          biomeTemperature: env.biomeTemperature,
+          biomeHumidity: env.biomeHumidity,
+          biomeCategory: env.biomeCategory,
           weather: env.weather || 'clear',
           timeOfDay: env.timeOfDay || 'day',
           nearbyEntities: perception.visibleEntities || [],

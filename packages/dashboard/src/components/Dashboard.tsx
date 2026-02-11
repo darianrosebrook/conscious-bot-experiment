@@ -968,7 +968,12 @@ export default function Dashboard() {
                     <div className={styles.envGrid}>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Biome</span>
-                        <div>{environment.biome}</div>
+                        <div>{environment.biome?.replace(/_/g, ' ')}</div>
+                        {environment.biomeCategory && (
+                          <div className={styles.envLabel} style={{ fontSize: '0.75rem', marginTop: '0.125rem' }}>
+                            {environment.biomeCategory}
+                          </div>
+                        )}
                       </div>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Weather</span>
@@ -984,6 +989,26 @@ export default function Dashboard() {
                           {environment.nearbyEntities?.join(', ') || 'None'}
                         </div>
                       </div>
+                      {(environment.biomeTemperature != null || environment.biomeHumidity != null) && (
+                        <>
+                          <div className={styles.envCell}>
+                            <span className={styles.envLabel}>Temperature</span>
+                            <div>
+                              {environment.biomeTemperature != null
+                                ? `${environment.biomeTemperature.toFixed(1)} ${environment.biomeTemperature < 0.2 ? '(cold)' : environment.biomeTemperature > 0.8 ? '(hot)' : '(mild)'}`
+                                : '—'}
+                            </div>
+                          </div>
+                          <div className={styles.envCell}>
+                            <span className={styles.envLabel}>Humidity</span>
+                            <div>
+                              {environment.biomeHumidity != null
+                                ? `${environment.biomeHumidity.toFixed(1)} ${environment.biomeHumidity < 0.3 ? '(dry)' : environment.biomeHumidity > 0.7 ? '(wet)' : '(moderate)'}`
+                                : '—'}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <EmptyState
