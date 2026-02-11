@@ -402,7 +402,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     const ttype = task.type;
 
     // Gathering wood but no tree-like blocks visible -> add exploration hint instead of changing type
-    if (ttype === 'gathering' && task.parameters?.blockType === 'oak_log') {
+    if (ttype === 'gathering' && (task.parameters?.blockType ?? '').includes('log')) {
       if (
         !this.isResourceAvailable('log') &&
         !this.isResourceAvailable('tree') &&
@@ -424,7 +424,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
               },
             ],
             originalIntent: 'gathering',
-            resourceType: 'oak_log',
+            resourceType: '_log',
           },
         };
       }

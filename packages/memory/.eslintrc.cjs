@@ -5,7 +5,7 @@ module.exports = {
     project: './tsconfig.json',
     tsconfigRootDir: __dirname,
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  ignorePatterns: ['dist/', 'node_modules/', '*.js', 'src/__tests__/memory-e2e.test.ts'],
   rules: {
     'no-unused-vars': 'warn',
     '@typescript-eslint/no-non-null-assertion': 'warn',

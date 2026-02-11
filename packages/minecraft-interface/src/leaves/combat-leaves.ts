@@ -390,8 +390,8 @@ export class AttackEntityLeaf implements LeafImpl {
           }
         }
 
-        // Calculate damage dealt
-        if (target.health) {
+        // Calculate damage dealt (use != null so health of 0 is still counted)
+        if (target.health != null) {
           damageDealt = Math.max(0, initialHealth - target.health);
         }
 

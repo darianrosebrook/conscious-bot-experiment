@@ -35,7 +35,7 @@ function BlockMesh({
 }: {
   position: Vec3;
   blockType: string;
-  onClick: (e: ThreeEvent<PointerEvent>) => void;
+  onClick: (_e: ThreeEvent<PointerEvent>) => void;
   atlasIndex: AtlasIndex;
   material: THREE.MeshLambertMaterial;
   blockIndex: Set<string>;
@@ -69,7 +69,7 @@ function InstancedBlocks({
 }: {
   blockType: string;
   positions: Vec3[];
-  onClick: (e: ThreeEvent<PointerEvent>) => void;
+  onClick: (_e: ThreeEvent<PointerEvent>) => void;
   atlasIndex: AtlasIndex;
   material: THREE.MeshLambertMaterial;
 }) {
@@ -85,7 +85,7 @@ function InstancedBlocks({
     positions.forEach((pos, i) => {
       dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
       dummy.updateMatrix();
-      meshRef.current!.setMatrixAt(i, dummy.matrix);
+      meshRef.current?.setMatrixAt(i, dummy.matrix);
     });
     meshRef.current.instanceMatrix.needsUpdate = true;
   }, [positions]);

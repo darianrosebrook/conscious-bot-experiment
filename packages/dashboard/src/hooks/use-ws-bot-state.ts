@@ -353,7 +353,6 @@ export function useWsBotState() {
     },
     // hud is accessed via hudRef to avoid callback identity churn.
     // setHud, setInventory, addThought are stable (from zustand store).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [setHud, setInventory, addThought]
   );
 

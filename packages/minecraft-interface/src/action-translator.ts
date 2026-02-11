@@ -3077,7 +3077,7 @@ export class ActionTranslator {
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const {
-      targetBlock = 'oak_log',
+      targetBlock = '_log',
       radius = 50,
       action: scanAction = 'find_nearest_block',
     } = action.parameters;

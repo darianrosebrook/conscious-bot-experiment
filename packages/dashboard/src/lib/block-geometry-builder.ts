@@ -30,7 +30,8 @@ export function createBlockGeometry(
   atlasIndex: AtlasIndex,
 ): THREE.BufferGeometry {
   const cacheKey = blockType;
-  if (geometryCache.has(cacheKey)) return geometryCache.get(cacheKey)!;
+  const cached = geometryCache.get(cacheKey);
+  if (cached) return cached;
 
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute;

@@ -37,7 +37,7 @@ const STERLING_URL = 'ws://localhost:8766';
 // Environment gate
 // ---------------------------------------------------------------------------
 
-const shouldRun = !!process.env.STERLING_E2E;
+const shouldRun = process.env.STERLING_E2E === '1';
 
 function describeIf(condition: boolean) {
   return condition ? describe : describe.skip;

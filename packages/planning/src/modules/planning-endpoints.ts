@@ -1647,7 +1647,7 @@ export function createPlanningEndpoints(
       | 'queue_timeout'
       | 'unknown';
 
-    function buildCheckpointProof(report: any) {
+    const buildCheckpointProof = (report: any) => {
       const A_requested = report?.sterling_expand_requested
         ? {
             ok: true,
@@ -1708,10 +1708,10 @@ export function createPlanningEndpoints(
         : { ok: false };
 
       return { A_requested, A_result, B_expansion, C_dispatch, D_verification };
-    }
+    };
 
     /** Derive artifact_state from the golden-run report (lightweight summary). */
-    function buildArtifactState(report: any) {
+    const buildArtifactState = (report: any) => {
       const dispatched = report?.execution?.dispatched_steps ?? [];
       const verification = report?.execution?.verification;
       const decisions = report?.execution?.decisions ?? [];
@@ -1728,14 +1728,14 @@ export function createPlanningEndpoints(
           (d: any) => d.reason === 'regen_failed' || d.reason === 'regen_success'
         ),
       };
-    }
+    };
 
     /** Classify the failure mode from checkpoints + timeout state. */
-    function classifyFailureMode(
+    const classifyFailureMode = (
       cp: ReturnType<typeof buildCheckpointProof>,
       timedOut: boolean,
       artifactState: ReturnType<typeof buildArtifactState>,
-    ): SmokeFailureMode {
+    ): SmokeFailureMode => {
       if (cp.A_requested.ok && cp.A_result.ok && cp.B_expansion.ok &&
           cp.C_dispatch.ok && cp.D_verification.ok && !timedOut) {
         return 'none';
@@ -1746,9 +1746,9 @@ export function createPlanningEndpoints(
       if (timedOut && cp.C_dispatch.count > 0) return 'verification_timeout';
       if (timedOut && cp.C_dispatch.count === 0) return 'queue_timeout';
       return 'unknown';
-    }
+    };
 
-    function isAllCheckpointsOk(report: any): boolean {
+    const isAllCheckpointsOk = (report: any): boolean => {
       const cp = buildCheckpointProof(report);
       return (
         cp.A_requested.ok &&
@@ -1757,7 +1757,7 @@ export function createPlanningEndpoints(
         cp.C_dispatch.ok &&
         cp.D_verification.ok
       );
-    }
+    };
 
     // Dev-only: Executor idle state endpoint.
     // Returns structured JSON showing whether the executor has outstanding work,

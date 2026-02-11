@@ -33,7 +33,7 @@ const createMockBot = (): Bot =>
         type: 'zombie',
         position: new Vec3(5, 64, 5),
         health: 20,
-        isValid: false, // For testing - mock entities don't have isValid
+        isValid: true,
       },
       2: {
         id: 2,
@@ -41,7 +41,7 @@ const createMockBot = (): Bot =>
         type: 'skeleton',
         position: new Vec3(10, 64, 10),
         health: 15,
-        isValid: false, // For testing - mock entities don't have isValid
+        isValid: true,
       },
     },
     inventory: {
@@ -82,10 +82,17 @@ describe('Combat Leaves', () => {
     it('should handle test scenario with mock entities', async () => {
       const leaf = new AttackEntityLeaf();
 
+      // Simulate attack killing the zombie: health drops to 0 after first bot.attack()
+      const zombie = (mockBot as any).entities[1];
+      (mockBot.attack as any).mockImplementation(async () => {
+        zombie.health = 0;
+      });
+
+      let tick = 1000;
       const ctx = {
         bot: mockBot,
         abortSignal: new AbortController().signal,
-        now: vi.fn().mockReturnValue(1000),
+        now: vi.fn(() => tick += 50),
         snapshot: vi.fn(),
         inventory: vi.fn(),
         emitMetric: vi.fn(),
@@ -94,21 +101,26 @@ describe('Combat Leaves', () => {
 
       const result = await leaf.run(ctx, {});
 
-      // In test mode, should return success with mock entity data
       expect(result.status).toBe('success');
       expect((result.result as any)?.success).toBe(true);
       expect((result.result as any)?.targetEntity.type).toBe('zombie');
-      expect((result.result as any)?.combatDuration).toBe(100);
-      expect((result.result as any)?.damageDealt).toBe(0);
+      expect((result.result as any)?.damageDealt).toBe(20);
     });
 
     it('should handle test scenario with specific entity ID', async () => {
       const leaf = new AttackEntityLeaf();
 
+      // Simulate attack killing the skeleton: health drops to 0 after first bot.attack()
+      const skeleton = (mockBot as any).entities[2];
+      (mockBot.attack as any).mockImplementation(async () => {
+        skeleton.health = 0;
+      });
+
+      let tick = 1000;
       const ctx = {
         bot: mockBot,
         abortSignal: new AbortController().signal,
-        now: vi.fn().mockReturnValue(1000),
+        now: vi.fn(() => tick += 50),
         snapshot: vi.fn(),
         inventory: vi.fn(),
         emitMetric: vi.fn(),
@@ -117,11 +129,10 @@ describe('Combat Leaves', () => {
 
       const result = await leaf.run(ctx, { entityId: 2 });
 
-      // In test mode, should return success with specific entity data
       expect(result.status).toBe('success');
       expect((result.result as any)?.targetEntity.type).toBe('skeleton');
       expect((result.result as any)?.targetEntity.id).toBe(2);
-      expect((result.result as any)?.combatDuration).toBe(100);
+      expect((result.result as any)?.damageDealt).toBe(15);
     });
 
     it('should reject non-hostile entities', async () => {

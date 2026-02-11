@@ -29,7 +29,8 @@ async function loadAtlas(): Promise<{ material: THREE.MeshLambertMaterial; atlas
   const canvas = document.createElement('canvas');
   canvas.width = atlasPixelSize;
   canvas.height = atlasPixelSize;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to get 2d context for atlas canvas');
 
   // Load all tile images in parallel
   const loadImage = (name: string): Promise<HTMLImageElement> =>
@@ -41,7 +42,8 @@ async function loadAtlas(): Promise<{ material: THREE.MeshLambertMaterial; atlas
         const placeholder = document.createElement('canvas');
         placeholder.width = tileSize;
         placeholder.height = tileSize;
-        const pCtx = placeholder.getContext('2d')!;
+        const pCtx = placeholder.getContext('2d');
+        if (!pCtx) return reject(new Error(`Failed to get 2d context for placeholder ${name}`));
         pCtx.fillStyle = '#ff00ff';
         pCtx.fillRect(0, 0, tileSize, tileSize);
         // Return a synthetic image from the placeholder canvas

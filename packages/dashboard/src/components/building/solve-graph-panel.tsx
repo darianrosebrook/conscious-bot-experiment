@@ -130,8 +130,9 @@ function computeLayout(
   let maxLevel = 0;
 
   while (queue.length > 0) {
-    const id = queue.shift()!;
-    const lv = level.get(id)!;
+    const id = queue.shift();
+    if (id === undefined) continue;
+    const lv = level.get(id) ?? 0;
     const kids = children.get(id) || [];
     for (const kid of kids) {
       if (!level.has(kid)) {
@@ -379,7 +380,7 @@ export function SolveGraphPanel() {
     // Map the block's Y level to a solution path edge's target node
     const layerId = `layer_${currentBlock.position.y}`;
     for (const edge of solutionPath) {
-      if (edge.label && edge.label.includes(layerId)) {
+      if (edge.label?.includes(layerId)) {
         return edge.target;
       }
     }

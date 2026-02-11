@@ -29,7 +29,7 @@ import type { PlacedBlock } from '@/types/building';
 // ─── Sterling WS URL ─────────────────────────────────────────────────────────
 
 const STERLING_WS_URL =
-  import.meta.env.VITE_STERLING_WS_URL ||
+  (import.meta.env.VITE_STERLING_WS_URL as string | undefined) ??
   `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/sterling`;
 
 // ─── Solution → playback blocks ──────────────────────────────────────────────
@@ -96,7 +96,8 @@ function derivePlaybackBlocks(
   const coveredYs = new Set(layerOrder);
   for (const y of sortedYLevels) {
     if (!coveredYs.has(y)) {
-      const layerBlocks = layers.get(y)!;
+      const layerBlocks = layers.get(y);
+      if (!layerBlocks) continue;
       layerBlocks.sort((a, b) => {
         if (a.position.x !== b.position.x) return a.position.x - b.position.x;
         return a.position.z - b.position.z;
@@ -111,7 +112,7 @@ function derivePlaybackBlocks(
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export interface UseSterlinSolveReturn {
-  startSolve: (request: BuildingSolveRequest) => void;
+  startSolve: (_request: BuildingSolveRequest) => void;
   cancel: () => void;
 }
 

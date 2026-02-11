@@ -81,7 +81,7 @@ export function blocksToSolveRequest(
 
   // Build modules
   const modules: BuildingModule[] = sortedYLevels.map((y, index) => {
-    const layerBlocks = layers.get(y)!;
+    const layerBlocks = layers.get(y) ?? [];
 
     // Count materials for this layer
     const matCounts: Record<string, number> = {};

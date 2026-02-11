@@ -114,51 +114,51 @@ export interface BuildingStore {
   manualInventory: Record<string, number>;
 
   // Actions
-  placeBlock: (pos: Vec3, type: string) => void;
-  removeBlock: (pos: Vec3) => void;
+  placeBlock: (_pos: Vec3, _type: string) => void;
+  removeBlock: (_pos: Vec3) => void;
   clearBlocks: () => void;
-  setSelectedBlockType: (type: string) => void;
-  setBuildMode: (mode: BuildMode) => void;
+  setSelectedBlockType: (_type: string) => void;
+  setBuildMode: (_mode: BuildMode) => void;
   /** Look up the block type at a position (for pick-block). */
-  getBlockAt: (pos: Vec3) => string | null;
+  getBlockAt: (_pos: Vec3) => string | null;
 
   /** Replace current blocks wholesale (used by templates and imports). */
-  loadBlocks: (blocks: PlacedBlock[]) => void;
+  loadBlocks: (_blocks: PlacedBlock[]) => void;
 
   // Layout persistence
-  saveLayout: (name: string) => void;
-  loadLayout: (id: string) => void;
-  deleteLayout: (id: string) => void;
+  saveLayout: (_name: string) => void;
+  loadLayout: (_id: string) => void;
+  deleteLayout: (_id: string) => void;
   exportLayoutJSON: () => string;
-  importLayoutJSON: (json: string) => boolean;
+  importLayoutJSON: (_json: string) => boolean;
 
   // Solve actions
-  setSolveStatus: (status: SolveStatus) => void;
-  addGraphNode: (node: GraphNode) => void;
-  addGraphEdge: (edge: GraphEdge) => void;
-  setSolutionPath: (path: GraphEdge[]) => void;
-  setSolveError: (error: string) => void;
-  setSolveDuration: (ms: number) => void;
+  setSolveStatus: (_status: SolveStatus) => void;
+  addGraphNode: (_node: GraphNode) => void;
+  addGraphEdge: (_edge: GraphEdge) => void;
+  setSolutionPath: (_path: GraphEdge[]) => void;
+  setSolveError: (_error: string) => void;
+  setSolveDuration: (_ms: number) => void;
   resetSolve: () => void;
 
   // Prerequisite actions
-  setPrerequisiteData: (data: { chains: PrerequisiteChain[]; deficit: Record<string, number> }) => void;
+  setPrerequisiteData: (_data: { chains: PrerequisiteChain[]; deficit: Record<string, number> }) => void;
   clearPrerequisites: () => void;
-  setSolveRunId: (runId: string) => void;
-  setInputsDigest: (digest: string) => void;
+  setSolveRunId: (_runId: string) => void;
+  setInputsDigest: (_digest: string) => void;
 
   // Playback actions
-  setPlaybackBlocks: (blocks: PlacedBlock[]) => void;
+  setPlaybackBlocks: (_blocks: PlacedBlock[]) => void;
   startPlayback: () => void;
   pausePlayback: () => void;
   stepForward: () => void;
   stepBackward: () => void;
-  setPlaybackSpeed: (speed: number) => void;
+  setPlaybackSpeed: (_speed: number) => void;
   resetPlayback: () => void;
 
   // Inventory actions
-  setInventoryMode: (mode: InventoryMode) => void;
-  setManualInventoryItem: (blockType: string, count: number) => void;
+  setInventoryMode: (_mode: InventoryMode) => void;
+  setManualInventoryItem: (_blockType: string, _count: number) => void;
   clearManualInventory: () => void;
   getActiveInventory: () => Record<string, number>;
 }

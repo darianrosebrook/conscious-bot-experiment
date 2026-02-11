@@ -181,7 +181,6 @@ export function useWebSocket({
   // Only reconnect when the URL or reconnection settings change.
   // Callback changes are handled via refs above — they should NOT
   // cause the WebSocket to disconnect and reconnect.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, reconnectInterval, maxReconnectAttempts]);
 
   const disconnect = useCallback(() => {

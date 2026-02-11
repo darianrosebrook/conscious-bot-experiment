@@ -80,7 +80,7 @@ function deriveLeafArgs(
   switch (leaf) {
     case 'dig_block': {
       const item = produces[0];
-      return { blockType: item?.name || 'oak_log' };
+      return { blockType: item?.name || '_log' };
     }
     case 'craft_recipe': {
       const output = produces[0];

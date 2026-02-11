@@ -131,8 +131,14 @@ async function fetchWorldStateFromPlanning(): Promise<WorldState | null> {
         sensorStatus: data.sensing?.sensorStatus || 'active',
       },
     };
-  } catch (error) {
-    console.error('Failed to fetch world state from planning server:', error);
+  } catch (error: any) {
+    // Suppress stack traces for connection errors during startup race
+    const code = error?.cause?.code ?? error?.code;
+    if (code === 'ECONNREFUSED' || code === 'ECONNRESET') {
+      console.warn('[World] Planning server not yet reachable — will retry');
+    } else {
+      console.error('[World] Failed to fetch world state:', error?.message ?? error);
+    }
     return null;
   }
 }

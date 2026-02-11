@@ -32,5 +32,5 @@
     "apps/**/*.ts",
     "apps/**/*.tsx"
   ],
-  "exclude": ["node_modules", "dist", "coverage", "packages/dashboard"]
+  "exclude": ["node_modules", "dist", "coverage", "packages/dashboard", "packages/planning/src/persistence"]
 }

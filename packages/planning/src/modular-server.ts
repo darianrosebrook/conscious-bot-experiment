@@ -249,6 +249,9 @@ declare global {
   var reflexEmitter: any;
   /** Metadata drop counter for diagnostics (P11) */
   var metadataDropCount: number | undefined;
+  /** Planning event store instance (gated by PLANNING_EVENT_STORE=1) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var planningEventStore: import('./persistence/planning-event-store').PlanningEventStore | undefined;
 }
 
 // Import existing components
@@ -381,7 +384,7 @@ function resolvedBlock(task: any) {
   return (
     task.parameters?.blockType ||
     inferBlockTypeFromTitle(task.title) ||
-    (/iron/i.test(task.title || '') ? 'iron_ore' : 'oak_log')
+    (/iron/i.test(task.title || '') ? 'iron_ore' : '_log')
   );
 }
 
@@ -800,7 +803,7 @@ function baseGatherMapping(
   item: string
 ): { type: 'gathering' | 'mining'; blockType: string } | null {
   const n = item.toLowerCase();
-  if (n.includes('log')) return { type: 'gathering', blockType: 'oak_log' };
+  if (n.includes('log')) return { type: 'gathering', blockType: '_log' };
   if (n.includes('stone') || n.includes('cobblestone'))
     return { type: 'mining', blockType: 'stone' };
   if (n.includes('iron_ore') || (n.includes('iron') && n.includes('ore')))
@@ -2375,7 +2378,7 @@ async function autonomousTaskExecutor() {
           leafName: 'dig_block',
           args: {
             blockType:
-              currentTask.parameters?.blockType || inferredBlock || 'oak_log',
+              currentTask.parameters?.blockType || inferredBlock || '_log',
             pos: currentTask.parameters?.pos,
           },
         },
@@ -2383,7 +2386,7 @@ async function autonomousTaskExecutor() {
           leafName: 'dig_block',
           args: {
             blockType:
-              currentTask.parameters?.blockType || inferredBlock || 'oak_log',
+              currentTask.parameters?.blockType || inferredBlock || '_log',
             pos: currentTask.parameters?.pos,
           },
         },
@@ -2391,7 +2394,7 @@ async function autonomousTaskExecutor() {
           leafName: 'dig_block',
           args: {
             blockType:
-              currentTask.parameters?.blockType || inferredBlock || 'oak_log',
+              currentTask.parameters?.blockType || inferredBlock || '_log',
             pos: currentTask.parameters?.pos,
           },
         },
@@ -4147,6 +4150,30 @@ async function startServer() {
       );
     }
 
+    // ── Planning Event Store (gated by PLANNING_EVENT_STORE=1) ──────
+    if (process.env.PLANNING_EVENT_STORE === '1') {
+      try {
+        const { PlanningEventStore } = await import('./persistence/planning-event-store');
+        const worldSeed = process.env.WORLD_SEED || '';
+        const store = new PlanningEventStore({
+          host: process.env.PG_HOST || 'localhost',
+          port: parseInt(process.env.PG_PORT || '5432'),
+          user: process.env.PG_USER || 'postgres',
+          password: process.env.PG_PASSWORD || '',
+          database: process.env.PG_DATABASE || 'conscious_bot',
+          worldSeed,
+        });
+        await store.initialize();
+        global.planningEventStore = store;
+        console.log('[Planning] Event store initialized');
+      } catch (error) {
+        console.warn(
+          '⚠️ Planning event store failed to initialize, continuing without persistence:',
+          error
+        );
+      }
+    }
+
     // Register placeholder Minecraft leaves with both the registry and MCP.
     // Placeholder leaves are registration-only; minecraft-interface must register real leaves before execution.
     try {
@@ -4299,6 +4326,22 @@ async function startServer() {
       },
     });
     serverConfig.mountRouter('/', planningRouter);
+
+    // ── Event store diagnostics endpoint ────────────────────────────
+    const { Router: EventStoreRouter } = await import('express');
+    const eventStoreRouter = EventStoreRouter();
+    eventStoreRouter.get('/event-store/status', (_req: any, res: any) => {
+      if (!global.planningEventStore) {
+        return res.json({
+          enabled: false,
+          initialized: false,
+          error: null,
+          database: null,
+        });
+      }
+      return res.json(global.planningEventStore.getStatus());
+    });
+    serverConfig.mountRouter('/', eventStoreRouter);
 
     // Navigation solve endpoint
     // Follows Option A: planning server owns the full scan→solve pipeline.
