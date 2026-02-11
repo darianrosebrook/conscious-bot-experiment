@@ -79,6 +79,7 @@ import { createCognitiveStreamRoutes } from './routes/cognitive-stream-routes';
 import { createSocialRoutes } from './routes/social-routes';
 import { createProcessRoutes } from './routes/process-routes';
 import { createSocialMemoryRoutes } from './routes/social-memory-routes';
+import { createReflectionRoutes } from './routes/reflection-routes';
 
 // ============================================================================
 // Service creation
@@ -991,6 +992,12 @@ app.use(
 app.use(
   createSocialMemoryRoutes({
     getSocialMemoryManager: () => state.socialMemoryManager,
+  })
+);
+
+app.use(
+  createReflectionRoutes({
+    llmInterface,
   })
 );
 

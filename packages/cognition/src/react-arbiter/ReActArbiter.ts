@@ -230,7 +230,9 @@ export class ReActArbiter {
           taskContext: context.task?.title,
           taskDescription: context.task?.description,
           inventoryItems: context.inventory?.items?.length || 0,
+          inventorySummary: this.summarizeInventory(context.inventory),
           nearbyBlocks: context.snapshot?.nearbyBlocks?.length || 0,
+          nearbyBlockSummary: this.summarizeNearbyBlocks(context.snapshot?.nearbyBlocks),
           hostileEntities:
             context.snapshot?.nearbyEntities?.filter((e) => e.hostile)
               ?.length || 0,
@@ -484,8 +486,8 @@ Task Type: ${context.task?.type || 'general'}
 
 Current Context:
 - Player Position: ${JSON.stringify(context.snapshot?.position || {})}
-- Inventory Items: ${context.inventory?.items?.length || 0} items
-- Nearby Blocks: ${context.snapshot?.nearbyBlocks?.length || 0} blocks
+- Inventory: ${this.summarizeInventory(context.inventory)}
+- Nearby Blocks: ${this.summarizeNearbyBlocks(context.snapshot?.nearbyBlocks)}
 - Hostile Entities: ${context.snapshot?.nearbyEntities?.filter((e) => e.hostile)?.length || 0} entities${reflexionHints}
 
 Instructions:
@@ -512,6 +514,59 @@ Choose ONE tool from the available tools list above and format your response cor
   // ============================================================================
   // Private Methods
   // ============================================================================
+
+  /**
+   * Compact inventory summary for prompt context.
+   * Merges tools into items, aggregates by type, shows top 8 by count.
+   */
+  private summarizeInventory(inventory: InventoryState): string {
+    const items = inventory?.items;
+    if (!items || items.length === 0) {
+      const tools = inventory?.tools;
+      if (!tools || tools.length === 0) return 'empty';
+    }
+
+    const allItems: Array<{ type: string; count: number }> = [
+      ...(inventory.items ?? []),
+      ...(inventory.tools ?? []).map((t) => ({ type: t.type, count: 1 })),
+    ];
+
+    if (allItems.length === 0) return 'empty';
+
+    const counts = new Map<string, number>();
+    for (const item of allItems) {
+      counts.set(item.type, (counts.get(item.type) ?? 0) + item.count);
+    }
+
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const top = sorted
+      .slice(0, 8)
+      .map(([name, count]) => `${name}: ${count}`)
+      .join(', ');
+    const remaining = sorted.length - 8;
+    return remaining > 0 ? `${top} (+${remaining} more)` : top;
+  }
+
+  /**
+   * Compact nearby block summary for prompt context.
+   * Aggregates by block type, shows top 5 types by count.
+   */
+  private summarizeNearbyBlocks(blocks: Block[]): string {
+    if (!blocks || blocks.length === 0) return 'none';
+
+    const counts = new Map<string, number>();
+    for (const block of blocks) {
+      counts.set(block.type, (counts.get(block.type) ?? 0) + 1);
+    }
+
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const top = sorted
+      .slice(0, 5)
+      .map(([type, count]) => `${type}: ${count}`)
+      .join(', ');
+    const remaining = sorted.length - 5;
+    return remaining > 0 ? `${top} (+${remaining} more types)` : top;
+  }
 
   private initializeToolRegistry(): void {
     // Register the narrow, composable tools as specified

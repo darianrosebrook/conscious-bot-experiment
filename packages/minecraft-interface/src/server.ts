@@ -515,40 +515,100 @@ function setupBotStateWebSocket() {
       label: 'memory/consolidate-death',
     }).catch(() => {});
 
-    // Signal death reflection
-    // TODO [PLACEHOLDER]: Replace static death reflection with LLM-generated content
-    // 1. Death context: Gather circumstances of death
-    //    - Query recent combat/damage events from minecraft bot state
-    //    - Identify mob type, damage source, location, and what bot was doing
-    //    - Get inventory state at time of death (items lost)
-    // 2. LLM analysis: Call cognition service to analyze the death
-    //    - POST to cognition /generate-reflection with death context
-    //    - LLM produces analysis of what went wrong and how to avoid it
-    //    - Include specific tactical lessons (e.g., "don't mine at night without armor")
-    // 3. Structured lessons: Parse into actionable lessons[]
-    //    - Extract specific avoidance strategies
-    //    - Update risk assessment for the area/activity
-    resilientFetch(`${memoryUrl}/enhanced/reflections`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'failure',
-        content:
-          '[PLACEHOLDER] Died and respawned. Need to reflect on what went wrong and be more careful.',
+    // Signal death reflection — call cognition for LLM-generated content, fallback to static
+    // Wrapped in async IIFE since the event handler is not async
+    (async () => {
+      const deathReflectionRequest = {
+        trigger: 'death-respawn' as const,
+        dedupeKey: deathDedupeKey,
         context: {
           emotionalState: 'cautious',
           recentEvents: ['death', 'respawn'],
-          location: data.position,
-          currentGoals: [],
+          currentGoals: [] as string[],
+          location: data.position
+            ? { x: data.position.x, y: data.position.y, z: data.position.z }
+            : null,
           timeOfDay: 'unknown',
+          deathCause: data.deathMessage || data.reason || undefined,
+          inventoryLost: undefined as string[] | undefined,
         },
-        lessons: ['Review what caused the death'],
-        insights: ['Safety should be prioritized'],
-        dedupeKey: deathDedupeKey,
-        isPlaceholder: true,
-      }),
-      label: 'memory/death-reflection',
-    }).catch(() => {});
+      };
+
+      const REFLECTION_TIMEOUT_MS = 10_000;
+      let reflectionResult: {
+        type: string;
+        content: string;
+        isPlaceholder: boolean;
+        insights: string[];
+        lessons: string[];
+      };
+
+      try {
+        const reflectionResponse = await Promise.race([
+          resilientFetch(`${cognitionUrl}/generate-reflection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(deathReflectionRequest),
+            label: 'cognition/death-reflection',
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Reflection generation timed out')),
+              REFLECTION_TIMEOUT_MS
+            )
+          ),
+        ]);
+
+        const generatedReflection = (await reflectionResponse.json()) as Record<string, any>;
+
+        if (generatedReflection?.generated && !generatedReflection?.isPlaceholder) {
+          reflectionResult = {
+            type: generatedReflection.type || 'failure',
+            content: generatedReflection.content,
+            isPlaceholder: false,
+            insights: generatedReflection.insights || [],
+            lessons: generatedReflection.lessons || [],
+          };
+        } else {
+          reflectionResult = {
+            type: 'failure',
+            content: generatedReflection?.content ||
+              `Died${data.deathMessage ? ` from ${data.deathMessage}` : ''} at (${dx}, ${dy}, ${dz}). Need to review what went wrong.`,
+            isPlaceholder: true,
+            insights: generatedReflection?.insights || [],
+            lessons: generatedReflection?.lessons || ['Review what caused the death'],
+          };
+        }
+      } catch (err) {
+        console.log(
+          '[death-handler] Cognition reflection failed, using static fallback:',
+          err instanceof Error ? err.message : String(err)
+        );
+        reflectionResult = {
+          type: 'failure',
+          content: `Died${data.deathMessage ? ` from ${data.deathMessage}` : ''} at (${dx}, ${dy}, ${dz}). Need to review what went wrong and be more careful.`,
+          isPlaceholder: true,
+          insights: [],
+          lessons: ['Review what caused the death'],
+        };
+      }
+
+      // Always POST to memory — regardless of whether cognition succeeded
+      resilientFetch(`${memoryUrl}/enhanced/reflections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: reflectionResult.type,
+          content: reflectionResult.content,
+          context: deathReflectionRequest.context,
+          lessons: reflectionResult.lessons,
+          insights: reflectionResult.insights,
+          dedupeKey: deathDedupeKey,
+          isPlaceholder: reflectionResult.isPlaceholder,
+        }),
+        label: 'memory/death-reflection',
+      }).catch(() => {});
+    })().catch(() => {});
 
     // Restart thought generation when bot respawns
     console.log('Bot respawned, restarting thought generation...');
@@ -2026,45 +2086,99 @@ app.post('/action', async (req, res) => {
         label: 'memory/consolidate-sleep',
       }).catch(() => {});
 
-      // Signal reflection (memory service creates the entry with its own policy)
-      // TODO [PLACEHOLDER]: Replace static reflection text with LLM-generated content
-      // 1. Context gathering: Query memory service for recent experiences since last sleep
-      //    - Fetch recent episodic memories (last 20) from /enhanced/memories
-      //    - Fetch current goals from planning service /state
-      //    - Get interoception state from cognition service /intero/state
-      // 2. LLM reflection generation: Call cognition service to generate contextual reflection
-      //    - POST to cognition /generate-reflection with gathered context
-      //    - Cognition uses LLM to produce meaningful narrative about the day's events
-      //    - Include emotional tone, lessons learned, and goal progress assessment
-      // 3. Structured output: Parse LLM response into reflection fields
-      //    - Extract insights[] from LLM analysis of what went well/poorly
-      //    - Extract lessons[] from LLM-identified patterns and takeaways
-      //    - Determine emotionalState from overall sentiment of the day
+      // Signal reflection — call cognition for LLM-generated content, fallback to static
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+
+      const sleepReflectionRequest = {
+        trigger: 'sleep-wake' as const,
+        dedupeKey: sleepDedupeKey,
+        context: {
+          emotionalState: 'rested',
+          recentEvents: ['sleep', 'wake'],
+          currentGoals: [] as string[],
+          location: null,
+          timeOfDay: 'morning',
+          gameDay: result?.data?.wakeDay ?? undefined,
+        },
+      };
+
+      const SLEEP_REFLECTION_TIMEOUT_MS = 10_000;
+      let sleepReflectionResult: {
+        type: string;
+        content: string;
+        isPlaceholder: boolean;
+        insights: string[];
+        lessons: string[];
+      };
+
+      try {
+        const reflectionResponse = await Promise.race([
+          resilientFetch(`${cognitionUrl}/generate-reflection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sleepReflectionRequest),
+            label: 'cognition/sleep-reflection',
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Sleep reflection generation timed out')),
+              SLEEP_REFLECTION_TIMEOUT_MS
+            )
+          ),
+        ]);
+
+        const generatedReflection = (await reflectionResponse.json()) as Record<string, any>;
+
+        if (generatedReflection?.generated && !generatedReflection?.isPlaceholder) {
+          sleepReflectionResult = {
+            type: generatedReflection.type || 'narrative',
+            content: generatedReflection.content,
+            isPlaceholder: false,
+            insights: generatedReflection.insights || [],
+            lessons: generatedReflection.lessons || [],
+          };
+        } else {
+          sleepReflectionResult = {
+            type: 'narrative',
+            content: generatedReflection?.content ||
+              `Completed day ${result?.data?.wakeDay ?? '?'}. Consolidating recent experiences and assessing goal progress.`,
+            isPlaceholder: true,
+            insights: generatedReflection?.insights || [],
+            lessons: generatedReflection?.lessons || [],
+          };
+        }
+      } catch (err) {
+        console.log(
+          '[sleep-handler] Cognition reflection failed, using static fallback:',
+          err instanceof Error ? err.message : String(err)
+        );
+        sleepReflectionResult = {
+          type: 'narrative',
+          content: `Completed day ${result?.data?.wakeDay ?? '?'}. Consolidating recent experiences and assessing goal progress.`,
+          isPlaceholder: true,
+          insights: [],
+          lessons: [],
+        };
+      }
+
+      // Always POST to memory — regardless of whether cognition succeeded
       resilientFetch(`${memoryUrl}/enhanced/reflections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'narrative',
-          content:
-            '[PLACEHOLDER] Woke up after sleeping through the night. A good time to reflect on recent experiences and consolidate what was learned.',
-          context: {
-            emotionalState: 'rested',
-            timeOfDay: 'morning',
-            recentEvents: ['sleep'],
-            currentGoals: [],
-            location: null,
-          },
-          lessons: [],
-          insights: [],
+          type: sleepReflectionResult.type,
+          content: sleepReflectionResult.content,
+          context: sleepReflectionRequest.context,
+          lessons: sleepReflectionResult.lessons,
+          insights: sleepReflectionResult.insights,
           dedupeKey: sleepDedupeKey,
-          isPlaceholder: true,
+          isPlaceholder: sleepReflectionResult.isPlaceholder,
         }),
         label: 'memory/sleep-reflection',
       }).catch(() => {});
 
       // Also reset stress
-      const cognitionUrl =
-        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
       resilientFetch(`${cognitionUrl}/stress/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2310,68 +2424,21 @@ app.get('/telemetry', (req, res) => {
 });
 
 // Get screenshots
-app.get('/screenshots', (req, res) => {
-  try {
-    // Get query parameters
-    const sessionId = req.query.sessionId as string;
-    const limit = parseInt((req.query.limit as string) || '10');
-
-    // Generate some placeholder screenshots
-    const screenshots = [];
-    const now = Date.now();
-
-    // Use placeholder image URLs since Prismarine viewer is disabled
-    const placeholderUrls = [
-      'https://via.placeholder.com/640x480?text=Minecraft+View',
-      'https://via.placeholder.com/640x480?text=Forest+Biome',
-      'https://via.placeholder.com/640x480?text=Plains+Biome',
-      'https://via.placeholder.com/640x480?text=Cave+Exploration',
-      'https://via.placeholder.com/640x480?text=Village+Encounter',
-    ];
-
-    for (let i = 0; i < Math.min(limit, 5); i++) {
-      screenshots.push({
-        id: `screenshot-${now - i * 60000}`,
-        ts: new Date(now - i * 60000).toISOString(),
-        url: placeholderUrls[i % placeholderUrls.length],
-        eventId: `event-${now - i * 60000}`,
-      });
-    }
-
-    res.json(screenshots);
-  } catch (error) {
-    console.error('Error getting screenshots:', error);
-    res.status(500).json({ error: 'Failed to get screenshots' });
-  }
+app.get('/screenshots', (_req, res) => {
+  res.json({
+    screenshots: [],
+    available: false,
+    reason: 'Screenshot capture not yet implemented — Prismarine viewer is disabled',
+  });
 });
 
 // Get nearest screenshot
-app.get('/screenshots/nearest', (req, res) => {
-  try {
-    // Get query parameters
-    const sessionId = req.query.sessionId as string;
-    const timestamp = req.query.at as string;
-
-    if (!sessionId || !timestamp) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    // Generate a placeholder screenshot with a static image URL
-    const now = Date.now();
-    const screenshot = {
-      id: `screenshot-${now}`,
-      ts: new Date(now).toISOString(),
-      url:
-        'https://via.placeholder.com/640x480?text=Minecraft+View+at+' +
-        new Date(parseInt(timestamp)).toISOString().split('T')[0],
-      eventId: `event-${now}`,
-    };
-
-    res.json(screenshot);
-  } catch (error) {
-    console.error('Error getting nearest screenshot:', error);
-    res.status(500).json({ error: 'Failed to get nearest screenshot' });
-  }
+app.get('/screenshots/nearest', (_req, res) => {
+  res.json({
+    screenshot: null,
+    available: false,
+    reason: 'Screenshot capture not yet implemented — Prismarine viewer is disabled',
+  });
 });
 
 // Execute planning scenario — RETIRED

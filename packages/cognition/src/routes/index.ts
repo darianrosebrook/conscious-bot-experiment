@@ -25,3 +25,6 @@ export type { ProcessRouteDeps } from './process-routes';
 
 export { createSocialMemoryRoutes } from './social-memory-routes';
 export type { SocialMemoryRouteDeps } from './social-memory-routes';
+
+export { createReflectionRoutes } from './reflection-routes';
+export type { ReflectionRouteDeps } from './reflection-routes';
