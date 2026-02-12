@@ -14,6 +14,7 @@ import { EnqueueSkipReason, type EnqueueSkipReasonType } from './reflex-lifecycl
 import type { HungerDriveshaftResult } from './hunger-driveshaft-controller';
 import type { BaseReflexResult } from './reflex-registry';
 import { scanForOutstandingGoalKey } from './goalkey-guard';
+import { logTaskIngestion } from '../task-lifecycle/task-ingestion-logger';
 
 // ============================================================================
 // Discriminated Result Type
@@ -71,8 +72,10 @@ export async function tryEnqueueReflexTask(
   }
 
   if (task?.id) {
+    logTaskIngestion({ _diag_version: 1, source: 'reflex_registry', task_id: task.id, decision: 'created', task_type: reflexResult.taskData.type });
     return { kind: 'enqueued', taskId: task.id };
   }
+  logTaskIngestion({ _diag_version: 1, source: 'reflex_registry', decision: 'rejected', reason: 'addTask_returned_null' });
   return { kind: 'skipped', reason: EnqueueSkipReason.ENQUEUE_RETURNED_NULL };
 }
 
@@ -124,7 +127,9 @@ export async function tryEnqueueReflexTaskGeneric(
   }
 
   if (task?.id) {
+    logTaskIngestion({ _diag_version: 1, source: 'reflex_registry', task_id: task.id, decision: 'created', task_type: result.taskData.type });
     return { kind: 'enqueued', taskId: task.id };
   }
+  logTaskIngestion({ _diag_version: 1, source: 'reflex_registry', decision: 'rejected', reason: 'addTask_returned_null' });
   return { kind: 'skipped', reason: EnqueueSkipReason.ENQUEUE_RETURNED_NULL };
 }

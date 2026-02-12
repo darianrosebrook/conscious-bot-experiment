@@ -70,6 +70,8 @@ function createMockContext(
       recordDispatch: vi.fn(),
       recordRegenerationAttempt: vi.fn(),
       recordLeafRewriteUsed: vi.fn(),
+      recordLoopDetected: vi.fn(),
+      markLoopBreakerEvaluated: vi.fn(),
     }),
     toDispatchResult: (r) =>
       r?.ok ? { status: 'ok' } : { status: 'error', error: (r as any)?.error },
@@ -158,6 +160,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     await executeSterlingStep(
@@ -230,6 +234,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     await executeSterlingStep(
@@ -276,6 +282,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     await executeSterlingStep(
@@ -381,6 +389,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     await executeSterlingStep(task, nextStep, ctx);
@@ -451,6 +461,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     const now = Date.now();
@@ -516,6 +528,8 @@ describe('executeSterlingStep', () => {
         recordDispatch: vi.fn(),
         recordRegenerationAttempt: vi.fn(),
         recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
       }),
     });
     const now = Date.now();
@@ -568,6 +582,8 @@ describe('executeSterlingStep', () => {
           recordDispatch: vi.fn(),
           recordRegenerationAttempt: vi.fn(),
           recordLeafRewriteUsed: vi.fn(),
+          recordLoopDetected: vi.fn(),
+          markLoopBreakerEvaluated: vi.fn(),
         }),
       });
 

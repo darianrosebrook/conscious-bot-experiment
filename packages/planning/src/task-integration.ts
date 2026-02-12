@@ -92,6 +92,8 @@ import { isIntentLeaf, isStepDispatchable } from './modules/leaf-arg-contracts';
 import { buildCraftingRules } from './sterling/minecraft-crafting-rules';
 import { canonicalize } from './sterling/solve-bundle';
 import { TRANSIENT_EXPANSION_REASONS, normalizeBlockedReason } from './task-lifecycle/task-block-evaluator';
+import { buildFailureSignature } from './task-lifecycle/failure-signature';
+import { getLoopBreaker } from './task-lifecycle/loop-breaker';
 
 const PLANNING_INGEST_DEBUG_400 =
   process.env.PLANNING_INGEST_DEBUG_400 === '1';
@@ -3005,6 +3007,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Check if max retries exceeded
     if (retryCount >= TaskIntegration.MAX_EXPANSION_RETRIES) {
       recordRetry({ reason: 'expansion_retries_exhausted', classification: 'exhausted' });
+      // LoopBreaker: record expansion final failure (per-task, not per-retry)
+      const loopSig = buildFailureSignature({ category: 'expansion_blocked', blockedReason: 'expansion_retries_exhausted' });
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+      if (episode && runId && recorder) { recorder.recordLoopDetected(runId, episode); }
+      if (runId && recorder) { recorder.markLoopBreakerEvaluated(runId); }
       this.updateTaskProgress(task.id, task.progress || 0, 'failed');
       this.updateTaskMetadata(task.id, {
         blockedReason: 'expansion_retries_exhausted',
@@ -3072,6 +3079,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (!isTransient) {
       // Contract-broken: fail the task immediately
       recordRetry({ reason, classification: 'contract_broken' });
+      // LoopBreaker: record expansion contract-broken failure (per-task, not per-retry)
+      const loopSig = buildFailureSignature({ category: 'expansion_blocked', blockedReason: reason });
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+      if (episode && runId && recorder) { recorder.recordLoopDetected(runId, episode); }
+      if (runId && recorder) { recorder.markLoopBreakerEvaluated(runId); }
       this.updateTaskProgress(task.id, task.progress || 0, 'failed');
       this.updateTaskMetadata(task.id, {
         blockedReason: reason,

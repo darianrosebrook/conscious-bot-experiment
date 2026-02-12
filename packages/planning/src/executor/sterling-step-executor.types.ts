@@ -6,6 +6,7 @@
  */
 
 import type { GoldenRunVerification } from '../golden-run-recorder';
+import type { LoopDetectedEpisodeV1 } from '../task-lifecycle/loop-breaker';
 
 export interface SterlingStepExecutorConfig {
   buildExecBudgetDisabled: boolean;
@@ -73,6 +74,8 @@ export interface SterlingStepExecutorContext {
       runId: string,
       payload: { leaf: string; originalLeaf: string }
     ) => void;
+    recordLoopDetected: (runId: string, episode: LoopDetectedEpisodeV1) => void;
+    markLoopBreakerEvaluated: (runId: string) => void;
   };
   toDispatchResult: (
     actionResult: Record<string, unknown> | null | undefined

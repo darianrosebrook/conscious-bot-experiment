@@ -299,6 +299,64 @@ describe('GoldenRunRecorder', () => {
     });
   });
 
+  // ── toolDiagnostics extraction tests (Layer 2A) ──
+
+  it('toDispatchResult extracts toolDiagnostics from data.diagnostics (nested)', () => {
+    const result = toDispatchResult({
+      ok: false,
+      error: 'No items found',
+      data: {
+        success: false,
+        diagnostics: { _diag_version: 1, reason_code: 'no_item_entities', scan: {} },
+      },
+    });
+    expect(result?.toolDiagnostics).toBeDefined();
+    expect(result?.toolDiagnostics?._diag_version).toBe(1);
+    expect(result?.toolDiagnostics?.reason_code).toBe('no_item_entities');
+  });
+
+  it('toDispatchResult extracts toolDiagnostics from top-level diagnostics (fallback)', () => {
+    const result = toDispatchResult({
+      ok: false,
+      error: 'fail',
+      diagnostics: { _diag_version: 1, reason_code: 'pathfinder_failed' },
+    });
+    expect(result?.toolDiagnostics).toBeDefined();
+    expect(result?.toolDiagnostics?.reason_code).toBe('pathfinder_failed');
+  });
+
+  it('toDispatchResult rejects diagnostics without _diag_version', () => {
+    const result = toDispatchResult({
+      ok: false,
+      error: 'fail',
+      data: { diagnostics: { reason_code: 'no_item_entities' } },
+    });
+    expect(result?.toolDiagnostics).toBeUndefined();
+  });
+
+  it('toDispatchResult extracts toolDiagnostics on ok path', () => {
+    const result = toDispatchResult({
+      ok: true,
+      data: {
+        success: true,
+        diagnostics: { _diag_version: 1, reason_code: 'collected_ok' },
+      },
+    });
+    expect(result?.status).toBe('ok');
+    expect(result?.toolDiagnostics).toBeDefined();
+    expect(result?.toolDiagnostics?.reason_code).toBe('collected_ok');
+  });
+
+  it('toDispatchResult prefers nested data.diagnostics over top-level', () => {
+    const result = toDispatchResult({
+      ok: false,
+      error: 'fail',
+      data: { diagnostics: { _diag_version: 1, reason_code: 'nested' } },
+      diagnostics: { _diag_version: 1, reason_code: 'top_level' },
+    });
+    expect(result?.toolDiagnostics?.reason_code).toBe('nested');
+  });
+
   describe('merge preservation: partial task patch does not erase richer task fields', () => {
     it('recordExecutorBlocked with taskId preserves existing task.title and task.status', () => {
       const recorder = new GoldenRunRecorder();

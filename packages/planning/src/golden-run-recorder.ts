@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { AutonomyProofBundleV1 } from './goal-formulation/autonomy-proof-bundle';
 import type { ExplorationEvidence } from './goal-formulation/exploration-driveshaft-controller';
+import type { LoopDetectedEpisodeV1 } from './task-lifecycle/loop-breaker';
 
 export type GoldenRunVerification = {
   status: 'verified' | 'failed' | 'skipped';
@@ -157,6 +158,8 @@ export type GoldenRunReport = {
         reason?: string;
         /** Placement receipt: position + block for receipt-anchored verification audit trail. */
         receipt?: Record<string, unknown>;
+        /** Tool-level diagnostics (e.g. CollectDiagnostics). Only attached when _diag_version present. */
+        toolDiagnostics?: Record<string, unknown>;
       };
     }>;
     shadow_steps?: Array<{
@@ -181,6 +184,10 @@ export type GoldenRunReport = {
       original_leaf?: string;
     };
   };
+  /** Loop breaker episodes detected during this run (max 20). */
+  loop_episodes?: LoopDetectedEpisodeV1[];
+  /** Whether the loop breaker evaluated this run. Absence means breaker not wired. */
+  loop_breaker_evaluated?: boolean;
 };
 
 /** Throttle window for recordExecutorBlocked: skip write if same (runId, reason, leaf) within this ms. */
@@ -214,6 +221,26 @@ export type GoldenRunDispatchResult = NonNullable<
 >;
 
 /**
+ * Extract tool-level diagnostics from an action result.
+ *
+ * After normalizeActionResponse, diagnostics lives at `actionResult.data.diagnostics`.
+ * Also checks top-level as fallback (in case a caller bypasses normalization).
+ * Only accepts bounded, versioned objects (must have `_diag_version`).
+ */
+function extractToolDiagnostics(
+  actionResult: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const data = actionResult.data as Record<string, unknown> | undefined;
+  const nested = data?.diagnostics as Record<string, unknown> | undefined;
+  const topLevel = actionResult.diagnostics as Record<string, unknown> | undefined;
+  const candidate = nested ?? topLevel;
+  if (candidate && typeof candidate === 'object' && (candidate as any)._diag_version != null) {
+    return candidate;
+  }
+  return undefined;
+}
+
+/**
  * Convert toolExecutor.execute / gateway response to GoldenRunDispatchResult for artifact.
  * Existence of result proves the loop closed (tool was attempted).
  */
@@ -233,6 +260,9 @@ export function toDispatchResult(
         ...(data.workstation ? { workstation: data.workstation } : {}),
       };
     }
+    // Preserve tool-level diagnostics (e.g. CollectDiagnostics)
+    const toolDiag = extractToolDiagnostics(actionResult);
+    if (toolDiag) base.toolDiagnostics = toolDiag;
     return base;
   }
   const meta = actionResult.metadata as Record<string, unknown> | undefined;
@@ -246,12 +276,14 @@ export function toDispatchResult(
   if (reason === 'no_mapped_action') {
     return { status: 'blocked', reason: 'no_mapped_action' };
   }
+  const toolDiag = extractToolDiagnostics(actionResult);
   return {
     status: 'error',
     error: String(actionResult.error ?? ''),
     failureCode: (actionResult.failureCode ?? meta?.failureCode) as
       | string
       | undefined,
+    ...(toolDiag ? { toolDiagnostics: toolDiag } : {}),
   };
 }
 
@@ -740,6 +772,29 @@ export class GoldenRunRecorder {
         reflex_proof: bundle,
       },
     });
+  }
+
+  /** Record a loop-detected episode. Bounded to 20 entries per run. */
+  recordLoopDetected(runId: string, episode: LoopDetectedEpisodeV1): void {
+    if (!runId) return;
+    const safeRunId = sanitizeRunId(runId);
+    const report = this.runs.get(safeRunId);
+    if (!report) return;
+    if (!report.loop_episodes) report.loop_episodes = [];
+    if (report.loop_episodes.length < 20) {
+      report.loop_episodes.push(episode);
+    }
+    report.loop_breaker_evaluated = true;
+    report.updated_at = Date.now();
+  }
+
+  /** Mark that the loop breaker was evaluated for this run (even if no episodes). */
+  markLoopBreakerEvaluated(runId: string): void {
+    if (!runId) return;
+    const safeRunId = sanitizeRunId(runId);
+    const report = this.runs.get(safeRunId);
+    if (!report) return;
+    report.loop_breaker_evaluated = true;
   }
 
   /** Return report from in-memory cache (with loop_started derived from evidence), or null if not found. */

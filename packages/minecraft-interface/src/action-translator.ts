@@ -34,6 +34,8 @@ export type CollectReasonCode =
 export interface CollectDiagnostics {
   _diag_version: 1;
   scan: {
+    /** Discriminant: what this scan observed. 'item_entities' = dropped items on ground, NOT block composition. */
+    scan_scope: 'item_entities';
     /** @deprecated Alias for entities_seen_total (kept for backward compatibility). */
     items_seen_count?: number;
     /** Count of unique item type names observed. */
@@ -3140,6 +3142,7 @@ export class ActionTranslator {
       diagnostics: {
         _diag_version: 1,
         scan: {
+          scan_scope: 'item_entities',
           items_seen_count: 0,
           item_types_seen_count: 0,
           entities_seen_total: 0,
@@ -3678,6 +3681,7 @@ export class ActionTranslator {
               diagnostics: {
                 _diag_version: 1,
                 scan: {
+                  scan_scope: 'item_entities',
                   items_seen_count: entitiesSeenTotal,
                   item_types_seen_count: itemTypesSeen.size,
                   entities_seen_total: entitiesSeenTotal,
@@ -3716,6 +3720,7 @@ export class ActionTranslator {
     const diagnostics: CollectDiagnostics = {
       _diag_version: 1,
       scan: {
+        scan_scope: 'item_entities',
         items_seen_count: entitiesSeenTotal,
         item_types_seen_count: itemTypesSeen.size,
         entities_seen_total: entitiesSeenTotal,

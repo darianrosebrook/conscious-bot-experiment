@@ -23,6 +23,7 @@ import {
 } from '../planning-runtime-config';
 import { mapBTActionToMinecraft } from './action-mapping';
 import { normalizeTaskStatus, bestUpdatedAtMs } from '../task-history-utils';
+import { logTaskIngestion } from '../task-lifecycle/task-ingestion-logger';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -599,7 +600,7 @@ export function createPlanningEndpoints(
       if (Array.isArray(tasks)) {
         for (const t of tasks) {
           try {
-            await planningSystem.goalFormulation.addTask({
+            const goalTask = await planningSystem.goalFormulation.addTask({
               title: t.title || t.name || t.description || 'Untitled Task',
               description: t.description || t.title || '',
               type: inferTaskType(
@@ -621,7 +622,9 @@ export function createPlanningEndpoints(
                 childTaskIds: [],
               },
             });
+            logTaskIngestion({ _diag_version: 1, source: 'http_post_goal', task_id: goalTask?.id, parent_task_id: goal.id, decision: goalTask?.id ? 'created' : 'rejected', task_type: inferTaskType(t.type, t.description || t.title || name || '') });
           } catch (e) {
+            logTaskIngestion({ _diag_version: 1, source: 'http_post_goal', parent_task_id: goal.id, decision: 'error', reason: e instanceof Error ? e.message : 'unknown' });
             // Continue; one bad task shouldn't block goal creation
           }
         }
@@ -814,6 +817,7 @@ export function createPlanningEndpoints(
       }
 
       const task = await planningSystem.goalFormulation.addTask(taskData);
+      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', task_id: task?.id, decision: task?.id ? 'created' : 'rejected', task_type: taskData.type });
       res.json({
         success: true,
         taskId: task?.id,
@@ -821,6 +825,7 @@ export function createPlanningEndpoints(
         timestamp: Date.now(),
       });
     } catch (error) {
+      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', decision: 'error', reason: error instanceof Error ? error.message : 'unknown' });
       console.error('Failed to add task:', error);
       res.status(500).json({
         success: false,

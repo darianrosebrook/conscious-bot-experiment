@@ -278,6 +278,7 @@ import {
   isTaskEligible,
   DEFAULT_BLOCKED_TTL_MS,
 } from './task-lifecycle/task-block-evaluator';
+import { logTaskIngestion } from './task-lifecycle/task-ingestion-logger';
 import {
   isCircuitBreakerOpen,
   tripCircuitBreaker,
@@ -1492,6 +1493,7 @@ async function addCraftingTableTask(
     extraParameters: { analysis: details },
   });
   const result = await taskIntegration.addTask(taskData);
+  logTaskIngestion({ _diag_version: 1, source: 'crafting_table_subtask', task_id: result?.id, parent_task_id: originalTask.id, decision: result?.id ? 'created' : 'rejected', task_type: taskData.type });
   if (result && result.id) {
     console.log(`✅ Added intelligent crafting table task: ${result.id}`);
     // Block parent
@@ -1539,6 +1541,7 @@ async function addResourceGatheringTask(
     },
   });
   const result = await taskIntegration.addTask(taskData);
+  logTaskIngestion({ _diag_version: 1, source: 'resource_gathering_subtask', task_id: result?.id, parent_task_id: originalTask.id, decision: result?.id ? 'created' : 'rejected', task_type: taskData.type });
   if (result && result.id) {
     console.log(`✅ Added intelligent wood gathering task: ${result.id}`);
     // Block parent
@@ -1634,6 +1637,7 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
           }
         }
         const result = await taskIntegration.addTask(subtaskData);
+        logTaskIngestion({ _diag_version: 1, source: 'complex_crafting_subtask', task_id: result?.id, parent_task_id: task.id, decision: result?.id ? 'created' : 'rejected', task_type: subtaskData.type });
         if (result && result.id) {
           console.log(`✅ Added crafting subtask: ${subtaskData.title}`);
           addedCount++;
@@ -2742,6 +2746,7 @@ async function autonomousTaskExecutor() {
                 tags: ['dynamic'],
               })
             );
+            logTaskIngestion({ _diag_version: 1, source: 'executor_explore_subtask', parent_task_id: currentTask.id, decision: 'created', task_type: 'explore' });
             taskIntegration.updateTaskMetadata(currentTask.id, {
               blockedReason: 'waiting_on_prereq',
             });
@@ -2934,6 +2939,7 @@ async function autonomousTaskExecutor() {
                 tags: ['dynamic'],
               })
             );
+            logTaskIngestion({ _diag_version: 1, source: 'mcp_explore_subtask', parent_task_id: currentTask.id, decision: 'created', task_type: 'explore' });
             taskIntegration.updateTaskMetadata(currentTask.id, {
               blockedReason: 'waiting_on_prereq',
             });

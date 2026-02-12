@@ -18,6 +18,8 @@ import {
 } from '../modules/leaf-arg-contracts';
 import { isDeterministicFailure } from '../server/task-action-resolver';
 import type { SterlingStepExecutorContext } from './sterling-step-executor.types';
+import { buildFailureSignature } from '../task-lifecycle/failure-signature';
+import { getLoopBreaker } from '../task-lifecycle/loop-breaker';
 
 /** Backoff for deterministic blocks (planner/materializer must change). Eligibility logic respects nextEligibleAt. */
 const DETERMINISTIC_BLOCK_BACKOFF_MS = 300_000; // 5 minutes
@@ -896,6 +898,15 @@ export async function executeSterlingStep(
       failureCode,
       failureError: actionResult?.error,
     });
+    // LoopBreaker: record tool deterministic failure (per-task final failure)
+    {
+      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
+      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode: failureCode!, diagReasonCode: diagReason });
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
+    }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     await ctx.recomputeProgressAndMaybeComplete(task);
     return;
@@ -924,6 +935,15 @@ export async function executeSterlingStep(
       ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
       ...failNoRegenPatch,
     });
+    // LoopBreaker: record smoke no-retry failure (per-task final failure)
+    {
+      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
+      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
+    }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     return;
   }
@@ -997,6 +1017,15 @@ export async function executeSterlingStep(
       ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
       retryCount: newRetryCount,
     });
+    // LoopBreaker: record max-retries-exceeded failure (per-task final failure)
+    {
+      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
+      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
+    }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
   } else {
     ctx.updateTaskMetadata(task.id, {

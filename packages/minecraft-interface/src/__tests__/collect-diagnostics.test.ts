@@ -19,6 +19,7 @@ describe('CollectDiagnostics shape contract', () => {
     const diag: CollectDiagnostics = {
       _diag_version: 1,
       scan: {
+      scan_scope: 'item_entities',
       items_seen_count: 30,
       item_types_seen_count: 3,
       entities_seen_total: 30,
@@ -41,6 +42,7 @@ describe('CollectDiagnostics shape contract', () => {
     };
 
     expect(diag._diag_version).toBe(1);
+    expect(diag.scan.scan_scope).toBe('item_entities');
     expect(diag.scan.item_types_seen).toEqual(['birch_log', 'iron_ingot', 'stick']);
     expect(diag.explore.path_requests).toBe(diag.explore.path_successes + diag.explore.path_failures);
     expect(diag.reason_code).toBe('no_item_entities');

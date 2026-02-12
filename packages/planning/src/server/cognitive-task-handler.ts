@@ -8,6 +8,7 @@
  */
 
 import type { ITaskIntegration } from '../interfaces/task-integration';
+import { logTaskIngestion } from '../task-lifecycle/task-ingestion-logger';
 
 const ACTIONABLE_KEYWORDS = [
   'approach',
@@ -189,6 +190,7 @@ export async function convertCognitiveReflectionToTasks(
         };
 
         await taskIntegration.addTask(actionTask);
+        logTaskIngestion({ _diag_version: 1, source: 'cognitive_reflection', parent_task_id: cognitiveTask.id, decision: 'created', task_type: 'advisory_action' });
         console.log(
           `[CognitiveHandler] Created advisory action: "${actionTask.title}" (${actionType})`
         );

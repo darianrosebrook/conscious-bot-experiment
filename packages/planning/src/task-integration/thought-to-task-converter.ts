@@ -11,6 +11,7 @@ import type { Task } from '../types/task';
 import type { CognitiveStreamThought } from '../modules/cognitive-stream-client';
 import type { ManagementResult, SterlingManagementAction } from './task-management-handler';
 import type { ReductionProvenance } from '@conscious-bot/cognition';
+import { logTaskIngestion } from '../task-lifecycle/task-ingestion-logger';
 
 /**
  * Explicit decision state for task creation — makes "why nothing happened" visible.
@@ -396,10 +397,12 @@ export async function convertThoughtToTask(
 
     const addedTask = await deps.addTask(task);
     await deps.markThoughtAsProcessed(thought.id);
+    logTaskIngestion({ _diag_version: 1, source: 'thought_converter', task_id: task.id, decision: 'created', task_type: 'sterling_ir' });
     const r: ConvertThoughtResult = { task: addedTask, decision: 'created' };
     logConversionDecision(thought, r);
     return r;
   } catch (error) {
+    logTaskIngestion({ _diag_version: 1, source: 'thought_converter', decision: 'error', reason: error instanceof Error ? error.message : 'unknown', task_type: 'sterling_ir' });
     console.error('Error converting thought to task:', error);
     const r: ConvertThoughtResult = { task: null, decision: 'error', reason: String(error) };
     logConversionDecision(thought, r);
