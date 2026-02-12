@@ -60,7 +60,7 @@ Each leaf implements `LeafImpl` with typed input/output schemas, permissions, ti
 
 ### LLM (`llm/`)
 **Local LLM Integration**
-- `sidecar-client.ts` — MLX-LM sidecar HTTP client supporting native `/api/generate` and OpenAI-compatible `/v1/chat/completions` endpoints. Configurable temperature, timeout, model selection via environment (`LLM_SIDECAR_URL`, `OLLAMA_MODEL`). Legacy `OLLAMA_HOST` and `OLLAMA_BASE_URL` accepted as deprecated fallbacks.
+- `sidecar-client.ts` — MLX-LM sidecar HTTP client supporting native `/api/generate` and OpenAI-compatible `/v1/chat/completions` endpoints. Configurable temperature, timeout, model selection via environment (`LLM_SIDECAR_URL`, `OLLAMA_MODEL`). Legacy `OLLAMA_HOST` accepted as deprecated fallback.
 
 ### Sterling (`sterling/`)
 **Sterling Reasoning Service Client**

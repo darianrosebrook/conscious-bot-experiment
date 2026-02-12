@@ -329,6 +329,11 @@ export class EnhancedVectorDatabase {
    * Auto-create the per-seed database if it doesn't already exist.
    * Connects to the base database to run CREATE DATABASE, since the
    * seed-specific database may not exist yet.
+   *
+   * Uses the `conscious_bot_seed_template` database as a template when
+   * available, so that pgvector and other extensions are inherited
+   * automatically — avoiding "permission denied to create extension"
+   * errors when the app user is not a superuser.
    */
   private async ensureDatabaseExists(): Promise<void> {
     // Validate database name (CREATE DATABASE can't use parameterized queries)
@@ -355,8 +360,21 @@ export class EnhancedVectorDatabase {
       );
 
       if (result.rowCount === 0) {
-        console.log(`Creating per-seed database: ${this.seedDatabase}`);
-        await tempClient.query(`CREATE DATABASE ${this.seedDatabase}`);
+        // Check if the seed template database exists (has pgvector pre-installed)
+        const templateResult = await tempClient.query(
+          `SELECT 1 FROM pg_database WHERE datname = 'conscious_bot_seed_template'`
+        );
+        const hasTemplate = (templateResult.rowCount ?? 0) > 0;
+
+        if (hasTemplate) {
+          console.log(`Creating per-seed database: ${this.seedDatabase} (from template)`);
+          await tempClient.query(
+            `CREATE DATABASE ${this.seedDatabase} TEMPLATE conscious_bot_seed_template`
+          );
+        } else {
+          console.log(`Creating per-seed database: ${this.seedDatabase} (no template available)`);
+          await tempClient.query(`CREATE DATABASE ${this.seedDatabase}`);
+        }
         console.log(`Per-seed database created: ${this.seedDatabase}`);
       }
     } finally {
@@ -372,8 +390,24 @@ export class EnhancedVectorDatabase {
 
     const client = await this.pool.connect();
     try {
-      // Enable pgvector extension
-      await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+      // Enable pgvector extension (may already exist via template database)
+      try {
+        await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+      } catch (extErr: any) {
+        // If the extension already exists (from template) this is fine.
+        // If permission denied, check whether it's already available.
+        const hasVector = await client.query(
+          `SELECT 1 FROM pg_extension WHERE extname = 'vector'`
+        );
+        if ((hasVector.rowCount ?? 0) === 0) {
+          throw new Error(
+            `pgvector extension is not installed and could not be created: ${extErr.message}. ` +
+            `Ensure the 'conscious_bot_seed_template' database exists with pgvector, ` +
+            `or install pgvector manually: psql -U <superuser> -d ${this.seedDatabase} -c "CREATE EXTENSION vector;"`
+          );
+        }
+        // Extension exists (inherited from template), safe to proceed
+      }
 
       // Create enhanced memory chunks table
       await client.query(`

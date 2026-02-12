@@ -415,8 +415,21 @@ export class EnhancedKnowledgeGraphCore {
   async initialize(): Promise<void> {
     const client = await this.pool.connect();
     try {
-      // Enable pgvector extension
-      await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+      // Enable pgvector extension (may already exist via template database)
+      try {
+        await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+      } catch (extErr: any) {
+        const hasVector = await client.query(
+          `SELECT 1 FROM pg_extension WHERE extname = 'vector'`
+        );
+        if ((hasVector.rowCount ?? 0) === 0) {
+          throw new Error(
+            `pgvector extension is not installed and could not be created: ${extErr.message}. ` +
+            `Ensure the 'conscious_bot_seed_template' database exists with pgvector, ` +
+            `or install pgvector manually in this database.`
+          );
+        }
+      }
 
       // Create enhanced entities table
       await client.query(`

@@ -72,7 +72,7 @@
 
 | Property | Value |
 |----------|-------|
-| Endpoint | `http://localhost:5002` (env: `LLM_SIDECAR_URL` → `OLLAMA_HOST` → `OLLAMA_BASE_URL`) or `/v1/chat/completions` (env: `LLM_SIDECAR_OPENAI`) |
+| Endpoint | `http://localhost:5002` (env: `LLM_SIDECAR_URL` → `OLLAMA_HOST`) or `/v1/chat/completions` (env: `LLM_SIDECAR_OPENAI`) |
 | Default model | `llama3.1` (env: `OLLAMA_MODEL`) |
 | Timeout | 20s (configurable) |
 
@@ -258,7 +258,7 @@ All items from the recommendation have been implemented. See ADR-006 in `archite
 
 1. **Dead code deleted:** `ProductionLLMInterface` file removed.
 2. **Naming unified:** `OllamaClient` → `SidecarClient`, `OllamaResponse` → `SidecarResponse`, `callOllama` → `callSidecar`. `OllamaClient`/`OllamaClientConfig` preserved as deprecated aliases in `core/llm/sidecar-client.ts`.
-3. **Env var unified:** `LLM_SIDECAR_URL` is canonical across all packages. Legacy `OLLAMA_HOST`, `OLLAMA_BASE_URL`, `COGNITION_LLM_HOST` + `COGNITION_LLM_PORT` accepted as deprecated fallbacks.
+3. **Env var unified:** `LLM_SIDECAR_URL` is canonical across all packages. Legacy `OLLAMA_HOST`, `COGNITION_LLM_HOST` + `COGNITION_LLM_PORT` accepted as deprecated fallbacks. `OLLAMA_BASE_URL` is no longer accepted (rename to `OLLAMA_HOST`).
 4. **DI seam fixed:** `DynamicCreationFlow` depends on `OptionProposalLLM` interface (narrow: just `proposeOption()`), not concrete `HRMLLMInterface`.
 5. **Provenance added:** `SidecarClient.generate()` returns `SidecarCallProvenance` (model, requestHash via canonical SHA-256, outputHash, latencyMs). HRM pipeline collects per-stage provenance array.
 6. **Embedding provenance:** `SidecarEmbeddingBackend.embed()` returns `model`, `dim`, `latencyMs`.

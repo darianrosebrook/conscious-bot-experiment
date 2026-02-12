@@ -446,9 +446,9 @@ describe('Reduction Gate Contract', () => {
       await flow.requestOptionProposal('task-old', {} as any, 'test', [MOCK_FAILURE]);
       expect(flow.getProposalHistory('task-old').length).toBe(1);
 
-      // Manually backdate task-old's entry to 31 minutes ago
-      const oldHistory = flow.getProposalHistory('task-old');
-      oldHistory[0].timestamp = Date.now() - 31 * 60 * 1000;
+      // Backdate task-old's entry to 31 minutes ago via test helper
+      // (getProposalHistory returns a defensive copy, so we can't mutate directly)
+      flow._backdateHistoryEntryForTesting('task-old', 0, Date.now() - 31 * 60 * 1000);
 
       // Write to a different task — should trigger TTL eviction of task-old
       primeImpasse(flow, 'task-new');

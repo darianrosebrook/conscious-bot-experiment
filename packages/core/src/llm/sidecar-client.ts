@@ -7,8 +7,10 @@
  * Env vars (precedence order):
  *   LLM_SIDECAR_URL  — canonical, full URL (e.g. http://localhost:5002)
  *   OLLAMA_HOST      — deprecated fallback (shared across packages)
- *   OLLAMA_BASE_URL  — deprecated fallback (legacy, will be removed)
  *   default          — http://localhost:5002
+ *
+ * BREAKING (2026-02-11): OLLAMA_BASE_URL is no longer accepted.
+ * If your .env uses OLLAMA_BASE_URL, rename it to OLLAMA_HOST.
  *
  * Other env vars consumed:
  *   OLLAMA_MODEL           — default model name (default: llama3.1)
@@ -37,7 +39,7 @@ export class SidecarLLMClient {
   private timeoutMs: number;
 
   constructor(cfg: SidecarLLMClientConfig = {}) {
-    this.baseUrl = cfg.baseUrl || process.env.LLM_SIDECAR_URL || process.env.OLLAMA_HOST || process.env.OLLAMA_BASE_URL || 'http://localhost:5002';
+    this.baseUrl = cfg.baseUrl || process.env.LLM_SIDECAR_URL || process.env.OLLAMA_HOST || 'http://localhost:5002';
     this.model = cfg.model || process.env.OLLAMA_MODEL || 'llama3.1';
     const flag = (process.env.LLM_SIDECAR_OPENAI || process.env.OLLAMA_OPENAI || '').toLowerCase();
     this.useOpenAI = cfg.useOpenAICompat ?? (flag === '1' || flag === 'true');

@@ -648,10 +648,24 @@ export class DynamicCreationFlow {
   }
 
   /**
-   * Get proposal history for a task
+   * Get proposal history for a task.
+   * Returns a shallow copy — callers cannot mutate internal state.
    */
-  getProposalHistory(taskId: string): ProposalHistoryEntry[] {
-    return this.proposalHistory.get(taskId) || [];
+  getProposalHistory(taskId: string): readonly ProposalHistoryEntry[] {
+    const history = this.proposalHistory.get(taskId);
+    return history ? [...history] : [];
+  }
+
+  /**
+   * Backdate a history entry's timestamp. Test-only — used by TTL eviction tests
+   * since getProposalHistory() returns a defensive copy.
+   * @internal
+   */
+  _backdateHistoryEntryForTesting(taskId: string, index: number, timestamp: number): void {
+    const history = this.proposalHistory.get(taskId);
+    if (history && history[index]) {
+      history[index].timestamp = timestamp;
+    }
   }
 
   /**

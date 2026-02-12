@@ -20,6 +20,58 @@ import { resilientFetch } from '@conscious-bot/core';
 import { NavigationLeaseManager } from './navigation-lease-manager';
 import { createHash } from 'crypto';
 
+// ---------------------------------------------------------------------------
+// Collect diagnostics — structured evidence for collect_items failures
+// ---------------------------------------------------------------------------
+
+export type CollectReasonCode =
+  | 'no_item_entities'
+  | 'movement_not_executed'
+  | 'pathfinder_failed'
+  | 'threat_lockout'
+  | 'timeout'
+  | 'collected_ok';
+
+export interface CollectDiagnostics {
+  _diag_version: 1;
+  scan: {
+    items_seen_count: number;
+    closest_item_distance: number | null;  // quantized to 0.1 blocks
+    item_types_seen: string[];             // sorted, max 20
+  };
+  explore: {
+    enabled: boolean;
+    waypoints_planned: number;
+    waypoints_reached: number;
+    path_requests: number;
+    path_successes: number;
+    path_failures: number;
+    net_position_delta: number; // quantized to 0.1 blocks
+    duration_ms: number;
+  };
+  reason_code: CollectReasonCode;
+}
+
+/** Quantize a float to 1 decimal place for deterministic diagnostics. */
+function quantize1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Determine reason code from spiral exploration metrics.
+ * Precedence is a contract — see plan for rationale.
+ */
+function resolveCollectReasonCode(
+  pathRequests: number,
+  pathSuccesses: number,
+  timedOut: boolean,
+): CollectReasonCode {
+  if (pathRequests === 0) return 'movement_not_executed';
+  if (pathSuccesses === 0) return 'pathfinder_failed';
+  if (timedOut) return 'timeout';
+  return 'no_item_entities';
+}
+
 /**
  * Seeded hash for exploration target selection.
  * Returns a stable value in [0, 1) derived from immutable trace facts.

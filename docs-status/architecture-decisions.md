@@ -194,9 +194,10 @@ All packages resolve the sidecar URL with the same top-two precedence levels:
 |------------|---------|-------|
 | 1 (canonical) | `LLM_SIDECAR_URL` | Full URL, e.g. `http://localhost:5002` |
 | 2 (deprecated) | `OLLAMA_HOST` | Shared legacy fallback across all packages |
-| 3a (core/llm only) | `OLLAMA_BASE_URL` | Legacy fallback for `SidecarLLMClient` only; will be removed in a future pass |
-| 3b (cognition only) | `COGNITION_LLM_HOST` + `COGNITION_LLM_PORT` | Legacy host/port split; two separate env vars, assembled as `http://{host}:{port}` |
+| 3 (cognition only) | `COGNITION_LLM_HOST` + `COGNITION_LLM_PORT` | Legacy host/port split; two separate env vars, assembled as `http://{host}:{port}` |
 | 4 (default) | — | `http://localhost:5002` |
+
+**Breaking (2026-02-11):** `OLLAMA_BASE_URL` is no longer accepted anywhere. If your `.env` or scripts use it, rename it to `OLLAMA_HOST`.
 
 #### Other env vars
 
