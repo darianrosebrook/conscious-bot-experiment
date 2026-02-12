@@ -26,6 +26,7 @@ import {
   ExecutionContext as GOAPExecutionContext,
   PlanRepair,
 } from './goap-types';
+import { createWorldStateFromManager } from './world-state-adapter';
 import {
   createPBIEnforcer,
   PlanStep as PBIPlanStep,
@@ -137,7 +138,6 @@ export class ReactiveExecutor implements IReactiveExecutor {
 
     // Wire world state from manager if provided
     if (opts.worldStateManager) {
-      const { createWorldStateFromManager } = require('./world-state-adapter');
       this.worldStateAdapter = createWorldStateFromManager(opts.worldStateManager) as WorldState;
     }
 
