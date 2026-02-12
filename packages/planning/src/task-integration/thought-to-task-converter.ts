@@ -233,6 +233,28 @@ function resolveReduction(thought: CognitiveStreamThought): {
 }
 
 /**
+ * Emit structured log for thought conversion decision.
+ * Single source of truth for "why was/wasn't a task created from this thought?"
+ * Payload is keys + booleans only — no thought text, bounded size.
+ */
+function logConversionDecision(
+  thought: CognitiveStreamThought,
+  result: ConvertThoughtResult,
+): void {
+  const reduction = thought.metadata?.reduction as ReductionProvenance | undefined;
+  console.log('[Thought→Task]', JSON.stringify({
+    _diag_version: 1,
+    thought_id: thought.id?.slice(0, 12) ?? '?',
+    source: (thought as any).source ?? 'unknown',
+    has_committed_ir_digest: !!reduction?.reducerResult?.committed_ir_digest,
+    reducer_is_executable: reduction?.isExecutable ?? null,
+    sterling_processed: reduction?.sterlingProcessed ?? false,
+    decision: result.decision,
+    reason: result.reason,
+  }));
+}
+
+/**
  * Convert a cognitive thought to a planning task.
  *
  * Only Sterling reduction artifacts are used. No local semantic parsing.
@@ -242,9 +264,17 @@ export async function convertThoughtToTask(
   deps: ConvertThoughtToTaskDeps
 ): Promise<ConvertThoughtResult> {
   try {
-    if (thought.processed) return { task: null, decision: 'blocked_guard', reason: 'already processed' };
+    if (thought.processed) {
+      const r: ConvertThoughtResult = { task: null, decision: 'blocked_guard', reason: 'already processed' };
+      logConversionDecision(thought, r);
+      return r;
+    }
 
-    if (deps.seenThoughtIds.has(thought.id)) return { task: null, decision: 'dropped_seen', reason: 'thought ID already seen' };
+    if (deps.seenThoughtIds.has(thought.id)) {
+      const r: ConvertThoughtResult = { task: null, decision: 'dropped_seen', reason: 'thought ID already seen' };
+      logConversionDecision(thought, r);
+      return r;
+    }
     deps.seenThoughtIds.add(thought.id);
     if (deps.seenThoughtIds.size > 500) {
       deps.trimSeenThoughtIds();
@@ -254,10 +284,14 @@ export async function convertThoughtToTask(
     const strict = deps.config?.strictConvertEligibility === true;
     if (strict) {
       if (thought.convertEligible !== true) {
-        return { task: null, decision: 'blocked_not_eligible', reason: 'strict mode: convertEligible !== true' };
+        const r: ConvertThoughtResult = { task: null, decision: 'blocked_not_eligible', reason: 'strict mode: convertEligible !== true' };
+        logConversionDecision(thought, r);
+        return r;
       }
     } else if (thought.convertEligible === false) {
-      return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
+      const r: ConvertThoughtResult = { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
+      logConversionDecision(thought, r);
+      return r;
     }
 
     const reductionCheck = resolveReduction(thought);
@@ -265,7 +299,9 @@ export async function convertThoughtToTask(
       if (reductionCheck.decision === 'dropped_missing_schema_version') {
         await deps.markThoughtAsProcessed(thought.id);
       }
-      return { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
+      const r: ConvertThoughtResult = { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
+      logConversionDecision(thought, r);
+      return r;
     }
 
     const reduction = reductionCheck.reduction!;
@@ -275,7 +311,9 @@ export async function convertThoughtToTask(
     const managementAction = extractSterlingManagementAction(reduction);
     if (managementAction) {
       if (!deps.managementHandler) {
-        return { task: null, decision: 'management_failed', reason: 'management handler not available' };
+        const r: ConvertThoughtResult = { task: null, decision: 'management_failed', reason: 'management handler not available' };
+        logConversionDecision(thought, r);
+        return r;
       }
       const mgmtResult = deps.managementHandler.handle(managementAction, thought.id);
       await deps.markThoughtAsProcessed(thought.id);
@@ -286,25 +324,31 @@ export async function convertThoughtToTask(
         invalid_transition: 'management_failed',
         error: 'management_failed',
       };
-      return {
+      const r: ConvertThoughtResult = {
         task: null,
         decision: decisionMap[mgmtResult.decision] ?? 'management_failed',
         reason: mgmtResult.reason ?? `management ${mgmtResult.action}: ${mgmtResult.decision}`,
         managementResult: mgmtResult,
       };
+      logConversionDecision(thought, r);
+      return r;
     }
 
     const schemaVersion = result.schema_version;
     const digestKey = `${schemaVersion}:${result.committed_ir_digest}`;
     if (isDigestDuplicate(digestKey)) {
-      return { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
+      const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
+      logConversionDecision(thought, r);
+      return r;
     }
 
     // Category-level cooldown: suppress tasks whose category recently failed
     // as unplannable. This prevents the idle→task→fail loop where each
     // Sterling reduction is unique but the task semantics are identical.
     if (isFailedCategoryCooldown(thought)) {
-      return { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (${FAILED_CATEGORY_COOLDOWN_MS / 1000}s cooldown)` };
+      const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (${FAILED_CATEGORY_COOLDOWN_MS / 1000}s cooldown)` };
+      logConversionDecision(thought, r);
+      return r;
     }
 
     const title = thought.content.trim().slice(0, 160) || `Sterling task ${result.committed_ir_digest.slice(0, 12)}`;
@@ -352,9 +396,13 @@ export async function convertThoughtToTask(
 
     const addedTask = await deps.addTask(task);
     await deps.markThoughtAsProcessed(thought.id);
-    return { task: addedTask, decision: 'created' };
+    const r: ConvertThoughtResult = { task: addedTask, decision: 'created' };
+    logConversionDecision(thought, r);
+    return r;
   } catch (error) {
     console.error('Error converting thought to task:', error);
-    return { task: null, decision: 'error', reason: String(error) };
+    const r: ConvertThoughtResult = { task: null, decision: 'error', reason: String(error) };
+    logConversionDecision(thought, r);
+    return r;
   }
 }

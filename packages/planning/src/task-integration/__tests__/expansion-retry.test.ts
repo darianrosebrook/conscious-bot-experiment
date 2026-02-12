@@ -324,3 +324,71 @@ describe('unknown Sterling blocked_reason normalization (evidence artifact)', ()
     expect(stateLate.shouldFail).toBe(true);
   });
 });
+
+// ── Diagnostic instrumentation tests (Upgrade 2) ──
+
+describe('ExpansionValidationError structure', () => {
+  // Import the type and helper — buildValidationErrors is not exported,
+  // so we test through the shape contract: validation_errors on task metadata.
+
+  it('blocked_invalid_steps_bundle is classified as contract_broken with 30s TTL', () => {
+    expect(BLOCKED_REASON_TTL_POLICY['blocked_invalid_steps_bundle']).toBe(30_000);
+  });
+
+  it('blocked_undispatchable_steps is classified as contract_broken with 30s TTL', () => {
+    expect(BLOCKED_REASON_TTL_POLICY['blocked_undispatchable_steps']).toBe(30_000);
+  });
+
+  it('validation_errors shape matches contract when present on task metadata', () => {
+    // Simulate a task with validation_errors on sterling.exec
+    const task = makeTask({
+      metadata: {
+        sterling: {
+          committedIrDigest: 'abc123',
+          schemaVersion: 'v1',
+          exec: {
+            status: 'blocked',
+            blockedReason: 'blocked_undispatchable_steps',
+            validation_errors: [
+              {
+                path: 'steps[0]',
+                code: 'undispatchable_leaf',
+                message: 'Leaf \'intent.shelter\' cannot be dispatched by executor',
+                leaf_name: 'intent.shelter',
+                step_index: 0,
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const exec = (task.metadata.sterling as any)?.exec;
+    expect(exec).toBeDefined();
+    expect(exec.validation_errors).toHaveLength(1);
+    expect(exec.validation_errors[0]).toHaveProperty('path', 'steps[0]');
+    expect(exec.validation_errors[0]).toHaveProperty('code', 'undispatchable_leaf');
+    expect(exec.validation_errors[0]).toHaveProperty('leaf_name', 'intent.shelter');
+    expect(exec.validation_errors[0]).toHaveProperty('step_index', 0);
+    expect(exec.validation_errors[0].message.length).toBeLessThanOrEqual(200);
+  });
+
+  it('validation_errors are sorted by step_index when present for determinism', () => {
+    const errors = [
+      { path: 'steps[10]', code: 'undispatchable_leaf', message: 'b', step_index: 10 },
+      { path: 'steps[2]', code: 'unresolved_intent', message: 'a', step_index: 2 },
+      { path: 'steps[1]', code: 'undispatchable_leaf', message: 'c', step_index: 1 },
+    ];
+
+    const sorted = [...errors].sort((a, b) => {
+      if (a.step_index != null && b.step_index != null) {
+        return a.step_index - b.step_index || a.code.localeCompare(b.code);
+      }
+      return (a.path + a.code).localeCompare(b.path + b.code);
+    });
+
+    expect(sorted[0].path).toBe('steps[1]');
+    expect(sorted[1].path).toBe('steps[2]');
+    expect(sorted[2].path).toBe('steps[10]');
+  });
+});

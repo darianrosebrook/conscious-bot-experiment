@@ -114,6 +114,14 @@ export type GoldenRunReport = {
     schema_version?: string;
     blocked_reason?: string;
     error?: string;
+    /** Structured validation errors — what invariant was violated? Sorted by numeric step_index when present, otherwise path+code; max 20; messages truncated to 200 chars. */
+    validation_errors?: Array<{
+      path: string;
+      code: string;
+      message: string;
+      leaf_name?: string;
+      step_index?: number;
+    }>;
     steps?: Array<{
       leaf: string;
       args?: Record<string, unknown>;

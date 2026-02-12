@@ -203,4 +203,85 @@ describe('convertThoughtToTask (Sterling reduction)', () => {
     expect(result.decision).toBe('management_applied');
     expect(store.getTask('task_1')?.status).toBe('failed');
   });
+
+  // ── Diagnostic instrumentation tests (Upgrade 3) ──
+
+  describe('[Thought→Task] structured log emission', () => {
+    it('emits structured log on successful creation', async () => {
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const deps = makeDeps();
+      const thought = makeThought({
+        metadata: { thoughtType: 'planning', reduction: makeReduction() },
+      });
+
+      await convertThoughtToTask(thought, deps);
+
+      const diagLog = spy.mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0] === '[Thought→Task]'
+      );
+      expect(diagLog).toBeDefined();
+
+      const payload = JSON.parse(diagLog![1] as string);
+      expect(payload).toHaveProperty('_diag_version', 1);
+      expect(payload).toHaveProperty('thought_id');
+      expect(payload).toHaveProperty('decision', 'created');
+      expect(payload).toHaveProperty('has_committed_ir_digest', true);
+      expect(payload).toHaveProperty('reducer_is_executable', true);
+      expect(payload).toHaveProperty('sterling_processed', true);
+
+      spy.mockRestore();
+    });
+
+    it('emits structured log when dropped as not executable', async () => {
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const deps = makeDeps();
+      const thought = makeThought({
+        metadata: {
+          thoughtType: 'planning',
+          reduction: makeReduction({ isExecutable: false }),
+        },
+      });
+
+      await convertThoughtToTask(thought, deps);
+
+      const diagLog = spy.mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0] === '[Thought→Task]'
+      );
+      expect(diagLog).toBeDefined();
+
+      const payload = JSON.parse(diagLog![1] as string);
+      expect(payload).toHaveProperty('decision', 'dropped_not_executable');
+      expect(payload).toHaveProperty('reducer_is_executable', false);
+
+      spy.mockRestore();
+    });
+
+    it('emits structured log for dedup suppression', async () => {
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const deps = makeDeps();
+      const reduction = makeReduction();
+      // First call creates the task
+      const thought1 = makeThought({
+        metadata: { thoughtType: 'planning', reduction },
+      });
+      await convertThoughtToTask(thought1, deps);
+
+      // Second call with same digest should be suppressed
+      const thought2 = makeThought({
+        metadata: { thoughtType: 'planning', reduction },
+      });
+      await convertThoughtToTask(thought2, deps);
+
+      const diagLogs = spy.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0] === '[Thought→Task]'
+      );
+      // Should have 2 logs: one 'created', one 'suppressed_dedup'
+      expect(diagLogs.length).toBeGreaterThanOrEqual(2);
+
+      const lastPayload = JSON.parse(diagLogs[diagLogs.length - 1]![1] as string);
+      expect(lastPayload).toHaveProperty('decision', 'suppressed_dedup');
+
+      spy.mockRestore();
+    });
+  });
 });

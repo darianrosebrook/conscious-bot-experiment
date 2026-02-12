@@ -167,6 +167,37 @@ export function canonicalizeIntentParams(raw: unknown): string | undefined {
  * for dashboards and alerts. Consumers needing the full task query the store
  * by taskId.
  */
+// ---------------------------------------------------------------------------
+// Expansion validation error — structured evidence for blocked expansions
+// ---------------------------------------------------------------------------
+
+export interface ExpansionValidationError {
+  path: string;        // e.g. "steps[2]", "response.steps", "intent_resolution"
+  code: string;        // e.g. "undispatchable_leaf", "empty_steps_bundle"
+  message: string;     // truncated to 200 chars
+  leaf_name?: string;
+  step_index?: number;
+}
+
+/** Build validation errors, applying caps and sort for determinism. */
+function buildValidationErrors(
+  raw: Array<{ path: string; code: string; message: string; leaf_name?: string; step_index?: number }>
+): ExpansionValidationError[] {
+  return raw
+    .map((e) => ({
+      ...e,
+      message: e.message.length > 200 ? e.message.slice(0, 200) : e.message,
+    }))
+    .sort((a, b) => {
+      // Numeric step ordering when present, else lexicographic path+code.
+      if (a.step_index != null && b.step_index != null) {
+        return a.step_index - b.step_index || a.code.localeCompare(b.code);
+      }
+      return (a.path + a.code).localeCompare(b.path + b.code);
+    })
+    .slice(0, 20);
+}
+
 export interface GoalBindingDriftEvent {
   type: 'goal_binding_drift';
   /** ID of the affected task */
@@ -1935,8 +1966,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         requestId: string;
         ingestRetry?: { count: number; delayMs: number; elapsedMs: number };
       }
-    | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }> }
-    | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number } }
+    | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }>; validation_errors?: ExpansionValidationError[] }
+    | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; validation_errors?: ExpansionValidationError[] }
   > {
     const routingEnabled = process.env.STERLING_IR_ROUTING !== '0';
     const requestId = `sterling_exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2199,10 +2230,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           final_request_id: ingestRetryCount > 0 ? `${requestId}_retry${ingestRetryCount}` : requestId,
         });
       }
+      const validation_errors_steps = buildValidationErrors([{
+        path: 'response.steps',
+        code: 'empty_steps_bundle',
+        message: `Sterling returned ${!response.steps ? 'missing' : 'empty'} steps array`,
+      }]);
       recordExpansion({
         request_id: requestId,
         status: 'blocked',
         blocked_reason: 'blocked_invalid_steps_bundle',
+        validation_errors: validation_errors_steps,
         ingest_retries: ingestRetryCount,
         ingest_retry_delay_ms: ingestRetry?.delayMs,
         ingest_retry_elapsed_ms: ingestRetry?.elapsedMs,
@@ -2212,6 +2249,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         reason: 'blocked_invalid_steps_bundle',
         requestId,
         ingestRetry,
+        validation_errors: validation_errors_steps,
       };
     }
 
@@ -2469,17 +2507,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           console.log(
             `[Sterling] Intent resolution ${resolveResponse.status}: ${detail} — blocking ${intentSteps.length} intent step(s)`
           );
+          const validation_errors_resfail = buildValidationErrors([{
+            path: 'intent_resolution',
+            code: 'resolution_failed',
+            message: `Intent resolver returned ${resolveResponse.status}: ${detail}`,
+          }]);
           recordExpansion({
             request_id: requestId,
             status: 'blocked',
             blocked_reason: 'blocked_intent_resolution_failed',
             resolution_detail: detail,
+            validation_errors: validation_errors_resfail,
           });
           return {
             outcome: 'blocked',
             reason: 'blocked_intent_resolution_failed',
             requestId,
             ingestRetry,
+            validation_errors: validation_errors_resfail,
           };
         }
       } catch (err) {
@@ -2487,17 +2532,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         console.warn(
           '[Sterling] Intent resolution error — blocking:', detail
         );
+        const validation_errors_reserr = buildValidationErrors([{
+          path: 'intent_resolution',
+          code: 'resolution_error',
+          message: `Intent resolver threw: ${detail}`,
+        }]);
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
           blocked_reason: 'blocked_intent_resolution_error',
           resolution_detail: detail,
+          validation_errors: validation_errors_reserr,
         });
         return {
           outcome: 'blocked',
           reason: 'blocked_intent_resolution_error',
           requestId,
           ingestRetry,
+          validation_errors: validation_errors_reserr,
         };
       }
 
@@ -2517,11 +2569,25 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         const blockReason = hasRemainingIntents
           ? 'blocked_unresolved_intents'
           : 'blocked_undispatchable_steps';
+        const validation_errors_dispatch = buildValidationErrors(
+          finalSteps.map((step, idx) => {
+            const check = isStepDispatchable(step.leaf, step.args ?? {});
+            if (check.ok) return null;
+            return {
+              path: `steps[${idx}]`,
+              code: isIntentLeaf(step.leaf) ? 'unresolved_intent' : 'undispatchable_leaf',
+              message: check.reason,
+              leaf_name: step.leaf,
+              step_index: idx,
+            };
+          }).filter((e): e is NonNullable<typeof e> => e !== null)
+        );
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
           blocked_reason: blockReason,
           undispatchable,
+          validation_errors: validation_errors_dispatch,
         });
         return {
           outcome: 'blocked',
@@ -2529,6 +2595,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           requestId,
           ingestRetry,
           undispatchable,
+          validation_errors: validation_errors_dispatch,
         };
       }
     }
@@ -2653,8 +2720,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           requestId: string;
           ingestRetry?: { count: number; delayMs: number; elapsedMs: number };
         }
-      | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }> }
-      | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number } }
+      | { outcome: 'blocked'; reason: string; retryAfterMs?: number; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; undispatchable?: Array<{ leaf: string; reason: string }>; validation_errors?: ExpansionValidationError[] }
+      | { outcome: 'error'; error: string; requestId: string; ingestRetry?: { count: number; delayMs: number; elapsedMs: number }; validation_errors?: ExpansionValidationError[] }
       | undefined;
 
     if (isAdvisory) {
@@ -2796,6 +2863,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           blockedReason: sterlingExpansion.reason,
           expansionError: sterlingExpansion.reason,
           ...ingestRetryMeta,
+          ...(sterlingExpansion.validation_errors?.length
+            ? { validation_errors: sterlingExpansion.validation_errors }
+            : {}),
         };
       } else {
         (task.metadata.sterling as any).exec = {
@@ -2807,6 +2877,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           error: sterlingExpansion.error,
           expansionError: sterlingExpansion.error,
           ...ingestRetryMeta,
+          ...((sterlingExpansion as any).validation_errors?.length
+            ? { validation_errors: (sterlingExpansion as any).validation_errors }
+            : {}),
         };
       }
       if (sterlingExpansion.outcome === 'blocked') {
