@@ -44,7 +44,7 @@ export interface ReductionProvenance {
  * LLM provider configuration
  */
 export interface LLMConfig {
-  provider: 'ollama' | 'openai' | 'anthropic' | 'mlx';
+  provider: 'sidecar' | 'mlx' | 'ollama' | 'openai' | 'anthropic';
   model: string;
   fallbackModel?: string;
   host?: string;
@@ -793,7 +793,7 @@ export interface StyleAdapter {
 // ============================================================================
 
 export const LLMConfigSchema = z.object({
-  provider: z.enum(['ollama', 'openai', 'anthropic', 'mlx']),
+  provider: z.enum(['sidecar', 'mlx', 'ollama', 'openai', 'anthropic']),
   model: z.string(),
   fallbackModel: z.string().optional(),
   host: z.string().optional(),

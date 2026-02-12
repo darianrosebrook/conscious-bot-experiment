@@ -859,6 +859,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // SSE broadcast for dashboard
       broadcastTaskUpdate('taskStatusUpdated', task);
 
+      // Fire-and-forget persistence (gated by PLANNING_EVENT_STORE=1)
+      global.planningEventStore?.recordEvent('task_status_updated', task.id, { task, previousStatus });
+      global.planningEventStore?.updateSnapshot(task);
+
       // Unblock parent when prerequisite children reach terminal state
       if (status === 'completed' || status === 'failed') {
         this.tryUnblockParent(task);
@@ -927,6 +931,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Log the task lifecycle event
       console.log(`Task lifecycle event: ${eventType} for task: ${task.title}`);
+
+      // Fire-and-forget persistence (gated by PLANNING_EVENT_STORE=1)
+      global.planningEventStore?.recordEvent('task_lifecycle', task.id, {
+        task,
+        lifecycleEventType: eventType,
+        previousStatus,
+      });
     } catch (error) {
       console.warn('⚠️ Failed to emit lifecycle event:', error);
     }
@@ -1492,6 +1503,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // ── SSE broadcast for dashboard ──
     broadcastTaskUpdate('taskAdded', task);
+
+    // Fire-and-forget persistence (gated by PLANNING_EVENT_STORE=1)
+    global.planningEventStore?.recordEvent('task_added', task.id, { task });
+    global.planningEventStore?.updateSnapshot(task);
 
     if (task.priority >= 0.8) {
       this.emit('taskLifecycleEvent', {
@@ -3327,6 +3342,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // SSE broadcast for dashboard
     broadcastTaskUpdate('taskProgressUpdated', task);
+
+    // Fire-and-forget persistence (gated by PLANNING_EVENT_STORE=1)
+    global.planningEventStore?.recordEvent('task_progress_updated', task.id, { task, previousProgress: oldProgress });
+    global.planningEventStore?.updateSnapshot(task);
 
     // Goal-binding protocol: fire progress hook AND status hook (runtime origin only).
     // Both hooks produce effects that are collected and scheduled once.

@@ -1,12 +1,14 @@
 /**
- * LLM Integration System - Real Ollama integration
+ * LLM Integration System — MLX-LM Sidecar Transport
  *
- * Implements real LLM integration with Ollama using a dual-system
+ * Implements LLM integration with the MLX-LM sidecar using a dual-system
  * architecture for hierarchical reasoning and option proposal generation.
+ * The sidecar speaks an Ollama-compatible HTTP dialect at /api/generate.
  *
  * @author @darianrosebrook
  */
 
+import crypto from 'node:crypto';
 import { LeafContext, ExecError } from './leaf-contracts';
 
 // ============================================================================
@@ -70,9 +72,9 @@ export interface HRMReasoningConfig {
 }
 
 /**
- * Ollama API response structure
+ * Sidecar API response structure (Ollama-compatible HTTP dialect)
  */
-export interface OllamaResponse {
+export interface SidecarResponse {
   model: string;
   created_at: string;
   response: string;
@@ -82,6 +84,62 @@ export interface OllamaResponse {
   load_duration?: number;
   prompt_eval_duration?: number;
   eval_duration?: number;
+}
+
+/**
+ * Provenance metadata for a single sidecar LLM call.
+ * Provides content-addressed traceability for debugging and auditing.
+ */
+export interface SidecarCallProvenance {
+  model: string;
+  requestHash: string;   // SHA-256(canonical request envelope), truncated to 16 hex chars
+  outputHash: string;    // SHA-256(response text), truncated to 16 hex chars
+  latencyMs: number;
+  createdAt: string;     // ISO-8601 timestamp
+}
+
+/**
+ * Extended generate result that includes provenance alongside the raw response.
+ */
+export interface SidecarGenerateResult {
+  response: SidecarResponse;
+  provenance: SidecarCallProvenance;
+}
+
+/**
+ * Hash a request envelope for reproducible provenance tracking.
+ *
+ * Determinism: keys are in a stable literal order (alphabetical by convention).
+ * This is NOT a general-purpose canonical JSON — it relies on the fixed literal
+ * below. If you add fields, insert them in alphabetical position.
+ *
+ * Scope: hashes model + prompt + temperature + maxTokens + systemPrompt.
+ * Does NOT include baseUrl or timeout, so identical prompts sent to different
+ * sidecars will share a hash. Add those fields if sidecar routing diverges.
+ */
+function hashRequestEnvelope(
+  model: string,
+  prompt: string,
+  opts: { temperature: number; maxTokens: number; systemPrompt?: string }
+): string {
+  const envelope = JSON.stringify({
+    maxTokens: opts.maxTokens,
+    model,
+    systemPrompt: opts.systemPrompt ?? '',
+    temperature: opts.temperature,
+    userPrompt: prompt,
+  });
+  return crypto.createHash('sha256').update(envelope).digest('hex').slice(0, 16);
+}
+
+/**
+ * Hash response output for correlation and deduplication.
+ * Uses a tagged payload to distinguish missing/null responses from empty strings,
+ * preventing false joins when outputHash is used as a correlation key.
+ */
+function hashOutput(text: string | undefined | null): string {
+  const tagged = text == null ? 'missing:true' : `text:${text}`;
+  return crypto.createHash('sha256').update(tagged).digest('hex').slice(0, 16);
 }
 
 /**
@@ -199,18 +257,24 @@ export const DEFAULT_HRM_CONFIG: HRMReasoningConfig = {
 };
 
 // ============================================================================
-// Ollama Client
+// Sidecar Client
 // ============================================================================
 
 /**
- * Ollama API client for model interaction
+ * MLX-LM sidecar client (Ollama-compatible HTTP dialect).
+ * Canonical transport for all LLM generation in the core package.
+ *
+ * Env var precedence for base URL:
+ *   1. LLM_SIDECAR_URL  — canonical full URL
+ *   2. OLLAMA_HOST       — deprecated fallback (shared across packages)
+ *   3. http://localhost:5002 — default
  */
-export class OllamaClient {
+export class SidecarClient {
   private baseUrl: string;
   private timeout: number;
 
   constructor(
-    baseUrl: string = 'http://localhost:5002',
+    baseUrl: string = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002',
     timeout: number = 10000
   ) {
     this.baseUrl = baseUrl;
@@ -218,7 +282,7 @@ export class OllamaClient {
   }
 
   /**
-   * Generate response from Ollama model
+   * Generate response from sidecar model, returning provenance metadata.
    */
   async generate(
     model: string,
@@ -229,7 +293,7 @@ export class OllamaClient {
       systemPrompt?: string;
       timeout?: number;
     } = {}
-  ): Promise<OllamaResponse> {
+  ): Promise<SidecarGenerateResult> {
     const {
       temperature = 0.7,
       maxTokens = 2048,
@@ -248,11 +312,13 @@ export class OllamaClient {
       stream: false,
     };
 
+    const startMs = Date.now();
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
+      const httpResponse = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,16 +329,27 @@ export class OllamaClient {
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
+      if (!httpResponse.ok) {
         throw new Error(
-          `Ollama API error: ${response.status} ${response.statusText}`
+          `Sidecar API error: ${httpResponse.status} ${httpResponse.statusText}`
         );
       }
 
-      return (await response.json()) as OllamaResponse;
+      const response = (await httpResponse.json()) as SidecarResponse;
+      const latencyMs = Date.now() - startMs;
+
+      const provenance: SidecarCallProvenance = {
+        model,
+        requestHash: hashRequestEnvelope(model, prompt, { temperature, maxTokens, systemPrompt }),
+        outputHash: hashOutput(response.response),
+        latencyMs,
+        createdAt: new Date().toISOString(),
+      };
+
+      return { response, provenance };
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Ollama request timed out after ${timeout}ms`);
+        throw new Error(`Sidecar request timed out after ${timeout}ms`);
       }
       throw error;
     }
@@ -288,7 +365,7 @@ export class OllamaClient {
       const response = await fetch(`${this.baseUrl}/api/tags`);
       if (!response.ok) {
         throw new Error(
-          `Ollama API error: ${response.status} ${response.statusText}`
+          `Sidecar API error: ${response.status} ${response.statusText}`
         );
       }
       return (await response.json()) as {
@@ -321,7 +398,7 @@ export class OllamaClient {
  * LLM interface with dual-system reasoning (abstract + detailed)
  */
 export class HRMLLMInterface {
-  private ollamaClient: OllamaClient;
+  private sidecarClient: SidecarClient;
   private config: HRMReasoningConfig;
   private availableModels: LLMModel[];
 
@@ -329,13 +406,14 @@ export class HRMLLMInterface {
     config: HRMReasoningConfig = DEFAULT_HRM_CONFIG,
     availableModels: LLMModel[] = AVAILABLE_MODELS
   ) {
-    this.ollamaClient = new OllamaClient();
+    this.sidecarClient = new SidecarClient();
     this.config = config;
     this.availableModels = availableModels;
   }
 
   /**
-   * Propose new options using dual-system reasoning
+   * Propose new options using dual-system reasoning.
+   * Collects per-stage provenance for debugging during HRM→Sterling migration.
    */
   async proposeOption(request: {
     taskId: string;
@@ -349,26 +427,33 @@ export class HRMLLMInterface {
     confidence: number;
     estimatedSuccessRate: number;
     reasoning: string;
+    provenance?: {
+      origin: 'hrm_pipeline';
+      stages: SidecarCallProvenance[];
+      totalLatencyMs: number;
+    };
   } | null> {
     const startTime = performance.now();
+    const stageProvenance: SidecarCallProvenance[] = [];
 
     try {
       // Step 1: High-level abstract planning (System 2)
-      const abstractPlan = await this.generateAbstractPlan(request);
+      const abstractPlan = await this.generateAbstractPlan(request, stageProvenance);
 
       // Step 2: Low-level detailed execution planning (System 1)
       const detailedPlan = await this.generateDetailedPlan(
         abstractPlan,
-        request
+        request,
+        stageProvenance
       );
 
       // Step 3: Iterative refinement loop
-      const refinedPlan = await this.iterativeRefinement(detailedPlan, request);
+      const refinedPlan = await this.iterativeRefinement(detailedPlan, request, stageProvenance);
 
       // Step 4: Generate BT-DSL from refined plan
-      const btDsl = await this.generateBTDSL(refinedPlan, request);
+      const btDsl = await this.generateBTDSL(refinedPlan, request, stageProvenance);
 
-      const durationMs = performance.now() - startTime;
+      const totalLatencyMs = performance.now() - startTime;
 
       return {
         name: `opt.${this.generateOptionName(request.currentTask)}`,
@@ -377,6 +462,11 @@ export class HRMLLMInterface {
         confidence: refinedPlan.confidence,
         estimatedSuccessRate: refinedPlan.estimatedSuccessRate,
         reasoning: refinedPlan.reasoning.join('\n'),
+        provenance: {
+          origin: 'hrm_pipeline',
+          stages: stageProvenance,
+          totalLatencyMs,
+        },
       };
     } catch (error) {
       console.error('Failed to propose option:', error);
@@ -387,7 +477,7 @@ export class HRMLLMInterface {
   /**
    * High-level abstract planning (System 2)
    */
-  private async generateAbstractPlan(request: any): Promise<any> {
+  private async generateAbstractPlan(request: any, stageProvenance: SidecarCallProvenance[]): Promise<any> {
     const systemPrompt = `Generate a high-level strategic plan for solving the following problem.
 
 Focus on:
@@ -410,7 +500,7 @@ Generate a high-level strategic plan that addresses the core problem.`;
 
 Consider the recent failures and design a robust approach that can handle similar challenges.`;
 
-    const response = await this.ollamaClient.generate(
+    const { response, provenance } = await this.sidecarClient.generate(
       this.config.abstractPlanner.model,
       userPrompt,
       {
@@ -420,6 +510,7 @@ Consider the recent failures and design a robust approach that can handle simila
         timeout: 40000, // 15 seconds for demo
       }
     );
+    stageProvenance.push(provenance);
 
     return {
       abstractPlan: response.response,
@@ -433,7 +524,8 @@ Consider the recent failures and design a robust approach that can handle simila
    */
   private async generateDetailedPlan(
     abstractPlan: any,
-    request: any
+    request: any,
+    stageProvenance: SidecarCallProvenance[]
   ): Promise<any> {
     const systemPrompt = `Convert the following high-level strategic plan into detailed tactical execution steps.
 
@@ -460,7 +552,7 @@ Current context:
 
 Generate specific, actionable steps that implement the abstract plan.`;
 
-    const response = await this.ollamaClient.generate(
+    const { response, provenance } = await this.sidecarClient.generate(
       this.config.detailedExecutor.model,
       userPrompt,
       {
@@ -470,6 +562,7 @@ Generate specific, actionable steps that implement the abstract plan.`;
         timeout: 5000, // 5 seconds for faster response
       }
     );
+    stageProvenance.push(provenance);
 
     return {
       ...abstractPlan,
@@ -485,7 +578,7 @@ Generate specific, actionable steps that implement the abstract plan.`;
   /**
    * Iterative refinement loop
    */
-  private async iterativeRefinement(plan: any, request: any): Promise<any> {
+  private async iterativeRefinement(plan: any, request: any, stageProvenance: SidecarCallProvenance[]): Promise<any> {
     let currentPlan = plan;
     let iteration = 0;
 
@@ -496,7 +589,7 @@ Generate specific, actionable steps that implement the abstract plan.`;
       }
 
       // Refine the plan
-      currentPlan = await this.refinePlan(currentPlan, request);
+      currentPlan = await this.refinePlan(currentPlan, request, stageProvenance);
       iteration++;
     }
 
@@ -532,7 +625,7 @@ Generate specific, actionable steps that implement the abstract plan.`;
   /**
    * Refine the current plan
    */
-  private async refinePlan(plan: any, request: any): Promise<any> {
+  private async refinePlan(plan: any, request: any, stageProvenance: SidecarCallProvenance[]): Promise<any> {
     const systemPrompt = `Improve and optimize the following plan based on feedback and analysis.
 
 Focus on:
@@ -553,7 +646,7 @@ Recent failures: ${request.recentFailures.map((f: ExecError) => f.detail).join('
 
 Provide specific improvements to increase the plan's success probability and robustness.`;
 
-    const response = await this.ollamaClient.generate(
+    const { response, provenance } = await this.sidecarClient.generate(
       this.config.abstractPlanner.model, // Use abstract planner for refinement
       userPrompt,
       {
@@ -563,6 +656,7 @@ Provide specific improvements to increase the plan's success probability and rob
         timeout: 5000, // 5 seconds for faster response
       }
     );
+    stageProvenance.push(provenance);
 
     return {
       ...plan,
@@ -576,7 +670,7 @@ Provide specific improvements to increase the plan's success probability and rob
   /**
    * Generate BT-DSL from refined plan
    */
-  private async generateBTDSL(plan: any, request: any): Promise<any> {
+  private async generateBTDSL(plan: any, request: any, stageProvenance: SidecarCallProvenance[]): Promise<any> {
     const systemPrompt = `Convert the following execution plan into structured Behavior Tree Domain Specific Language (BT-DSL) JSON.
 
 Available node types:
@@ -602,7 +696,7 @@ Recent failures: ${request.recentFailures.map((f: ExecError) => f.detail).join('
 
 Generate a BT-DSL JSON structure that implements this plan using the available node types and sensor predicates.`;
 
-    const response = await this.ollamaClient.generate(
+    const { response: btResponse, provenance } = await this.sidecarClient.generate(
       this.config.detailedExecutor.model,
       userPrompt,
       {
@@ -612,10 +706,11 @@ Generate a BT-DSL JSON structure that implements this plan using the available n
         timeout: 5000, // 5 seconds for faster response
       }
     );
+    stageProvenance.push(provenance);
 
     try {
       // Extract JSON from response
-      const jsonMatch = response.response.match(/\{[\s\S]*\}/);
+      const jsonMatch = btResponse.response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       } else {
@@ -677,6 +772,6 @@ Generate a BT-DSL JSON structure that implements this plan using the available n
    * Test model availability
    */
   async testModelAvailability(modelName: string): Promise<boolean> {
-    return await this.ollamaClient.isModelAvailable(modelName);
+    return await this.sidecarClient.isModelAvailable(modelName);
   }
 }

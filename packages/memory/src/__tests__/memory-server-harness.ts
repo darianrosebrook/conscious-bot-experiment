@@ -3,7 +3,7 @@ import { httpGet, waitForEndpoint } from './e2e-helpers';
 
 export type MemoryHarnessConfig = {
   port: number;
-  ollamaHost: string;
+  sidecarUrl: string;
   worldSeed: string;
 
   // Postgres env (expected to be supplied by test runner environment)
@@ -42,7 +42,8 @@ export class MemoryServerHarness {
       ...process.env,
       NODE_ENV: 'test',
       PORT: String(this.cfg.port),
-      OLLAMA_HOST: this.cfg.ollamaHost,
+      LLM_SIDECAR_URL: this.cfg.sidecarUrl,
+      OLLAMA_HOST: this.cfg.sidecarUrl, // deprecated fallback
       WORLD_SEED: this.cfg.worldSeed,
       MEMORY_DEV_DEFAULT_SEED: 'true',
 

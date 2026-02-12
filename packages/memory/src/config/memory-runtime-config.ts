@@ -8,7 +8,12 @@
  * - PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DATABASE
  * - MLX_SIDECAR_HOST/UMAP_SERVICE_HOST, MLX_SIDECAR_PORT/UMAP_SERVICE_PORT
  * - MEMORY_ALLOW_DEDUPE_CLEANUP (false)
- * - MEMORY_* and OLLAMA_* (see buildMemorySystemConfig)
+ * - MEMORY_* (see buildMemorySystemConfig)
+ *
+ * Sidecar URL precedence (for embedding backend):
+ *   1. LLM_SIDECAR_URL  — canonical full URL
+ *   2. OLLAMA_HOST       — deprecated fallback
+ *   3. http://localhost:5002 — default
  *
  * @author @darianrosebrook
  */
@@ -101,7 +106,7 @@ function buildMemorySystemBaseFromEnv(): Omit<
     password: process.env.PG_PASSWORD || 'secure_password',
     database: process.env.PG_DATABASE || 'conscious_bot',
     vectorDbTableName: 'memory_chunks',
-    ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
+    sidecarUrl: process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002',
     embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
     embeddingDimension: parseInt(
       process.env.MEMORY_EMBEDDING_DIMENSION || '768'

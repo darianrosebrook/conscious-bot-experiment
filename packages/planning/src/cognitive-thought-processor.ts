@@ -16,6 +16,9 @@ import {
   MCPIntegration,
 } from './modules/mcp-integration';
 import { auditLogger } from '@conscious-bot/cognition';
+import type { TaskHistoryProvider } from './task-history-provider';
+import { NullTaskHistoryProvider } from './task-history-provider';
+import type { RecentTaskItem, TaskHistoryProvenance } from './types/task-history';
 
 export interface CognitiveThought {
   type:
@@ -276,8 +279,14 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private recentTaskKeys: Map<string, number> = new Map(); // key -> ts
   private recentTaskTTLms: number = 60_000; // de-dupe window (increased to 1 minute)
   private maxActiveTasks: number = 3; // Maximum active tasks to prevent overload
+  private cachedActiveTasks: any[] = []; // Cached from shouldCreateNewTasks polling
+  private taskHistoryProvider: TaskHistoryProvider;
+  /** Last task-history provenance for diagnostics (not injected into prompts). */
+  private lastTaskHistoryProvenance?: TaskHistoryProvenance;
+  /** One-shot flag: warn once if NullProvider is hit during active thought processing. */
+  private _nullProviderWarned = false;
 
-  constructor(config: Partial<CognitiveThoughtProcessorConfig> = {}) {
+  constructor(config: Partial<CognitiveThoughtProcessorConfig> = {}, deps?: { taskHistoryProvider?: TaskHistoryProvider }) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.planning = new HttpPlanningClient(this.config.planningEndpoint);
@@ -287,6 +296,16 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     if (this.config.enableMemoryIntegration && this.config.memoryEndpoint) {
       this.memory = new HttpMemoryClient(this.config.memoryEndpoint);
     }
+
+    // Task history provider (DI seam — tests can inject mock, production uses DirectTaskHistoryProvider)
+    this.taskHistoryProvider = deps?.taskHistoryProvider || new NullTaskHistoryProvider();
+  }
+
+  /**
+   * Late-bind a task history provider (when taskIntegration is created after this instance).
+   */
+  setTaskHistoryProvider(provider: TaskHistoryProvider): void {
+    this.taskHistoryProvider = provider;
   }
 
   /**
@@ -303,6 +322,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private async shouldCreateNewTasks(): Promise<boolean> {
     try {
       const activeTasks = await this.planning.getActiveTasks();
+      this.cachedActiveTasks = activeTasks; // Cache for getRecentTaskHistory
       const activeCount = activeTasks.filter(
         (task: any) => task.status === 'pending' || task.status === 'active'
       ).length;
@@ -1162,12 +1182,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     // 1. Get memory context if memory client is available
     if (this.memory) {
       try {
+        const recentTasks = await this.getRecentTaskHistory(5);
         const memoryContext = await this.memory.getMemoryContext({
           query: thought.content,
           taskType: thought.category,
           entities: this.extractEntitiesFromThought(thought),
           location: this.worldState?.location,
-          recentEvents: this.getRecentTaskHistory(5),
+          recentEvents: recentTasks,
           maxMemories: 3,
         });
 
@@ -1261,9 +1282,52 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
   /**
    * Get recent task history for memory context.
-   * PLACEHOLDER: real task history not integrated; returns empty until task store or planning API is wired.
+   *
+   * Uses the injected TaskHistoryProvider for a prompt-safe, provenance-rich
+   * snapshot of recent tasks. Falls back to cached active tasks if the provider
+   * returns empty (e.g., during startup before the first poll).
+   *
+   * Provenance is stored on `this.lastTaskHistoryProvenance` for diagnostics
+   * but is NOT included in the prompt payload (TASK-HIST-2).
+   *
+   * @see docs-status/architecture-decisions.md DR-H9
    */
-  private getRecentTaskHistory(_limit: number): any[] {
+  private async getRecentTaskHistory(limit: number): Promise<RecentTaskItem[]> {
+    const snap = await this.taskHistoryProvider.getRecent(limit);
+    this.lastTaskHistoryProvenance = snap.provenance;
+
+    // Fix 4: One-time warning when the Null provider is still active during
+    // thought generation. Gates on provider identity (instanceof), not provenance,
+    // so HTTP/Direct failures don't false-positive this warning.
+    if (
+      !this._nullProviderWarned &&
+      this.taskHistoryProvider instanceof NullTaskHistoryProvider
+    ) {
+      this._nullProviderWarned = true;
+      console.warn(
+        `⚠️ [CognitiveThoughtProcessor] Task history provider not configured — ` +
+        `thought generation is running without task context. ` +
+        `Call setTaskHistoryProvider() after bootstrap completes.`
+      );
+    }
+
+    if (snap.ok && snap.tasks.length > 0) {
+      return snap.tasks;
+    }
+
+    // Fallback: use cached active tasks from shouldCreateNewTasks() polling
+    if (this.cachedActiveTasks.length > 0) {
+      return this.cachedActiveTasks
+        .slice(0, limit)
+        .map((task: any) => ({
+          id: task.id || 'unknown',
+          title: task.title || task.description || task.name || 'unknown task',
+          status: (task.status || 'unknown') as RecentTaskItem['status'],
+          createdAt: task.metadata?.createdAt || task.createdAt,
+          updatedAt: task.metadata?.updatedAt || task.updatedAt || Date.now(),
+        }));
+    }
+
     return [];
   }
 

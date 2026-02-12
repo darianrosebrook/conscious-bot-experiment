@@ -1,8 +1,17 @@
 /**
  * LLM interface for cognitive core integration.
  *
- * Provides unified interface for interacting with local LLMs through Ollama,
- * with fallback mechanisms and performance optimization.
+ * Provides unified interface for interacting with the MLX-LM sidecar
+ * (Ollama-compatible HTTP dialect), with fallback mechanisms and performance optimization.
+ *
+ * Sidecar URL resolution (precedence):
+ *   1. LLM_SIDECAR_URL          — canonical full URL (e.g. http://localhost:5002)
+ *   2. OLLAMA_HOST               — deprecated full URL fallback (shared across packages)
+ *   3. COGNITION_LLM_HOST + COGNITION_LLM_PORT   — legacy host+port split (cognition-specific, two separate vars)
+ *   4. localhost:5002             — default
+ *
+ * Other env vars consumed:
+ *   COGNITION_LLM_TIMEOUT_MS — sidecar call timeout (default: 45000ms)
  *
  * @author @darianrosebrook
  */
@@ -46,7 +55,8 @@ function stripGuillemets(text: string): string {
 }
 
 /**
- * Ollama API client for local LLM interaction
+ * MLX-LM sidecar client for local LLM interaction.
+ * Speaks Ollama-compatible HTTP at /api/generate.
  */
 export class LLMInterface {
   private config: LLMConfig;
@@ -65,14 +75,25 @@ export class LLMInterface {
   private readonly languageIOClient: SterlingLanguageIOClient;
 
   constructor(config: Partial<LLMConfig> = {}, deps?: LLMInterfaceDeps) {
+    // Sidecar URL resolution (precedence):
+    //   1. LLM_SIDECAR_URL          — canonical full URL (e.g. http://localhost:5002)
+    //   2. OLLAMA_HOST               — deprecated full URL fallback (shared across packages)
+    //   3. COGNITION_LLM_HOST + COGNITION_LLM_PORT   — legacy host+port split (cognition-specific)
+    //   4. localhost:5002             — default
+    const _sidecarUrl = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST;
+    const _defaultHost = _sidecarUrl
+      ? new URL(_sidecarUrl).hostname
+      : (process.env.COGNITION_LLM_HOST ?? 'localhost');
+    const _defaultPort = _sidecarUrl
+      ? parseInt(new URL(_sidecarUrl).port || '5002', 10)
+      : (process.env.COGNITION_LLM_PORT ? parseInt(process.env.COGNITION_LLM_PORT, 10) : 5002);
+
     const defaultConfig: LLMConfig = {
       provider: 'mlx',
       model: 'gemma3n:e2b',
       fallbackModel: 'qwen3:4b',
-      host: process.env.COGNITION_LLM_HOST ?? 'localhost',
-      port: process.env.COGNITION_LLM_PORT
-        ? parseInt(process.env.COGNITION_LLM_PORT, 10)
-        : 5002,
+      host: _defaultHost,
+      port: _defaultPort,
       maxTokens: 2048,
       temperature: 0.7,
       timeout: process.env.COGNITION_LLM_TIMEOUT_MS
@@ -133,7 +154,7 @@ export class LLMInterface {
       process.env.COGNITION_LLM_BENCHMARK === 'true';
 
     try {
-      const response = await this.callOllama(model, fullPrompt, {
+      const response = await this.callSidecar(model, fullPrompt, {
         temperature,
         maxTokens,
         signal: options?.signal,
@@ -172,7 +193,7 @@ export class LLMInterface {
       // Quality gate: check if content is usable for TTS (non-semantic check)
       if (!isUsableForTTS(displayText)) {
         // Single quality retry — slightly bumped temperature, no recursive check
-        const retryResponse = await this.callOllama(model, fullPrompt, {
+        const retryResponse = await this.callSidecar(model, fullPrompt, {
           temperature: Math.min(temperature + 0.1, 1.0),
           maxTokens,
           signal: options?.signal,
@@ -228,7 +249,7 @@ export class LLMInterface {
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
 
-          const retryResp = await this.callOllama(model, fullPrompt, {
+          const retryResp = await this.callSidecar(model, fullPrompt, {
             temperature,
             maxTokens,
             signal: options?.signal,
@@ -523,9 +544,9 @@ Please analyze this situation and provide ethical guidance, including:
   }
 
   /**
-   * Call Ollama API
+   * Call MLX-LM sidecar API (Ollama-compatible HTTP dialect)
    */
-  private async callOllama(
+  private async callSidecar(
     model: string,
     prompt: string,
     options: {
@@ -593,7 +614,7 @@ Please analyze this situation and provide ethical guidance, including:
           }
         }
         throw new Error(
-          `Ollama API error: ${response.status} ${response.statusText}`
+          `Sidecar API error: ${response.status} ${response.statusText}`
         );
       }
 

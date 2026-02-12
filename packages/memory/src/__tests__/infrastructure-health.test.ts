@@ -61,8 +61,8 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('Ollama service is accessible', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
-    const response = await fetch(`${ollamaHost}/api/tags`);
+    const sidecarUrl = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002';
+    const response = await fetch(`${sidecarUrl}/api/tags`);
     expect(response.ok).toBe(true);
 
     const data = (await response.json()) as { models: any[] };
@@ -71,8 +71,8 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('embeddinggemma model is available', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
-    const response = await fetch(`${ollamaHost}/api/tags`);
+    const sidecarUrl = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002';
+    const response = await fetch(`${sidecarUrl}/api/tags`);
     const data = (await response.json()) as { models: any[] };
 
     const embeddingModel = data.models.find((m: any) =>
@@ -82,8 +82,8 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('gemma3n:e2b generation model is available', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
-    const response = await fetch(`${ollamaHost}/api/tags`);
+    const sidecarUrl = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002';
+    const response = await fetch(`${sidecarUrl}/api/tags`);
     const data = (await response.json()) as { models: any[] };
 
     const generationModel = data.models.find((m: any) =>
@@ -93,8 +93,8 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('can generate embeddings via MLX sidecar', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
-    const response = await fetch(`${ollamaHost}/api/embeddings`, {
+    const sidecarUrl = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002';
+    const response = await fetch(`${sidecarUrl}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

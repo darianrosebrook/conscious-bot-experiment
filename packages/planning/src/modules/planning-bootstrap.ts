@@ -10,6 +10,7 @@
 import type { ITaskIntegration } from '../interfaces/task-integration';
 import type { IGoalManager } from '../interfaces/goal-manager';
 import type { IReactiveExecutor } from '../interfaces/reactive-executor';
+import type { WorldStateManager } from '../world-state/world-state-manager';
 import { TaskIntegration } from '../task-integration';
 import { GoalManager } from '../goal-formulation/goal-manager';
 import { ReactiveExecutor } from '../reactive-executor/reactive-executor';
@@ -18,6 +19,7 @@ export interface PlanningBootstrapOverrides {
   taskIntegration?: ITaskIntegration;
   goalManager?: IGoalManager;
   reactiveExecutor?: IReactiveExecutor;
+  worldStateManager?: WorldStateManager;
 }
 
 export interface PlanningBootstrapConfig {
@@ -56,7 +58,12 @@ export function createPlanningBootstrap(
 
   const goalManager = overrides?.goalManager ?? new GoalManager();
   const reactiveExecutor =
-    overrides?.reactiveExecutor ?? new ReactiveExecutor();
+    overrides?.reactiveExecutor ??
+    new ReactiveExecutor(
+      overrides?.worldStateManager
+        ? { worldStateManager: overrides.worldStateManager }
+        : undefined
+    );
 
   return { taskIntegration, goalManager, reactiveExecutor };
 }

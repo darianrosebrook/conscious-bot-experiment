@@ -146,7 +146,7 @@ describe.skipIf(!MEMORY_E2E)('Memory E2E: Lane A (deterministic)', () => {
 
     harness = new MemoryServerHarness({
       port: memoryPort,
-      ollamaHost: sidecar.baseUrl(),
+      sidecarUrl: sidecar.baseUrl(),
       worldSeed,
 
       pgHost: requireEnv('PG_HOST'),

@@ -122,8 +122,8 @@ export type {
   RollbackResult,
 } from './mcp-capabilities/types';
 // LLM
-export { OllamaClient } from './llm/ollama-client';
-export type { OllamaClientConfig } from './llm/ollama-client';
+export { SidecarLLMClient, OllamaClient } from './llm/sidecar-client';
+export type { SidecarLLMClientConfig, OllamaClientConfig } from './llm/sidecar-client';
 
 // Logging configuration
 export * from './logging/config';

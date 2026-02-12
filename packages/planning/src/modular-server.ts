@@ -311,6 +311,7 @@ let minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
 let minecraftNavigationSolver: MinecraftNavigationSolver | undefined;
 import { MemoryIntegration } from './memory-integration';
 import { createPlanningBootstrap } from './modules/planning-bootstrap';
+import { DirectTaskHistoryProvider } from './task-history-provider';
 import { EnvironmentIntegration } from './environment-integration';
 import { LiveStreamIntegration } from './live-stream-integration';
 import { GoalStatus } from './types';
@@ -3122,7 +3123,12 @@ worldStateManager.on('updated', (snapshot) => {
 // Sterling solvers + deterministic compiler are the canonical planning backends.
 
 const { goalManager, reactiveExecutor, taskIntegration } =
-  createPlanningBootstrap();
+  createPlanningBootstrap({ worldStateManager });
+
+// Wire task history provider into cognitive thought processor (DR-H9: task context for reasoning)
+cognitiveThoughtProcessor.setTaskHistoryProvider(
+  new DirectTaskHistoryProvider(taskIntegration)
+);
 
 // Wire cached inventory provider so verification can skip HTTP when fresh data exists
 taskIntegration.setInventoryProvider?.(() => {

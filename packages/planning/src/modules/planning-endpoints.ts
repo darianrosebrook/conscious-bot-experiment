@@ -22,6 +22,7 @@ import {
   buildPlanningBanner,
 } from '../planning-runtime-config';
 import { mapBTActionToMinecraft } from './action-mapping';
+import { normalizeTaskStatus, bestUpdatedAtMs } from '../task-history-utils';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -887,6 +888,70 @@ export function createPlanningEndpoints(
         success: false,
         error: 'Failed to get tasks',
         details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // GET /tasks/recent — Prompt-safe recent task history (DR-H9: TASK-HIST-3)
+  // Returns a bounded, sorted list of recent tasks for thought generation context.
+  // Sort: updatedAt DESC, id DESC (stable tie-break). Cap: 50 max.
+  router.get('/tasks/recent', (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string, 10) || 10, 50);
+      const MAX_TITLE = 120;
+      const MAX_SUMMARY = 200;
+
+      const currentTasks: any[] = planningSystem.goalFormulation.getCurrentTasks();
+      const completedTasks: any[] = planningSystem.goalFormulation.getCompletedTasks();
+
+      // Combine, deduplicate by id
+      const seen = new Set<string>();
+      const all = [...currentTasks, ...completedTasks].filter((t) => {
+        if (!t?.id || seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+
+      // Sort: bestUpdatedAt DESC, id DESC — fallback chain (TASK-HIST-3)
+      all.sort((a, b) => {
+        const aUp = bestUpdatedAtMs(a.metadata);
+        const bUp = bestUpdatedAtMs(b.metadata);
+        if (aUp !== bUp) return bUp - aUp;
+        return (b.id || '').localeCompare(a.id || '');
+      });
+
+      // Map to prompt-safe shape — single-authority status normalization
+      const tasks = all.slice(0, limit).map((t: any) => {
+        const item: Record<string, any> = {
+          id: t.id,
+          title: t.title?.slice(0, MAX_TITLE),
+          status: normalizeTaskStatus(t.status),
+          createdAt: t.metadata?.createdAt,
+          updatedAt: bestUpdatedAtMs(t.metadata),
+          startedAt: t.metadata?.startedAt,
+          finishedAt: t.metadata?.completedAt,
+          attemptCount: t.metadata?.retryCount,
+        };
+
+        if (t.status === 'completed') {
+          const lastStep = t.steps?.[t.steps.length - 1];
+          item.outcomeSummary = lastStep?.label?.slice(0, MAX_SUMMARY) || 'completed';
+        } else if (t.status === 'failed') {
+          item.errorSummary =
+            t.metadata?.failureError?.message?.slice(0, MAX_SUMMARY) ||
+            t.metadata?.failureCode ||
+            'failed';
+        }
+
+        return item;
+      });
+
+      res.json({ tasks });
+    } catch (error) {
+      console.error('Failed to get recent tasks:', error);
+      res.status(500).json({
+        tasks: [],
+        error: 'Failed to get recent tasks',
       });
     }
   });

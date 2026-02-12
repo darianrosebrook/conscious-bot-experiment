@@ -255,12 +255,8 @@ export {
 export {
   classifyOutcome,
   extractSolveJoinKeys,
-  // Canonical linkage builders (use these)
   buildSterlingEpisodeLinkage,
   buildSterlingEpisodeLinkageFromResult,
-  // Legacy aliases (deprecated, for backward compat)
-  buildEpisodeLinkage,
-  buildEpisodeLinkageFromResult,
 } from './episode-classification';
 
 // P21 Primitive Capsule (contract types + reference fixtures only)

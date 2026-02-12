@@ -14,7 +14,9 @@ export { ConstitutionalFilter } from './constitutional-filter';
 export { DynamicCreationFlow } from './dynamic-creation-flow';
 
 // Types
-export type { ImpasseResult } from './dynamic-creation-flow';
+export type { ImpasseResult, OptionProposalLLM, OptionProposalResponse, ProposalHistoryEntry } from './dynamic-creation-flow';
+export type { SidecarCallProvenance, SidecarGenerateResult } from './llm-integration';
+export type { ReductionResult, ReductionClient } from './reduction-client';
 export type { RegistryStatus, ShadowRunResult } from './types';
 
 // Leaf Contract System

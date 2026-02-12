@@ -16,7 +16,7 @@ Dataflow for how inputs reach the MLX sidecar, how they are prioritized and rout
 | Minecraft Interface | 3005 | Bot, chat, entity/event detection |
 | MLX-LM Sidecar      | 5002 | Single-process LLM (generate/embed); one request at a time |
 
-All Cognition-originated LLM calls use `LLMInterface` (or subclasses), which by default target `COGNITION_LLM_HOST:COGNITION_LLM_PORT` (e.g. localhost:5002). The sidecar exposes `/api/generate` (and optionally `/api/embed`); it holds a single GPU lock so requests are serialized at the backend.
+All Cognition-originated LLM calls use `LLMInterface` (or subclasses), which by default target `LLM_SIDECAR_URL` (canonical), falling back to `OLLAMA_HOST`, then `COGNITION_LLM_HOST` + `COGNITION_LLM_PORT` (e.g. localhost:5002). The sidecar exposes `/api/generate` (and optionally `/api/embed`); it holds a single GPU lock so requests are serialized at the backend.
 
 ---
 

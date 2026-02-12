@@ -152,6 +152,3 @@ export async function createCustomMemorySystem(
 // Integration Examples
 // ============================================================================
 
-// Comprehensive integration examples showing how to use the enhanced memory system
-// Note: Exported types may conflict with local definitions above
-// export * from './integration-examples';

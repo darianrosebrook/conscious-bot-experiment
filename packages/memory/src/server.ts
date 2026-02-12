@@ -58,7 +58,7 @@ type DegradedReason =
 //   2. /ready health checks
 // ============================================================================
 const embeddingBackend: EmbeddingBackend = new SidecarEmbeddingBackend(
-  process.env.OLLAMA_HOST || 'http://localhost:5002',
+  process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002',
   10_000
 );
 

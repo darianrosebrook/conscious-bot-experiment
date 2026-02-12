@@ -20,8 +20,15 @@ import { z } from 'zod';
 // Embedding Backend Abstraction (provider-agnostic)
 // ============================================================================
 
+export interface EmbeddingBackendResult {
+  embedding: number[];
+  model?: string;
+  dim?: number;
+  latencyMs?: number;
+}
+
 export interface EmbeddingBackend {
-  embed(text: string, modelId: string): Promise<{ embedding: number[] }>;
+  embed(text: string, modelId: string): Promise<EmbeddingBackendResult>;
   health(): Promise<{ ok: boolean; provider: string; error?: string }>;
 }
 
@@ -31,7 +38,8 @@ export class SidecarEmbeddingBackend implements EmbeddingBackend {
     private timeoutMs: number = 10_000
   ) {}
 
-  async embed(text: string, modelId: string): Promise<{ embedding: number[] }> {
+  async embed(text: string, modelId: string): Promise<EmbeddingBackendResult> {
+    const startMs = Date.now();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -43,7 +51,13 @@ export class SidecarEmbeddingBackend implements EmbeddingBackend {
       });
       if (!response.ok) throw new Error(`Sidecar API error: ${response.statusText}`);
       const data = (await response.json()) as { embedding: number[] };
-      return { embedding: data.embedding || [] };
+      const embedding = data.embedding || [];
+      return {
+        embedding,
+        model: modelId,
+        dim: embedding.length,
+        latencyMs: Date.now() - startMs,
+      };
     } finally {
       clearTimeout(timeout);
     }
@@ -92,8 +106,8 @@ export interface EmbeddingResult {
 }
 
 export interface EmbeddingServiceConfig {
-  ollamaHost: string;
-  ollamaTimeoutMs: number;
+  sidecarUrl: string;
+  sidecarTimeoutMs: number;
   embeddingModel: string;
   dimension: number;
   maxRetries: number;
@@ -138,8 +152,8 @@ export interface EmbeddingQualityAnalysis {
 }
 
 const DEFAULT_CONFIG: Required<EmbeddingServiceConfig> = {
-  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
-  ollamaTimeoutMs: 10_000,
+  sidecarUrl: process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002',
+  sidecarTimeoutMs: 10_000,
   embeddingModel: 'embeddinggemma',
   dimension: 768,
   maxRetries: 3,
@@ -220,7 +234,7 @@ export class EmbeddingService {
 
   constructor(config: Partial<EmbeddingServiceConfig> = {}, backend?: EmbeddingBackend) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.backend = backend ?? new SidecarEmbeddingBackend(this.config.ollamaHost, this.config.ollamaTimeoutMs);
+    this.backend = backend ?? new SidecarEmbeddingBackend(this.config.sidecarUrl, this.config.sidecarTimeoutMs);
   }
 
   /**

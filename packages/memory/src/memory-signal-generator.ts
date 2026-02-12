@@ -309,17 +309,110 @@ export class MemorySignalGenerator {
   // ============================================================================
 
   private async findSalientMemories(context: any): Promise<SalientMemory[]> {
-    // This would integrate with the enhanced memory system to find salient memories
-    // For now, return empty array as placeholder
-    console.log('🔍 Finding salient memories (placeholder implementation)');
+    try {
+      // Build a query from recent events, goals, and emotional state
+      const queryParts: string[] = [];
+      if (context.recentEvents?.length) {
+        queryParts.push(context.recentEvents.slice(0, 3).join(', '));
+      }
+      if (context.currentGoals?.length) {
+        queryParts.push(context.currentGoals.slice(0, 2).join(', '));
+      }
+      if (context.emotionalState) {
+        queryParts.push(context.emotionalState);
+      }
 
-    // In a real implementation, this would:
-    // 1. Query the memory system for memories with high salience
-    // 2. Apply context-based relevance boosts
-    // 3. Filter by memory type and recency
-    // 4. Calculate suggested actions based on memory content
+      // Fall back to a broad recency query if no context is available
+      const query = queryParts.length > 0
+        ? queryParts.join(' ')
+        : 'recent experiences and observations';
 
-    return [];
+      const searchResponse = await this.memorySystem.searchMemories({
+        query,
+        types: this.config.allowedMemoryTypes,
+        limit: this.config.maxSignalsPerScan * 2, // fetch extra, filter by salience
+        minConfidence: this.config.minSalienceThreshold,
+        maxAge: 3600000, // 1 hour — focus on recent memories
+        world: context.world,
+        smartMode: true,
+      });
+
+      if (!searchResponse?.results?.length) {
+        return [];
+      }
+
+      // Map search results to SalientMemory with context-based relevance boosts
+      const salientMemories: SalientMemory[] = searchResponse.results
+        .map((result) => {
+          let salience = result.score || result.hybridScore || 0;
+
+          // Apply context boosts
+          if (context.world && result.metadata?.world === context.world) {
+            salience += this.config.contextBoosts.sameWorldBoost;
+          }
+          if (result.temporalContext?.timestamp) {
+            const ageMs = Date.now() - result.temporalContext.timestamp;
+            if (ageMs < 300000) { // < 5 min
+              salience += this.config.contextBoosts.recentMemoryBoost;
+            }
+          }
+
+          // Map memory type from metadata
+          const typeStr = result.metadata?.type || 'experience';
+          const memoryType = Object.values(MemoryType).includes(typeStr as MemoryType)
+            ? (typeStr as MemoryType)
+            : MemoryType.EXPERIENCE;
+
+          // Derive emotional impact from sentiment
+          const emotionalImpact = result.metadata?.sentiment === 'negative' ? -0.5
+            : result.metadata?.sentiment === 'positive' ? 0.5
+            : 0;
+
+          return {
+            id: result.id,
+            content: result.content,
+            type: memoryType,
+            salience: Math.min(1, salience),
+            emotionalImpact,
+            lastAccessed: result.temporalContext?.timestamp ?? Date.now(),
+            contextRelevance: result.score || 0,
+            suggestedAction: this.inferAction(result.content, memoryType),
+            urgency: salience > 0.7 ? 0.8 : salience > 0.5 ? 0.5 : 0.2,
+            metadata: result.metadata || {},
+          };
+        })
+        .filter((m) => m.salience >= this.config.minSalienceThreshold)
+        .slice(0, this.config.maxSignalsPerScan);
+
+      return salientMemories;
+    } catch (error) {
+      console.warn(
+        '[MemorySignalGenerator] findSalientMemories failed, returning empty:',
+        error instanceof Error ? error.message : String(error)
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Infer a suggested action from memory content and type.
+   * Simple heuristic — maps memory type to action category.
+   */
+  private inferAction(content: string, type: MemoryType): string {
+    switch (type) {
+      case MemoryType.EMOTIONAL:
+        return 'process_emotion';
+      case MemoryType.PROCEDURAL:
+        return 'apply_skill';
+      case MemoryType.KNOWLEDGE:
+        return 'use_knowledge';
+      default:
+        // Check content for danger/threat keywords
+        if (/die|death|damage|hurt|attack|creeper|zombie|skeleton/i.test(content)) {
+          return 'assess_danger';
+        }
+        return 'reflect';
+    }
   }
 
   private async convertToSignals(

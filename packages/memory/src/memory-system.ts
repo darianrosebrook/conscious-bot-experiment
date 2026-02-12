@@ -63,7 +63,7 @@ export interface EnhancedMemorySystemConfig {
   vectorDbTableName?: string;
 
   // Embedding configuration
-  ollamaHost: string;
+  sidecarUrl: string;
   embeddingModel: string;
   embeddingDimension: number;
 
@@ -124,6 +124,55 @@ export interface EnhancedMemorySystemConfig {
   toolEfficiencyThreshold: number;
   toolEfficiencyCleanupInterval: number;
 }
+
+export interface MemoryExportFilter {
+  /** Memory types (metadata->>'type'): 'knowledge', 'experience', etc. */
+  types?: string[];
+  /** Memory subtypes (metadata->>'memorySubtype'): 'reflection', 'lesson', etc. */
+  subtypes?: string[];
+  /** Max rows per category. Default: 500 */
+  limit?: number;
+}
+
+// ---------------------------------------------------------------------------
+// ADR-004: Versioned backup bundle envelope
+// ---------------------------------------------------------------------------
+
+export const MEMORY_BACKUP_SCHEMA_VERSION = 1 as const;
+
+export interface MemoryBackupBundleV1 {
+  schemaVersion: typeof MEMORY_BACKUP_SCHEMA_VERSION;
+  exportedAtMs: number;
+  selection: {
+    types?: string[];
+    subtypes?: string[];
+    limit: number;
+  };
+  counts: {
+    byType: Record<string, number>;
+    bySubtype: Record<string, number>;
+    total: number;
+  };
+  chunks: EnhancedMemoryChunk[];
+}
+
+export type MemoryBackupBundle = MemoryBackupBundleV1;
+
+export type MemoryExportResult =
+  | {
+      ok: true;
+      memories: EnhancedMemoryChunk[];
+      counts: {
+        byType: Record<string, number>;
+        bySubtype: Record<string, number>;
+      };
+      bundle: MemoryBackupBundleV1;
+    }
+  | {
+      ok: false;
+      error: string;
+      memories: EnhancedMemoryChunk[];
+    };
 
 export interface MemoryIngestionOptions {
   type: 'experience' | 'thought' | 'knowledge' | 'observation' | 'dialogue';
@@ -289,7 +338,7 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     this.embeddingService = new EmbeddingService(
       {
-        ollamaHost: config.ollamaHost,
+        sidecarUrl: config.sidecarUrl,
         embeddingModel: config.embeddingModel,
         dimension: config.embeddingDimension,
       },
@@ -705,22 +754,154 @@ export class EnhancedMemorySystem extends EventEmitter {
   }
 
   /**
-   * Export memories for backup or migration
+   * Export memories for backup or migration.
+   * Uses structured filters to distinguish metadata->>'type' from metadata->>'memorySubtype'.
    */
-  async exportMemories(types?: string[]): Promise<EnhancedMemoryChunk[]> {
-    // This would require a full table scan in production
-    // For now, return empty array as placeholder
-    console.log('📤 Exporting memories...');
-    return [];
+  async exportMemories(
+    filter: MemoryExportFilter
+  ): Promise<MemoryExportResult> {
+    const limit = filter.limit ?? 500;
+
+    if (!filter.types?.length && !filter.subtypes?.length) {
+      console.warn('⚠️ exportMemories: no types or subtypes specified');
+      const emptyBundle: MemoryBackupBundleV1 = {
+        schemaVersion: MEMORY_BACKUP_SCHEMA_VERSION,
+        exportedAtMs: Date.now(),
+        selection: { types: filter.types, subtypes: filter.subtypes, limit },
+        counts: { byType: {}, bySubtype: {}, total: 0 },
+        chunks: [],
+      };
+      return {
+        ok: true,
+        memories: [],
+        counts: { byType: {}, bySubtype: {} },
+        bundle: emptyBundle,
+      };
+    }
+
+    try {
+      const allRows: EnhancedMemoryChunk[] = [];
+
+      // Select newest-first at DB boundary so the limit window tracks recent identity,
+      // then re-sort ASC in-memory for deterministic hash ordering.
+      if (filter.types?.length) {
+        const typeResult = await this.vectorDb.queryByMetadataTypes({
+          types: filter.types,
+          limit,
+          offset: 0,
+          includePlaceholders: false,
+          sortOrder: 'desc',
+        });
+        allRows.push(...typeResult.rows);
+      }
+
+      if (filter.subtypes?.length) {
+        const subtypeResult = await this.vectorDb.queryByMetadataSubtype({
+          subtypes: filter.subtypes,
+          limit,
+          offset: 0,
+          includePlaceholders: false,
+          sortOrder: 'desc',
+        });
+        allRows.push(...subtypeResult.rows);
+      }
+
+      // Deduplicate — a memory could match both filters
+      const seen = new Set<string>();
+      const deduped = allRows.filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+
+      // Sort deterministically: oldest first, id tiebreaker
+      deduped.sort(
+        (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+      );
+
+      // Build counts for observability
+      const byType: Record<string, number> = {};
+      const bySubtype: Record<string, number> = {};
+      for (const m of deduped) {
+        const t = (m.metadata as any)?.type || 'unknown';
+        byType[t] = (byType[t] || 0) + 1;
+        const st = (m.metadata as any)?.memorySubtype;
+        if (st) bySubtype[st] = (bySubtype[st] || 0) + 1;
+      }
+
+      // Suspiciously-empty guardrail
+      if (
+        deduped.length === 0 &&
+        (filter.types?.length || filter.subtypes?.length)
+      ) {
+        console.warn(
+          `⚠️ exportMemories: 0 rows for types=${JSON.stringify(filter.types)}, subtypes=${JSON.stringify(filter.subtypes)}`
+        );
+      }
+
+      // ADR-004: Wrap in versioned bundle envelope
+      const bundle: MemoryBackupBundleV1 = {
+        schemaVersion: MEMORY_BACKUP_SCHEMA_VERSION,
+        exportedAtMs: Date.now(),
+        selection: {
+          types: filter.types,
+          subtypes: filter.subtypes,
+          limit,
+        },
+        counts: {
+          byType,
+          bySubtype,
+          total: deduped.length,
+        },
+        chunks: deduped,
+      };
+
+      console.log(
+        `📤 Exported ${deduped.length} memories (types: ${JSON.stringify(byType)}, subtypes: ${JSON.stringify(bySubtype)})`
+      );
+      return { ok: true, memories: deduped, counts: { byType, bySubtype }, bundle };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('❌ exportMemories failed:', msg);
+      return { ok: false, error: msg, memories: [] };
+    }
   }
 
   /**
-   * Import memories from backup
+   * Import memories from backup (legacy — does NOT preserve timestamps).
+   * Prefer importMemoryBackupBundle() for identity-preservation restores.
    */
   async importMemories(chunks: EnhancedMemoryChunk[]): Promise<number> {
     console.log(`📥 Importing ${chunks.length} memories...`);
     await this.vectorDb.batchUpsertChunks(chunks);
     return chunks.length;
+  }
+
+  /**
+   * Import a versioned backup bundle with timestamp preservation.
+   * ADR-004: Rejects unknown schema versions (fail-closed).
+   * ADR-002: Uses batchRestoreChunks to preserve created_at/updated_at.
+   */
+  async importMemoryBackupBundle(
+    bundle: MemoryBackupBundle
+  ): Promise<number> {
+    if (bundle.schemaVersion !== MEMORY_BACKUP_SCHEMA_VERSION) {
+      throw new Error(
+        `Unsupported memory backup bundle schemaVersion=${(bundle as any).schemaVersion}. ` +
+          `Supported: ${MEMORY_BACKUP_SCHEMA_VERSION}`
+      );
+    }
+
+    if (!bundle.chunks?.length) {
+      console.warn('⚠️ importMemoryBackupBundle: bundle contains 0 chunks');
+      return 0;
+    }
+
+    console.log(
+      `📥 Importing backup bundle v${bundle.schemaVersion}: ${bundle.chunks.length} chunks (timestamp-preserving)`
+    );
+    await this.vectorDb.batchRestoreChunks(bundle.chunks);
+    return bundle.chunks.length;
   }
 
   /**
@@ -2115,14 +2296,39 @@ export class EnhancedMemorySystem extends EventEmitter {
       if (this.isRecoveryMode) return; // Don't backup during recovery
 
       // Backup core identity memories
-      const coreMemories = await this.exportMemories([
-        'knowledge',
-        'reflection',
-      ]);
+      // types = metadata->>'type', subtypes = metadata->>'memorySubtype'
+      const exportResult = await this.exportMemories({
+        types: ['knowledge'],
+        subtypes: ['reflection', 'lesson', 'narrative_checkpoint'],
+        limit: 500,
+      });
 
-      // Add to backup queue (limit size)
-      this.backupQueue.push(...coreMemories);
+      if (!exportResult.ok) {
+        console.error(
+          `❌ Auto-backup export failed: ${exportResult.error}`
+        );
+        this.emit('auto-backup-failed', { error: exportResult.error });
+        return;
+      }
+
+      const coreMemories = exportResult.memories;
+
+      // Merge into backup queue, deduplicating by id.
+      // New exports overwrite stale entries so the queue reflects current content.
+      // TODO: 1000-row cap is a cliff — cursor-based incremental backup is a follow-up
+      const queueMap = new Map<string, EnhancedMemoryChunk>();
+      for (const chunk of this.backupQueue) {
+        queueMap.set(chunk.id, chunk);
+      }
+      for (const chunk of coreMemories) {
+        queueMap.set(chunk.id, chunk);
+      }
+      // Materialize back to array, sorted canonically for stable iteration
+      this.backupQueue = Array.from(queueMap.values()).sort(
+        (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+      );
       if (this.backupQueue.length > 1000) {
+        // Keep the newest 1000 (tail of ascending sort)
         this.backupQueue = this.backupQueue.slice(-1000);
       }
 
@@ -2497,16 +2703,14 @@ export class EnhancedMemorySystem extends EventEmitter {
       throw new Error('No backup data available');
     }
 
-    console.log(`🔄 Restoring ${this.backupQueue.length} memories from backup`);
+    console.log(
+      `🔄 Restoring ${this.backupQueue.length} memories from backup`
+    );
 
-    // Re-ingest backup memories
-    for (const chunk of this.backupQueue) {
-      try {
-        await this.vectorDb.storeChunk(chunk);
-      } catch (error) {
-        console.warn(`Failed to restore chunk ${chunk.id}:`, error);
-      }
-    }
+    // ADR-002: Use timestamp-preserving restore to maintain chronological ordering.
+    // The old path used storeChunk() which writes NOW() for timestamps,
+    // silently destroying identity ordering on disaster recovery.
+    await this.vectorDb.batchRestoreChunks(this.backupQueue);
 
     console.log('✅ Backup restoration completed');
   }

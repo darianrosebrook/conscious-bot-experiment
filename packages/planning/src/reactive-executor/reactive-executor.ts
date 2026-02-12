@@ -82,6 +82,7 @@ export interface MCPExecutionConfig {
 export interface ReactiveExecutorOptions extends MCPExecutionConfig {
   contextBuilder?: ExecutionContextBuilder;
   realTimeAdapter?: RealTimeAdapter;
+  worldStateManager?: import('../world-state/world-state-manager').WorldStateManager;
 }
 
 /**
@@ -120,6 +121,9 @@ export class ReactiveExecutor implements IReactiveExecutor {
   private mcpConfig?: MCPExecutionConfig;
   private mcpIntegration?: MCPIntegration;
 
+  // World state adapter — when provided, replaces mock world state with real data
+  private worldStateAdapter?: WorldState;
+
   constructor(options?: ReactiveExecutorOptions | MCPExecutionConfig) {
     this.goapPlanner = new GOAPPlanner();
     this.planRepair = new PlanRepair();
@@ -130,6 +134,12 @@ export class ReactiveExecutor implements IReactiveExecutor {
       opts.contextBuilder ?? new DefaultExecutionContextBuilder();
     this.realTimeAdapter =
       opts.realTimeAdapter ?? new DefaultRealTimeAdapter(this.pbiEnforcer);
+
+    // Wire world state from manager if provided
+    if (opts.worldStateManager) {
+      const { createWorldStateFromManager } = require('./world-state-adapter');
+      this.worldStateAdapter = createWorldStateFromManager(opts.worldStateManager) as WorldState;
+    }
 
     this.metrics = this.initializeMetrics();
     this.pbiMetrics = this.initializePBIMetrics();
@@ -1355,8 +1365,8 @@ export class ReactiveExecutor implements IReactiveExecutor {
         airLevel: 300,
       };
 
-      // Create mock world state for PBI
-      const mockWorldState = {
+      // Use real world state from adapter, or fall back to safe defaults
+      const pbiWorldState = this.worldStateAdapter ?? {
         getHealth: () => 20,
         getHunger: () => 20,
         getEnergy: () => 20,
@@ -1364,8 +1374,8 @@ export class ReactiveExecutor implements IReactiveExecutor {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
-        distanceTo: (target: any) => 50,
+        hasItem: (_item: string) => false,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -1376,7 +1386,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
       const pbiResult = await this.pbiEnforcer.executeStep(
         pbiStep,
         executionContext,
-        mockWorldState
+        pbiWorldState
       );
 
       console.log(`📋 PBI Execution Result:`, {
@@ -1638,6 +1648,15 @@ export class ReactiveExecutor implements IReactiveExecutor {
         type: 'action',
       };
     }
+  }
+
+  /**
+   * Get the current world state — uses the real adapter if available,
+   * otherwise returns safe defaults.
+   */
+  getWorldState(): WorldState {
+    if (this.worldStateAdapter) return this.worldStateAdapter;
+    return this.createDefaultWorldState();
   }
 
   /**

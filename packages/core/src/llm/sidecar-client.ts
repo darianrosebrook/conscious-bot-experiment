@@ -1,11 +1,22 @@
 /**
- * Ollama LLM Client
+ * Sidecar LLM Client
  *
- * Minimal client for local Ollama server. Supports /api/generate and
- * OpenAI-compatible /v1/chat/completions when OLLAMA_OPENAI=truish.
+ * Minimal client for local MLX-LM sidecar server. Supports /api/generate and
+ * OpenAI-compatible /v1/chat/completions when LLM_SIDECAR_OPENAI=truish.
+ *
+ * Env vars (precedence order):
+ *   LLM_SIDECAR_URL  — canonical, full URL (e.g. http://localhost:5002)
+ *   OLLAMA_HOST      — deprecated fallback (shared across packages)
+ *   OLLAMA_BASE_URL  — deprecated fallback (legacy, will be removed)
+ *   default          — http://localhost:5002
+ *
+ * Other env vars consumed:
+ *   OLLAMA_MODEL           — default model name (default: llama3.1)
+ *   LLM_SIDECAR_OPENAI     — '1'|'true' to use /v1/chat/completions
+ *   OLLAMA_API_KEY          — bearer token for proxy auth
  */
 
-export type OllamaClientConfig = {
+export type SidecarLLMClientConfig = {
   baseUrl?: string; // e.g., http://localhost:5002
   model?: string; // e.g., llama3.1, qwen2.5, deepseek-r1, etc
   useOpenAICompat?: boolean; // use /v1/chat/completions
@@ -14,7 +25,10 @@ export type OllamaClientConfig = {
   timeoutMs?: number;
 };
 
-export class OllamaClient {
+/** @deprecated Use SidecarLLMClientConfig */
+export type OllamaClientConfig = SidecarLLMClientConfig;
+
+export class SidecarLLMClient {
   private baseUrl: string;
   private model: string;
   private useOpenAI: boolean;
@@ -22,10 +36,10 @@ export class OllamaClient {
   private temperature: number;
   private timeoutMs: number;
 
-  constructor(cfg: OllamaClientConfig = {}) {
-    this.baseUrl = cfg.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:5002';
+  constructor(cfg: SidecarLLMClientConfig = {}) {
+    this.baseUrl = cfg.baseUrl || process.env.LLM_SIDECAR_URL || process.env.OLLAMA_HOST || process.env.OLLAMA_BASE_URL || 'http://localhost:5002';
     this.model = cfg.model || process.env.OLLAMA_MODEL || 'llama3.1';
-    const flag = (process.env.OLLAMA_OPENAI || '').toLowerCase();
+    const flag = (process.env.LLM_SIDECAR_OPENAI || process.env.OLLAMA_OPENAI || '').toLowerCase();
     this.useOpenAI = cfg.useOpenAICompat ?? (flag === '1' || flag === 'true');
     this.apiKey = cfg.apiKey || process.env.OLLAMA_API_KEY;
     this.temperature = cfg.defaultTemperature ?? 0.2;
@@ -41,10 +55,10 @@ export class OllamaClient {
   }): Promise<string> {
     return this.useOpenAI
       ? this.generateOpenAI(options)
-      : this.generateOllama(options);
+      : this.generateNative(options);
   }
 
-  private async generateOllama(options: {
+  private async generateNative(options: {
     prompt: string;
     system?: string;
     temperature?: number;
@@ -72,7 +86,7 @@ export class OllamaClient {
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
-        throw new Error(`Ollama /api/generate HTTP ${res.status}: ${txt}`);
+        throw new Error(`Sidecar /api/generate HTTP ${res.status}: ${txt}`);
       }
       const json = (await res.json()) as any;
       if (typeof json?.response === 'string') return json.response;
@@ -115,7 +129,7 @@ export class OllamaClient {
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
-        throw new Error(`Ollama /v1/chat/completions HTTP ${res.status}: ${txt}`);
+        throw new Error(`Sidecar /v1/chat/completions HTTP ${res.status}: ${txt}`);
       }
       const json = (await res.json()) as any;
       const msg = json?.choices?.[0]?.message?.content;
@@ -127,3 +141,5 @@ export class OllamaClient {
   }
 }
 
+/** @deprecated Use SidecarLLMClient */
+export const OllamaClient = SidecarLLMClient;

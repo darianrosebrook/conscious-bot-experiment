@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-02-11T02:21:47.554Z",
+  "context": "ci",
+  "files_scoped": 1773,
+  "warnings": [],
+  "violations": [],
+  "waivers": {
+    "active": 0,
+    "applied": 0,
+    "details": []
+  },
+  "performance": {
+    "total_execution_time_ms": 514728,
+    "gate_timings": {
+      "hidden-todo": 513876
+    },
+    "cache": {
+      "totalHits": 0,
+      "totalMisses": 0,
+      "totalWrites": 0,
+      "caches": {},
+      "overallHitRate": "0%"
+    }
+  }
+}

@@ -216,22 +216,3 @@ export function buildSterlingEpisodeLinkageFromResult(
   return { linkage, classified };
 }
 
-// ============================================================================
-// Legacy Aliases (for backward compatibility during migration)
-// TODO(2026-03-01): Remove these aliases and update all call sites to use
-// buildSterlingEpisodeLinkage / buildSterlingEpisodeLinkageFromResult directly.
-// ============================================================================
-
-/**
- * @deprecated Use buildSterlingEpisodeLinkage instead. This alias exists for
- * backward compatibility and will be removed after 2026-03-01.
- */
-// TODO(2026-03-01): remove alias
-export const buildEpisodeLinkage = buildSterlingEpisodeLinkage;
-
-/**
- * @deprecated Use buildSterlingEpisodeLinkageFromResult instead. This alias exists for
- * backward compatibility and will be removed after 2026-03-01.
- */
-// TODO(2026-03-01): remove alias
-export const buildEpisodeLinkageFromResult = buildSterlingEpisodeLinkageFromResult;

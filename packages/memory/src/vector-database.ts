@@ -1082,7 +1082,13 @@ export class EnhancedVectorDatabase {
   }
 
   /**
-   * Batch insert/update multiple chunks
+   * Batch insert/update multiple chunks.
+   *
+   * WARNING: Transaction wrapper is ineffective — upsertChunk() acquires its own
+   * client from the pool, so BEGIN/COMMIT on `client` here does not bracket the
+   * actual writes. A mid-batch failure will NOT rollback earlier inserts.
+   * See ADR-002 for the transactional pattern; batchRestoreChunks() is the
+   * reference implementation (single client + private helper).
    */
   async batchUpsertChunks(chunks: EnhancedMemoryChunk[]): Promise<void> {
     if (chunks.length === 0) return;
@@ -1321,6 +1327,158 @@ export class EnhancedVectorDatabase {
     return this.upsertChunk(chunk);
   }
 
+  // ---------------------------------------------------------------------------
+  // ADR-002: Timestamp-preserving restore path
+  // ---------------------------------------------------------------------------
+  // Unlike upsertChunk (which writes NOW() for timestamps), these methods
+  // preserve created_at / updated_at from the bundle. Use for disaster recovery
+  // and identity-preservation restore only.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Restore a single chunk preserving its original timestamps.
+   * (ADR-002, rig-I-memory-restore-1)
+   *
+   * INSERT: writes explicit created_at/updated_at from the chunk.
+   * ON CONFLICT: only updates if the bundle's updated_at >= existing row's updated_at.
+   *   This prevents stale bundles from "time-traveling" a live DB's chronology backward.
+   *   In the empty-DB (disaster recovery) case, every INSERT succeeds with exact bundle timestamps.
+   *
+   * Fails closed on: invalid timestamps, non-finite embedding values, schema validation.
+   */
+  private async restoreChunkWithClient(
+    client: any,
+    chunk: EnhancedMemoryChunk
+  ): Promise<void> {
+    const validation = EnhancedMemoryChunkSchema.safeParse(chunk);
+    if (!validation.success) {
+      throw new Error(
+        `Invalid chunk for restore: ${validation.error.message}`
+      );
+    }
+
+    if (chunk.embedding.length !== this.config.dimension) {
+      throw new Error(
+        `Embedding dimension mismatch: expected ${this.config.dimension}, got ${chunk.embedding.length}`
+      );
+    }
+
+    // Fail closed on non-finite embedding values (Infinity, NaN)
+    if (!chunk.embedding.every(Number.isFinite)) {
+      throw new Error(
+        `Non-finite embedding value in restore (id=${chunk.id})`
+      );
+    }
+
+    if (
+      !Number.isFinite(chunk.createdAt) ||
+      !Number.isFinite(chunk.updatedAt) ||
+      chunk.createdAt <= 0 ||
+      chunk.updatedAt <= 0
+    ) {
+      throw new Error(
+        `Invalid timestamps for restore (id=${chunk.id}): createdAt=${chunk.createdAt}, updatedAt=${chunk.updatedAt}`
+      );
+    }
+
+    // Parameterized vector text — avoids inline SQL string composition
+    const vectorText = `[${chunk.embedding.join(',')}]`;
+    const createdAt = new Date(chunk.createdAt);
+    const updatedAt = new Date(chunk.updatedAt);
+
+    // Embedding model id: derive from dimension if not explicitly set,
+    // so provenance stays consistent with stored dimensionality
+    const embeddingModelId =
+      chunk.embeddingModelId || `legacy_${chunk.embedding.length}`;
+
+    await client.query(
+      `
+      INSERT INTO ${this.config.tableName}
+      (id, content, embedding, metadata, entities, relationships, decay_profile, provenance, graph_links, temporal_context, spatial_context, embedding_model_id, embedding_dim, created_at, updated_at)
+      VALUES ($1, $2, $3::vector, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, $14, $15)
+      ON CONFLICT (id) DO UPDATE SET
+        content = EXCLUDED.content,
+        embedding = EXCLUDED.embedding,
+        metadata = EXCLUDED.metadata,
+        entities = EXCLUDED.entities,
+        relationships = EXCLUDED.relationships,
+        decay_profile = EXCLUDED.decay_profile,
+        provenance = EXCLUDED.provenance,
+        graph_links = EXCLUDED.graph_links,
+        temporal_context = EXCLUDED.temporal_context,
+        spatial_context = EXCLUDED.spatial_context,
+        embedding_model_id = EXCLUDED.embedding_model_id,
+        embedding_dim = EXCLUDED.embedding_dim,
+        updated_at = EXCLUDED.updated_at
+      WHERE EXCLUDED.updated_at >= ${this.config.tableName}.updated_at
+      `,
+      [
+        chunk.id,
+        chunk.content,
+        vectorText,
+        JSON.stringify(chunk.metadata),
+        JSON.stringify(chunk.entities),
+        JSON.stringify(chunk.relationships),
+        JSON.stringify(chunk.decayProfile),
+        JSON.stringify(chunk.provenance),
+        JSON.stringify(chunk.graphLinks || []),
+        JSON.stringify(chunk.temporalContext || null),
+        JSON.stringify(chunk.spatialContext || null),
+        embeddingModelId,
+        chunk.embedding.length,
+        createdAt,
+        updatedAt,
+      ]
+    );
+  }
+
+  /**
+   * Restore a single chunk with timestamp preservation.
+   */
+  async restoreChunk(chunk: EnhancedMemoryChunk): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await this.restoreChunkWithClient(client, chunk);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Batch restore chunks with timestamp preservation (transactional).
+   * Uses a single client for the entire transaction (unlike batchUpsertChunks).
+   */
+  async batchRestoreChunks(chunks: EnhancedMemoryChunk[]): Promise<void> {
+    if (chunks.length === 0) return;
+
+    if (chunks.length > 2000) {
+      console.warn(
+        `⚠️ batchRestoreChunks: large batch (${chunks.length} chunks) — consider chunked batching for production restores`
+      );
+    }
+
+    const startMs = Date.now();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const chunk of chunks) {
+        await this.restoreChunkWithClient(client, chunk);
+      }
+
+      await client.query('COMMIT');
+      const elapsedMs = Date.now() - startMs;
+      console.log(
+        `✅ Restored ${chunks.length} chunks in ${elapsedMs}ms (timestamp-preserving)`
+      );
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   /**
    * Find a chunk by metadata dedupeKey. Returns the first match or null.
    * Used for idempotent reflection/lesson/checkpoint persistence.
@@ -1367,6 +1525,7 @@ export class EnhancedVectorDatabase {
     limit: number;
     offset: number;
     includePlaceholders?: boolean;
+    sortOrder?: 'asc' | 'desc';
   }): Promise<{ rows: EnhancedMemoryChunk[]; total: number }> {
     const client = await this.pool.connect();
     try {
@@ -1385,10 +1544,11 @@ export class EnhancedVectorDatabase {
       const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
       // Get paginated results
+      const order = options.sortOrder === 'asc' ? 'ASC' : 'DESC';
       const dataResult = await client.query(
         `SELECT * FROM ${this.config.tableName}
          WHERE ${whereClause}
-         ORDER BY created_at DESC
+         ORDER BY created_at ${order}, id ${order === 'ASC' ? 'ASC' : 'DESC'}
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, options.limit, options.offset]
       );
@@ -1405,8 +1565,66 @@ export class EnhancedVectorDatabase {
         graphLinks: row.graph_links || [],
         temporalContext: row.temporal_context,
         spatialContext: row.spatial_context,
-        createdAt: row.created_at.getTime(),
-        updatedAt: row.updated_at.getTime(),
+        createdAt: row.created_at instanceof Date ? row.created_at.getTime() : new Date(row.created_at).getTime(),
+        updatedAt: row.updated_at instanceof Date ? row.updated_at.getTime() : new Date(row.updated_at).getTime(),
+      }));
+
+      return { rows, total };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Query chunks by metadata type (metadata->>'type') with pagination.
+   * Uses the metadata_type_idx index.
+   * sortOrder defaults to 'desc' (newest first) — callers re-sort for hash stability.
+   */
+  async queryByMetadataTypes(options: {
+    types: string[];
+    limit: number;
+    offset: number;
+    includePlaceholders?: boolean;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{ rows: EnhancedMemoryChunk[]; total: number }> {
+    const client = await this.pool.connect();
+    try {
+      let whereClause = `metadata->>'type' = ANY($1)`;
+      const params: any[] = [options.types];
+
+      if (!options.includePlaceholders) {
+        whereClause += ` AND (metadata->>'isPlaceholder' IS NULL OR metadata->>'isPlaceholder' != 'true')`;
+      }
+
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM ${this.config.tableName} WHERE ${whereClause}`,
+        params
+      );
+      const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+      const order = options.sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const dataResult = await client.query(
+        `SELECT * FROM ${this.config.tableName}
+         WHERE ${whereClause}
+         ORDER BY created_at ${order}, id ${order}
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, options.limit, options.offset]
+      );
+
+      const rows = dataResult.rows.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        embedding: row.embedding,
+        metadata: row.metadata,
+        entities: row.entities || [],
+        relationships: row.relationships || [],
+        decayProfile: row.decay_profile,
+        provenance: row.provenance,
+        graphLinks: row.graph_links || [],
+        temporalContext: row.temporal_context,
+        spatialContext: row.spatial_context,
+        createdAt: row.created_at instanceof Date ? row.created_at.getTime() : new Date(row.created_at).getTime(),
+        updatedAt: row.updated_at instanceof Date ? row.updated_at.getTime() : new Date(row.updated_at).getTime(),
       }));
 
       return { rows, total };

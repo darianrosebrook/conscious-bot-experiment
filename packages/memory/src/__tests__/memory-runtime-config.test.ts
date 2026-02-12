@@ -66,7 +66,7 @@ describe('MemoryRuntimeConfig', () => {
     const sys = getMemorySystemConfig();
     expect(sys.worldSeed).toBe('999');
     expect(sys.embeddingModel).toBeDefined();
-    expect(sys.ollamaHost).toBeDefined();
+    expect(sys.sidecarUrl).toBeDefined();
     expect(sys.enablePersistence).toBeDefined();
   });
 

@@ -3,7 +3,7 @@
  *
  * Connects to Sterling's unified WS server for graph-search reasoning.
  * Follows the same patterns as HttpClient (circuit breaker, retry) and
- * OllamaClient (env-var config with defaults).
+ * SidecarLLMClient (env-var config with defaults).
  *
  * @author @darianrosebrook
  */

@@ -12,9 +12,6 @@ import {
   extractSolveJoinKeys,
   buildSterlingEpisodeLinkage,
   buildSterlingEpisodeLinkageFromResult,
-  // Test legacy aliases still work
-  buildEpisodeLinkage,
-  buildEpisodeLinkageFromResult,
 } from '../episode-classification';
 import type { SolveBundle, SterlingIdentity } from '../solve-bundle-types';
 
@@ -314,13 +311,13 @@ describe('extractSolveJoinKeys', () => {
 });
 
 // ============================================================================
-// buildEpisodeLinkage tests (Phase 1 identity chain)
+// buildSterlingEpisodeLinkage tests (Phase 1 identity chain)
 // ============================================================================
 
-describe('buildEpisodeLinkage', () => {
+describe('buildSterlingEpisodeLinkage', () => {
   it('builds linkage from join keys and outcome', () => {
     const joinKeys = { bundleHash: 'bundle-hash-123', traceBundleHash: 'trace-hash-456' };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS');
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS');
 
     expect(linkage.bundleHash).toBe('bundle-hash-123');
     expect(linkage.traceBundleHash).toBe('trace-hash-456');
@@ -328,7 +325,7 @@ describe('buildEpisodeLinkage', () => {
   });
 
   it('handles undefined join keys', () => {
-    const linkage = buildEpisodeLinkage(undefined, 'EXECUTION_FAILURE');
+    const linkage = buildSterlingEpisodeLinkage(undefined, 'EXECUTION_FAILURE');
 
     expect(linkage.bundleHash).toBeUndefined();
     expect(linkage.traceBundleHash).toBeUndefined();
@@ -337,7 +334,7 @@ describe('buildEpisodeLinkage', () => {
 
   it('handles partial join keys (bundleHash only)', () => {
     const joinKeys = { bundleHash: 'bundle-only' };
-    const linkage = buildEpisodeLinkage(joinKeys, 'SEARCH_EXHAUSTED');
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'SEARCH_EXHAUSTED');
 
     expect(linkage.bundleHash).toBe('bundle-only');
     expect(linkage.traceBundleHash).toBeUndefined();
@@ -351,7 +348,7 @@ describe('buildEpisodeLinkage', () => {
       engineCommitment: 'engine-commit-abc',
       operatorRegistryHash: 'registry-hash-xyz',
     };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
 
     expect(linkage.bundleHash).toBe('b-123');
     expect(linkage.traceBundleHash).toBe('t-456');
@@ -362,7 +359,7 @@ describe('buildEpisodeLinkage', () => {
 
   it('omits Phase 1 identity fields when sterling identity is undefined', () => {
     const joinKeys = { bundleHash: 'b-789' };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', undefined);
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', undefined);
 
     expect(linkage.bundleHash).toBe('b-789');
     expect(linkage.engineCommitment).toBeUndefined();
@@ -375,7 +372,7 @@ describe('buildEpisodeLinkage', () => {
       engineCommitment: 'engine-only',
       // no operatorRegistryHash
     };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
 
     expect(linkage.engineCommitment).toBe('engine-only');
     expect(linkage.operatorRegistryHash).toBeUndefined();
@@ -389,7 +386,7 @@ describe('buildEpisodeLinkage', () => {
       engineCommitment: 'engine-from-keys',
       operatorRegistryHash: 'registry-from-keys',
     };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS');
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS');
 
     expect(linkage.bundleHash).toBe('b-closed-loop');
     expect(linkage.traceBundleHash).toBe('t-closed-loop');
@@ -407,7 +404,7 @@ describe('buildEpisodeLinkage', () => {
       engineCommitment: 'new-engine',
       operatorRegistryHash: 'new-registry',
     };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
 
     // identity param takes precedence
     expect(linkage.engineCommitment).toBe('new-engine');
@@ -424,7 +421,7 @@ describe('buildEpisodeLinkage', () => {
       engineCommitment: 'new-engine-only',
       // no operatorRegistryHash — falls back to joinKeys
     };
-    const linkage = buildEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
+    const linkage = buildSterlingEpisodeLinkage(joinKeys, 'EXECUTION_SUCCESS', identity);
 
     expect(linkage.engineCommitment).toBe('new-engine-only');
     expect(linkage.operatorRegistryHash).toBe('registry-from-keys');
@@ -445,22 +442,22 @@ describe('buildEpisodeLinkage', () => {
     ];
 
     for (const outcome of outcomes) {
-      const linkage = buildEpisodeLinkage({ bundleHash: 'test' }, outcome);
+      const linkage = buildSterlingEpisodeLinkage({ bundleHash: 'test' }, outcome);
       expect(linkage.outcomeClass).toBe(outcome);
     }
   });
 });
 
 // ============================================================================
-// buildEpisodeLinkageFromResult tests (combined classification + linkage)
+// buildSterlingEpisodeLinkageFromResult tests (combined classification + linkage)
 // ============================================================================
 
-describe('buildEpisodeLinkageFromResult', () => {
+describe('buildSterlingEpisodeLinkageFromResult', () => {
   it('classifies and builds linkage in one call (success case)', () => {
     const joinKeys = { bundleHash: 'b-combined', traceBundleHash: 't-combined' };
     const result = { solved: true };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(joinKeys, result);
 
     expect(linkage.bundleHash).toBe('b-combined');
     expect(linkage.traceBundleHash).toBe('t-combined');
@@ -473,7 +470,7 @@ describe('buildEpisodeLinkageFromResult', () => {
     const joinKeys = { bundleHash: 'b-exhausted' };
     const result = { solved: false, searchHealth: { terminationReason: 'max_nodes' } };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(joinKeys, result);
 
     expect(linkage.outcomeClass).toBe('SEARCH_EXHAUSTED');
     expect(classified.outcomeClass).toBe('SEARCH_EXHAUSTED');
@@ -485,7 +482,7 @@ describe('buildEpisodeLinkageFromResult', () => {
     const result = { solved: false };
     const opts = { compatIssues: [{ code: 'E001', severity: 'error' }] };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result, opts);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(joinKeys, result, opts);
 
     expect(linkage.outcomeClass).toBe('ILLEGAL_TRANSITION');
     expect(classified.outcomeClass).toBe('ILLEGAL_TRANSITION');
@@ -497,7 +494,7 @@ describe('buildEpisodeLinkageFromResult', () => {
     const result = { solved: false, totalNodes: 5000 };
     const opts = { maxNodes: 3000 };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result, opts);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(joinKeys, result, opts);
 
     expect(linkage.outcomeClass).toBe('SEARCH_EXHAUSTED');
     expect(classified.outcomeClass).toBe('SEARCH_EXHAUSTED');
@@ -511,7 +508,7 @@ describe('buildEpisodeLinkageFromResult', () => {
       operatorRegistryHash: 'registry-from-result',
     };
 
-    const { linkage } = buildEpisodeLinkageFromResult(joinKeys, result, undefined, identity);
+    const { linkage } = buildSterlingEpisodeLinkageFromResult(joinKeys, result, undefined, identity);
 
     expect(linkage.engineCommitment).toBe('engine-from-result');
     expect(linkage.operatorRegistryHash).toBe('registry-from-result');
@@ -525,7 +522,7 @@ describe('buildEpisodeLinkageFromResult', () => {
     };
     const result = { solved: true };
 
-    const { linkage } = buildEpisodeLinkageFromResult(joinKeys, result);
+    const { linkage } = buildSterlingEpisodeLinkageFromResult(joinKeys, result);
 
     expect(linkage.engineCommitment).toBe('engine-from-keys');
     expect(linkage.operatorRegistryHash).toBe('registry-from-keys');
@@ -535,7 +532,7 @@ describe('buildEpisodeLinkageFromResult', () => {
     const joinKeys = { bundleHash: 'b-heuristic' };
     const result = { solved: false, error: 'temporal deadlock detected' };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(joinKeys, result);
 
     expect(linkage.outcomeClass).toBe('STRATEGY_INFEASIBLE');
     expect(classified.outcomeClass).toBe('STRATEGY_INFEASIBLE');
@@ -545,7 +542,7 @@ describe('buildEpisodeLinkageFromResult', () => {
   it('handles undefined joinKeys gracefully', () => {
     const result = { solved: false };
 
-    const { linkage, classified } = buildEpisodeLinkageFromResult(undefined, result);
+    const { linkage, classified } = buildSterlingEpisodeLinkageFromResult(undefined, result);
 
     expect(linkage.bundleHash).toBeUndefined();
     expect(linkage.outcomeClass).toBe('EXECUTION_FAILURE');
@@ -560,7 +557,7 @@ describe('buildEpisodeLinkageFromResult', () => {
 
     // Structured classification — safe for learning
     const structuredResult = { solved: true };
-    const { classified: structuredClassified } = buildEpisodeLinkageFromResult(
+    const { classified: structuredClassified } = buildSterlingEpisodeLinkageFromResult(
       joinKeys,
       structuredResult,
     );
@@ -568,7 +565,7 @@ describe('buildEpisodeLinkageFromResult', () => {
 
     // Heuristic classification — telemetry only
     const heuristicResult = { solved: false, error: 'infeasible constraint' };
-    const { classified: heuristicClassified } = buildEpisodeLinkageFromResult(
+    const { classified: heuristicClassified } = buildSterlingEpisodeLinkageFromResult(
       joinKeys,
       heuristicResult,
     );

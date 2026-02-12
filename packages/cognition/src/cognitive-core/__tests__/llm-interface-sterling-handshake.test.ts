@@ -231,9 +231,9 @@ describe('LLM Interface Sterling Handshake (Migration B)', () => {
         { languageIOClient: mockClient }
       );
 
-      // Mock the Ollama call to avoid network dependency
-      // We're testing Sterling integration, not Ollama connectivity
-      vi.spyOn(llm as any, 'callOllama').mockResolvedValue({
+      // Mock the sidecar call to avoid network dependency
+      // We're testing Sterling integration, not sidecar connectivity
+      vi.spyOn(llm as any, 'callSidecar').mockResolvedValue({
         response: 'I see trees nearby. [GOAL: dig stone]',
         done: true,
         prompt_eval_count: 10,
@@ -292,7 +292,7 @@ describe('LLM Interface Sterling Handshake (Migration B)', () => {
         { languageIOClient: mockClient }
       );
 
-      vi.spyOn(llm as any, 'callOllama').mockResolvedValue({
+      vi.spyOn(llm as any, 'callSidecar').mockResolvedValue({
         response: 'I see trees. [GOAL: dig stone]',
         done: true,
         prompt_eval_count: 10,
@@ -350,7 +350,7 @@ describe('LLM Interface Sterling Handshake (Migration B)', () => {
         { languageIOClient: mockClient }
       );
 
-      vi.spyOn(llm as any, 'callOllama').mockResolvedValue({
+      vi.spyOn(llm as any, 'callSidecar').mockResolvedValue({
         response: 'Say something',
         done: true,
         prompt_eval_count: 5,

@@ -42,7 +42,7 @@ import * as fs from 'fs';
 // ============================================================================
 
 const MEMORY_URL = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
-const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
+const SIDECAR_URL = process.env.LLM_SIDECAR_URL ?? process.env.OLLAMA_HOST ?? 'http://localhost:5002';
 
 // Soak parameters
 const PIPELINE_SOAK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -200,7 +200,7 @@ async function runPreflight(): Promise<SoakReport['preflight']> {
     embeddingServiceHealthy: false,
     singleReflectionPersisted: false,
     metadataContractValid: false,
-    effectiveEmbeddingHost: OLLAMA_HOST,
+    effectiveEmbeddingHost: SIDECAR_URL,
     preflightDurationMs: 0,
   };
 
@@ -225,7 +225,7 @@ async function runPreflight(): Promise<SoakReport['preflight']> {
       `   ${result.embeddingServiceHealthy ? '✅' : '❌'} Embedding service: ${status.status?.services?.embeddingService || 'unknown'}`
     );
     if (!result.embeddingServiceHealthy) {
-      console.log(`   ⚠️  Embedding host: ${OLLAMA_HOST}`);
+      console.log(`   ⚠️  Embedding host: ${SIDECAR_URL}`);
       console.log(`   ⚠️  Ensure embedding service is running and has a model loaded.`);
     }
   } catch (err) {
@@ -323,7 +323,7 @@ async function runPreflight(): Promise<SoakReport['preflight']> {
   }
   if (!result.embeddingServiceHealthy) {
     console.error('\n❌ PREFLIGHT FAILED: Embedding service not healthy. Aborting.');
-    console.error(`   Embedding host: ${OLLAMA_HOST}`);
+    console.error(`   Embedding host: ${SIDECAR_URL}`);
     process.exit(1);
   }
   if (!result.singleReflectionPersisted) {
@@ -761,7 +761,7 @@ async function main() {
   console.log(`\n🧪 REFLECTION PERSISTENCE SOAK TEST`);
   console.log(`Mode: ${mode}`);
   console.log(`Memory URL: ${MEMORY_URL}`);
-  console.log(`OLLAMA_HOST: ${OLLAMA_HOST}`);
+  console.log(`SIDECAR_URL: ${SIDECAR_URL}`);
   console.log(`Started: ${new Date().toISOString()}\n`);
 
   const startTime = Date.now();
