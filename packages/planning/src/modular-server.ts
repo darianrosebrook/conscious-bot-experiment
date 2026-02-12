@@ -299,6 +299,7 @@ import {
   emergencyStopExecutor,
   type ExecutorConfig,
 } from './server/autonomous-executor';
+import { registerFailedTaskCategory } from './task-integration/thought-to-task-converter';
 
 // Create HTTP clients for inter-service communication
 const serviceClients = createServiceClients();
@@ -3358,6 +3359,13 @@ taskIntegration.on(
   (event: { type: string; taskId: string; task?: any; reason?: string }) => {
     const reason = `${event.type}: task ${event.taskId}${event.reason ? ` (${event.reason})` : ''}`;
     console.log(`[Lifecycle→Review] ${reason}`);
+
+    // Register failed task categories so the thought-to-task converter
+    // can suppress creation of identical tasks during the cooldown window.
+    if (event.type === 'failed' && event.task) {
+      registerFailedTaskCategory(event.task);
+    }
+
     fetch(`${cognitionEndpoint}/api/task-review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

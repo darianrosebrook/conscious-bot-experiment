@@ -344,12 +344,44 @@ export class KeepAliveIntegration {
 
   /**
    * Handle thought events from the controller.
+   *
+   * When Sterling metadata is available on the thought, wrap it in a
+   * ReductionProvenance so the thought-to-task converter can evaluate it
+   * through the standard 5-gate contract. Without this, keep-alive
+   * thoughts are dropped with "no reduction provided" regardless of
+   * whether Sterling processed them successfully.
    */
   private async onThought(event: any, thought: KeepAliveThought): Promise<void> {
     console.log(
       `[KeepAliveIntegration] Generated thought: ${thought.content.slice(0, 60)}...` +
-      ` (eligible=${thought.eligibility.convertEligible})`
+      ` (eligible=${thought.eligibility.convertEligible}, sterlingUsed=${thought.sterlingUsed ?? false})`
     );
+
+    // Build ReductionProvenance from Sterling metadata when available.
+    // This mirrors the structure built in trySterlingIdleEpisode() so that
+    // both code paths go through the same thought-to-task conversion gates.
+    let reduction: Record<string, unknown> | undefined;
+    if (thought.sterlingUsed && thought.committedIrDigest) {
+      reduction = {
+        sterlingProcessed: true,
+        envelopeId: thought.envelopeId ?? null,
+        reducerResult: {
+          committed_goal_prop_id: thought.committedGoalPropId ?? null,
+          committed_ir_digest: thought.committedIrDigest,
+          source_envelope_id: thought.envelopeId ?? '',
+          is_executable: thought.isExecutable ?? false,
+          is_semantically_empty: false,
+          advisory: null,
+          grounding: thought.groundingResult ?? null,
+          schema_version: '1.1.0', // match current reducer schema
+          reducer_version: 'keepalive-bridge-v1',
+        },
+        isExecutable: thought.isExecutable ?? false,
+        blockReason: thought.blockReason ?? null,
+        durationMs: thought.processingDurationMs ?? 0,
+        sterlingError: null,
+      };
+    }
 
     await this.postThoughtToCognition({
       id: thought.id,
@@ -360,6 +392,7 @@ export class KeepAliveIntegration {
         source: 'keepalive',
         frameProfile: thought.frameProfile,
         convertEligible: thought.eligibility.convertEligible,
+        ...(reduction ? { reduction } : {}),
       },
       convertEligible: thought.eligibility.convertEligible,
     });
@@ -440,7 +473,12 @@ export class KeepAliveIntegration {
     const spatialBucket = pos
       ? `${bucketX}:${bucketZ}:${botState.biome ?? ''}`
       : 'unknown';
-    return `${executorState.idleReason}:${invDigest}:${spatialBucket}:${executorState.recentTaskConversions}`;
+    // NOTE: recentTaskConversions was removed from the lease key because each
+    // task creation incremented the counter, which changed the key, which bypassed
+    // the cooldown, causing an infinite idle→task→fail→idle loop every ~30s.
+    // The spatial bucket + inventory + idle reason provide sufficient context change
+    // detection. The hourly cap (MAX_IDLE_EPISODES_PER_HOUR) bounds total volume.
+    return `${executorState.idleReason}:${invDigest}:${spatialBucket}`;
   }
 
   private async trySterlingIdleEpisode(

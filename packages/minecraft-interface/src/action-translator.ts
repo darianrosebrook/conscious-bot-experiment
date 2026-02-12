@@ -3326,6 +3326,8 @@ export class ActionTranslator {
       // Use the world package's perception system for better item detection
       const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
 
+      // Cap perception API timeout to 3s so the fallback spiral still has
+      // most of the time budget if the world service is slow or unreachable.
       const response = await resilientFetch(
         `${worldUrl}/api/perception/visual-field`,
         {
@@ -3334,11 +3336,14 @@ export class ActionTranslator {
           body: JSON.stringify({
             position: { x: center.x, y: center.y, z: center.z },
             radius: radius,
-            fieldOfView: { horizontal: 120, vertical: 60 }, // Wide field of view for exploration
+            fieldOfView: { horizontal: 120, vertical: 60 },
             maxDistance: radius,
             observerPosition: { x: center.x, y: center.y, z: center.z },
-            level: 'enhanced', // Use enhanced perception for better detection
+            level: 'enhanced',
           }),
+          maxRetries: 1,
+          timeoutMs: 3000,
+          silent: true,
         }
       );
 
@@ -3437,7 +3442,14 @@ export class ActionTranslator {
   }
 
   /**
-   * Fallback spiral exploration for when perception system fails
+   * Fallback spiral exploration for when perception system fails.
+   *
+   * Scans outward in a spiral, checking downward from the bot's y-level to
+   * find solid ground. At each waypoint, the bot physically moves (via
+   * pathfinder) and scans for dropped items. The previous implementation
+   * checked blocks at the bot's exact y-level, which was typically air
+   * above the ground surface — causing the entire loop to skip every
+   * direction without attempting movement.
    */
   private async fallbackSpiralExploration(
     item: string | undefined,
@@ -3446,44 +3458,68 @@ export class ActionTranslator {
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const startTime = Date.now();
     const center = this.bot.entity.position.clone();
-    const spiralRadius = Math.min(radius, 10); // Limit spiral to reasonable size
+    const spiralRadius = Math.min(radius, 16); // Wider spiral for better coverage
+    // Ensure at least 5 seconds for the spiral even if the caller's budget is low
+    const effectiveMaxTime = Math.max(maxTime, 5000);
 
     console.log(
-      `🔄 Starting fallback spiral exploration pattern within ${spiralRadius} blocks`
+      `🔄 Starting fallback spiral exploration within ${spiralRadius} blocks (budget: ${Math.round(effectiveMaxTime / 1000)}s)`
     );
 
-    // Simple spiral exploration
-    for (let r = 1; r <= spiralRadius; r += 2) {
-      if (Date.now() - startTime > maxTime) {
+    let waypointsAttempted = 0;
+    let waypointsReached = 0;
+
+    // Spiral outward with 8 directions (intercardinal too) for better coverage
+    for (let r = 2; r <= spiralRadius; r += 3) {
+      if (Date.now() - startTime > effectiveMaxTime) {
         break;
       }
 
-      // Check 4 directions at this radius
       const directions = [
-        new Vec3(r, 0, 0), // East
-        new Vec3(0, 0, r), // South
-        new Vec3(-r, 0, 0), // West
-        new Vec3(0, 0, -r), // North
+        new Vec3(r, 0, 0),   // East
+        new Vec3(0, 0, r),   // South
+        new Vec3(-r, 0, 0),  // West
+        new Vec3(0, 0, -r),  // North
+        new Vec3(r, 0, r),   // SE
+        new Vec3(-r, 0, r),  // SW
+        new Vec3(-r, 0, -r), // NW
+        new Vec3(r, 0, -r),  // NE
       ];
 
       for (const direction of directions) {
-        const targetPos = center.clone().add(direction);
-
-        // Check if position is safe (not over void, water, lava, etc.)
-        const block = this.bot.blockAt(targetPos);
-        if (!block || block.name === 'air') {
-          continue;
+        if (Date.now() - startTime > effectiveMaxTime) {
+          break;
         }
 
-        // Move to position (under nav lease)
+        const targetPos = center.clone().add(direction);
+
+        // Scan downward from the bot's y-level to find solid ground.
+        // The bot stands on a block, so blocks at eye level are typically air.
+        let groundBlock = null;
+        for (let dy = 0; dy >= -4; dy--) {
+          const checkPos = targetPos.offset(0, dy, 0);
+          const block = this.bot.blockAt(checkPos);
+          if (block && block.name !== 'air' && block.name !== 'cave_air') {
+            groundBlock = block;
+            break;
+          }
+        }
+
+        if (!groundBlock) {
+          continue; // No solid ground found at this position
+        }
+
+        // Navigate to above the solid block
+        waypointsAttempted++;
         try {
           const Goals = await getGoals();
+          const goalPos = groundBlock.position.offset(0, 1, 0); // Stand on top of the block
           const gotoResult = await this.withNavLease(
             'action:explore_spiral',
             'normal',
             async () => {
               await this.bot.pathfinder.goto(
-                new Goals.GoalBlock(targetPos.x, targetPos.y, targetPos.z)
+                new Goals.GoalBlock(goalPos.x, goalPos.y, goalPos.z)
               );
               return { success: true };
             },
@@ -3491,8 +3527,10 @@ export class ActionTranslator {
             { success: false, error: 'NAV_PREEMPTED' },
           );
           if (!gotoResult.success) {
-            continue; // Skip this waypoint, try the next direction
+            continue;
           }
+
+          waypointsReached++;
 
           // Look for items from this new position
           const itemsFound = Object.values(this.bot.entities).filter(
@@ -3506,9 +3544,8 @@ export class ActionTranslator {
 
           if (itemsFound.length > 0) {
             console.log(
-              `🎯 Found ${itemsFound.length} items at exploration position`
+              `🎯 Found ${itemsFound.length} items at exploration position (after ${waypointsReached} waypoints)`
             );
-            // Try to collect them
             return await this.executePickup(
               {
                 type: 'pickup_item',
@@ -3519,15 +3556,19 @@ export class ActionTranslator {
             );
           }
         } catch (error) {
-          // Ignore pathfinding errors and continue
+          // Pathfinding errors are expected (unreachable terrain) — continue
           continue;
         }
       }
     }
 
+    console.log(
+      `🔍 Spiral exploration complete: ${waypointsReached}/${waypointsAttempted} waypoints reached, no items found`
+    );
+
     return {
       success: false,
-      error: 'No items found during exploration',
+      error: `No items found during exploration (${waypointsReached} positions checked in ${Math.round((Date.now() - startTime) / 1000)}s)`,
     };
   }
 

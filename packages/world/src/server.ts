@@ -553,6 +553,91 @@ app.get('/telemetry', (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Perception API — visual field query
+// ---------------------------------------------------------------------------
+// The Minecraft Interface calls this endpoint to detect nearby blocks and
+// entities. Currently returns cached perception data from the planning
+// server's world state. When the full PerceptionIntegration pipeline is
+// wired, this endpoint can delegate to it for ray-cast-based results.
+
+app.post('/api/perception/visual-field', (req, res) => {
+  try {
+    const {
+      position,
+      radius = 10,
+      maxDistance,
+    } = req.body as {
+      position?: { x: number; y: number; z: number };
+      radius?: number;
+      maxDistance?: number;
+      fieldOfView?: { horizontal: number; vertical: number };
+      observerPosition?: { x: number; y: number; z: number };
+      level?: string;
+    };
+
+    const effectiveRadius = maxDistance ?? radius;
+    const observerPos = position ?? currentWorldState.player?.position;
+
+    if (!observerPos) {
+      return res.status(503).json({
+        error: 'No observer position available — world state not yet populated',
+        observations: [],
+      });
+    }
+
+    // Combine visible entities and recognized objects from cached world state
+    const visibleEntities = currentWorldState.perception?.visibleEntities ?? [];
+    const recognizedObjects = currentWorldState.perception?.recognizedObjects ?? [];
+
+    // Filter observations within the requested radius
+    const observations = [
+      ...visibleEntities.map((entity: any) => ({
+        type: entity.type ?? 'entity',
+        name: entity.name ?? entity.displayName ?? 'unknown',
+        itemId: entity.itemId ?? entity.entityId ?? null,
+        pos: entity.position ?? entity.pos ?? { x: 0, y: 0, z: 0 },
+        distance: entity.distance ?? (entity.position
+          ? Math.sqrt(
+              (entity.position.x - observerPos.x) ** 2 +
+              (entity.position.y - observerPos.y) ** 2 +
+              (entity.position.z - observerPos.z) ** 2
+            )
+          : Infinity),
+        confidence: entity.confidence ?? 0.5,
+      })),
+      ...recognizedObjects.map((obj: any) => ({
+        type: obj.type ?? 'block',
+        name: obj.name ?? obj.blockName ?? 'unknown',
+        itemId: obj.itemId ?? obj.blockId ?? null,
+        pos: obj.position ?? obj.pos ?? { x: 0, y: 0, z: 0 },
+        distance: obj.distance ?? (obj.position
+          ? Math.sqrt(
+              (obj.position.x - observerPos.x) ** 2 +
+              (obj.position.y - observerPos.y) ** 2 +
+              (obj.position.z - observerPos.z) ** 2
+            )
+          : Infinity),
+        confidence: obj.confidence ?? 0.5,
+      })),
+    ].filter((obs) => obs.distance <= effectiveRadius);
+
+    // Sort by distance (closest first)
+    observations.sort((a, b) => a.distance - b.distance);
+
+    res.json({
+      observations,
+      observerPosition: observerPos,
+      radius: effectiveRadius,
+      perceptionQuality: currentWorldState.perception?.perceptionQuality ?? 0.5,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('[World] Perception visual-field error:', error);
+    res.status(500).json({ error: 'Perception query failed', observations: [] });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`World system server running on port ${port}`);

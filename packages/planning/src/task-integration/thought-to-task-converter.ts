@@ -65,6 +65,54 @@ const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 /** Hard cap on digest dedup entries to prevent unbounded growth in long-running processes. */
 const MAX_DIGEST_DEDUP_ENTRIES = 200;
 
+/**
+ * Recently-failed task category cooldown.
+ *
+ * Digest-level dedup doesn't prevent the idle→task→fail loop because each
+ * Sterling reduction produces a unique committed_ir_digest. This cooldown
+ * tracks task *categories* (idle-episode source + content prefix) so that
+ * tasks that repeatedly fail as "unplannable" are suppressed for a cooldown
+ * window before a new identical task can be created.
+ */
+const recentFailedCategories = new Map<string, number>();
+const FAILED_CATEGORY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Call when a task transitions to unplannable/failed to register the cooldown. */
+export function registerFailedTaskCategory(task: { title?: string; metadata?: any }): void {
+  const key = computeTaskCategoryKey(task);
+  if (key) recentFailedCategories.set(key, Date.now());
+}
+
+function computeTaskCategoryKey(task: { title?: string; metadata?: any }): string | null {
+  // Use the source + a normalized prefix of the title as the category key.
+  // This groups "Idle episode (sterling executable)" tasks together regardless
+  // of their unique sterling digest.
+  const source = task.metadata?.sterling?.dedupeNamespace ?? task.metadata?.category ?? 'unknown';
+  const prefix = (task.title ?? '').slice(0, 60).toLowerCase().trim();
+  if (!prefix) return null;
+  return `${source}:${prefix}`;
+}
+
+function isFailedCategoryCooldown(thought: CognitiveStreamThought): boolean {
+  const prefix = (thought.content ?? '').trim().slice(0, 60).toLowerCase().trim();
+  if (!prefix) return false;
+  const reduction = thought.metadata?.reduction;
+  const source = reduction?.reducerResult?.schema_version ?? 'unknown';
+  const key = `${source}:${prefix}`;
+  const now = Date.now();
+  const lastFailed = recentFailedCategories.get(key);
+  if (lastFailed && now - lastFailed < FAILED_CATEGORY_COOLDOWN_MS) {
+    return true;
+  }
+  // Prune expired entries
+  if (recentFailedCategories.size > 50) {
+    for (const [k, ts] of recentFailedCategories) {
+      if (now - ts > FAILED_CATEGORY_COOLDOWN_MS) recentFailedCategories.delete(k);
+    }
+  }
+  return false;
+}
+
 function isDigestDuplicate(digestKey: string): boolean {
   const now = Date.now();
   const lastSeen = recentDigestHashes.get(digestKey);
@@ -250,6 +298,13 @@ export async function convertThoughtToTask(
     const digestKey = `${schemaVersion}:${result.committed_ir_digest}`;
     if (isDigestDuplicate(digestKey)) {
       return { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
+    }
+
+    // Category-level cooldown: suppress tasks whose category recently failed
+    // as unplannable. This prevents the idle→task→fail loop where each
+    // Sterling reduction is unique but the task semantics are identical.
+    if (isFailedCategoryCooldown(thought)) {
+      return { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (${FAILED_CATEGORY_COOLDOWN_MS / 1000}s cooldown)` };
     }
 
     const title = thought.content.trim().slice(0, 160) || `Sterling task ${result.committed_ir_digest.slice(0, 12)}`;
