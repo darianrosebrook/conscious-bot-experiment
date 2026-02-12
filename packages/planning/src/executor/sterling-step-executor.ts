@@ -20,6 +20,7 @@ import { isDeterministicFailure } from '../server/task-action-resolver';
 import type { SterlingStepExecutorContext } from './sterling-step-executor.types';
 import { buildFailureSignature } from '../task-lifecycle/failure-signature';
 import { getLoopBreaker } from '../task-lifecycle/loop-breaker';
+import { extractDiagReasonCode, extractRetryHint } from '../golden-run-recorder';
 
 /** Backoff for deterministic blocks (planner/materializer must change). Eligibility logic respects nextEligibleAt. */
 const DETERMINISTIC_BLOCK_BACKOFF_MS = 300_000; // 5 minutes
@@ -305,6 +306,12 @@ export async function executeSterlingStep(
     (meta.goldenRun as Record<string, unknown> | undefined)
   )?.runId as string | undefined;
 
+  // Mark loop breaker as evaluated early — covers ALL paths (success + failure).
+  // Individual failure paths still call recordLoopDetected/recordFailure as needed.
+  if (runId) {
+    ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId);
+  }
+
   /** Local helper: produces a blockTaskPatch with existingMetadata pre-filled
    *  so that blockedAt is preserved across same-reason re-blocks (TTL anchor). */
   const block = (
@@ -352,6 +359,14 @@ export async function executeSterlingStep(
     }
     return;
   }
+
+  // ── Routing trace: log the dispatch chain for diagnostics ──
+  console.log(`[StepDispatch] task=${task.id} step=${nextStep.id ?? '?'} ` +
+    `planned_leaf=${(nextStep.meta?.leaf as string) ?? '?'} ` +
+    `resolved_leaf=${leafExec.leafName} ` +
+    `argsSource=${leafExec.argsSource} ` +
+    `args=${JSON.stringify(leafExec.args).slice(0, 200)}` +
+    (leafExec.originalLeaf ? ` original_leaf=${leafExec.originalLeaf}` : ''));
 
   const { config, leafAllowlist, mode } = ctx;
 
@@ -900,15 +915,67 @@ export async function executeSterlingStep(
     });
     // LoopBreaker: record tool deterministic failure (per-task final failure)
     {
-      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const diagReason = extractDiagReasonCode(actionResult);
       const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
       const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode: failureCode!, diagReasonCode: diagReason });
       const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
       if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
-      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     await ctx.recomputeProgressAndMaybeComplete(task);
+    return;
+  }
+
+  // Retry-hint aware failure handling: when the leaf signals 'reposition_or_rescan',
+  // the bot needs to move to a new location before retrying. Use a longer backoff
+  // and record the hint so movement/idle systems can act on it.
+  const retryHint = extractRetryHint(actionResult);
+  if (retryHint === 'reposition_or_rescan') {
+    const repositionBackoffMs = 60_000; // 60s — gives movement/idle system time to reposition
+    const repositionRetries = ((task.metadata?.repositionRetryCount as number) || 0) + 1;
+    const maxRepositionRetries = 3;
+    if (repositionRetries >= maxRepositionRetries) {
+      ctx.updateTaskMetadata(task.id, {
+        ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
+        retryCount: repositionRetries,
+        lastRetryHint: retryHint,
+      });
+      // LoopBreaker: record reposition exhaustion
+      {
+        const diagReason = extractDiagReasonCode(actionResult);
+        const targetParam = (leafExec.args as Record<string, unknown>)?.item as string
+          ?? (leafExec.args as Record<string, unknown>)?.blockType as string;
+        const loopSig = buildFailureSignature({
+          category: 'tool_failure',
+          leaf: leafExec.leafName,
+          targetParam,
+          failureCode: failureCode ?? 'reposition_exhausted',
+          diagReasonCode: diagReason,
+        });
+        const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
+        if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      }
+      ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
+      return;
+    }
+    console.log(
+      `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
+      `(attempt ${repositionRetries}/${maxRepositionRetries}) — backing off ${repositionBackoffMs}ms`
+    );
+    ctx.updateTaskMetadata(task.id, {
+      repositionRetryCount: repositionRetries,
+      lastRetryHint: retryHint,
+      nextEligibleAt: Date.now() + repositionBackoffMs,
+    });
+    if (runId) {
+      ctx.getGoldenRunRecorder().recordDispatch(runId, {
+        step_id: stepId,
+        leaf: leafExec.leafName,
+        retry_hint: retryHint,
+        reposition_attempt: repositionRetries,
+        dispatched_at: Date.now(),
+      });
+    }
     return;
   }
 
@@ -937,12 +1004,11 @@ export async function executeSterlingStep(
     });
     // LoopBreaker: record smoke no-retry failure (per-task final failure)
     {
-      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const diagReason = extractDiagReasonCode(actionResult);
       const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
       const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
       const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
       if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
-      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     return;
@@ -1019,12 +1085,11 @@ export async function executeSterlingStep(
     });
     // LoopBreaker: record max-retries-exceeded failure (per-task final failure)
     {
-      const diagReason = ((actionResult?.data as Record<string, unknown>)?.diagnostics as Record<string, unknown>)?.reason_code as string | undefined;
+      const diagReason = extractDiagReasonCode(actionResult);
       const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
       const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
       const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
       if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
-      if (runId) { ctx.getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
   } else {

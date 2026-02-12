@@ -102,7 +102,7 @@ describe('Sterling step dispatch to toolExecutor', () => {
       );
     });
 
-    it('dig_block dispatches minecraft.acquire_material (remapped leaf)', () => {
+    it('dig_block dispatches minecraft.acquire_material (legacy remapped leaf)', () => {
       const step = {
         meta: {
           leaf: 'dig_block',
@@ -112,6 +112,7 @@ describe('Sterling step dispatch to toolExecutor', () => {
 
       const dispatched = dispatchSterlingStepToTool(step, mockExecute);
       expect(dispatched).toBe(true);
+      // dig_block → acquire_material happens in stepToLeafExecution (legacy path)
       expect(mockExecute).toHaveBeenCalledWith(
         'minecraft.acquire_material',
         expect.objectContaining({ item: 'oak_log', count: 1 })

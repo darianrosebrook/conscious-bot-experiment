@@ -221,6 +221,17 @@ export type MapBTActionOptions = {
   strict?: boolean;
 };
 
+/**
+ * Emit a warning when action-mapping intentionally changes the action type.
+ * Every type remap MUST call this — unlisted remaps are bugs.
+ * See: scan_for_trees → scan_environment, pathfind → move_forward, etc.
+ */
+function warnTypeRemap(from: string, to: string): void {
+  console.warn(
+    `[ActionMapping] Intentional type remap: ${from} → ${to}`
+  );
+}
+
 export function mapBTActionToMinecraft(
   tool: string,
   args: Record<string, any>,
@@ -239,31 +250,35 @@ export function mapBTActionToMinecraft(
 
   switch (normalizedTool) {
     case 'scan_for_trees':
+      warnTypeRemap('scan_for_trees', 'scan_environment');
       return {
         type: 'scan_environment',
         parameters: {
           radius: args.radius || 50,
-          targetBlock: args.blockType || 'oak_log',
+          targetBlock: args.blockType || '_log',
           action: 'find_nearest_block',
         },
         timeout: 10000, // Give enough time for scanning
       };
     case 'pathfind':
+      warnTypeRemap('pathfind', 'move_forward');
       return {
         type: 'move_forward',
         parameters: { distance: args.distance || 1 },
       };
     case 'scan_tree_structure':
+      warnTypeRemap('scan_tree_structure', 'scan_environment');
       return {
         type: 'scan_environment',
         parameters: {
           radius: 10,
-          targetBlock: 'oak_log',
+          targetBlock: '_log',
           action: 'analyze_tree_structure',
         },
         timeout: 3000,
       };
     case 'execute_bt':
+      warnTypeRemap('execute_bt', 'execute_behavior_tree');
       return {
         type: 'execute_behavior_tree',
         parameters: {
@@ -276,33 +291,45 @@ export function mapBTActionToMinecraft(
       return {
         type: 'dig_block',
         parameters: {
-          pos: args.position || args.pos || 'current',
+          // Only pass pos if Sterling/caller explicitly provided coordinates.
+          // When omitted, the leaf auto-locates by blockType (expanding search + pathfind).
+          ...(args.position || args.pos ? { pos: args.position || args.pos } : {}),
           tool: args.tool || 'axe',
           blockType: args.blockType,
         },
       };
     case 'collect_items':
+      // No remap — collect_items routes to CollectItemsLeaf (dropped-item pickup).
+      // Previously remapped to collect_items_enhanced with exploreOnFail, which
+      // triggered a handler-path spiral scan. Leaf dispatch is now the canonical path.
       return {
-        type: 'collect_items_enhanced',
+        type: 'collect_items',
         parameters: {
-          item: args.item || args.blockType || 'oak_log', // Support both item and blockType
-          radius: args.radius || 10,
-          exploreOnFail: true,
-          maxSearchTime: 30000,
+          itemName: args.itemName || args.item || args.blockType,
+          radius: args.radius || 16,
+          maxItems: args.maxItems || 10,
+          timeout: args.timeout || args.maxSearchTime || 15000,
         },
       };
-    case 'acquire_material':
+    case 'acquire_material': {
+      const item = args.itemName || args.item || args.blockType;
+      if (!item || typeof item !== 'string') {
+        return {
+          type: 'acquire_material',
+          parameters: { _error: 'missing_required_arg:item' },
+          debug: debugInfo,
+        };
+      }
       return {
-        type: 'collect_items_enhanced',
+        type: 'acquire_material',
         parameters: {
-          item: args.item || args.blockType || 'oak_log',
-          radius: args.radius || 10,
-          quantity: args.count ?? args.quantity ?? 1,
-          exploreOnFail: true,
-          maxSearchTime: 30000,
+          item,
+          count: args.count ?? args.quantity ?? 1,
         },
       };
+    }
     case 'clear_3x3_area':
+      warnTypeRemap('clear_3x3_area', 'mine_block');
       return {
         type: 'mine_block',
         parameters: {
@@ -372,6 +399,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'craft_recipe':
+      warnTypeRemap('craft_recipe', 'craft');
       return {
         type: 'craft',
         parameters: {
@@ -389,6 +417,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'place_door':
+      warnTypeRemap('place_door', 'place_block');
       return {
         type: 'place_block',
         parameters: {
@@ -403,13 +432,15 @@ export function mapBTActionToMinecraft(
     case 'wait':
       return { type: 'wait', parameters: { duration: args.duration || 2000 } };
     case 'step_forward_safely':
+      warnTypeRemap('step_forward_safely', 'move_forward');
       return {
         type: 'move_forward',
         parameters: { distance: args.distance || 1 },
         timeout: 5000,
       };
-    // Add new action mappings for cognitive reflection generated actions
+    // Cognitive reflection generated actions — all remap to canonical types
     case 'move_and_gather':
+      warnTypeRemap('move_and_gather', 'gather_resources');
       return {
         type: 'gather_resources',
         parameters: {
@@ -419,6 +450,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'move_and_mine':
+      warnTypeRemap('move_and_mine', 'mine_block');
       return {
         type: 'mine_block',
         parameters: {
@@ -428,6 +460,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'explore_area':
+      warnTypeRemap('explore_area', 'move_random');
       return {
         type: 'move_random',
         parameters: {
@@ -436,6 +469,7 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'assess_safety':
+      warnTypeRemap('assess_safety', 'scan_environment');
       return {
         type: 'scan_environment',
         parameters: {
@@ -508,4 +542,8 @@ export function mapBTActionToMinecraft(
       if (strict) return null;
       return { type: normalizedTool, parameters: args, debug: debugInfo };
   }
+
+  // Unreachable — all cases return.
+  // Tripwire: every case that changes the action type MUST call warnTypeRemap().
+  // If you add a new case that remaps, add warnTypeRemap(from, to) before the return.
 }

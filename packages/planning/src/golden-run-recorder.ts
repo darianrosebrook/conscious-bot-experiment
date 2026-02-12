@@ -227,7 +227,7 @@ export type GoldenRunDispatchResult = NonNullable<
  * Also checks top-level as fallback (in case a caller bypasses normalization).
  * Only accepts bounded, versioned objects (must have `_diag_version`).
  */
-function extractToolDiagnostics(
+export function extractToolDiagnostics(
   actionResult: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
   const data = actionResult.data as Record<string, unknown> | undefined;
@@ -238,6 +238,32 @@ function extractToolDiagnostics(
     return candidate;
   }
   return undefined;
+}
+
+/**
+ * Extract the `reason_code` from tool diagnostics in an action result.
+ * Convenience wrapper over `extractToolDiagnostics` for LoopBreaker signature building.
+ */
+export function extractDiagReasonCode(
+  actionResult: Record<string, unknown> | null | undefined,
+): string | undefined {
+  if (!actionResult) return undefined;
+  const diag = extractToolDiagnostics(actionResult);
+  return (diag as Record<string, unknown> | undefined)?.reason_code as string | undefined;
+}
+
+/**
+ * Extract the `retry_hint` from tool diagnostics in an action result.
+ * The retry_hint tells the executor what state change is needed before retrying:
+ *   - 'reposition_or_rescan': bot should move before retrying (no_blocks_found)
+ *   - undefined: default retry behavior (exponential backoff in place)
+ */
+export function extractRetryHint(
+  actionResult: Record<string, unknown> | null | undefined,
+): string | undefined {
+  if (!actionResult) return undefined;
+  const diag = extractToolDiagnostics(actionResult);
+  return (diag as Record<string, unknown> | undefined)?.retry_hint as string | undefined;
 }
 
 /**

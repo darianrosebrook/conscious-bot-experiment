@@ -54,6 +54,13 @@ export function stepToLeafExecution(
 
   switch (leaf) {
     case 'dig_block': {
+      // Legacy remap: dig_block → acquire_material.
+      // Gated: emit diagnostic so we can track usage and remove once counter hits zero.
+      console.warn(
+        '[stepToLeafExecution] Legacy dig_block → acquire_material rewrite fired. ' +
+        'This path should not be hit by Sterling-resolved steps (they use explicit args). ' +
+        'If you see this in production, a producer is still emitting derived dig_block steps.'
+      );
       const item = produces[0];
       return {
         leafName: 'acquire_material',

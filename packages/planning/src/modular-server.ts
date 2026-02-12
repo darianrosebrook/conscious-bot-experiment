@@ -73,6 +73,8 @@ import {
   type KeepAliveIntegration,
 } from './modules/keep-alive-integration';
 import { getGoldenRunRecorder, toDispatchResult } from './golden-run-recorder';
+import { buildFailureSignature } from './task-lifecycle/failure-signature';
+import { getLoopBreaker } from './task-lifecycle/loop-breaker';
 import { getPlanningRuntimeConfig } from './planning-runtime-config';
 // Dynamic import to avoid TypeScript path resolution issues
 // import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
@@ -595,6 +597,30 @@ const toolExecutor = {
           cost: 1,
           duration: Date.now() - startTime,
           metadata: { reason: 'no_mapped_action' },
+        };
+      }
+
+      // Fail-closed: if action-mapping flagged invalid args, block dispatch
+      // before reaching the MC interface. The _error marker is set when
+      // required args (like item) are missing — retrying won't help.
+      if (mappedAction.parameters?._error) {
+        const errorMarker = mappedAction.parameters._error;
+        console.warn(
+          `[toolExecutor] Blocked dispatch: ${mappedAction.type} has _error marker: ${errorMarker}`
+        );
+        return {
+          ok: false,
+          data: null,
+          environmentDeltas: {},
+          error: `blocked_invalid_action_args: ${errorMarker}`,
+          confidence: 0,
+          cost: 0,
+          duration: Date.now() - startTime,
+          metadata: {
+            reason: 'blocked_invalid_action_args',
+            errorMarker,
+            actionType: mappedAction.type,
+          },
         };
       }
 
@@ -2297,6 +2323,13 @@ async function autonomousTaskExecutor() {
         console.warn(
           `⚠️ [Executor] Task ${currentTask.id} has no remaining executable steps — marking blocked`
         );
+        {
+          const runId = (currentTask.metadata as any)?.goldenRun?.runId as string | undefined;
+          const loopSig = buildFailureSignature({ category: 'executor_error', blockedReason: 'no-executable-plan' });
+          const episode = getLoopBreaker().recordFailure(loopSig, { taskId: currentTask.id, runId });
+          if (episode && runId) { getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+          if (runId) { getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
+        }
         return;
       }
 
@@ -2327,6 +2360,17 @@ async function autonomousTaskExecutor() {
             console.warn(
               `[Executor] Step ${nextStep.order} has no leaf binding — blocking task (no MCP fallback)`
             );
+            {
+              const runId = (currentTask.metadata as any)?.goldenRun?.runId as string | undefined;
+              const loopSig = buildFailureSignature({
+                category: 'executor_error',
+                blockedReason: 'executable-step-no-leaf-binding',
+                leaf: nextStep.meta?.leaf as string | undefined,
+              });
+              const episode = getLoopBreaker().recordFailure(loopSig, { taskId: currentTask.id, runId });
+              if (episode && runId) { getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+              if (runId) { getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
+            }
             return;
           }
           console.warn(
@@ -3370,6 +3414,25 @@ taskIntegration.on(
     // can suppress creation of identical tasks during the cooldown window.
     if (event.type === 'failed' && event.task) {
       registerFailedTaskCategory(event.task);
+
+      // LoopBreaker: record at the true terminal surface — task lifecycle 'failed'.
+      // This captures PlanRoute:unplannable, blocked_invalid_ir_bundle, and all other
+      // failure modes that terminate tasks without reaching executor blocking points.
+      const meta = (event.task.metadata ?? {}) as Record<string, unknown>;
+      const solverMeta = meta.solver as Record<string, unknown> | undefined;
+      const blockedReason = (meta.blockedReason as string)
+        || (solverMeta?.noStepsReason as string)
+        || 'unknown';
+      const routeBackend = solverMeta?.routeBackend as string | undefined;
+      const loopSig = buildFailureSignature({
+        category: 'task_terminal',
+        blockedReason,
+        leaf: routeBackend,  // carry route backend as discriminator
+      });
+      const runId = ((meta.goldenRun as Record<string, unknown> | undefined)?.runId) as string | undefined;
+      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: event.taskId, runId });
+      if (episode && runId) { getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      if (runId) { getGoldenRunRecorder().markLoopBreakerEvaluated(runId); }
     }
 
     fetch(`${cognitionEndpoint}/api/task-review`, {

@@ -89,7 +89,7 @@ describe('Sterling step-to-executor pipeline', () => {
       expect(result!.btAction.parameters?.item).toBe('wooden_pickaxe');
     });
 
-    it('dig_block (remapped to acquire_material) produces executor-ready output', () => {
+    it('dig_block (legacy remapped to acquire_material) produces executor-ready output', () => {
       const step = {
         meta: {
           leaf: 'dig_block',
@@ -99,7 +99,10 @@ describe('Sterling step-to-executor pipeline', () => {
       const result = runExecutorPipeline(step);
       expect(result).not.toBeNull();
       expect(result!.leafName).toBe('acquire_material');
+      // After Fix 1: acquire_material passes through as acquire_material (not collect_items_enhanced)
+      expect(result!.btAction.type).toBe('acquire_material');
       expect(result!.btAction.parameters).toBeDefined();
+      expect(result!.btAction.parameters.item).toBe('oak_log');
     });
 
     it('smelt with legacy consumes maps through pipeline', () => {
@@ -185,7 +188,7 @@ describe('Sterling step-to-executor pipeline', () => {
       expect(result!.btAction.parameters).toBeDefined();
     });
 
-    it('acquire_material with explicit args maps through pipeline', () => {
+    it('acquire_material with explicit args maps through pipeline (no type remap)', () => {
       const step = {
         meta: {
           leaf: 'acquire_material',
@@ -197,8 +200,35 @@ describe('Sterling step-to-executor pipeline', () => {
       expect(result!.leafName).toBe('acquire_material');
       expect(result!.args.item).toBe('cobblestone');
       expect(result!.args.count).toBe(8);
-      expect(result!.btAction.parameters).toBeDefined();
+      // After Fix 1: acquire_material stays acquire_material (routes to AcquireMaterialLeaf)
+      expect(result!.btAction.type).toBe('acquire_material');
+      expect(result!.btAction.parameters.item).toBe('cobblestone');
+      expect(result!.btAction.parameters.count).toBe(8);
     });
+  });
+
+  describe('passthrough actions must not remap type', () => {
+    // These actions MUST preserve their type through mapBTActionToMinecraft.
+    // If a new action remaps, it must use warnTypeRemap() and be added to the
+    // intentional-remap list below instead.
+    const PASSTHROUGH_CASES: Array<{ tool: string; args: Record<string, any> }> = [
+      { tool: 'acquire_material', args: { item: 'oak_log', count: 1 } },
+      { tool: 'collect_items', args: { itemName: 'oak_log' } },
+      { tool: 'dig_block', args: { blockType: 'stone' } },
+      { tool: 'place_block', args: { block_type: 'stone' } },
+      { tool: 'place_workstation', args: { workstation: 'crafting_table' } },
+      { tool: 'place_torch', args: {} },
+      { tool: 'wait', args: { duration: 1000 } },
+      { tool: 'chat', args: { message: 'hello' } },
+    ];
+
+    for (const { tool, args } of PASSTHROUGH_CASES) {
+      it(`${tool} → type === ${tool} (no remap)`, () => {
+        const result = mapBTActionToMinecraft(tool, args);
+        expect(result).not.toBeNull();
+        expect(result!.type).toBe(tool);
+      });
+    }
   });
 
   describe('pipeline rejects invalid steps', () => {

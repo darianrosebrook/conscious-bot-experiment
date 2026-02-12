@@ -891,9 +891,9 @@ export class DigBlockLeaf implements LeafImpl {
         itemsCollected: { type: 'number' },
       },
     },
-    timeoutMs: 10000,
+    timeoutMs: 30000, // Increased: auto-locate may pathfind up to 32 blocks
     retries: 2,
-    permissions: ['dig'],
+    permissions: ['dig', 'movement'],
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -923,15 +923,22 @@ export class DigBlockLeaf implements LeafImpl {
               tgt: { x: number; y: number; z: number }
             ) => boolean)
           | undefined;
-        // Expanding cube search: prefer blocks the bot can actually see (no digging through dirt/stone)
-        outer: for (let r = 1; r <= 10; r++) {
+        // Expanding cube search with radius up to 32 blocks.
+        // Inner 10: prefer blocks with line-of-sight (diggable without moving).
+        // Outer 11–32: find blocks the bot will pathfind to before digging.
+        const MAX_SEARCH_RADIUS = 32;
+        const LOS_RADIUS = 10;
+        outer: for (let r = 1; r <= MAX_SEARCH_RADIUS; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = -r; dy <= r; dy++) {
               for (let dz = -r; dz <= r; dz++) {
+                // Only check the shell at distance r (skip interior, already checked)
+                if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(namePattern)) {
-                  if (hasLineOfSight) {
+                  // Within LOS radius: require line-of-sight if checker available
+                  if (r <= LOS_RADIUS && hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,
@@ -948,12 +955,13 @@ export class DigBlockLeaf implements LeafImpl {
         }
 
         if (!resolvedPos) {
+          console.warn(`[DigBlock] No ${namePattern} found within ${MAX_SEARCH_RADIUS} blocks from ${origin}`);
           return {
             status: 'failure',
             error: {
               code: 'world.invalidPosition',
               retryable: true,
-              detail: `No ${namePattern} found nearby`,
+              detail: `No ${namePattern} found within ${MAX_SEARCH_RADIUS} blocks`,
             },
             metrics: {
               durationMs: ctx.now() - startTime,
@@ -961,6 +969,47 @@ export class DigBlockLeaf implements LeafImpl {
               timeouts: 0,
             },
           };
+        }
+
+        // Pathfind to within dig reach if the block is far away
+        const DIG_REACH = 4.0;
+        const distToBlock = origin.distanceTo(resolvedPos);
+        if (distToBlock > DIG_REACH) {
+          const botWithPf = bot as BotWithPathfinder;
+          if (!botWithPf.pathfinder) {
+            botWithPf.loadPlugin(pathfinder);
+          }
+          const moves = new Movements(bot);
+          moves.scafoldingBlocks = [];
+          moves.canDig = false;
+          botWithPf.pathfinder.setMovements(moves);
+
+          const goal = new pathfinderGoals.GoalNear(
+            resolvedPos.x,
+            resolvedPos.y,
+            resolvedPos.z,
+            3
+          );
+
+          // Retry pathfinding once if goal gets preempted (e.g. by D* Lite replan
+          // or SafetyMonitor flee). The second attempt usually succeeds because the
+          // conflicting navigation has settled.
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              botWithPf.pathfinder.setMovements(moves);
+              await botWithPf.pathfinder.goto(goal);
+              break; // success
+            } catch (navErr: any) {
+              const msg = navErr?.message ?? '';
+              if (attempt === 0 && msg.includes('goal was changed')) {
+                console.warn(`[DigBlock] Pathfind preempted, retrying (attempt ${attempt + 1})`);
+                await new Promise(r => setTimeout(r, 500));
+                continue;
+              }
+              console.warn(`[DigBlock] Pathfind failed (${msg}), attempting dig anyway`);
+              break;
+            }
+          }
         }
       } else {
         return {
@@ -980,14 +1029,16 @@ export class DigBlockLeaf implements LeafImpl {
 
       const targetPos = resolvedPos;
       const block = bot.blockAt(targetPos);
+      const distAfterNav = bot.entity.position.distanceTo(targetPos);
 
       if (!block || block.name === 'air') {
+        console.warn(`[DigBlock] No block at target (dist=${distAfterNav.toFixed(1)}, block=${block?.name ?? 'null'}, target=${targetPos})`);
         return {
           status: 'failure',
           error: {
             code: 'world.invalidPosition',
-            retryable: false,
-            detail: 'No block at specified position',
+            retryable: true, // retryable: bot may need to pathfind closer
+            detail: `No block at position (dist=${distAfterNav.toFixed(1)}, got=${block?.name ?? 'null'})`,
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -1014,39 +1065,67 @@ export class DigBlockLeaf implements LeafImpl {
         };
       }
 
-      // Do not dig blocks the bot cannot see (occluded by dirt, stone, etc.)
-      const hasLineOfSight = (ctx as any).hasLineOfSight as
-        | ((
-            obs: { x: number; y: number; z: number },
-            tgt: { x: number; y: number; z: number }
-          ) => boolean)
-        | undefined;
-      if (hasLineOfSight) {
-        const eyePos = bot.entity.position.offset(
-          0,
-          bot.entity.height ?? 1.62,
-          0
-        );
-        const blockCenter = {
-          x: targetPos.x + 0.5,
-          y: targetPos.y + 0.5,
-          z: targetPos.z + 0.5,
+      // If the bot is still too far after pathfinding, return retryable failure.
+      // Mineflayer's bot.dig() will throw if the block is beyond ~6 blocks.
+      const DIG_MAX = 6.0;
+      if (distAfterNav > DIG_MAX) {
+        console.warn(`[DigBlock] Block still out of reach after nav (dist=${distAfterNav.toFixed(1)}, block=${block.name})`);
+        return {
+          status: 'failure',
+          error: {
+            code: 'world.invalidPosition',
+            retryable: true,
+            detail: `Block out of reach (dist=${distAfterNav.toFixed(1)}, block=${block.name})`,
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
         };
-        if (!hasLineOfSight(eyePos, blockCenter)) {
-          return {
-            status: 'failure',
-            error: {
-              code: 'world.invalidPosition',
-              retryable: true,
-              detail:
-                'Block not visible (occluded); cannot dig through obstacles',
-            },
-            metrics: {
-              durationMs: ctx.now() - startTime,
-              retries: 0,
-              timeouts: 0,
-            },
+      }
+
+      // Skip LOS check when within normal dig reach (~4.5 blocks). The raycast
+      // produces false negatives on tree logs surrounded by leaves or adjacent
+      // blocks. At close range, just let bot.dig() try — it will throw if the
+      // block is truly unreachable.
+      // Only apply LOS check for blocks at medium range (4.5–6 blocks) where
+      // terrain occlusion is a real concern.
+      const CLOSE_DIG_RANGE = 4.5;
+      if (distAfterNav > CLOSE_DIG_RANGE) {
+        const hasLineOfSight = (ctx as any).hasLineOfSight as
+          | ((
+              obs: { x: number; y: number; z: number },
+              tgt: { x: number; y: number; z: number }
+            ) => boolean)
+          | undefined;
+        if (hasLineOfSight) {
+          const eyePos = bot.entity.position.offset(
+            0,
+            bot.entity.height ?? 1.62,
+            0
+          );
+          const blockCenter = {
+            x: targetPos.x + 0.5,
+            y: targetPos.y + 0.5,
+            z: targetPos.z + 0.5,
           };
+          if (!hasLineOfSight(eyePos, blockCenter)) {
+            console.warn(`[DigBlock] Block occluded at dist=${distAfterNav.toFixed(1)}, block=${block.name}`);
+            return {
+              status: 'failure',
+              error: {
+                code: 'world.invalidPosition',
+                retryable: true,
+                detail: `Block occluded (dist=${distAfterNav.toFixed(1)}, block=${block.name})`,
+              },
+              metrics: {
+                durationMs: ctx.now() - startTime,
+                retries: 0,
+                timeouts: 0,
+              },
+            };
+          }
         }
       }
 
@@ -1200,15 +1279,19 @@ export class AcquireMaterialLeaf implements LeafImpl {
     }
 
     const count = Math.max(1, Math.min(args?.count ?? 1, 8));
+    const maxSearchRadius = Math.min(Math.max(args?.maxRadius ?? 32, 10), 48);
     const tool = args?.tool as string | undefined;
     const bot = ctx.bot;
     const collected: Array<{ name: string; count: number }> = [];
     let totalAcquired = 0;
     let lastToolUsed = 'hand';
+    let searchRadiusUsed = 0;
 
     try {
       for (let i = 0; i < count; i++) {
         // --- Phase 1: Find nearest matching block (expanding cube search) ---
+        // Tiered search: inner ring (≤10) requires LOS for immediate dig;
+        // outer rings (11-24, 25-maxRadius) will pathfind before digging.
         const origin = bot.entity.position.clone();
         const eyePos = origin.offset(0, bot.entity.height ?? 1.62, 0);
         const hasLineOfSight = (ctx as any).hasLineOfSight as
@@ -1222,14 +1305,18 @@ export class AcquireMaterialLeaf implements LeafImpl {
         // Expanding cube search for nearest matching block.
         // Prefer blocks at or above bot Y; skip deep pits.
         const MIN_DY = -2;
-        outer: for (let r = 1; r <= 10; r++) {
+        const LOS_RADIUS = 10;
+        outer: for (let r = 1; r <= maxSearchRadius; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
               for (let dz = -r; dz <= r; dz++) {
+                // Only check the shell at distance r (skip interior, already checked)
+                if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(itemPattern)) {
-                  if (hasLineOfSight) {
+                  // Within LOS radius: require line-of-sight for immediate dig
+                  if (r <= LOS_RADIUS && hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,
@@ -1238,6 +1325,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                     if (!hasLineOfSight(eyePos, blockCenter)) continue;
                   }
                   resolvedPos = p;
+                  searchRadiusUsed = r;
                   break outer;
                 }
               }
@@ -1253,7 +1341,22 @@ export class AcquireMaterialLeaf implements LeafImpl {
             error: {
               code: 'world.invalidPosition',
               retryable: true,
-              detail: `No ${itemPattern} found nearby`,
+              detail: `No ${itemPattern} found within ${maxSearchRadius} blocks — reposition needed`,
+            },
+            result: {
+              success: false,
+              acquired: totalAcquired,
+              items: collected,
+              toolDiagnostics: {
+                _diag_version: 1,
+                scan: {
+                  scan_scope: 'blocks',
+                  search_radius: maxSearchRadius,
+                  target_pattern: itemPattern,
+                },
+                reason_code: 'no_blocks_found',
+                retry_hint: 'reposition_or_rescan',
+              },
             },
             metrics: {
               durationMs: ctx.now() - startTime,
@@ -1292,6 +1395,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
             console.warn(
               `[AcquireMaterial] Pathfind failed (${navErr?.message}), attempting dig anyway`
             );
+            // Diagnostics for pathfind failure are captured in the result if dig also fails
           }
         }
 
@@ -1373,6 +1477,11 @@ export class AcquireMaterialLeaf implements LeafImpl {
           collected: true,
           item: itemPattern,
           toolUsed: lastToolUsed,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: totalAcquired >= count ? 'harvest_complete' : 'harvest_partial',
+            searchRadiusUsed,
+          },
         },
         ...(totalAcquired === 0
           ? {
@@ -1401,6 +1510,11 @@ export class AcquireMaterialLeaf implements LeafImpl {
             collected: true,
             item: itemPattern,
             toolUsed: lastToolUsed,
+            toolDiagnostics: {
+              _diag_version: 1,
+              reason_code: 'harvest_partial',
+              searchRadiusUsed,
+            },
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -1417,6 +1531,11 @@ export class AcquireMaterialLeaf implements LeafImpl {
           items: [],
           item: itemPattern,
           toolUsed: lastToolUsed,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'no_path_to_block',
+            searchRadiusUsed,
+          },
         },
         error: {
           code: 'acquire.failed',
