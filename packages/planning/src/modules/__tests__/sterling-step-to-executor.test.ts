@@ -214,7 +214,8 @@ describe('Sterling step-to-executor pipeline', () => {
     const PASSTHROUGH_CASES: Array<{ tool: string; args: Record<string, any> }> = [
       { tool: 'acquire_material', args: { item: 'oak_log', count: 1 } },
       { tool: 'collect_items', args: { itemName: 'oak_log' } },
-      { tool: 'dig_block', args: { blockType: 'stone' } },
+      // dig_block with explicit pos passes through; without pos + with blockType → acquire_material
+      { tool: 'dig_block', args: { blockType: 'stone', pos: { x: 0, y: 64, z: 0 } } },
       { tool: 'place_block', args: { block_type: 'stone' } },
       { tool: 'place_workstation', args: { workstation: 'crafting_table' } },
       { tool: 'place_torch', args: {} },
@@ -229,6 +230,25 @@ describe('Sterling step-to-executor pipeline', () => {
         expect(result!.type).toBe(tool);
       });
     }
+  });
+
+  describe('intentional type remaps', () => {
+    it('dig_block without pos (search-mode) remaps to acquire_material', () => {
+      const result = mapBTActionToMinecraft('dig_block', { blockType: 'stone' });
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('acquire_material');
+      expect(result!.parameters.item).toBe('stone');
+    });
+
+    it('dig_block with explicit pos stays dig_block', () => {
+      const result = mapBTActionToMinecraft('dig_block', {
+        blockType: 'stone',
+        pos: { x: 10, y: 64, z: 20 },
+      });
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('dig_block');
+      expect(result!.parameters.pos).toEqual({ x: 10, y: 64, z: 20 });
+    });
   });
 
   describe('pipeline rejects invalid steps', () => {

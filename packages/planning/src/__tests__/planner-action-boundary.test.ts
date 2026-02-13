@@ -54,7 +54,10 @@ const ACCEPTED_ACTION_TYPES = new Set([
   'get_block_at',
   // Collection
   'pickup_item',
-  'collect_items_enhanced',
+  'collect_items',
+  'collect_items_enhanced', // deprecated: kept for raw /action endpoint compat
+  // Material acquisition
+  'acquire_material',
   // Observation
   'look_at',
   'scan_environment',

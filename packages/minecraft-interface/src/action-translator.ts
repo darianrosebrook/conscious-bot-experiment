@@ -83,6 +83,45 @@ function resolveCollectReasonCode(
 }
 
 /**
+ * Resolve a possibly-fuzzy item name (e.g. '_log') to a set of matching mcData item IDs.
+ *
+ * Sterling bootstrap emits suffix patterns like '_log' which match 'oak_log', 'birch_log', etc.
+ * Normal item names (e.g. 'oak_log') are resolved via exact lookup.
+ *
+ * Returns null when no filter should be applied (item is undefined/empty).
+ * Returns an empty Set when the pattern matched nothing in mcData.
+ */
+function resolveItemIds(bot: Bot, item: string | undefined): Set<number> | null {
+  if (!item) return null;
+  const mcData = (bot as any).mcData;
+  if (!mcData?.itemsByName) return null;
+
+  // Exact match first
+  const exact = mcData.itemsByName[item];
+  if (exact) return new Set([exact.id]);
+
+  // Suffix/substring pattern (e.g. '_log', '_planks')
+  const ids = new Set<number>();
+  for (const [name, entry] of Object.entries(mcData.itemsByName)) {
+    if (name.includes(item)) {
+      ids.add((entry as any).id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Check if an item entity matches the target item filter.
+ * Uses the fuzzy ID set from resolveItemIds.
+ */
+function entityMatchesItem(entity: any, itemIds: Set<number> | null): boolean {
+  if (!itemIds) return true; // no filter → match all
+  const entityItemId = (entity.metadata?.[8] as any)?.itemId;
+  if (entityItemId == null) return false;
+  return itemIds.has(entityItemId);
+}
+
+/**
  * Seeded hash for exploration target selection.
  * Returns a stable value in [0, 1) derived from immutable trace facts.
  * Replayable: same input string always produces the same output.
@@ -1724,7 +1763,12 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    console.log('🔧 executeDigBlock called with:', action);
+    console.warn(
+      '[DEPRECATED] executeDigBlock handler called. ' +
+      'Sterling pipeline routes dig_block→acquire_material at stepToLeafExecution. ' +
+      'This handler should only be reached from raw /action endpoint with explicit pos. ' +
+      `Caller: type=${action.type}, hasPos=${!!(action.parameters?.pos || action.parameters?.position)}`
+    );
     try {
       // Get the global leaf factory
       const leafFactory = (global as any).minecraftLeafFactory;
@@ -2993,14 +3037,13 @@ export class ActionTranslator {
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const { item, maxDistance = 3 } = action.parameters;
+    const itemIds = resolveItemIds(this.bot, item);
 
-    // Find nearby items
+    // Find nearby items (fuzzy match for suffix patterns like '_log')
     const droppedItems = Object.values(this.bot.entities).filter(
       (entity) =>
         entity.name === 'item' &&
-        (!item ||
-          (entity.metadata?.[8] as any)?.itemId ===
-            (this.bot as any).mcData.itemsByName[item]?.id) &&
+        entityMatchesItem(entity, itemIds) &&
         entity.position.distanceTo(this.bot.entity.position) <= maxDistance
     );
 
@@ -3023,43 +3066,33 @@ export class ActionTranslator {
 
     for (const itemEntity of sortedItems) {
       try {
-        // Move to the item
-        const Goals = await getGoals();
-        const goal = new Goals.GoalNear(
-          itemEntity.position.x,
-          itemEntity.position.y,
-          itemEntity.position.z,
-          1
-        );
-        this.bot.pathfinder.setGoal(goal);
+        const dist = itemEntity.position.distanceTo(this.bot.entity.position);
 
-        // Wait for goal to be reached or timeout
-        await new Promise<void>((resolve, reject) => {
-          const timeoutId = setTimeout(
-            () => reject(new Error('Pickup timeout')),
-            timeout
-          );
+        // Use direct-walk approach: look at item and walk forward.
+        // This is more reliable than pathfinder for nearby items because:
+        // 1) Pathfinder gets preempted by D* Lite navigation replanning
+        // 2) Items are usually within a few blocks after dig_block
+        // 3) Auto-pickup range in Minecraft is ~1.5 blocks, so we need to get close
+        const walkDuration = Math.min(Math.max(dist * 400, 500), 3000);
+        await this.bot.lookAt(itemEntity.position);
+        this.bot.setControlState('forward', true);
+        await new Promise(r => setTimeout(r, walkDuration));
+        this.bot.setControlState('forward', false);
 
-          this.bot.once('goal_reached', () => {
-            clearTimeout(timeoutId);
-            resolve();
-          });
-
-          (this.bot as any).once('path_error', (error: any) => {
-            clearTimeout(timeoutId);
-            reject(error);
-          });
-        });
-
-        // The item should be automatically collected when we're close enough
-        collectedItems++;
-        collectedData.push({
-          itemId: itemEntity.id,
-          position: itemEntity.position.clone(),
-        });
-
-        // Small delay to allow collection
+        // Wait for auto-pickup to register
         await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Check if the entity was actually collected (disappeared from entities)
+        const stillExists = this.bot.entities[itemEntity.id];
+        if (!stillExists) {
+          collectedItems++;
+          collectedData.push({
+            itemId: itemEntity.id,
+            position: itemEntity.position.clone(),
+          });
+        } else {
+          console.log(`[CollectItems] Item ${itemEntity.id} still exists after approach (dist=${itemEntity.position.distanceTo(this.bot.entity.position).toFixed(1)})`);
+        }
       } catch (error) {
         console.log(`Failed to collect item ${itemEntity.id}: ${error}`);
         continue;
@@ -3089,6 +3122,12 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string; diagnostics?: CollectDiagnostics }> {
+    console.warn(
+      '[DEPRECATED] executeCollectItemsEnhanced handler called. ' +
+      'Sterling pipeline no longer routes here (action-mapping stopped remapping to collect_items_enhanced). ' +
+      'This handler should only be reached from raw /action endpoint with exploreOnFail=true. ' +
+      'If you see this in production, investigate the caller.'
+    );
     const {
       item,
       radius = 10,
@@ -3454,13 +3493,13 @@ export class ActionTranslator {
         }>;
       };
 
-      // Look for items in the perception results
+      // Look for items in the perception results (fuzzy match for suffix patterns)
+      const perceptionItemIds = resolveItemIds(this.bot, item);
       const itemsFound =
         perceptionResult.observations?.filter(
           (obs) =>
             obs.type === 'item' &&
-            (!item ||
-              obs.itemId === (this.bot as any).mcData.itemsByName[item]?.id)
+            (perceptionItemIds === null || perceptionItemIds.has(Number(obs.itemId)))
         ) || [];
 
       if (itemsFound.length > 0) {
@@ -3655,12 +3694,11 @@ export class ActionTranslator {
             }
           }
 
-          // Filter to target item for collection
+          // Filter to target item for collection (fuzzy match for suffix patterns)
+          const spiralItemIds = resolveItemIds(this.bot, item);
           const itemsFound = allItemEntities.filter(
             (entity) =>
-              (!item ||
-                (entity.metadata?.[8] as any)?.itemId ===
-                  (this.bot as any).mcData.itemsByName[item]?.id) &&
+              entityMatchesItem(entity, spiralItemIds) &&
               entity.position.distanceTo(this.bot.entity.position) <= radius
           );
 
@@ -3688,7 +3726,7 @@ export class ActionTranslator {
                   closest_item_distance:
                     closestItemDist !== null ? quantize1(closestItemDist) : null,
                   item_types_seen: [...itemTypesSeen].sort().slice(0, 20),
-                  target_type_seen: item ? itemTypesSeen.has(item) : false,
+                  target_type_seen: item ? [...itemTypesSeen].some(t => t === item || t.includes(item)) : false,
                 },
                 explore: {
                   enabled: true,
@@ -3727,7 +3765,7 @@ export class ActionTranslator {
         closest_item_distance:
           closestItemDist !== null ? quantize1(closestItemDist) : null,
         item_types_seen: [...itemTypesSeen].sort().slice(0, 20),
-        target_type_seen: item ? itemTypesSeen.has(item) : false,
+        target_type_seen: item ? [...itemTypesSeen].some(t => t === item || t.includes(item)) : false,
       },
       explore: {
         enabled: true,

@@ -823,8 +823,19 @@ export async function executeSterlingStep(
   if (actionResult?.ok) {
     const stepCompleted = await ctx.completeTaskStep(task.id, nextStep.id);
     if (stepCompleted) {
-      if (task.metadata?.verifyFailCount) {
-        ctx.updateTaskMetadata(task.id, { verifyFailCount: 0 });
+      // Clear step-scoped retry state on success.
+      // These counters must not bleed across steps — a 9-step plan should not
+      // "use up" reposition retries on step 1 and then fail early on step 5.
+      const staleRetryState =
+        task.metadata?.verifyFailCount ||
+        task.metadata?.repositionRetryCount ||
+        task.metadata?.lastRetryHint;
+      if (staleRetryState) {
+        ctx.updateTaskMetadata(task.id, {
+          verifyFailCount: 0,
+          repositionRetryCount: undefined,
+          lastRetryHint: undefined,
+        });
       }
     } else {
       // Smoke tasks with noRetry: skip verification and finalize immediately.

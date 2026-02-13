@@ -287,17 +287,31 @@ export function mapBTActionToMinecraft(
         timeout: 30000,
       };
     case 'dig_blocks':
-    case 'dig_block':
+    case 'dig_block': {
+      const hasExplicitPos = !!(args.position || args.pos);
+      if (!hasExplicitPos && args.blockType) {
+        // Search-mode: no position, only blockType → route to acquire_material.
+        // acquire_material does find→pathfind→dig→collect (full harvest pipeline).
+        // dig_block without pos would just find→dig without reliable drop pickup.
+        warnTypeRemap('dig_block', 'acquire_material');
+        return {
+          type: 'acquire_material',
+          parameters: {
+            item: args.blockType,
+            count: args.count ?? args.quantity ?? 1,
+          },
+        };
+      }
+      // Position-mode: caller knows exact block → use dig_block leaf directly.
       return {
         type: 'dig_block',
         parameters: {
-          // Only pass pos if Sterling/caller explicitly provided coordinates.
-          // When omitted, the leaf auto-locates by blockType (expanding search + pathfind).
-          ...(args.position || args.pos ? { pos: args.position || args.pos } : {}),
+          ...(hasExplicitPos ? { pos: args.position || args.pos } : {}),
           tool: args.tool || 'axe',
           blockType: args.blockType,
         },
       };
+    }
     case 'collect_items':
       // No remap — collect_items routes to CollectItemsLeaf (dropped-item pickup).
       // Previously remapped to collect_items_enhanced with exploreOnFail, which

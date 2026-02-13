@@ -59,6 +59,10 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     stripKeys: ['exploreOnFail'],
     deprecatedKeys: ['exploreOnFail'],
     dispatchMode: 'guarded',
+    // DEPRECATED: No Sterling step emits collect_items_enhanced. action-mapping
+    // no longer remaps anything to it. This contract only exists for raw /action
+    // endpoint callers. Track handler hits via the deprecation log in
+    // executeCollectItemsEnhanced; remove contract + handler when hits reach zero.
   },
   // --- Existing routed actions (document their contracts) ---
   craft: {
@@ -205,6 +209,49 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     aliases: {},
     defaults: {},
     requiredKeys: ['position'],
+  },
+
+  // ── Phase 2 handler-mode actions (registry entries for validation + routing trace) ──
+  // These use dedicated handler methods; the registry entry ensures they participate
+  // in parameter normalization and routing trace instrumentation.
+  dig_block: {
+    leafName: 'dig_block',
+    aliases: { position: 'pos' },
+    defaults: { tool: 'axe' },
+    // dig_block is remapped to acquire_material at the Sterling pipeline level
+    // (stepToLeafExecution). This contract only applies to raw /action endpoint
+    // callers. Handler is kept for backward compat with non-Sterling callers.
+    dispatchMode: 'handler',
+  },
+  navigate: {
+    leafName: 'sterling_navigate',
+    aliases: {},
+    defaults: {},
+    dispatchMode: 'handler',
+  },
+  move_to: {
+    leafName: 'sterling_navigate',
+    aliases: {},
+    defaults: {},
+    dispatchMode: 'handler',
+  },
+  mine_block: {
+    leafName: 'mine_block',
+    aliases: {},
+    defaults: { tool: 'pickaxe' },
+    dispatchMode: 'handler',
+  },
+  gather_resources: {
+    leafName: 'gather_resources',
+    aliases: {},
+    defaults: {},
+    dispatchMode: 'handler',
+  },
+  scan_environment: {
+    leafName: 'scan_environment',
+    aliases: {},
+    defaults: {},
+    dispatchMode: 'handler',
   },
 };
 
