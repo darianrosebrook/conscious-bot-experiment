@@ -92,6 +92,43 @@ function countByName(inv: any): Record<string, number> {
 }
 
 /**
+ * Normalize a recipe ID by stripping solver-internal suffixes (e.g. `:v9`,
+ * `:variant_3`) and namespace prefixes (e.g. `minecraft:`).
+ * Returns the cleaned ID or null if invalid.
+ */
+const VALID_MC_ID = /^[a-z0-9_]+$/;
+function normalizeRecipeId(raw: string | undefined): { id: string | null; raw?: string } {
+  if (!raw || typeof raw !== 'string') return { id: null };
+  let normalized = raw.trim().toLowerCase();
+  if (normalized.includes(':')) {
+    const beforeColon = normalized.split(':')[0];
+    const afterColon = normalized.split(':').slice(1).join(':');
+    if (/^v\d+$/.test(afterColon) || /^variant_\d+$/.test(afterColon)) {
+      // Solver-internal suffix like crafting_table:v9 → crafting_table
+      normalized = beforeColon;
+    } else if (beforeColon === 'minecraft') {
+      // Namespace prefix like minecraft:oak_planks → oak_planks
+      normalized = afterColon;
+    } else {
+      console.warn(
+        `[CraftRecipeLeaf] recipe_id normalization: unknown format "${raw}" → using "${beforeColon}"`
+      );
+      normalized = beforeColon;
+    }
+  }
+  if (!VALID_MC_ID.test(normalized) || normalized.length === 0) {
+    console.warn(
+      `[CraftRecipeLeaf] recipe_id rejected: "${raw}" → "${normalized}" does not match ${VALID_MC_ID}`
+    );
+    return { id: null, raw };
+  }
+  if (normalized !== raw) {
+    return { id: normalized, raw };
+  }
+  return { id: normalized };
+}
+
+/**
  * Find nearest block of specified types
  */
 async function findNearestBlock(
@@ -319,8 +356,36 @@ export class CraftRecipeLeaf implements LeafImpl {
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
     const t0 = ctx.now();
-    const { recipe, qty = 1, timeoutMs = this.spec.timeoutMs } = args;
+    const { qty = 1, timeoutMs = this.spec.timeoutMs } = args;
     const bot = ctx.bot;
+
+    // Normalize recipe ID: strip solver-internal suffixes (:v9) and namespace prefixes (minecraft:)
+    const { id: normalizedRecipe, raw: recipeRaw } = normalizeRecipeId(args.recipe);
+    if (!normalizedRecipe) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'craft.missingInput',
+          retryable: false,
+          detail: `Invalid or missing recipe ID: ${recipeRaw ?? args.recipe ?? 'undefined'}`,
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe: args.recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'invalid_recipe_id',
+            recipe_raw: recipeRaw ?? args.recipe,
+          },
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+    const recipe = normalizedRecipe;
+    if (recipeRaw) {
+      console.log(`[CraftRecipeLeaf] Normalized recipe: "${recipeRaw}" → "${recipe}"`);
+    }
 
     // Get mcData from bot
     const mcData = (bot as any).mcData;
@@ -331,6 +396,15 @@ export class CraftRecipeLeaf implements LeafImpl {
           code: 'unknown',
           retryable: false,
           detail: 'mcData not available on bot',
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'no_mcdata',
+          },
         },
         metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
       };
@@ -344,6 +418,16 @@ export class CraftRecipeLeaf implements LeafImpl {
           code: 'craft.missingInput',
           retryable: false,
           detail: `Unknown item: ${recipe}`,
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'unknown_item',
+            recipe_requested: recipe,
+          },
         },
         metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
       };
@@ -365,12 +449,29 @@ export class CraftRecipeLeaf implements LeafImpl {
       useTable = true;
     }
     if (!recipes || recipes.length === 0) {
+      // Distinguish: is the item known but we can't craft it (no table / missing inputs)?
+      const hasTable = !!tableBlock;
+      const invSnapshot = await ctx.inventory();
+      const invCounts = countByName(invSnapshot);
       return {
         status: 'failure',
         error: {
           code: 'craft.missingInput',
           retryable: false,
           detail: `No available recipe for ${recipe} (inputs missing or not near table)`,
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'no_recipe_available',
+            recipe_requested: recipe,
+            crafting_table_nearby: hasTable,
+            search_radius: WORKSTATION_SEARCH_RADIUS,
+            inventory_snapshot: invCounts,
+          },
         },
         metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
       };
@@ -411,12 +512,28 @@ export class CraftRecipeLeaf implements LeafImpl {
           : msg === 'aborted'
             ? 'aborted'
             : 'unknown';
+      const reasonCode =
+        code === 'craft.uiTimeout'
+          ? 'craft_timeout'
+          : code === 'aborted'
+            ? 'craft_aborted'
+            : 'craft_error';
       return {
         status: 'failure',
         error: {
           code: code as any,
           retryable: code !== 'aborted',
           detail: msg,
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: reasonCode,
+            used_table: useTable,
+          },
         },
         metrics: {
           durationMs: ctx.now() - t0,
@@ -436,12 +553,25 @@ export class CraftRecipeLeaf implements LeafImpl {
     // But only if we haven't already caught a timeout or abort error
     if (crafted <= 0 && process.env.NODE_ENV !== 'test') {
       // classify common causes (UI stall / inputs consumed weirdly)
+      const afterCounts2 = countByName(afterInv);
       return {
         status: 'failure',
         error: {
           code: 'craft.uiTimeout',
           retryable: true,
           detail: 'No inventory delta after craft',
+        },
+        result: {
+          success: false,
+          crafted: 0,
+          recipe,
+          toolDiagnostics: {
+            _diag_version: 1,
+            reason_code: 'no_inventory_delta',
+            used_table: useTable,
+            before_count: beforeCounts[recipe] ?? 0,
+            after_count: afterCounts2[recipe] ?? 0,
+          },
         },
         metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 1 },
       };
@@ -456,7 +586,17 @@ export class CraftRecipeLeaf implements LeafImpl {
     });
     return {
       status: 'success',
-      result: { crafted: finalCrafted, recipe },
+      result: {
+        crafted: finalCrafted,
+        recipe,
+        toolDiagnostics: {
+          _diag_version: 1,
+          reason_code: 'craft_complete',
+          used_table: useTable,
+          qty_requested: qty,
+          qty_crafted: finalCrafted,
+        },
+      },
       metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
     };
   }
