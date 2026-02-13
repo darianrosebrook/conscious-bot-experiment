@@ -232,6 +232,51 @@ function warnTypeRemap(from: string, to: string): void {
   );
 }
 
+/** Valid Minecraft item/recipe identifier: lowercase alphanumeric + underscores.
+ *  Rejects solver-internal formats like "crafting_table:v9" or "minecraft:oak_planks". */
+const VALID_MC_ID = /^[a-z0-9_]+$/;
+
+/**
+ * Normalize a recipe identifier at the action-mapping boundary.
+ * Strips solver-internal suffixes (`:v9`, `:variant_2`) and namespace prefixes (`minecraft:`).
+ * Returns the normalized ID, or null if the result is empty/invalid.
+ * Records the raw value for diagnostics when normalization changes it.
+ */
+function normalizeRecipeId(raw: string | undefined): { id: string | null; raw?: string } {
+  if (!raw || typeof raw !== 'string') return { id: null };
+  let normalized = raw.trim().toLowerCase();
+  // Strip namespace prefix: "minecraft:oak_planks" → "oak_planks"
+  if (normalized.includes(':')) {
+    const beforeColon = normalized.split(':')[0];
+    const afterColon = normalized.split(':').slice(1).join(':');
+    // If afterColon matches a version/variant pattern (v9, variant_2), strip it
+    if (/^v\d+$/.test(afterColon) || /^variant_\d+$/.test(afterColon)) {
+      normalized = beforeColon;
+    }
+    // If beforeColon is "minecraft", use afterColon as the ID
+    else if (beforeColon === 'minecraft') {
+      normalized = afterColon;
+    }
+    // Otherwise log and strip — unknown namespace
+    else {
+      console.warn(
+        `[ActionMapping] recipe_id normalization: unknown format "${raw}" → using "${beforeColon}"`
+      );
+      normalized = beforeColon;
+    }
+  }
+  if (!VALID_MC_ID.test(normalized) || normalized.length === 0) {
+    console.warn(
+      `[ActionMapping] recipe_id rejected: "${raw}" → "${normalized}" does not match ${VALID_MC_ID}`
+    );
+    return { id: null, raw };
+  }
+  if (normalized !== raw) {
+    return { id: normalized, raw };
+  }
+  return { id: normalized };
+}
+
 export function mapBTActionToMinecraft(
   tool: string,
   args: Record<string, any>,
@@ -288,25 +333,21 @@ export function mapBTActionToMinecraft(
       };
     case 'dig_blocks':
     case 'dig_block': {
-      const hasExplicitPos = !!(args.position || args.pos);
-      if (!hasExplicitPos && args.blockType) {
-        // Search-mode: no position, only blockType → route to acquire_material.
-        // acquire_material does find→pathfind→dig→collect (full harvest pipeline).
-        // dig_block without pos would just find→dig without reliable drop pickup.
-        warnTypeRemap('dig_block', 'acquire_material');
+      // dig_block is a position-required primitive: "dig this specific block."
+      // If you want search+pathfind+dig+collect, use acquire_material directly.
+      // Fail closed on missing pos — no silent behavior substitution.
+      const pos = args.position || args.pos;
+      if (!pos || typeof pos !== 'object') {
         return {
-          type: 'acquire_material',
-          parameters: {
-            item: args.blockType,
-            count: args.count ?? args.quantity ?? 1,
-          },
+          type: 'dig_block',
+          parameters: { _error: 'missing_required_arg:pos' },
+          debug: debugInfo,
         };
       }
-      // Position-mode: caller knows exact block → use dig_block leaf directly.
       return {
         type: 'dig_block',
         parameters: {
-          ...(hasExplicitPos ? { pos: args.position || args.pos } : {}),
+          pos,
           tool: args.tool || 'axe',
           blockType: args.blockType,
         },
@@ -412,15 +453,31 @@ export function mapBTActionToMinecraft(
           distance: args.distance || 10,
         },
       };
-    case 'craft_recipe':
-      warnTypeRemap('craft_recipe', 'craft');
+    case 'craft_recipe': {
+      // No remap — craft_recipe routes directly to CraftRecipeLeaf via contract.
+      // Previously remapped to 'craft' which forced handler dispatch (executeCraftItem),
+      // bypassing the leaf and its toolDiagnostics.
+      const { id: recipeId, raw: recipeRaw } = normalizeRecipeId(
+        args.recipe || args.item
+      );
+      if (!recipeId) {
+        return {
+          type: 'craft_recipe',
+          parameters: {
+            _error: `invalid_recipe_id:${recipeRaw ?? 'missing'}`,
+          },
+          debug: debugInfo,
+        };
+      }
       return {
-        type: 'craft',
+        type: 'craft_recipe',
         parameters: {
-          item: args.recipe || args.item,
-          quantity: args.qty || args.quantity || 1,
+          recipe: recipeId,
+          qty: args.qty || args.quantity || 1,
+          ...(recipeRaw ? { _recipe_raw: recipeRaw } : {}),
         },
       };
+    }
     case 'smelt':
       return {
         type: 'smelt',

@@ -73,7 +73,8 @@ describe('Sterling step-to-executor pipeline', () => {
       expect(result!.leafName).toBe('craft_recipe');
       expect(result!.btAction.type).toBeDefined();
       expect(result!.btAction.parameters).toBeDefined();
-      expect(result!.btAction.parameters?.item).toBe('oak_planks');
+      // craft_recipe passes through — canonical param is 'recipe'
+      expect(result!.btAction.parameters?.recipe).toBe('oak_planks');
     });
 
     it('craft_recipe with legacy produces maps through pipeline', () => {
@@ -86,7 +87,7 @@ describe('Sterling step-to-executor pipeline', () => {
       const result = runExecutorPipeline(step);
       expect(result).not.toBeNull();
       expect(result!.leafName).toBe('craft_recipe');
-      expect(result!.btAction.parameters?.item).toBe('wooden_pickaxe');
+      expect(result!.btAction.parameters?.recipe).toBe('wooden_pickaxe');
     });
 
     it('dig_block (legacy remapped to acquire_material) produces executor-ready output', () => {
@@ -214,7 +215,9 @@ describe('Sterling step-to-executor pipeline', () => {
     const PASSTHROUGH_CASES: Array<{ tool: string; args: Record<string, any> }> = [
       { tool: 'acquire_material', args: { item: 'oak_log', count: 1 } },
       { tool: 'collect_items', args: { itemName: 'oak_log' } },
-      // dig_block with explicit pos passes through; without pos + with blockType → acquire_material
+      // craft_recipe passes through as itself (no remap to 'craft')
+      { tool: 'craft_recipe', args: { recipe: 'oak_planks', qty: 1 } },
+      // dig_block with explicit pos passes through; without pos fails closed
       { tool: 'dig_block', args: { blockType: 'stone', pos: { x: 0, y: 64, z: 0 } } },
       { tool: 'place_block', args: { block_type: 'stone' } },
       { tool: 'place_workstation', args: { workstation: 'crafting_table' } },
@@ -232,15 +235,15 @@ describe('Sterling step-to-executor pipeline', () => {
     }
   });
 
-  describe('intentional type remaps', () => {
-    it('dig_block without pos (search-mode) remaps to acquire_material', () => {
+  describe('dig_block is position-required (no arg-shape remap)', () => {
+    it('dig_block without pos fails closed with _error marker', () => {
       const result = mapBTActionToMinecraft('dig_block', { blockType: 'stone' });
       expect(result).not.toBeNull();
-      expect(result!.type).toBe('acquire_material');
-      expect(result!.parameters.item).toBe('stone');
+      expect(result!.type).toBe('dig_block');
+      expect(result!.parameters._error).toBe('missing_required_arg:pos');
     });
 
-    it('dig_block with explicit pos stays dig_block', () => {
+    it('dig_block with explicit pos passes through', () => {
       const result = mapBTActionToMinecraft('dig_block', {
         blockType: 'stone',
         pos: { x: 10, y: 64, z: 20 },
@@ -248,6 +251,7 @@ describe('Sterling step-to-executor pipeline', () => {
       expect(result).not.toBeNull();
       expect(result!.type).toBe('dig_block');
       expect(result!.parameters.pos).toEqual({ x: 10, y: 64, z: 20 });
+      expect(result!.parameters._error).toBeUndefined();
     });
   });
 

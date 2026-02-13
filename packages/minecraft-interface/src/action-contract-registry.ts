@@ -65,6 +65,15 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     // executeCollectItemsEnhanced; remove contract + handler when hits reach zero.
   },
   // --- Existing routed actions (document their contracts) ---
+  // craft_recipe is the canonical crafting action. Routes to CraftRecipeLeaf.
+  craft_recipe: {
+    leafName: 'craft_recipe',
+    aliases: { item: 'recipe', quantity: 'qty' },
+    defaults: { qty: 1 },
+    requiredKeys: ['recipe'],
+  },
+  // Legacy synonyms — route to handler for backward compat with non-Sterling callers.
+  // Sterling pipeline uses craft_recipe directly (no remap).
   craft: {
     leafName: 'craft_recipe',
     aliases: { item: 'recipe', quantity: 'qty' },

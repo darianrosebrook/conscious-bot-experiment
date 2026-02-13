@@ -11,12 +11,15 @@ import { mapBTActionToMinecraft } from '../action-mapping';
 
 const ACCEPTED_ACTION_TYPES = new Set([
   'craft',
+  'craft_recipe',
   'smelt',
   'smelt_item',
   'dig_block',
   'place_block',
   'move_to',
+  'collect_items',
   'collect_items_enhanced',
+  'acquire_material',
   'scan_environment',
   'execute_behavior_tree',
   'place_workstation',
@@ -47,7 +50,8 @@ describe('Sterling-to-bot transfer path', () => {
       );
       expect(mapped).not.toBeNull();
       expect(ACCEPTED_ACTION_TYPES.has(mapped!.type)).toBe(true);
-      expect(mapped!.parameters?.item).toBe('oak_planks');
+      // craft_recipe passes through as itself — canonical param is 'recipe', not 'item'
+      expect(mapped!.parameters?.recipe).toBe('oak_planks');
     });
 
     it('craft_recipe with legacy produces maps to accepted action', () => {
@@ -66,7 +70,8 @@ describe('Sterling-to-bot transfer path', () => {
       );
       expect(mapped).not.toBeNull();
       expect(ACCEPTED_ACTION_TYPES.has(mapped!.type)).toBe(true);
-      expect(mapped!.parameters?.item).toBe('wooden_pickaxe');
+      // craft_recipe passes through — recipe derived from produces[0].name
+      expect(mapped!.parameters?.recipe).toBe('wooden_pickaxe');
     });
 
     it('minecraft. prefixed tool name produces same result as bare name', () => {

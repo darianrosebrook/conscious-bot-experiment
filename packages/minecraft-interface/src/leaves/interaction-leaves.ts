@@ -1479,7 +1479,12 @@ export class AcquireMaterialLeaf implements LeafImpl {
           toolUsed: lastToolUsed,
           toolDiagnostics: {
             _diag_version: 1,
-            reason_code: totalAcquired >= count ? 'harvest_complete' : 'harvest_partial',
+            reason_code:
+              totalAcquired >= count
+                ? 'harvest_complete'
+                : totalAcquired > 0
+                  ? 'harvest_partial'
+                  : 'pickup_failed_after_dig',
             searchRadiusUsed,
           },
         },
@@ -1488,6 +1493,8 @@ export class AcquireMaterialLeaf implements LeafImpl {
               error: {
                 code: 'acquire.noneCollected',
                 retryable: true,
+                // Distinct from no_blocks_found: we found and dug blocks but
+                // drops weren't collected. Retry should approach drops, not reposition.
                 detail: `Dug blocks but failed to collect any ${itemPattern}`,
               },
             }

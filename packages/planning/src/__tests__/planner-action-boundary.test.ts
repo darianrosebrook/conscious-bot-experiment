@@ -44,6 +44,7 @@ const ACCEPTED_ACTION_TYPES = new Set([
   // Crafting & smelting
   'craft',
   'craft_item',
+  'craft_recipe',
   'smelt',
   'smelt_item',
   // Workstation placement (via LeafFactory)
@@ -118,9 +119,9 @@ const KNOWN_GAP_LEAVES = ['move_and_gather', 'explore_area'];
 // ---------------------------------------------------------------------------
 const PLANNER_EMITTED_TYPES = [
   // Rig A (crafting) — via mapBTActionToMinecraft('craft_recipe')
-  'craft',
+  'craft_recipe',
   // Rig B (tool progression) — crafting + smelting
-  'craft',
+  'craft_recipe',
   'smelt',
   // Rig G (building) — via LeafFactory dispatch
   'prepare_site',
@@ -182,15 +183,16 @@ describe('planner -> /action boundary conformance', () => {
    * No codepath may derive recipe from predicate_lemma / proposition metadata.
    */
   describe('no TS semantic translation for craft_recipe (Live Option A)', () => {
-    it('craft_recipe passes args.recipe through to parameters.item verbatim', () => {
+    it('craft_recipe passes through as itself with args.recipe in parameters.recipe', () => {
       const mapped = mapBTActionToMinecraft('craft_recipe', {
         recipe: 'oak_planks',
         qty: 1,
       });
       expect(mapped).not.toBeNull();
       if (!mapped) return;
-      expect(mapped.type).toBe('craft');
-      expect(mapped.parameters?.item).toBe('oak_planks');
+      // craft_recipe now passes through — no remap to 'craft'
+      expect(mapped.type).toBe('craft_recipe');
+      expect(mapped.parameters?.recipe).toBe('oak_planks');
     });
 
     it('craft_recipe uses args.recipe, NOT predicate_lemma or proposition', () => {
@@ -201,7 +203,7 @@ describe('planner -> /action boundary conformance', () => {
       });
       expect(mapped).not.toBeNull();
       if (!mapped) return;
-      expect(mapped.parameters?.item).toBe('wooden_pickaxe');
+      expect(mapped.parameters?.recipe).toBe('wooden_pickaxe');
       expect(mapped.parameters?.predicate_lemma).toBeUndefined();
       expect(mapped.parameters?.proposition).toBeUndefined();
     });
@@ -212,14 +214,14 @@ describe('planner -> /action boundary conformance', () => {
       });
       expect(withRecipe).not.toBeNull();
       if (!withRecipe) return;
-      expect(withRecipe.parameters?.item).toBe('oak_planks');
+      expect(withRecipe.parameters?.recipe).toBe('oak_planks');
 
       const withItem = mapBTActionToMinecraft('craft_recipe', {
         item: 'torch',
       });
       expect(withItem).not.toBeNull();
       if (!withItem) return;
-      expect(withItem.parameters?.item).toBe('torch');
+      expect(withItem.parameters?.recipe).toBe('torch');
     });
   });
 
@@ -312,8 +314,8 @@ describe('planner -> /action boundary conformance', () => {
         { strict: true }
       );
       expect(mapped).not.toBeNull();
-      expect(mapped!.type).toBe('craft');
-      expect(mapped!.parameters?.item).toBe('oak_planks');
+      expect(mapped!.type).toBe('craft_recipe');
+      expect(mapped!.parameters?.recipe).toBe('oak_planks');
     });
   });
 });
