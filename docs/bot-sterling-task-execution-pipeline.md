@@ -2807,7 +2807,7 @@ Recommended execution order:
 
 ```bash
 # 1. Start services + wait for executor
-pnpm start:quiet  # or: node scripts/start.js --skip-install --skip-build
+pnpm start -- --quiet  # or: node scripts/start.js --skip-install --skip-build
 curl -X POST http://localhost:3002/system/ready
 # Wait for "Starting executor" in logs (~80s)
 

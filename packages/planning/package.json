@@ -15,10 +15,8 @@
     "test": "vitest run",
     "test:golden-run": "vitest run src/__tests__/golden-run-recorder.test.ts",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",
-    "type-check": "tsc --noEmit",
-    "dev:modular": "tsx src/modular-server.ts"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@conscious-bot/cognition": "workspace:*",

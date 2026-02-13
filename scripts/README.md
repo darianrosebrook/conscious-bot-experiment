@@ -7,24 +7,24 @@ The `start.js` script supports multiple output modes for different use cases:
 ### Usage
 
 ```bash
-# Default verbose mode (shows all logs)
+# Default progress mode (progress bars during boot, streaming after)
 pnpm start
 node scripts/start.js
 
 # Quiet mode (minimal output, errors only)
-pnpm start:quiet
+pnpm start -- --quiet
 node scripts/start.js --quiet
 
-# Progress mode (dynamic progress bars)
-pnpm start:progress
-node scripts/start.js --progress
+# Verbose mode (traditional full logging)
+pnpm start -- --verbose
+node scripts/start.js --verbose
 
 # Debug mode (extra verbose)
-pnpm start:debug
+pnpm start -- --debug
 node scripts/start.js --debug
 
 # Production mode (no debug logs)
-pnpm start:production
+pnpm start -- --production
 node scripts/start.js --production
 ```
 
@@ -32,9 +32,9 @@ node scripts/start.js --production
 
 | Mode | Use Case | Output Level | MLX Install | Service Logs |
 |------|----------|--------------|-------------|--------------|
-| **verbose** | Development (default) | Full | Visible | All prefixed |
+| **progress** | Interactive dev (default) | Progress bars | Hidden | In-place updates |
+| **verbose** | Development | Full | Visible | All prefixed |
 | **quiet** | CI/Scripts | Errors only | Hidden | Errors only |
-| **progress** | Interactive dev | Progress bars | Hidden | In-place updates |
 | **debug** | Troubleshooting | Extra verbose | Visible | All + debug |
 | **production** | Production deploy | Info + errors | Hidden | No debug |
 

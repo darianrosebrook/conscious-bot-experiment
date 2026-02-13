@@ -203,24 +203,18 @@ Tier 1 Acceptance
 ####  Available Commands
 
 ```bash
-# Real Minecraft server testing
-npm run simple:connect
-npm run simple:move
-npm run simple:turn
-npm run simple:jump
-npm run simple:chat
+# Real Minecraft server testing (pass --action after --)
+pnpm run simple -- --action=connect
+pnpm run simple -- --action=move
+pnpm run simple -- --action=turn
+pnpm run simple -- --action=jump
+pnpm run simple -- --action=chat
 
-# Simulation testing (no server required)
-npm run sim:demo
-npm run sim:connect
-npm run sim:move
-npm run sim:mine
-npm run sim:place
-npm run sim:stats
-
-# Build standalone version
-npm run build:simple
+# Standalone runner with scenario (pass --scenario after --)
+pnpm run standalone -- --scenario=basic
 ```
+
+Note: The former `sim:*` scripts and `dist-simple`/`build:simple` were removed; use the main `simple` and `standalone` scripts with flags.
 
 ####  Current Capabilities
 

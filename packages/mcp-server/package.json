@@ -10,7 +10,6 @@
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",
     "start": "node dist/mcp-server.js",
-    "start:server": "node dist/mcp-server.js",
     "test:client": "node dist/test-client.js"
   },
   "dependencies": {

@@ -10,7 +10,6 @@
     "start": "node dist/server.js",
     "dev:server": "tsx src/server.ts",
     "test": "vitest run",
-    "test:run": "vitest run",
     "test:memory-integration": "vitest run src/__tests__/memory-llm-integration.test.ts",
     "test:ollama-memory": "vitest run src/__tests__/ollama-memory-integration.test.ts",
     "test:complete-flow": "vitest run src/__tests__/complete-cognitive-flow.test.ts",

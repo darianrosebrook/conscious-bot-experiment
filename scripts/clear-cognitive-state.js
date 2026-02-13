@@ -12,7 +12,7 @@
  *
  * Full clean slate (stream + DB + new Minecraft world):
  *   1. Ensure memory service is running (port 3001) and .env has WORLD_SEED set.
- *   2. pnpm run clear-cognitive-state:db
+ *   2. pnpm run clear-cognitive-state -- --db
  *   3. docker compose down -v && docker compose up -d
  *   Step 3 removes the Minecraft volume so the world is recreated with
  *   LEVEL_SEED from docker-compose.yml.

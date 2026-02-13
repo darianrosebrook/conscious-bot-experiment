@@ -36,19 +36,13 @@ Your Minecraft bot system is now **fully operational** and connected to real Min
    pnpm run build
    ```
 
-2. **Run a demo**:
+2. **Run tests**:
    ```bash
-   # Test basic bot connection
-   pnpm run demo:bot-connection
-   
-   # Test action execution
-   pnpm run demo:action-execution
-   
-   # Test real capability execution
-   pnpm run demo:real-capability
-   
-   # Full system capabilities demo
-   pnpm run demo:full-system
+   # Run all core tests
+   pnpm test
+
+   # Run a specific test file (e.g. bot connection)
+   pnpm exec vitest run src/__tests__/bot-connection.test.ts
    ```
 
 ### Environment Variables
@@ -152,31 +146,15 @@ capabilities.forEach(cap => {
 });
 ```
 
-## 🎮 Demo Scripts
+## Tests
 
-### 1. Bot Connection Test
-```bash
-pnpm run demo:bot-connection
-```
-Tests basic bot connectivity and cognitive integration setup.
+Run the full test suite with `pnpm test`. To run a single test file:
 
-### 2. Action Execution Test
 ```bash
-pnpm run demo:action-execution
+pnpm exec vitest run src/__tests__/bot-connection.test.ts
+pnpm exec vitest run src/__tests__/action-execution.test.ts
+pnpm exec vitest run src/__tests__/real-capability-execution.test.ts
 ```
-Tests capability identification and planning pipeline.
-
-### 3. Real Capability Execution
-```bash
-pnpm run demo:real-capability
-```
-Tests actual bot movement and action execution in Minecraft.
-
-### 4. Full System Demo
-```bash
-pnpm run demo:full-system
-```
-Comprehensive demonstration of all system capabilities.
 
 ## 🔧 Troubleshooting
 

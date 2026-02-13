@@ -9,13 +9,9 @@
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist",
-    "benchmarks": "node --loader ts-node/esm src/benchmarking/run-benchmarks.ts",
-    "benchmarks:memory": "node --loader ts-node/esm src/benchmarking/run-benchmarks.ts --memory-only",
-    "benchmarks:safety": "node --loader ts-node/esm src/benchmarking/run-benchmarks.ts --safety-only",
-    "benchmarks:quick": "node --loader ts-node/esm src/benchmarking/run-benchmarks.ts --quick"
+    "benchmarks": "node --loader ts-node/esm src/benchmarking/run-benchmarks.ts"
   },
   "dependencies": {
     "@conscious-bot/cognition": "workspace:^",

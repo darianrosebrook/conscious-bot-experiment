@@ -136,10 +136,22 @@ pnpm kill            # Stop all running services and free ports
 pnpm test            # Run all tests
 pnpm type-check      # TypeScript type checking
 pnpm e2e             # Run E2E test suites (starts Docker, Sterling, MLX automatically)
-pnpm e2e:teardown    # Same, but tears down Docker afterward
+pnpm e2e -- --teardown  # Same, but tears down Docker afterward
 pnpm docker:down     # Stop Docker services
 pnpm docker:logs     # Tail Docker logs
 ```
+
+#### Start Script Flags
+
+Pass flags after `--` when running `pnpm start` or `pnpm dev`:
+
+```bash
+pnpm start -- --quiet              # Minimal output
+pnpm start -- --skip-docker        # Skip Docker (Postgres/Minecraft)
+pnpm start -- --skip-install --skip-build  # Fast restart
+```
+
+See `scripts/start.js` and `docs/internal/package-scripts-audit.md` for full flag reference.
 
 #### Starting Individual Services
 

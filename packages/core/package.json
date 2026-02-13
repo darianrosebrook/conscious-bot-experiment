@@ -16,16 +16,7 @@
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit",
     "start": "node dist/server.js",
-    "dev:server": "tsx src/server.ts",
-    "test:bot-connection": "vitest run src/__tests__/bot-connection.test.ts",
-    "test:action-execution": "vitest run src/__tests__/action-execution.test.ts",
-    "test:real-capability": "vitest run src/__tests__/real-capability-execution.test.ts",
-    "test:simple-actions": "vitest run src/__tests__/simple-actions.test.ts",
-    "test:cognitive-stream": "vitest run src/__tests__/cognitive-stream-validation.test.ts",
-    "test:narrative-thoughts": "vitest run src/__tests__/narrative-thoughts.test.ts",
-    "test:working-bot": "vitest run src/__tests__/working-bot.test.ts",
-    "test:version-compatibility": "vitest run src/__tests__/version-compatibility.test.ts",
-    "test:simple-server": "vitest run src/__tests__/simple-server.test.ts"
+    "dev:server": "tsx src/server.ts"
   },
   "dependencies": {
     "@types/semver": "^7.7.0",
