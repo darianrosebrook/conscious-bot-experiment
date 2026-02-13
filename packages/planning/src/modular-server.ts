@@ -656,6 +656,13 @@ const toolExecutor = {
       );
       const duration = Date.now() - startTime;
 
+      // Diagnostic: log gateway result for dispatch tracing
+      if (!result.ok) {
+        console.warn(
+          `[toolExecutor] Action failed (${duration}ms): type=${mappedAction.type} error=${result.error} outcome=${(result as any).outcome}`
+        );
+      }
+
       // Enhance result with metrics
       const enhancedResult = {
         ...result,
