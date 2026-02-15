@@ -961,6 +961,7 @@ app.use(
   createCognitiveStreamRoutes({
     state,
     enhancedThoughtGenerator,
+    intrusiveThoughtProcessor,
   })
 );
 

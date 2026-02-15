@@ -87,6 +87,8 @@ function applyAtlasUVs(
   blockType: string,
   atlasIndex: AtlasIndex,
 ): void {
+  const atlasSize = atlasIndex.atlasPixelSize ?? 256;
+  const halfTexel = 0.5 / atlasSize; // Avoid boundary sampling (grass_block_top vs gravel)
   const faces = resolveBlockTextures(blockType);
   const topEntry = atlasIndex.textures[faces.top];
   const sideEntry = atlasIndex.textures[faces.side];
@@ -112,14 +114,18 @@ function applyAtlasUVs(
   for (let face = 0; face < 6; face++) {
     const entry = faceTextures[face] ?? DEFAULT_ATLAS_ENTRY;
     const baseIdx = face * 4 * 2;
-    uvArray[baseIdx + 0] = entry.u;
-    uvArray[baseIdx + 1] = entry.v;
-    uvArray[baseIdx + 2] = entry.u + entry.su;
-    uvArray[baseIdx + 3] = entry.v;
-    uvArray[baseIdx + 4] = entry.u;
-    uvArray[baseIdx + 5] = entry.v + entry.sv;
-    uvArray[baseIdx + 6] = entry.u + entry.su;
-    uvArray[baseIdx + 7] = entry.v + entry.sv;
+    const u0 = entry.u + halfTexel;
+    const v0 = entry.v + halfTexel;
+    const u1 = entry.u + entry.su - halfTexel;
+    const v1 = entry.v + entry.sv - halfTexel;
+    uvArray[baseIdx + 0] = u0;
+    uvArray[baseIdx + 1] = v0;
+    uvArray[baseIdx + 2] = u1;
+    uvArray[baseIdx + 3] = v0;
+    uvArray[baseIdx + 4] = u0;
+    uvArray[baseIdx + 5] = v1;
+    uvArray[baseIdx + 6] = u1;
+    uvArray[baseIdx + 7] = v1;
   }
   uvAttr.needsUpdate = true;
 
@@ -128,11 +134,18 @@ function applyAtlasUVs(
   geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
 }
 
-/** Cache key for geometry with optional block state. */
-function geometryCacheKey(blockType: string, blockState?: BlockStateForVariant | null): string {
-  if (!blockState || Object.keys(blockState).length === 0) return blockType;
-  const parts = [blockType, ...Object.entries(blockState).map(([k, v]) => `${k}=${v}`)];
-  return parts.join('|');
+/** Cache key for geometry with optional block state and atlas source. */
+function geometryCacheKey(
+  blockType: string,
+  blockState?: BlockStateForVariant | null,
+  blockStates?: BlockStatesData | null,
+): string {
+  const statePart =
+    !blockState || Object.keys(blockState).length === 0
+      ? ''
+      : '|' + Object.entries(blockState).map(([k, v]) => `${k}=${v}`).join(',');
+  const atlasPart = blockStates ? 'mc-assets' : 'legacy';
+  return `${blockType}${statePart}:${atlasPart}`;
 }
 
 /**
@@ -148,7 +161,7 @@ export function createBlockGeometry(
   blockStates?: BlockStatesData | null,
   blockState?: BlockStateForVariant | null,
 ): THREE.BufferGeometry {
-  const cacheKey = geometryCacheKey(blockType, blockState);
+  const cacheKey = geometryCacheKey(blockType, blockState, blockStates);
   const cached = geometryCache.get(cacheKey);
   if (cached) return cached;
 
@@ -161,7 +174,7 @@ export function createBlockGeometry(
     }
   }
 
-  // Fallback: hardcoded torch/lantern or full cube
+  // Fallback: hardcoded torch/lantern or full cube (uses applyAtlasUVs for legacy atlas)
   if (blockType === 'torch' || blockType === 'soul_torch') {
     return createTorchGeometry(blockType, atlasIndex);
   }

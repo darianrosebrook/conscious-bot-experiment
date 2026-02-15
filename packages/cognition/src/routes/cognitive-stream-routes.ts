@@ -13,10 +13,14 @@ import {
 } from '../event-driven-thought-generator';
 import type { EnhancedThoughtGenerator } from '../thought-generator';
 import type { CognitionMutableState } from '../cognition-state';
+import type { IntrusiveThoughtProcessor } from '../intrusive-thought-processor';
+import { updateStressFromIntrusion } from '../interoception-store';
+import { logStressAtBoundary } from '../stress-boundary-logger';
 
 export interface CognitiveStreamRouteDeps {
   state: CognitionMutableState;
   enhancedThoughtGenerator: EnhancedThoughtGenerator;
+  intrusiveThoughtProcessor: IntrusiveThoughtProcessor;
 }
 
 // ── Eval Metadata Interface ────────────────────────────────────────────
@@ -395,6 +399,33 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         timestamp: thoughtWithId.timestamp,
         metadata: thoughtWithId.metadata,
       });
+
+      // Process intrusive thoughts through IntrusiveThoughtProcessor so they become actionable tasks.
+      // Dashboard-injected thoughts skip the consideration step (user explicitly chose to inject).
+      const content = thoughtWithId.content;
+      if (
+        (thoughtWithId.type === 'intrusive' || thoughtWithId.attribution === 'intrusive') &&
+        typeof content === 'string' &&
+        content.trim().length > 0
+      ) {
+        const processor = deps.intrusiveThoughtProcessor;
+        const processPromise =
+          processor?.processIntrusiveThought?.(content.trim()) ?? Promise.resolve({ accepted: false });
+        processPromise
+          .then((result) => {
+            updateStressFromIntrusion({
+              accepted: result.accepted,
+              task: result.task,
+            });
+            logStressAtBoundary(
+              result.accepted ? 'intrusion_accept' : 'intrusion_resist',
+              { thoughtSummary: result.response?.slice(0, 200) }
+            );
+          })
+          .catch((err) => {
+            console.error('[CognitiveStream] Error processing intrusive thought:', err);
+          });
+      }
 
       // Intrusive thought broadcast (verbose logging suppressed)
       res.json({ success: true, thoughtId: thoughtWithId.id });

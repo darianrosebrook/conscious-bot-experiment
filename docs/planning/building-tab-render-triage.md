@@ -111,9 +111,67 @@ ls -la ~/.minecraft-assets-cache/generated/1.21.4/
 # Expect: textures.png, blockstates.json, atlas-index.json
 ```
 
-## Next Steps for Fix
+## Triage Implementation (Builder-Viewer Texture Fidelity)
 
-1. Add console logging in `useAtlasMaterial` to report which path (mc-assets vs legacy) and whether atlas-index loaded.
-2. If atlas-index 404: ensure pipeline writes it and asset-server serves it; or derive atlas-index from blockStates when unavailable.
-3. If buildBlockGeometryFromAssets returns null for grass_block: inspect blockStates structure for that block.
-4. Add a diagnostic overlay or dev-mode indicator showing: asset path, atlas-index keys count, blockStates keys count.
+Completed per Builder-Viewer texture fidelity triage plan.
+
+### Findings
+
+- **Version propagation:** `mcVersion` flows from Dashboard (viewer-status `executionStatus.bot.server.version`) to BuildingTab to BlockCanvas to `useAtlasMaterial`. No change needed.
+- **FACE_CORNERS / UV math:** Builder `FACE_CORNERS` in `mc-asset-block-loader.ts` matches viewer `elemFaces` in `models.js`. For rotation 0, UV formula matches (`baseu * su + u`, `basev * sv + v`).
+- **Multipart apply:** Pipeline can output `multipart[].apply` as an array. Loader previously only read `apply.model`; it now handles `Array.isArray(apply) ? apply[0]?.model : apply.model`.
+- **Atlas-index:** Pipeline writes `atlas-index.json` when generating assets. Asset-server serves it and can auto-generate. When atlas-index 404s, console warns with the `pnpm mc:assets extract {version}` command.
+- **Half-texel inset:** Applied in both `block-geometry-builder.ts` (applyAtlasUVs) and `mc-asset-block-loader.ts` (buildGeometryFromModel) so NearestFilter does not sample at tile boundaries (e.g. grass_block_top vs gravel).
+
+### Changes Made
+
+1. **Diagnostic overlay** (`?diagnostic=1`): Shows asset path, version, atlas-index key count, blockStates key count, and grass_block geometry source (model vs applyAtlasUVs). See `block-canvas.tsx` and `block-canvas.module.scss`.
+2. **useAtlasMaterial:** Returns `version`; logs atlas-index 200 (key count) or 404 with extract hint.
+3. **mc-asset-block-loader:** `canBuildFromAssets(blockType, blockStates)` for overlay; grass_block logging when resolving model; multipart apply array handling; half-texel inset in `buildGeometryFromModel` (4096 atlas).
+4. **building-tab-render-triage.md:** This section.
+
+### Success Criteria Met
+
+- Diagnostic overlay (or dev-mode) shows asset path, version, atlas-index status, blockStates keys, and geometry source for grass_block.
+- Grass block tops should show green grass when mc-assets is used and blockStates/model path is used; half-texel inset avoids boundary sampling.
+
+### Verification
+
+1. Open Building tab with `?diagnostic=1`. Confirm overlay shows path, version, counts, and grass_block: model or applyAtlasUVs.
+2. With minecraft-interface running and assets extracted for the version, grass_block should use model path and display green top.
+3. If grass_block shows applyAtlasUVs, check console for `[mc-asset-block-loader] grass_block:` and `[useAtlasMaterial] atlas-index` to see model resolution and atlas-index status.
+
+---
+
+## Live test results (triage)
+
+**Test:** Building tab with `?diagnostic=1`, mc-assets and minecraft-interface running, version 1.21.9.
+
+**Diagnostic overlay:**
+
+| Field | Value |
+|-------|--------|
+| path | mc-assets |
+| version | 1.21.9 |
+| atlas-index keys | 1112 |
+| blockStates keys | 1189 |
+| grass_block | **model** |
+
+**Observation:** Grass blocks still show **gravel texture on top**; sides show dirt (correct). So:
+
+- Atlas-index and blockStates are loaded.
+- Geometry for grass_block comes from **model** (buildBlockGeometryFromAssets), not applyAtlasUVs.
+- The bug is not missing atlas-index or fallback path.
+
+**Conclusion:** The wrong texture is being used for the **up** face when building from the model. Either:
+
+1. **Pipeline:** The resolved model for grass_block has the "up" face texture (u, v, su, sv) pointing at the gravel tile in the atlas (e.g. atlas builder or blockstates-builder assigns wrong UVs to `grass_block_top`), or
+2. **Atlas layout:** `grass_block_top` and `gravel` are adjacent and a one-tile offset or naming mix-up in the pipeline yields gravel UVs for the top face.
+
+**Recommended next steps:**
+
+1. **Pipeline inspection done:** Fetched blockstates and atlas-index from `~/.minecraft-assets-cache/generated/1.21.9/`. grass_block up face UVs match `grass_block_top` exactly (not gravel). Root cause was V-axis flip (see below).
+2. **Atlas builder:** In minecraft-interface asset-pipeline, confirm texture name to atlas position for `grass_block_top` and that blockstates-builder resolves the grass_block model’s `#top` to that texture’s UVs.
+3. **Optional:** Add a one-off log in `buildGeometryFromModel` for grass_block’s "up" face: log `face.texture` (u, v, su, sv) to confirm what the builder receives.
+
+**Root cause (confirmed):** Pipeline atlas is built with 2D canvas (v = y / atlasSize), so v=0 at image top. Three.js texture with flipY = false uses v=0 at image bottom. Using pipeline (u,v) directly sampled the wrong atlas row. Fix: flip V in the builder so v_webgl = 1 - v - sv (applied in mc-asset-block-loader.ts buildGeometryFromModel).

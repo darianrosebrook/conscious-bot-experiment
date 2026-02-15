@@ -36,3 +36,19 @@
   pointer-events: none;
   z-index: 1;
 }
+
+.diagnosticOverlay {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.65rem;
+  font-family: ui-monospace, monospace;
+  color: rgb(161 161 170);
+  background: rgb(9 9 11 / 0.9);
+  padding: 0.35rem 0.5rem;
+  border-radius: $radius-sm;
+  pointer-events: none;
+  z-index: 1;
+  max-width: 280px;
+  line-height: 1.35;
+}

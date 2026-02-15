@@ -200,8 +200,13 @@ function getModelForBlock(
     if (Array.isArray(variant)) return variant[0]?.model ?? null;
     return variant?.model ?? null;
   }
-  if (state.multipart?.[0]?.apply?.model) {
-    return state.multipart[0].apply.model;
+  const firstPart = state.multipart?.[0];
+  if (firstPart?.apply) {
+    const apply = firstPart.apply as
+      | { model: ResolvedModel }
+      | Array<{ model: ResolvedModel }>;
+    const model = Array.isArray(apply) ? apply[0]?.model : apply.model;
+    return model ?? null;
   }
   return null;
 }
@@ -248,14 +253,21 @@ function buildGeometryFromModel(model: ResolvedModel): THREE.BufferGeometry {
       ];
     }
 
+    // Half-texel inset (same as block-geometry-builder applyAtlasUVs) to avoid sampling
+    // at tile boundaries (e.g. grass_block_top vs adjacent gravel with NearestFilter).
+    const ATLAS_PIXEL_SIZE = 4096;
+    const halfTexelNorm = 0.5 / ATLAS_PIXEL_SIZE;
+
+    // V convention: mc-assets texture is loaded with flipY=true so pipeline (v=0 at top) matches.
+    // Use pipeline (u,v) directly; no per-face V flip here.
     for (const faceName of Object.keys(element.faces)) {
       const face = element.faces[faceName];
       const { dir, corners } = FACE_CORNERS[faceName];
 
-      const u = face.texture.u;
-      const v = face.texture.v;
-      const su = face.texture.su;
-      const sv = face.texture.sv;
+      const u = face.texture.u + halfTexelNorm;
+      const v = face.texture.v + halfTexelNorm;
+      const su = face.texture.su - 2 * halfTexelNorm;
+      const sv = face.texture.sv - 2 * halfTexelNorm;
 
       const ndx = Math.floor(positions.length / 3);
 
@@ -362,6 +374,10 @@ export function buildBlockGeometryFromAssets(
   if (cached) return cached.clone();
 
   const model = getModelForBlock(blockStates, blockType, blockState);
+  if (blockType === 'grass_block' || blockType === 'minecraft:grass_block') {
+    const state = blockStates['grass_block'] ?? blockStates['minecraft:grass_block'];
+    console.info('[mc-asset-block-loader] grass_block: model=', model ? 'resolved' : 'null', state ? `state keys=${Object.keys(state).join(',')}` : 'no state', model && typeof model === 'object' && model.elements ? `elements=${model.elements.length}` : '');
+  }
   if (!model || typeof model === 'string' || !model.elements?.length) return null;
 
   const geo = buildGeometryFromModel(model);
@@ -405,6 +421,24 @@ export function getAtlasTextureUrl(version: string = DEFAULT_MC_VERSION): string
  */
 export function getAtlasIndexUrl(version: string = DEFAULT_MC_VERSION): string {
   return `/api/mc-assets/atlas-index/${version}.json`;
+}
+
+/**
+ * Returns true if geometry for this block type can be built from blockStates (model path).
+ * Used by diagnostic overlay to show grass_block geometry source (model vs applyAtlasUVs).
+ */
+export function canBuildFromAssets(
+  blockType: string,
+  blockStates: BlockStatesData | null,
+): boolean {
+  if (!blockStates) return false;
+  const model = getModelForBlock(blockStates, blockType, null);
+  return !!(
+    model &&
+    typeof model === 'object' &&
+    Array.isArray(model.elements) &&
+    model.elements.length > 0
+  );
 }
 
 /** Clear caches (e.g. on hot reload) */

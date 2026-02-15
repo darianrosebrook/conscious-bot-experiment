@@ -22,7 +22,7 @@ import { useAtlasMaterial } from '@/hooks/use-atlas-material';
 import { createBlockGeometry } from '@/lib/block-geometry-builder';
 import { bakeBlockAO } from '@/lib/ambient-occlusion';
 import type { AtlasIndex } from '@/types/atlas';
-import type { BlockStatesData, BlockStateForVariant } from '@/lib/mc-asset-block-loader';
+import { canBuildFromAssets, type BlockStatesData, type BlockStateForVariant } from '@/lib/mc-asset-block-loader';
 import { generatePlatformTerrain } from '@/lib/platform-terrain';
 import s from './block-canvas.module.scss';
 
@@ -623,7 +623,20 @@ export function BlockCanvas({ mcVersion }: BlockCanvasProps = {}) {
     blockStates,
     isReady,
     atlasSource,
+    version,
   } = useAtlasMaterial(mcVersion);
+
+  const showDiagnostic =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('diagnostic') === '1';
+  const atlasKeyCount = atlasIndex?.textures ? Object.keys(atlasIndex.textures).length : 0;
+  const blockStatesKeyCount = blockStates ? Object.keys(blockStates).length : 0;
+  const grassBlockSource =
+    isReady && blockStates
+      ? canBuildFromAssets('grass_block', blockStates)
+        ? 'model'
+        : 'applyAtlasUVs'
+      : '-';
 
   const displayCount =
     playbackMode !== 'off'
@@ -650,6 +663,15 @@ export function BlockCanvas({ mcVersion }: BlockCanvasProps = {}) {
       {atlasSource === 'legacy' && (
         <div className={s.atlasHint}>
           Start minecraft-interface to use the same textures as the Live viewer.
+        </div>
+      )}
+      {showDiagnostic && isReady && (
+        <div className={s.diagnosticOverlay} data-testid="building-diagnostic-overlay">
+          <div>path: {atlasSource ?? '-'}</div>
+          <div>version: {version}</div>
+          <div>atlas-index keys: {atlasKeyCount}</div>
+          <div>blockStates keys: {blockStatesKeyCount}</div>
+          <div>grass_block: {grassBlockSource}</div>
         </div>
       )}
     </div>

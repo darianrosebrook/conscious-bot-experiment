@@ -30,6 +30,7 @@ const cacheByVersion = new Map<
     atlasIndex: AtlasIndex;
     blockStates: BlockStatesData | null;
     source: 'mc-assets' | 'legacy';
+    version: string;
   }
 >();
 const loadPromisesByVersion = new Map<string, Promise<void>>();
@@ -45,6 +46,7 @@ async function loadMcAssets(version: string): Promise<{
   atlasIndex: AtlasIndex;
   blockStates: BlockStatesData;
   source: 'mc-assets';
+  version: string;
 } | null> {
   try {
     const [atlasRes, blockStates] = await Promise.all([
@@ -67,7 +69,9 @@ async function loadMcAssets(version: string): Promise<{
         objectUrl,
         (tex) => {
           URL.revokeObjectURL(objectUrl);
-          tex.flipY = false;
+          // Pipeline atlas is built with canvas coords (v=0 at image top). Three.js default
+          // has v=0 at bottom. Set flipY=true so pipeline UVs match without per-face flip.
+          tex.flipY = true;
           tex.magFilter = THREE.NearestFilter;
           tex.minFilter = THREE.NearestFilter;
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -100,20 +104,29 @@ async function loadMcAssets(version: string): Promise<{
       const textureMap = (await atlasIndexRes.json()) as Record<string, { u: number; v: number; su: number; sv: number; col: number; row: number }>;
       atlasIndex.textures = textureMap;
       atlasIndex.textureNames = Object.keys(textureMap);
+      console.info('[useAtlasMaterial] atlas-index 200, keys:', Object.keys(textureMap).length);
+    } else {
+      console.warn(
+        '[useAtlasMaterial] atlas-index',
+        atlasIndexRes.status,
+        getAtlasIndexUrl(version),
+        '- run `pnpm mc:assets extract ' + version + '` in minecraft-interface to generate'
+      );
     }
 
-    return { material, atlasIndex, blockStates, source: 'mc-assets' };
+    return { material, atlasIndex, blockStates, source: 'mc-assets', version };
   } catch (err) {
     console.warn('[useAtlasMaterial] mc-assets load failed:', err);
     return null;
   }
 }
 
-async function loadLegacyAtlas(): Promise<{
+async function loadLegacyAtlas(version: string): Promise<{
   material: THREE.MeshLambertMaterial;
   atlasIndex: AtlasIndex;
   blockStates: null;
   source: 'legacy';
+  version: string;
 }> {
   const res = await fetch('/atlas/blocks-atlas-index.json');
   const index: AtlasIndex = await res.json();
@@ -176,7 +189,7 @@ async function loadLegacyAtlas(): Promise<{
     vertexColors: true,
   });
 
-  return { material, atlasIndex: index, blockStates: null, source: 'legacy' };
+  return { material, atlasIndex: index, blockStates: null, source: 'legacy', version };
 }
 
 async function loadAtlas(version: string): Promise<{
@@ -184,6 +197,7 @@ async function loadAtlas(version: string): Promise<{
   atlasIndex: AtlasIndex;
   blockStates: BlockStatesData | null;
   source: 'mc-assets' | 'legacy';
+  version: string;
 }> {
   const forceLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('atlas') === 'legacy';
   if (!forceLegacy) {
@@ -192,7 +206,7 @@ async function loadAtlas(version: string): Promise<{
       return mc;
     }
   }
-  return loadLegacyAtlas();
+  return loadLegacyAtlas(version);
 }
 
 export function useAtlasMaterial(mcVersion?: string | null): {
@@ -201,6 +215,8 @@ export function useAtlasMaterial(mcVersion?: string | null): {
   blockStates: BlockStatesData | null;
   isReady: boolean;
   atlasSource: 'mc-assets' | 'legacy' | null;
+  /** Resolved version used for loading (for diagnostic overlay) */
+  version: string;
 } {
   const version = mcVersion ?? DEFAULT_MC_VERSION;
   const cacheKey = getCacheKey(version);
@@ -257,5 +273,6 @@ export function useAtlasMaterial(mcVersion?: string | null): {
     blockStates: entry?.blockStates ?? null,
     isReady: ready,
     atlasSource: source,
+    version: entry?.version ?? version,
   };
 }
