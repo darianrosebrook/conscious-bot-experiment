@@ -1240,6 +1240,11 @@ function buildSterlingStepExecutorContext() {
       getCount(inv, item),
     injectDynamicPrereqForCraft: (task: unknown, opts?: { recipe?: string; qty?: number; toolDiagnostics?: any }) =>
       injectDynamicPrereqForCraft(task, opts),
+    getThreatSnapshot: async () => {
+      const { fetchThreatSignal } = await import('./goals/threat-hold-bridge');
+      const signal = await fetchThreatSignal();
+      return { overallThreatLevel: signal.overallThreatLevel, threats: signal.threats };
+    },
     emitExecutorBudgetEvent: (
       taskId: string,
       stepId: string,

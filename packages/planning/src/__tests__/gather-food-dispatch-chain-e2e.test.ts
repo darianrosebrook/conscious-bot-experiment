@@ -185,6 +185,7 @@ function createMockExecutorContext(
     updateTaskProgress: vi.fn(),
     recomputeProgressAndMaybeComplete: vi.fn().mockResolvedValue(undefined),
     regenerateSteps: vi.fn().mockResolvedValue({ success: false }),
+    getThreatSnapshot: vi.fn().mockResolvedValue({ overallThreatLevel: 'low', threats: [] }),
     ...overrides,
   };
 }

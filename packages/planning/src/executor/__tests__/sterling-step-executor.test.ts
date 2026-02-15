@@ -53,6 +53,9 @@ function createMockContext(
       'minecraft.smelt',
       'minecraft.place_block',
       'minecraft.place_workstation',
+      'minecraft.explore_for_resources',
+      'minecraft.step_forward_safely',
+      'minecraft.retreat_from_threat',
     ]),
     mode: 'live',
     updateTaskMetadata: mockUpdateTaskMetadata,
@@ -90,6 +93,7 @@ function createMockContext(
     updateTaskProgress: vi.fn(),
     recomputeProgressAndMaybeComplete: vi.fn().mockResolvedValue(undefined),
     regenerateSteps: vi.fn().mockResolvedValue({ success: false }),
+    getThreatSnapshot: vi.fn().mockResolvedValue({ overallThreatLevel: 'low', threats: [] }),
     ...overrides,
   };
 }
@@ -1182,5 +1186,273 @@ describe('smoke policy tripwire (metadata assertion)', () => {
 
     // With disableRegen, the regen branch is skipped
     expect(ctx.regenerateSteps).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Recovery step injection on reposition_or_rescan (Spec A: doom-loop breaker)
+// ============================================================================
+describe('recovery step injection on reposition_or_rescan', () => {
+  const acquireStep = {
+    id: 'step-acq',
+    order: 1,
+    label: 'Acquire sweet berry',
+    done: false,
+    meta: {
+      leaf: 'acquire_material',
+      args: { item: 'sweet_berries', count: 1 },
+      authority: 'sterling',
+    },
+  };
+
+  const placeStep = {
+    id: 'step-place',
+    order: 1,
+    label: 'Place block',
+    done: false,
+    meta: {
+      leaf: 'place_block',
+      args: { item: 'cobblestone' },
+      authority: 'sterling',
+    },
+  };
+
+  function failWithRepositionHint() {
+    return {
+      ok: false,
+      error: 'no_blocks_found',
+      failureCode: 'no_blocks_found',
+      toolDiagnostics: {
+        _diag_version: 1,
+        retry_hint: 'reposition_or_rescan',
+        reason_code: 'no_blocks_found',
+      },
+    };
+  }
+
+  it('dispatches explore_for_resources for acquire_material failure (low threat)', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())  // original leaf fails
+      .mockResolvedValueOnce({ ok: true });              // recovery step succeeds
+
+    const ctx = createMockContext({ executeTool });
+    const testTask = { id: 'task-r1', steps: [], metadata: {}, progress: 0 };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    // Second executeTool call is the recovery step
+    expect(executeTool).toHaveBeenCalledTimes(2);
+    expect(executeTool).toHaveBeenNthCalledWith(2,
+      'minecraft.explore_for_resources',
+      expect.objectContaining({
+        resource_tags: ['sweet_berries'],
+        reason: 'recovery_reposition',
+      }),
+      undefined,
+    );
+
+    // Metadata reflects successful recovery with short backoff
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r1',
+      expect.objectContaining({
+        lastRecoveryOutcome: 'success',
+        lastRecoveryLeaf: 'explore_for_resources',
+        lastRecoveryMode: 'explore',
+        recoveryActionCount: 1,
+      }),
+    );
+    // Short backoff (5s) on success
+    const patch = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(patch.nextEligibleAt).toBeLessThanOrEqual(Date.now() + 5_000 + 100);
+  });
+
+  it('dispatches retreat_from_threat when threat >= medium', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce({ ok: true });
+
+    const ctx = createMockContext({
+      executeTool,
+      getThreatSnapshot: vi.fn().mockResolvedValue({
+        overallThreatLevel: 'medium',
+        threats: [{ type: 'zombie', distance: 8 }],
+      }),
+    });
+    const testTask = { id: 'task-r2', steps: [], metadata: {}, progress: 0 };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    expect(executeTool).toHaveBeenNthCalledWith(2,
+      'minecraft.retreat_from_threat',
+      expect.objectContaining({ retreatDistance: 15 }),
+      undefined,
+    );
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r2',
+      expect.objectContaining({
+        lastRecoveryMode: 'retreat',
+      }),
+    );
+  });
+
+  it('broadens exploration tags after 2 repeat failures', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce({ ok: true });
+
+    const ctx = createMockContext({ executeTool });
+    // repositionRetryCount=1 → incremented to 2 (inside budget, past <2 threshold)
+    const testTask = {
+      id: 'task-r3',
+      steps: [],
+      metadata: { repositionRetryCount: 1 },
+      progress: 0,
+    };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    // After 2 failures, explore_for_resources called WITHOUT resource_tags
+    expect(executeTool).toHaveBeenNthCalledWith(2,
+      'minecraft.explore_for_resources',
+      expect.objectContaining({ reason: 'recovery_broadened' }),
+      undefined,
+    );
+    // Verify resource_tags is NOT in the args
+    const recoveryArgs = executeTool.mock.calls[1][1];
+    expect(recoveryArgs.resource_tags).toBeUndefined();
+  });
+
+  it('budget exhausted after 3 actions — falls back to long backoff', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint());
+
+    const ctx = createMockContext({ executeTool });
+    const testTask = {
+      id: 'task-r4',
+      steps: [],
+      metadata: { recoveryActionCount: 3 },
+      progress: 0,
+    };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    // No recovery executeTool call — only the original leaf call
+    expect(executeTool).toHaveBeenCalledTimes(1);
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r4',
+      expect.objectContaining({
+        lastRecoveryOutcome: 'budget_exhausted',
+      }),
+    );
+    // Long backoff (60s)
+    const patch = (ctx.updateTaskMetadata as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(patch.nextEligibleAt).toBeGreaterThanOrEqual(Date.now() + 59_000);
+  });
+
+  it('uses step_forward_safely for non-acquisition leaf', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce({ ok: true });
+
+    const ctx = createMockContext({ executeTool });
+    const testTask = { id: 'task-r5', steps: [], metadata: {}, progress: 0 };
+
+    await executeSterlingStep(testTask, placeStep, ctx);
+
+    expect(executeTool).toHaveBeenNthCalledWith(2,
+      'minecraft.step_forward_safely',
+      expect.objectContaining({ distance: 2.0 }),
+      undefined,
+    );
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r5',
+      expect.objectContaining({
+        lastRecoveryMode: 'reposition',
+      }),
+    );
+  });
+
+  it('max reposition retries still terminates task', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint());
+
+    const ctx = createMockContext({ executeTool });
+    // maxRepositionRetries = RECOVERY_MAX_ACTIONS + 1 = 4
+    // repositionRetryCount=3 → repositionRetries = 3 + 1 = 4 >= 4 → task fails
+    const testTask = {
+      id: 'task-r6',
+      steps: [],
+      metadata: { repositionRetryCount: 3 },
+      progress: 0,
+    };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r6',
+      expect.objectContaining({
+        blockedReason: BLOCK_REASONS.MAX_RETRIES_EXCEEDED,
+      }),
+    );
+    expect(ctx.updateTaskProgress).toHaveBeenCalledWith('task-r6', 0, 'failed');
+  });
+
+  it('recovery step recorded in golden-run dispatch ledger', async () => {
+    const recordDispatch = vi.fn();
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce({ ok: true });
+
+    const ctx = createMockContext({
+      executeTool,
+      getGoldenRunRecorder: () => ({
+        recordExecutorBlocked: vi.fn(),
+        recordShadowDispatch: vi.fn(),
+        recordVerification: vi.fn(),
+        recordDispatch,
+        recordRegenerationAttempt: vi.fn(),
+        recordLeafRewriteUsed: vi.fn(),
+        recordLoopDetected: vi.fn(),
+        markLoopBreakerEvaluated: vi.fn(),
+      }),
+    });
+    const testTask = {
+      id: 'task-r7',
+      steps: [],
+      metadata: { goldenRun: { runId: 'run-r7' } },
+      progress: 0,
+    };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    // recordDispatch called with recovery step_id prefix
+    const recoveryCalls = recordDispatch.mock.calls.filter(
+      (c: any[]) => typeof c[1]?.step_id === 'string' && c[1].step_id.startsWith('recovery-')
+    );
+    expect(recoveryCalls.length).toBeGreaterThanOrEqual(1);
+    expect(recoveryCalls[0][1]).toMatchObject({
+      leaf: 'explore_for_resources',
+      recovery_mode: 'explore',
+      recovery_for_task: 'task-r7',
+    });
+  });
+
+  it('recovery step propagates abort signal from executor context', async () => {
+    const abortController = new AbortController();
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce({ ok: true });
+
+    const ctx = createMockContext({
+      executeTool,
+      getAbortSignal: () => abortController.signal,
+    });
+    const testTask = { id: 'task-r8', steps: [], metadata: {}, progress: 0 };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    // Recovery tool call must receive the same abort signal as the executor context
+    const recoveryCall = executeTool.mock.calls[1];
+    expect(recoveryCall[2]).toBe(abortController.signal);
   });
 });

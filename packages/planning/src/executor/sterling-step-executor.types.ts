@@ -116,4 +116,9 @@ export interface SterlingStepExecutorContext {
     taskId: string,
     failureContext: Record<string, unknown>
   ) => Promise<{ success: boolean; stepsDigest?: string; reason?: string }>;
+
+  getThreatSnapshot: () => Promise<{
+    overallThreatLevel: string;
+    threats: Array<{ type: string; distance: number }>;
+  }>;
 }

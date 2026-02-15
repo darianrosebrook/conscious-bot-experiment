@@ -32,6 +32,18 @@ const DETERMINISTIC_BLOCK_BACKOFF_MS = 300_000; // 5 minutes
 /** Backoff for transient blocks (world/runtime must change). Short so task becomes eligible again after condition clears. */
 const TRANSIENT_BLOCK_BACKOFF_MS = 30_000; // 30 seconds
 
+/** Recovery step injection constants (spec A: doom-loop breaker) */
+const RECOVERY_MAX_ACTIONS = 3;
+const RECOVERY_SHORT_BACKOFF_MS = 5_000;
+const RECOVERY_LONG_BACKOFF_MS = 60_000;
+
+/**
+ * Phase 1 frozen policy: threat levels that trigger retreat recovery mode.
+ * Changing threat semantics in Phase 3 must not silently alter recovery behavior.
+ * If threat thresholds are recalibrated, update this set explicitly.
+ */
+const THREAT_RECOVERY_LEVELS = Object.freeze(new Set(['medium', 'high', 'critical'])) as ReadonlySet<string>;
+
 // ============================================================================
 // Block Reason Registry — single source of truth for executor block reasons.
 // Use these constants everywhere: executor, tests, recorder assertions, docs.
@@ -300,6 +312,125 @@ function extractLeafReceipt(
       return null;
     default:
       return null;
+  }
+}
+
+// ============================================================================
+// Recovery Step Injection (Spec A: doom-loop breaker)
+// When reposition_or_rescan retry-hint fires, inject a first-class recovery
+// step that physically moves the bot before retrying the failed leaf.
+// ============================================================================
+
+interface RecoveryPlan {
+  leaf: string;
+  args: Record<string, unknown>;
+  stepId: string;
+  mode: 'explore' | 'reposition' | 'retreat';
+}
+
+async function buildRecoveryPlan(
+  ctx: SterlingStepExecutorContext,
+  task: { id: string; metadata?: Record<string, unknown> },
+  failedLeaf: string,
+  failedArgs: Record<string, unknown>,
+  attemptIndex: number,
+  repositionRetries: number,
+): Promise<RecoveryPlan> {
+  const threat = await ctx.getThreatSnapshot();
+  const isUnderThreat = THREAT_RECOVERY_LEVELS.has(threat.overallThreatLevel);
+  const stepId = `recovery-${task.id}-${attemptIndex}`;
+
+  if (isUnderThreat) {
+    return {
+      leaf: 'retreat_from_threat',
+      args: { retreatDistance: 15, safeRadius: 20, useSprint: true },
+      stepId,
+      mode: 'retreat',
+    };
+  }
+
+  const isAcquisition = ['acquire_material', 'dig_block', 'collect_items'].includes(failedLeaf);
+  // Use the already-incremented repositionRetries (current attempt number)
+  // so broadening kicks in on the 2nd+ attempt, not locked behind max-retries.
+  const repeatFailures = repositionRetries;
+
+  if (isAcquisition && repeatFailures < 2) {
+    return {
+      leaf: 'explore_for_resources',
+      args: {
+        resource_tags: [failedArgs.item ?? failedArgs.blockType ?? 'unknown'],
+        reason: 'recovery_reposition',
+      },
+      stepId,
+      mode: 'explore',
+    };
+  }
+
+  if (isAcquisition && repeatFailures >= 2) {
+    return {
+      leaf: 'explore_for_resources',
+      args: { reason: 'recovery_broadened' },
+      stepId,
+      mode: 'explore',
+    };
+  }
+
+  return {
+    leaf: 'step_forward_safely',
+    args: { distance: 2.0 },
+    stepId,
+    mode: 'reposition',
+  };
+}
+
+async function executeRecoveryStep(
+  ctx: SterlingStepExecutorContext,
+  task: { id: string },
+  plan: RecoveryPlan,
+  runId: string | undefined,
+): Promise<{ success: boolean; durationMs: number }> {
+  const start = Date.now();
+
+  if (runId) {
+    ctx.getGoldenRunRecorder().recordDispatch(runId, {
+      step_id: plan.stepId,
+      leaf: plan.leaf,
+      recovery_mode: plan.mode,
+      recovery_for_task: task.id,
+      dispatched_at: start,
+    });
+  }
+  ctx.emit('recovery_step_dispatched', {
+    taskId: task.id,
+    stepId: plan.stepId,
+    leaf: plan.leaf,
+    mode: plan.mode,
+    args: plan.args,
+    timestamp: start,
+  });
+
+  try {
+    const result = await ctx.executeTool(
+      `minecraft.${plan.leaf}`,
+      plan.args,
+      ctx.getAbortSignal(),
+    );
+    const durationMs = Date.now() - start;
+    const success = result.ok === true;
+
+    if (runId) {
+      ctx.getGoldenRunRecorder().recordDispatch(runId, {
+        step_id: plan.stepId,
+        leaf: plan.leaf,
+        recovery_outcome: success ? 'success' : 'failed',
+        duration_ms: durationMs,
+        dispatched_at: Date.now(),
+      });
+    }
+
+    return { success, durationMs };
+  } catch {
+    return { success: false, durationMs: Date.now() - start };
   }
 }
 
@@ -1067,10 +1198,12 @@ export async function executeSterlingStep(
   // and record the hint so movement/idle systems can act on it.
   const retryHint = extractRetryHint(actionResult);
   if (retryHint === 'reposition_or_rescan') {
-    const repositionBackoffMs = 60_000; // 60s — gives movement/idle system time to reposition
     const repositionRetries =
       ((task.metadata?.repositionRetryCount as number) || 0) + 1;
-    const maxRepositionRetries = 3;
+    // Aligned with RECOVERY_MAX_ACTIONS: allow all recovery injections to fire
+    // before terminal failure. +1 so the Nth recovery attempt can execute on
+    // attempt N, and only attempt N+1 (with no recovery left) terminates.
+    const maxRepositionRetries = RECOVERY_MAX_ACTIONS + 1;
     if (repositionRetries >= maxRepositionRetries) {
       ctx.updateTaskMetadata(task.id, {
         ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
@@ -1102,22 +1235,49 @@ export async function executeSterlingStep(
       ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
       return;
     }
-    console.log(
-      `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
-        `(attempt ${repositionRetries}/${maxRepositionRetries}) — backing off ${repositionBackoffMs}ms`
-    );
-    ctx.updateTaskMetadata(task.id, {
-      repositionRetryCount: repositionRetries,
-      lastRetryHint: retryHint,
-      nextEligibleAt: Date.now() + repositionBackoffMs,
-    });
-    if (runId) {
-      ctx.getGoldenRunRecorder().recordDispatch(runId, {
-        step_id: stepId,
-        leaf: leafExec.leafName,
-        retry_hint: retryHint,
-        reposition_attempt: repositionRetries,
-        dispatched_at: Date.now(),
+    // --- Recovery step injection (spec A: doom-loop breaker) ---
+    // Instead of passive backoff, inject a first-class recovery step that
+    // physically moves the bot before retrying the failed leaf.
+    const recoveryActions = (task.metadata?.recoveryActionCount as number) || 0;
+
+    if (recoveryActions < RECOVERY_MAX_ACTIONS) {
+      const plan = await buildRecoveryPlan(
+        ctx, task, leafExec.leafName,
+        leafExec.args as Record<string, unknown>,
+        recoveryActions + 1,
+        repositionRetries,
+      );
+      const outcome = await executeRecoveryStep(ctx, task, plan, runId);
+      const backoffMs = outcome.success ? RECOVERY_SHORT_BACKOFF_MS : RECOVERY_LONG_BACKOFF_MS;
+
+      console.log(
+        `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
+          `(attempt ${repositionRetries}/${maxRepositionRetries}) ` +
+          `recovery=${outcome.success ? 'success' : 'failed'} ` +
+          `leaf=${plan.leaf} mode=${plan.mode} backoff=${backoffMs}ms`
+      );
+
+      ctx.updateTaskMetadata(task.id, {
+        repositionRetryCount: repositionRetries,
+        lastRetryHint: retryHint,
+        nextEligibleAt: Date.now() + backoffMs,
+        recoveryActionCount: recoveryActions + 1,
+        lastRecoveryOutcome: outcome.success ? 'success' : 'failed',
+        lastRecoveryLeaf: plan.leaf,
+        lastRecoveryMode: plan.mode,
+      });
+    } else {
+      // Budget exhausted — fall back to existing long backoff
+      console.log(
+        `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
+          `(attempt ${repositionRetries}/${maxRepositionRetries}) ` +
+          `recovery=budget_exhausted backoff=${RECOVERY_LONG_BACKOFF_MS}ms`
+      );
+      ctx.updateTaskMetadata(task.id, {
+        repositionRetryCount: repositionRetries,
+        lastRetryHint: retryHint,
+        nextEligibleAt: Date.now() + RECOVERY_LONG_BACKOFF_MS,
+        lastRecoveryOutcome: 'budget_exhausted',
       });
     }
     return;

@@ -29,6 +29,7 @@ function createMockTaskIntegration(): ITaskIntegration {
     completeTaskStep: vi.fn().mockResolvedValue(true),
     startTaskStep: vi.fn().mockResolvedValue(true),
     regenerateSteps: vi.fn().mockResolvedValue({ steps: [] }),
+    getThreatSnapshot: vi.fn().mockResolvedValue({ overallThreatLevel: 'low', threats: [] }),
     addStepsBeforeCurrent: vi.fn(),
     annotateCurrentStepWithLeaf: vi.fn(),
     annotateCurrentStepWithOption: vi.fn().mockReturnValue(true),
