@@ -63,6 +63,16 @@ export interface ConvertThoughtToTaskDeps {
   };
 }
 
+/**
+ * Process-local registry for keepalive transient drops.
+ * Tracks first-seen time for keepalive thoughts dropped with no goal-prop,
+ * so we can bound retries by TTL without mutating the thought object
+ * (which doesn't persist across HTTP fetches).
+ */
+const keepaliveDropRegistry = new Map<string, number>();
+const KEEPALIVE_DROP_TTL_MS = 120_000; // 2 minutes
+const KEEPALIVE_DROP_REGISTRY_MAX = 100;
+
 /** Recent digest hashes for 5-minute dedup window */
 const recentDigestHashes = new Map<string, number>();
 const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
@@ -285,6 +295,7 @@ function pruneCooldownEntries(): void {
 export function __resetDedupStateForTests(): void {
   recentDigestHashes.clear();
   recentFailedCategories.clear();
+  keepaliveDropRegistry.clear();
 }
 
 /** Dedup metrics for observability. */
@@ -507,17 +518,40 @@ export async function convertThoughtToTask(
         reductionCheck.decision === 'dropped_no_goal_prop' && isKeepAlive;
 
       if (isTransientKeepAliveDrop) {
-        const KEEPALIVE_DROP_TTL_MS = 120_000; // 2 minutes
-        const KEEPALIVE_DROP_MAX_ATTEMPTS = 3;
-        const thoughtAge = Date.now() - (thought.timestamp ?? Date.now());
-        const attemptCount = ((thought as any).metadata?._vitalsDropAttempts as number ?? 0) + 1;
-        // Write attempt count back for next retry
-        if ((thought as any).metadata) {
-          (thought as any).metadata._vitalsDropAttempts = attemptCount;
+        // TTL-only bounding via process-local registry.
+        // We do NOT mutate thought.metadata (it doesn't persist across HTTP fetches).
+        // Instead, track first-seen time in a module-scoped map.
+        const now = Date.now();
+
+        // Normalize timestamp defensively — thought.timestamp may be missing, non-numeric,
+        // or an ISO string from a different serialization path.
+        const rawTs = thought.timestamp;
+        const parsedTs = typeof rawTs === 'number' ? rawTs
+          : typeof rawTs === 'string' ? Date.parse(rawTs)
+          : NaN;
+        const ts = Number.isFinite(parsedTs) ? parsedTs : now;
+
+        // Use whichever is older: thought creation time or first time we saw this drop
+        if (!keepaliveDropRegistry.has(thought.id)) {
+          keepaliveDropRegistry.set(thought.id, Math.min(ts, now));
+          // Prune registry if it grows too large (evict oldest entries)
+          if (keepaliveDropRegistry.size > KEEPALIVE_DROP_REGISTRY_MAX) {
+            const entries = [...keepaliveDropRegistry.entries()].sort((a, b) => a[1] - b[1]);
+            for (const [k] of entries.slice(0, entries.length - KEEPALIVE_DROP_REGISTRY_MAX)) {
+              keepaliveDropRegistry.delete(k);
+            }
+          }
         }
-        if (thoughtAge > KEEPALIVE_DROP_TTL_MS || attemptCount >= KEEPALIVE_DROP_MAX_ATTEMPTS) {
+
+        const firstSeenAt = keepaliveDropRegistry.get(thought.id)!;
+        const elapsed = now - firstSeenAt;
+
+        if (elapsed >= KEEPALIVE_DROP_TTL_MS) {
+          // TTL expired — mark processed to prevent infinite churn
           await deps.markThoughtAsProcessed(thought.id);
+          keepaliveDropRegistry.delete(thought.id);
         }
+        // Otherwise: leave unprocessed so keep-alive can retry when botState arrives
       } else if (deterministic.has(reductionCheck.decision) ||
           (reductionCheck.decision === 'dropped_no_goal_prop' && !isKeepAlive)) {
         await deps.markThoughtAsProcessed(thought.id);
@@ -628,6 +662,8 @@ export async function convertThoughtToTask(
 
     const addedTask = await deps.addTask(task);
     await deps.markThoughtAsProcessed(thought.id);
+    // Clean up keepalive drop registry if this thought previously had transient drops
+    keepaliveDropRegistry.delete(thought.id);
     logTaskIngestion({ _diag_version: 1, source: 'thought_converter', task_id: task.id, decision: 'created', task_type: 'sterling_ir' });
     const r: ConvertThoughtResult = { task: addedTask, decision: 'created' };
     logConversionDecision(thought, r);

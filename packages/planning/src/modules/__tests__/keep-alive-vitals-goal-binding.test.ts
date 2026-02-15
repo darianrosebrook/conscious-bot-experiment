@@ -480,4 +480,111 @@ describe('dropped_no_goal_prop transient for keepalive', () => {
     // TTL expired → mark as processed to prevent infinite churn
     expect(markThoughtAsProcessed).toHaveBeenCalledWith('keepalive-old-1');
   });
+
+  it('handles non-numeric thought.timestamp defensively (treats as "now")', async () => {
+    const { convertThoughtToTask, __resetDedupStateForTests } = await import('../../task-integration/thought-to-task-converter');
+    __resetDedupStateForTests();
+
+    const markThoughtAsProcessed = vi.fn();
+    const deps = {
+      addTask: vi.fn(),
+      markThoughtAsProcessed,
+      seenThoughtIds: new Set<string>(),
+      trimSeenThoughtIds: vi.fn(),
+    };
+
+    // Keepalive thought with undefined timestamp — should be treated as "now"
+    // (fresh), so NOT marked as processed
+    const thought = {
+      id: 'keepalive-bad-ts',
+      type: 'planning',
+      content: 'I am hungry',
+      attribution: 'llm',
+      timestamp: undefined, // missing timestamp
+      processed: false,
+      context: { emotionalState: 'stressed', confidence: 0.5, cognitiveSystem: 'generator' },
+      metadata: {
+        thoughtType: 'planning',
+        source: 'keepalive',
+        reduction: {
+          sterlingProcessed: true,
+          envelopeId: 'env_ts',
+          reducerResult: {
+            committed_goal_prop_id: null,
+            committed_ir_digest: 'digest_ts',
+            source_envelope_id: 'env_ts',
+            is_executable: true,
+            is_semantically_empty: false,
+            advisory: null,
+            grounding: null,
+            schema_version: '1.1.0',
+            reducer_version: 'keepalive-bridge-v1',
+          },
+          isExecutable: true,
+          blockReason: null,
+          durationMs: 10,
+          sterlingError: null,
+        },
+      },
+    };
+
+    const result = await convertThoughtToTask(thought as any, deps as any);
+
+    expect(result.decision).toBe('dropped_no_goal_prop');
+    // Undefined timestamp → treated as "now" → TTL not expired → NOT marked processed
+    expect(markThoughtAsProcessed).not.toHaveBeenCalled();
+  });
+
+  it('handles ISO string timestamp correctly', async () => {
+    const { convertThoughtToTask, __resetDedupStateForTests } = await import('../../task-integration/thought-to-task-converter');
+    __resetDedupStateForTests();
+
+    const markThoughtAsProcessed = vi.fn();
+    const deps = {
+      addTask: vi.fn(),
+      markThoughtAsProcessed,
+      seenThoughtIds: new Set<string>(),
+      trimSeenThoughtIds: vi.fn(),
+    };
+
+    // Keepalive thought with ISO string timestamp from 3 minutes ago
+    const thought = {
+      id: 'keepalive-iso-ts',
+      type: 'planning',
+      content: 'I am hungry',
+      attribution: 'llm',
+      timestamp: new Date(Date.now() - 200_000).toISOString(), // 3+ min ago as ISO string
+      processed: false,
+      context: { emotionalState: 'stressed', confidence: 0.5, cognitiveSystem: 'generator' },
+      metadata: {
+        thoughtType: 'planning',
+        source: 'keepalive',
+        reduction: {
+          sterlingProcessed: true,
+          envelopeId: 'env_iso',
+          reducerResult: {
+            committed_goal_prop_id: null,
+            committed_ir_digest: 'digest_iso',
+            source_envelope_id: 'env_iso',
+            is_executable: true,
+            is_semantically_empty: false,
+            advisory: null,
+            grounding: null,
+            schema_version: '1.1.0',
+            reducer_version: 'keepalive-bridge-v1',
+          },
+          isExecutable: true,
+          blockReason: null,
+          durationMs: 10,
+          sterlingError: null,
+        },
+      },
+    };
+
+    const result = await convertThoughtToTask(thought as any, deps as any);
+
+    expect(result.decision).toBe('dropped_no_goal_prop');
+    // ISO string timestamp parsed → 3 min ago → TTL expired → marked processed
+    expect(markThoughtAsProcessed).toHaveBeenCalledWith('keepalive-iso-ts');
+  });
 });
