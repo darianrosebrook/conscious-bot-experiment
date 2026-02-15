@@ -81,6 +81,8 @@ export interface BuildingStore {
   /** Set of "x,y,z" keys for fast collision checks. */
   blockIndex: Set<string>;
   selectedBlockType: string;
+  /** Position of block selected via shift+click (for highlight). */
+  selectedBlockPosition: Vec3 | null;
   buildMode: BuildMode;
   gridSize: Vec3;
   savedLayouts: SavedLayout[];
@@ -114,10 +116,13 @@ export interface BuildingStore {
   manualInventory: Record<string, number>;
 
   // Actions
-  placeBlock: (_pos: Vec3, _type: string) => void;
+  placeBlock: (_pos: Vec3, _type: string, _blockState?: import('@/types/building').BlockState) => void;
+  /** Place multiple blocks in one operation (for drag-to-place line). */
+  placeBlocks: (_positions: Vec3[], _type: string, _blockState?: import('@/types/building').BlockState) => void;
   removeBlock: (_pos: Vec3) => void;
   clearBlocks: () => void;
   setSelectedBlockType: (_type: string) => void;
+  setSelectedBlockPosition: (_pos: Vec3 | null) => void;
   setBuildMode: (_mode: BuildMode) => void;
   /** Look up the block type at a position (for pick-block). */
   getBlockAt: (_pos: Vec3) => string | null;
@@ -180,6 +185,7 @@ export const useBuildingStore = create<BuildingStore>()(
         blocks: [],
         blockIndex: new Set<string>(),
         selectedBlockType: DEFAULT_BLOCK_TYPE,
+        selectedBlockPosition: null,
         buildMode: 'place',
         gridSize: { ...DEFAULT_GRID_SIZE },
         savedLayouts: [],
@@ -212,7 +218,7 @@ export const useBuildingStore = create<BuildingStore>()(
         inventoryMode: 'auto' as InventoryMode,
         manualInventory: {},
 
-        placeBlock: (pos, type) => {
+        placeBlock: (pos, type, blockState) => {
           const key = posKey(pos);
           const { blockIndex, blocks, gridSize } = get();
 
@@ -229,9 +235,27 @@ export const useBuildingStore = create<BuildingStore>()(
           const newIndex = new Set(blockIndex);
           newIndex.add(key);
           set({
-            blocks: [...blocks, { position: { ...pos }, blockType: type }],
+            blocks: [...blocks, { position: { ...pos }, blockType: type, blockState }],
             blockIndex: newIndex,
           });
+        },
+
+        placeBlocks: (positions, type, blockState) => {
+          const { blockIndex, blocks, gridSize } = get();
+          const newIndex = new Set(blockIndex);
+          const newBlocks = [...blocks];
+          for (const pos of positions) {
+            const key = posKey(pos);
+            if (
+              pos.x < 0 || pos.x >= gridSize.x ||
+              pos.y < 0 || pos.y >= gridSize.y ||
+              pos.z < 0 || pos.z >= gridSize.z
+            ) continue;
+            if (newIndex.has(key)) continue;
+            newIndex.add(key);
+            newBlocks.push({ position: { ...pos }, blockType: type, blockState });
+          }
+          set({ blocks: newBlocks, blockIndex: newIndex });
         },
 
         removeBlock: (pos) => {
@@ -253,6 +277,9 @@ export const useBuildingStore = create<BuildingStore>()(
         setSelectedBlockType: (type) =>
           set({ selectedBlockType: type }),
 
+        setSelectedBlockPosition: (pos) =>
+          set({ selectedBlockPosition: pos }),
+
         setBuildMode: (mode) =>
           set({ buildMode: mode }),
 
@@ -270,6 +297,7 @@ export const useBuildingStore = create<BuildingStore>()(
             seen.set(posKey(bl.position), {
               position: { ...bl.position },
               blockType: bl.blockType,
+              blockState: bl.blockState ? { ...bl.blockState } : undefined,
             });
           }
           const blocks = Array.from(seen.values());
@@ -287,6 +315,7 @@ export const useBuildingStore = create<BuildingStore>()(
             blocks: blocks.map((b) => ({
               position: { ...b.position },
               blockType: b.blockType,
+              blockState: b.blockState ? { ...b.blockState } : undefined,
             })),
             savedAt: Date.now(),
           };

@@ -22,3 +22,17 @@
   pointer-events: none;
   z-index: 1;
 }
+
+.atlasHint {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: rgb(161 161 170);
+  background: rgb(9 9 11 / 0.85);
+  padding: 0.2rem 0.6rem;
+  border-radius: $radius-sm;
+  pointer-events: none;
+  z-index: 1;
+}

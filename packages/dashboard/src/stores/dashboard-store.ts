@@ -58,41 +58,46 @@ import { GOAL_TAG_RE, cleanDisplayText } from '@/lib/text-utils';
 /** Alias for backward-compat references within this file. */
 const GOAL_TAG_STRIP_RE = GOAL_TAG_RE;
 
+/** Session restore limits to avoid localStorage bloat. */
+const SESSION_TASKS_MAX = 50;
+const SESSION_EVENTS_MAX = 50;
+const SESSION_MEMORIES_MAX = 50;
+const SESSION_NOTES_MAX = 50;
+const SESSION_INVENTORY_MAX = 100;
+
 const PERSIST_CONFIG = {
   name: 'conscious-bot-dashboard-state',
   partialize: (state: DashboardStore) => ({
-    // Only persist thoughts and essential state
     thoughts: state.thoughts,
     isLive: state.isLive,
     ttsEnabled: state.ttsEnabled,
-    // Persist valuation records WITHOUT the fullRecord blob (can be large).
-    // fullRecord is kept in-memory only for the current session.
     valuationRecords: state.valuationRecords.map(
       ({ fullRecord: _dropped, ...rest }) => rest
     ),
-    // Don't persist real-time data that should be fetched fresh
-    // hud: state.hud,
-    // tasks: state.tasks,
-    // environment: state.environment,
-    // inventory: state.inventory,
-    // plannerData: state.plannerData,
+    // Session restore: persist so refresh shows data immediately; server fetch updates in background
+    tasks: (state.tasks || []).slice(-SESSION_TASKS_MAX),
+    tasksFallback: state.tasksFallback,
+    events: (state.events || []).slice(-SESSION_EVENTS_MAX),
+    memories: (state.memories || []).slice(-SESSION_MEMORIES_MAX),
+    notes: (state.notes || []).slice(-SESSION_NOTES_MAX),
+    environment: state.environment,
+    hud: state.hud,
+    inventory: (state.inventory || []).slice(-SESSION_INVENTORY_MAX),
+    plannerData: state.plannerData,
   }),
-  // Clean and deduplicate persisted thoughts on rehydration.
-  // Strips GOAL tags (handles pre-displayContent thoughts) and collapses
-  // repeated identical messages, keeping only the most recent occurrence.
   merge: (
     persistedState: any,
     currentState: DashboardStore
   ): DashboardStore => {
     if (!persistedState) return currentState;
     const merged = { ...currentState, ...persistedState };
+
+    // Clean and deduplicate thoughts
     if (Array.isArray(merged.thoughts)) {
-      // Clean text
       const cleaned = merged.thoughts.map((t: any) => ({
         ...t,
         text: typeof t.text === 'string' ? cleanDisplayText(t.text) : t.text,
       }));
-      // Deduplicate: keep only the most recent occurrence of each canonical text
       const seen = new Map<string, (typeof cleaned)[0]>();
       for (const t of cleaned) {
         const key = (t.text || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -105,6 +110,38 @@ const PERSIST_CONFIG = {
         (a.ts || '').localeCompare(b.ts || '')
       );
     }
+
+    // Restore session arrays only if valid; otherwise keep initial state
+    merged.tasks = Array.isArray(persistedState.tasks)
+      ? persistedState.tasks.slice(-SESSION_TASKS_MAX)
+      : currentState.tasks;
+    merged.events = Array.isArray(persistedState.events)
+      ? persistedState.events.slice(-SESSION_EVENTS_MAX)
+      : currentState.events;
+    merged.memories = Array.isArray(persistedState.memories)
+      ? persistedState.memories.slice(-SESSION_MEMORIES_MAX)
+      : currentState.memories;
+    merged.notes = Array.isArray(persistedState.notes)
+      ? persistedState.notes.slice(-SESSION_NOTES_MAX)
+      : currentState.notes;
+    merged.inventory = Array.isArray(persistedState.inventory)
+      ? persistedState.inventory.slice(-SESSION_INVENTORY_MAX)
+      : currentState.inventory;
+    merged.tasksFallback =
+      persistedState.tasksFallback === true || currentState.tasksFallback;
+    merged.environment =
+      persistedState.environment && typeof persistedState.environment === 'object'
+        ? persistedState.environment
+        : currentState.environment;
+    merged.hud =
+      persistedState.hud && typeof persistedState.hud === 'object'
+        ? persistedState.hud
+        : currentState.hud;
+    merged.plannerData =
+      persistedState.plannerData && typeof persistedState.plannerData === 'object'
+        ? persistedState.plannerData
+        : currentState.plannerData;
+
     return merged;
   },
 };

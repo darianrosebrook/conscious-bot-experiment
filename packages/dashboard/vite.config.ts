@@ -176,6 +176,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/inventory/, '/inventory'),
       },
+      // Minecraft asset pipeline — textures, blockStates (shared with viewer)
+      '/api/mc-assets': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/mc-assets/, '/mc-assets'),
+      },
 
       // =====================================================================
       // Evaluation service (port 3006 - if separate, otherwise part of another)

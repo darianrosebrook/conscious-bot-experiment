@@ -45,7 +45,12 @@ import { MaterialsPicker } from './materials-picker';
 import { InventoryPanel } from './inventory-panel';
 import s from './building-tab.module.scss';
 
-export function BuildingTab() {
+export interface BuildingTabProps {
+  /** MC version from viewer-status (bot.server.version) so Building tab uses same textures as Live viewer */
+  mcVersion?: string | null;
+}
+
+export function BuildingTab({ mcVersion }: BuildingTabProps = {}) {
   const buildMode = useBuildingStore((st) => st.buildMode);
   const setBuildMode = useBuildingStore((st) => st.setBuildMode);
   const clearBlocks = useBuildingStore((st) => st.clearBlocks);
@@ -411,7 +416,7 @@ export function BuildingTab() {
       {/* ── Two-pane area ───────────────────────────────────────────────── */}
       <div className={s.panes}>
         <div className={s.canvasPane}>
-          <BlockCanvas />
+          <BlockCanvas mcVersion={mcVersion} />
         </div>
         <div className={s.graphPane}>
           <SolveGraphPanel />

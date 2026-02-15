@@ -4,7 +4,7 @@ import styles from './pill.module.scss';
 
 interface PillProps {
   children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'danger';
+  variant?: 'default' | 'muted' | 'success' | 'warning' | 'danger';
   className?: string;
 }
 
@@ -19,6 +19,7 @@ export function Pill({
 }: PillProps) {
   const variantClasses = {
     default: styles.variantDefault,
+    muted: styles.variantMuted,
     success: styles.variantSuccess,
     warning: styles.variantWarning,
     danger: styles.variantDanger,

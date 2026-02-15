@@ -27,13 +27,19 @@ import {
 
 import { useDashboardStore } from '@/stores/dashboard-store';
 import type { Task } from '@/types';
-import { cn, debugLog, formatTime } from '@/lib/utils';
+import {
+  cn,
+  debugLog,
+  formatTime,
+  formatMinecraftTime,
+  formatRelativeTime,
+} from '@/lib/utils';
 import { useCognitiveStream } from '@/hooks/use-cognitive-stream';
 import { useWsBotState } from '@/hooks/use-ws-bot-state';
 import { useInitialDataFetch } from '@/hooks/use-initial-data-fetch';
 import { useTaskStream } from '@/hooks/use-task-stream';
 import { usePeriodicRefresh } from '@/hooks/use-periodic-refresh';
-import { parseGoalTags, goalToLabel } from '@/lib/text-utils';
+import { parseThoughtTags, goalToLabel, intentToLabel } from '@/lib/text-utils';
 import { ViewerHudOverlay } from '@/components/viewer-hud-overlay';
 import { StressHexHeatmap } from '@/components/stress-hex-heatmap';
 import { Section } from '@/components/section';
@@ -550,11 +556,12 @@ export default function Dashboard() {
     };
 
     const rawContent = `${prefix}${thought.content ?? thought.text ?? ''}`;
-    const { displayText, goals } = parseGoalTags(rawContent);
+    const { displayText, goals, intents } = parseThoughtTags(rawContent);
 
+    const hasTags = goals.length > 0 || intents.length > 0;
     // Only show expand/collapse when content would overflow (2-line clamp)
-    // or when there are goal tags, or when already expanded (to allow collapse).
-    const wouldOverflow = (displayText?.length ?? 0) > 100 || goals.length > 0;
+    // or when there are goal/intent tags, or when already expanded (to allow collapse).
+    const wouldOverflow = (displayText?.length ?? 0) > 100 || hasTags;
     const showExpandTrigger = wouldOverflow || isExpanded;
 
     return (
@@ -580,7 +587,7 @@ export default function Dashboard() {
         >
           {displayText || '\u00A0'}
         </p>
-        {goals.length > 0 && (
+        {hasTags && (
           <div className={styles.thoughtGoalTags}>
             <Tag className={styles.thoughtGoalTagIcon} aria-hidden />
             {goals.map((goal, i) => (
@@ -589,6 +596,14 @@ export default function Dashboard() {
                 className={styles.thoughtGoalChip}
               >
                 [GOAL] {goalToLabel(goal)}
+              </span>
+            ))}
+            {intents.map((intent, i) => (
+              <span
+                key={`${thought.id}-intent-${i}`}
+                className={styles.thoughtIntentChip}
+              >
+                INTENT: {intentToLabel(intent)}
               </span>
             ))}
           </div>
@@ -776,80 +791,170 @@ export default function Dashboard() {
                 >
                   {tasks.length > 0 ? (
                     <div className={styles.taskList}>
-                      {tasks.map((task) => (
-                        <div key={task.id} className={styles.taskCard}>
-                          <div className={styles.taskHeader}>
-                            <div className={styles.taskTitle}>{task.title}</div>
-                            <Pill>{task.source}</Pill>
-                          </div>
-                          <div className={styles.taskProgressTrack}>
-                            <div
-                              className={styles.taskProgressFill}
-                              style={{
-                                width: `${Math.round(task.progress * 100)}%`,
-                              }}
-                            />
-                          </div>
-                          {task.requirement && (
-                            <div className={styles.taskRequirement}>
-                              <div className={styles.requirementHeader}>
-                                <span className={styles.requirementLabel}>
-                                  Requirement
-                                </span>
-                                {task.requirement?.kind === 'craft' &&
-                                task.requirement?.outputPattern ? (
-                                  <span>
-                                    Output: {task.requirement.outputPattern}
-                                    {task.requirement.have >=
-                                    (task.requirement.quantity || 1)
-                                      ? ' • Crafted'
-                                      : task.requirement.proxyHave !== undefined
-                                        ? ` • Materials ~${task.requirement.proxyHave}`
-                                        : ''}
-                                  </span>
-                                ) : (
-                                  <span>
-                                    Have {task.requirement?.have ?? 0}/
-                                    {task.requirement?.quantity ?? 0}
-                                    {typeof task.requirement?.needed ===
-                                    'number'
-                                      ? ` • Need ${task.requirement.needed}`
-                                      : ''}
-                                  </span>
+                      {tasks.map((task) => {
+                        const meta = task.metadata as
+                          | {
+                              category?: string;
+                              createdAt?: number;
+                              sterling?: { committedIrDigest?: string };
+                            }
+                          | undefined;
+                        const thoughtContent =
+                          (task.parameters as { thoughtContent?: string })
+                            ?.thoughtContent ?? '';
+                        const descDiffers =
+                          task.description &&
+                          task.description.trim() !== (task.title ?? '').trim();
+                        const thoughtAddsContext =
+                          thoughtContent &&
+                          thoughtContent.trim() !== (task.title ?? '').trim() &&
+                          thoughtContent.length > (task.title ?? '').length;
+                        const contextText = descDiffers
+                          ? (task.description ?? '').slice(0, 150) +
+                            ((task.description?.length ?? 0) > 150 ? '...' : '')
+                          : thoughtAddsContext
+                            ? thoughtContent.slice(0, 150) +
+                              (thoughtContent.length > 150 ? '...' : '')
+                            : null;
+                        const digest =
+                          meta?.sterling?.committedIrDigest?.slice(0, 8) ??
+                          null;
+                        const createdAt = meta?.createdAt;
+                        const typeLabel = task.type ?? meta?.category;
+                        const showTypeBadge =
+                          typeLabel &&
+                          typeLabel !== 'unknown' &&
+                          typeLabel !== task.source;
+                        return (
+                          <div key={task.id} className={styles.taskCard}>
+                            <div className={styles.taskHeader}>
+                              <div className={styles.taskTitle}>
+                                {task.title}
+                              </div>
+                              <div className={styles.taskBadges}>
+                                {task.status && <Pill>{task.status}</Pill>}
+                                {showTypeBadge && (
+                                  <Pill variant="muted">{typeLabel}</Pill>
+                                )}
+                                {!showTypeBadge && task.source && (
+                                  <Pill variant="muted">{task.source}</Pill>
                                 )}
                               </div>
-                              {Array.isArray(task.requirement?.patterns) &&
-                              task.requirement?.patterns?.length ? (
-                                <div className={styles.requirementPatterns}>
-                                  Items: {task.requirement.patterns.join(', ')}
-                                </div>
-                              ) : null}
-                              {renderRequirementProgress(task)}
                             </div>
-                          )}
-                          {task.steps && (
-                            <ul className={styles.taskSteps}>
-                              {task.steps.map((step) => (
-                                <li key={step.id} className={styles.stepItem}>
-                                  <input
-                                    type="checkbox"
-                                    checked={step.done}
-                                    onChange={() => {}}
-                                    className={styles.stepCheckbox}
-                                  />
-                                  <span
-                                    className={
-                                      step.done ? styles.stepDone : undefined
+                            {(contextText || digest || createdAt) && (
+                              <div className={styles.taskMeta}>
+                                {contextText && (
+                                  <div
+                                    className={styles.taskContext}
+                                    title={
+                                      thoughtContent ||
+                                      task.description ||
+                                      undefined
                                     }
                                   >
-                                    {step.label}
+                                    {contextText}
+                                  </div>
+                                )}
+                                <div className={styles.taskMetaRow}>
+                                  {createdAt && (
+                                    <time
+                                      className={styles.taskMetaTime}
+                                      title={formatTime(
+                                        new Date(createdAt).toISOString()
+                                      )}
+                                    >
+                                      {formatRelativeTime(
+                                        new Date(createdAt).toISOString()
+                                      )}
+                                    </time>
+                                  )}
+                                  {createdAt && digest && (
+                                    <span className={styles.taskMetaSep}>
+                                      ·
+                                    </span>
+                                  )}
+                                  {digest && (
+                                    <span
+                                      className={styles.taskDigestChip}
+                                      title={`Sterling digest: ${meta?.sterling?.committedIrDigest ?? digest}`}
+                                    >
+                                      {digest}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <div className={styles.taskProgressTrack}>
+                              <div
+                                className={styles.taskProgressFill}
+                                style={{
+                                  width: `${Math.round(task.progress * 100)}%`,
+                                }}
+                              />
+                            </div>
+                            {task.requirement && (
+                              <div className={styles.taskRequirement}>
+                                <div className={styles.requirementHeader}>
+                                  <span className={styles.requirementLabel}>
+                                    Requirement
                                   </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
+                                  {task.requirement?.kind === 'craft' &&
+                                  task.requirement?.outputPattern ? (
+                                    <span>
+                                      Output: {task.requirement.outputPattern}
+                                      {task.requirement.have >=
+                                      (task.requirement.quantity || 1)
+                                        ? ' • Crafted'
+                                        : task.requirement.proxyHave !==
+                                            undefined
+                                          ? ` • Materials ~${task.requirement.proxyHave}`
+                                          : ''}
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      Have {task.requirement?.have ?? 0}/
+                                      {task.requirement?.quantity ?? 0}
+                                      {typeof task.requirement?.needed ===
+                                      'number'
+                                        ? ` • Need ${task.requirement.needed}`
+                                        : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                {Array.isArray(task.requirement?.patterns) &&
+                                task.requirement?.patterns?.length ? (
+                                  <div className={styles.requirementPatterns}>
+                                    Items:{' '}
+                                    {task.requirement.patterns.join(', ')}
+                                  </div>
+                                ) : null}
+                                {renderRequirementProgress(task)}
+                              </div>
+                            )}
+                            {task.steps && (
+                              <ul className={styles.taskSteps}>
+                                {task.steps.map((step) => (
+                                  <li key={step.id} className={styles.stepItem}>
+                                    <input
+                                      type="checkbox"
+                                      checked={step.done}
+                                      onChange={() => {}}
+                                      className={styles.stepCheckbox}
+                                    />
+                                    <span
+                                      className={
+                                        step.done ? styles.stepDone : undefined
+                                      }
+                                    >
+                                      {step.label}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <EmptyState
@@ -970,7 +1075,13 @@ export default function Dashboard() {
                         <span className={styles.envLabel}>Biome</span>
                         <div>{environment.biome?.replace(/_/g, ' ')}</div>
                         {environment.biomeCategory && (
-                          <div className={styles.envLabel} style={{ fontSize: '0.75rem', marginTop: '0.125rem' }}>
+                          <div
+                            className={styles.envLabel}
+                            style={{
+                              fontSize: '0.75rem',
+                              marginTop: '0.125rem',
+                            }}
+                          >
                             {environment.biomeCategory}
                           </div>
                         )}
@@ -981,7 +1092,7 @@ export default function Dashboard() {
                       </div>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Time</span>
-                        <div>{environment.timeOfDay}</div>
+                        <div>{formatMinecraftTime(environment.timeOfDay)}</div>
                       </div>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Nearby</span>
@@ -989,7 +1100,8 @@ export default function Dashboard() {
                           {environment.nearbyEntities?.join(', ') || 'None'}
                         </div>
                       </div>
-                      {(environment.biomeTemperature != null || environment.biomeHumidity != null) && (
+                      {(environment.biomeTemperature != null ||
+                        environment.biomeHumidity != null) && (
                         <>
                           <div className={styles.envCell}>
                             <span className={styles.envLabel}>Temperature</span>
@@ -1382,7 +1494,12 @@ export default function Dashboard() {
 
           {/* Building Tab Content */}
           <TabsContent value="building" className={styles.tabContentFull}>
-            <BuildingTab />
+            <BuildingTab
+              mcVersion={
+                (viewerStatus as { executionStatus?: { bot?: { server?: { version?: string } } } } | null)
+                  ?.executionStatus?.bot?.server?.version ?? undefined
+              }
+            />
           </TabsContent>
         </Tabs>
       </div>

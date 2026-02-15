@@ -27,6 +27,20 @@ export function formatTime(ts: string): string {
 }
 
 /**
+ * Format Minecraft timeOfDay (0-24000) to day/night label, aligned with viewer.
+ * 0-1000 dawn, 1000-13000 day, 13000-14000 dusk, 14000-24000 night.
+ */
+export function formatMinecraftTime(timeOfDay: number | string | undefined): string {
+  if (timeOfDay == null) return 'day';
+  const t = typeof timeOfDay === 'number' ? timeOfDay : parseInt(String(timeOfDay), 10);
+  if (Number.isNaN(t)) return 'day';
+  if (t < 1000 || t > 23000) return 'dawn';
+  if (t < 13000) return 'day';
+  if (t < 14000) return 'dusk';
+  return 'night';
+}
+
+/**
  * Format relative time (e.g., "2 minutes ago")
  * @param ts - ISO timestamp string
  * @returns Relative time string

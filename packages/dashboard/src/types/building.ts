@@ -13,9 +13,20 @@ export interface Vec3 {
   z: number;
 }
 
+/** Minecraft block state properties (subset relevant to placement). */
+export interface BlockState {
+  half?: 'top' | 'bottom' | 'lower' | 'upper';
+  facing?: 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
+  type?: 'floor' | 'wall' | 'single' | 'left' | 'right';
+  open?: boolean;
+  shape?: 'straight' | 'inner_left' | 'inner_right' | 'outer_left' | 'outer_right';
+}
+
 export interface PlacedBlock {
   position: Vec3;
   blockType: string; // e.g. 'cobblestone', 'oak_planks'
+  /** Derived from placement context (face, floor). Optional for blocks that don't use it. */
+  blockState?: BlockState;
 }
 
 export type BuildMode = 'place' | 'erase';

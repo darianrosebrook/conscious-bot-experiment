@@ -60,7 +60,9 @@ export type TaskSource =
   | 'planner'
   | 'reflection'
   | 'intrusion'
-  | 'system';
+  | 'system'
+  | 'autonomous'
+  | 'manual';
 
 export interface TaskStep {
   id: string;
@@ -71,6 +73,12 @@ export interface TaskStep {
 export interface Task {
   id: string;
   title: string;
+  /** Optional; from planning API. Provides context when title is generic (e.g. "Idle episode (sterling executable)"). */
+  description?: string;
+  /** Optional; from planning API. e.g. sterling_ir, reflex, etc. */
+  type?: string;
+  /** Optional; from planning API. */
+  status?: string;
   priority: number; // 0..1
   progress: number; // 0..1
   source: TaskSource;
@@ -85,6 +93,16 @@ export interface Task {
     proxyPatterns?: string[];
     proxyHave?: number;
   };
+  /** Optional; from planning API. Includes category, sterling digest, createdAt, etc. */
+  metadata?: {
+    category?: string;
+    createdAt?: number;
+    updatedAt?: number;
+    sterling?: { committedIrDigest?: string; schemaVersion?: string };
+    tags?: string[];
+  };
+  /** Optional; from planning API. thoughtContent can provide semantic context. */
+  parameters?: Record<string, unknown>;
 }
 
 // Event types
