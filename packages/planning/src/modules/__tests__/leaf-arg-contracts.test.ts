@@ -771,14 +771,14 @@ function buildFullArgs(fields: string[]): Record<string, unknown> {
  * Contracts with OR constraints: all fields are optional individually
  * but at least one is required by validate(). These need special handling.
  */
-const OR_CONSTRAINT_LEAVES = new Set(['dig_block', 'open_container']);
+const OR_CONSTRAINT_LEAVES = new Set(['dig_block']);
 
 /**
  * Contracts with mixed AND+OR constraints: some fields are required (AND),
  * and additionally at least one of several optional fields is required (OR).
  * Minimal valid args must include all required fields PLUS one optional.
  */
-const MIXED_AND_OR_LEAVES = new Set(['interact_with_entity']);
+const MIXED_AND_OR_LEAVES = new Set<string>();
 
 describe('fields[] ↔ validate() coherence (contract invariant)', () => {
   const entries = getLeafContractEntries();

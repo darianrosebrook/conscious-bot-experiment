@@ -371,11 +371,11 @@ describe('interact_with_entity leaf contract', () => {
     expect(err).toContain('entityType');
   });
 
-  it('invalid without entityId or entityPosition', () => {
+  it('valid with only entityType (resolver-style — leaf resolves nearest at runtime)', () => {
     const err = validateLeafArgs('interact_with_entity', {
       entityType: 'villager',
     });
-    expect(err).toContain('entityId');
+    expect(err).toBeNull();
   });
 });
 
@@ -398,8 +398,8 @@ describe('open_container leaf contract', () => {
     expect(err).toBeNull();
   });
 
-  it('invalid without containerType or position', () => {
+  it('valid with empty args (resolver-style — leaf defaults to chest at runtime)', () => {
     const err = validateLeafArgs('open_container', {});
-    expect(err).toContain('containerType');
+    expect(err).toBeNull();
   });
 });
