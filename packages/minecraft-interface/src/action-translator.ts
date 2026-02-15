@@ -122,6 +122,69 @@ function entityMatchesItem(entity: any, itemIds: Set<number> | null): boolean {
 }
 
 /**
+ * Returns true if the given name is a known block type (e.g. stone, iron_ore).
+ * Used to distinguish block targets (to mine) from item targets (to pick up).
+ */
+function isBlockTarget(bot: Bot, name: string | undefined): boolean {
+  if (!name || typeof name !== 'string') return false;
+  const mcData = (bot as any).mcData;
+  if (!mcData?.blocksByName) return false;
+  const normalized = name.startsWith('minecraft:') ? name.slice('minecraft:'.length) : name;
+  return (mcData.blocksByName as Record<string, unknown>)[normalized] != null;
+}
+
+/**
+ * Resolve a block name to a set of matching mcData block IDs.
+ * Used for block observation matching when perception returns blockId.
+ */
+function resolveBlockIds(bot: Bot, blockName: string | undefined): Set<number> | null {
+  if (!blockName) return null;
+  const mcData = (bot as any).mcData;
+  if (!mcData?.blocksByName) return null;
+  const normalized = blockName.startsWith('minecraft:') ? blockName.slice('minecraft:'.length) : blockName;
+  const exact = (mcData.blocksByName as Record<string, { id: number }>)[normalized];
+  if (exact) return new Set([exact.id]);
+  const ids = new Set<number>();
+  for (const [name, entry] of Object.entries(mcData.blocksByName as Record<string, { id: number }>)) {
+    if (name.includes(normalized)) ids.add(entry.id);
+  }
+  return ids.size > 0 ? ids : null;
+}
+
+/**
+ * Resolve multiple item names to a merged set of mcData item IDs.
+ * Used when exploring for any of several resource types (e.g. oak_log, birch_log).
+ */
+function resolveItemIdsForItems(bot: Bot, items: string[]): Set<number> | null {
+  if (!items?.length) return null;
+  const merged = new Set<number>();
+  for (const item of items) {
+    const ids = resolveItemIds(bot, item);
+    if (ids) ids.forEach((id) => merged.add(id));
+  }
+  return merged.size > 0 ? merged : null;
+}
+
+/**
+ * Check if an observation's block name matches the target (exact or substring).
+ */
+function blockNameMatches(target: string, obsName: string | undefined): boolean {
+  if (!obsName) return false;
+  const t = target.startsWith('minecraft:') ? target.slice('minecraft:'.length) : target;
+  const o = obsName.startsWith('minecraft:') ? obsName.slice('minecraft:'.length) : obsName;
+  return o === t || o.includes(t);
+}
+
+/**
+ * Check if a block name matches any of the given resource tags.
+ * Used when exploring for multiple resource types (e.g. oak_log, birch_log, acacia_log).
+ */
+function blockMatchesAnyTag(tags: string[], blockName: string | undefined): boolean {
+  if (!blockName || !tags?.length) return false;
+  return tags.some((tag) => blockNameMatches(tag, blockName));
+}
+
+/**
  * Seeded hash for exploration target selection.
  * Returns a stable value in [0, 1) derived from immutable trace facts.
  * Replayable: same input string always produces the same output.
@@ -522,6 +585,7 @@ export class ActionTranslator {
       case 'go_to':
       case 'explore_environment':
       case 'explore':
+      case 'explore_for_resources':
       case 'scout':
       case 'patrol':
       case 'wander':
@@ -1336,6 +1400,22 @@ export class ActionTranslator {
         case 'scan_environment':
           return await this.executeScanEnvironment(action, timeout);
 
+        case 'explore_for_resources':
+        case 'gather_resources':
+          // explore_for_resources: Solver emitted this because no observed mine
+          // targets matched the crafting goal's dependency chain.
+          // gather_resources: General resource-seeking exploration action.
+          // Both route to explore behavior.
+          return await this.executeExplore({
+            ...action,
+            type: 'explore' as any,
+            parameters: {
+              ...action.parameters,
+              distance: action.parameters?.radius || 64,
+              target: 'exploration_target',
+            },
+          }, timeout);
+
         case 'execute_behavior_tree':
           return await this.executeBehaviorTree(action, timeout);
 
@@ -1731,10 +1811,34 @@ export class ActionTranslator {
       const effectiveTimeout = leafTimeout ? Math.max(leafTimeout, timeout) : timeout;
 
       const context = this.createLeafContext(signal);
+      const leafStartTime = Date.now();
       const result = await leaf.run(context, {
         ...stripReservedMeta(params),
         timeoutMs: effectiveTimeout,
       });
+
+      // P0-B: Leaf dispatch result log (extended with craft diagnostic fields)
+      const leafDuration = Date.now() - leafStartTime;
+      const diag = result.result?.toolDiagnostics;
+      const reasonCode = diag?.reason_code;
+      let diagSuffix = '';
+      if (diag && result.status === 'failure') {
+        const parts: string[] = [];
+        if (diag.requires_workstation != null) parts.push(`workstation=${diag.requires_workstation}`);
+        if (diag.crafting_table_nearby != null) parts.push(`table_nearby=${diag.crafting_table_nearby}`);
+        if (Array.isArray(diag.missing_inputs) && diag.missing_inputs.length > 0) {
+          const missing = diag.missing_inputs.map(
+            (m: any) => `${m.item}(${m.have}/${m.need})`
+          ).join(',');
+          parts.push(`missing=[${missing}]`);
+        }
+        if (parts.length > 0) diagSuffix = ` ${parts.join(' ')}`;
+      }
+      console.log(
+        `[MC/leaf] ${leafName} status=${result.status} duration=${leafDuration}ms` +
+        (reasonCode ? ` reason=${reasonCode}` : '') +
+        diagSuffix
+      );
 
       return {
         success: result.status === 'success',
@@ -3030,14 +3134,18 @@ export class ActionTranslator {
   }
 
   /**
-   * Execute pickup action
+   * Execute pickup action.
+   * Accepts item (single) or items (array) to pick up any matching resource.
    */
   private async executePickup(
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { item, maxDistance = 3 } = action.parameters;
-    const itemIds = resolveItemIds(this.bot, item);
+    const { item, items, maxDistance = 3 } = action.parameters;
+    const itemIds =
+      Array.isArray(items) && items.length > 0
+        ? resolveItemIdsForItems(this.bot, items)
+        : resolveItemIds(this.bot, item);
 
     // Find nearby items (fuzzy match for suffix patterns like '_log')
     const droppedItems = Object.values(this.bot.entities).filter(
@@ -3048,9 +3156,10 @@ export class ActionTranslator {
     );
 
     if (droppedItems.length === 0) {
+      const label = Array.isArray(items) ? items.join(', ') : item;
       return {
         success: false,
-        error: `No ${item || 'items'} found within ${maxDistance} blocks`,
+        error: `No ${label || 'items'} found within ${maxDistance} blocks`,
       };
     }
 
@@ -3266,6 +3375,48 @@ export class ActionTranslator {
     }
   }
 
+  /**
+   * Execute explore action - general resource-seeking exploration when no
+   * specific targets are known. Used by explore_for_resources and gather_resources.
+   */
+  private async executeExplore(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { distance = 64, radius, resource_tags } = action.parameters ?? {};
+    const searchRadius = radius ?? distance ?? 64;
+    const targetItems =
+      Array.isArray(resource_tags) && resource_tags.length > 0
+        ? resource_tags.map((t) => String(t))
+        : undefined;
+
+    console.log('[explore:block] executeExplore input', {
+      resource_tags,
+      targetItems,
+      searchRadius,
+      goal_item: action.parameters?.goal_item,
+      reason: action.parameters?.reason,
+    });
+
+    try {
+      const result = await this.exploreForItems(
+        targetItems,
+        Math.min(searchRadius, 64),
+        timeout
+      );
+      return {
+        success: result.success,
+        data: result.data ?? result.diagnostics,
+        error: result.error,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   private scanVisibleForTargetBlock(
     targetBlock: string,
     maxDistance: number,
@@ -3433,13 +3584,19 @@ export class ActionTranslator {
   }
 
   /**
-   * Explore area for items using spiral movement pattern
+   * Explore area for items using spiral movement pattern.
+   * Accepts a single item or array of items; searches for any matching resource.
    */
   private async exploreForItems(
-    item: string | undefined,
+    items: string | string[] | undefined,
     radius: number,
     maxTime: number
   ): Promise<{ success: boolean; data?: any; error?: string; diagnostics?: CollectDiagnostics }> {
+    const itemsArr = Array.isArray(items)
+      ? items
+      : items
+        ? [items]
+        : [];
     const startTime = Date.now();
     const center = this.bot.entity.position.clone();
     const spiralRadius = Math.min(radius, 10); // Limit spiral to reasonable size
@@ -3451,6 +3608,19 @@ export class ActionTranslator {
     try {
       // Use the world package's perception system for better item detection
       const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
+      const perceptionRequest = {
+        position: { x: center.x, y: center.y, z: center.z },
+        radius: radius,
+        fieldOfView: { horizontal: 120, vertical: 60 },
+        maxDistance: radius,
+        observerPosition: { x: center.x, y: center.y, z: center.z },
+        level: 'enhanced',
+      };
+      console.log('[explore:block] perception request', {
+        url: `${worldUrl}/api/perception/visual-field`,
+        targetItems: itemsArr,
+        ...perceptionRequest,
+      });
 
       // Cap perception API timeout to 3s so the fallback spiral still has
       // most of the time budget if the world service is slow or unreachable.
@@ -3459,14 +3629,7 @@ export class ActionTranslator {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            position: { x: center.x, y: center.y, z: center.z },
-            radius: radius,
-            fieldOfView: { horizontal: 120, vertical: 60 },
-            maxDistance: radius,
-            observerPosition: { x: center.x, y: center.y, z: center.z },
-            level: 'enhanced',
-          }),
+          body: JSON.stringify(perceptionRequest),
           maxRetries: 1,
           timeoutMs: 3000,
           silent: true,
@@ -3474,11 +3637,13 @@ export class ActionTranslator {
       );
 
       if (!response?.ok) {
-        console.log(
-          `World perception API failed, falling back to spiral search`
-        );
+        console.log('[explore:block] perception API failed, falling back to spiral', {
+          ok: response?.ok,
+          status: response?.status,
+          targetItems: itemsArr,
+        });
         return this.fallbackSpiralExploration(
-          item,
+          itemsArr,
           radius,
           maxTime - (Date.now() - startTime)
         );
@@ -3487,20 +3652,114 @@ export class ActionTranslator {
       const perceptionResult = (await response.json()) as {
         observations?: Array<{
           type: string;
-          itemId?: string;
+          name?: string;
+          itemId?: string | number;
           pos: { x: number; y: number; z: number };
           distance: number;
         }>;
       };
 
-      // Look for items in the perception results (fuzzy match for suffix patterns)
-      const perceptionItemIds = resolveItemIds(this.bot, item);
+      const obs = perceptionResult.observations ?? [];
+      const typeCounts = obs.reduce((acc: Record<string, number>, o) => {
+        acc[o.type] = (acc[o.type] ?? 0) + 1;
+        return acc;
+      }, {});
+      const sampleObs = obs.slice(0, 3).map((o) => ({
+        type: o.type,
+        name: o.name,
+        itemId: o.itemId,
+        pos: o.pos,
+        distance: o.distance,
+      }));
+      console.log('[explore:block] perception response', {
+        totalObservations: obs.length,
+        typeCounts,
+        sampleObs,
+      });
+
+      const targetIsBlock =
+        itemsArr.length > 0 && itemsArr.some((i) => isBlockTarget(this.bot, i));
+      console.log('[explore:block] target classification', {
+        items: itemsArr,
+        targetIsBlock,
+        mcDataBlocksByName: !!(this.bot as any).mcData?.blocksByName,
+      });
+
+      // Block target: look for blocks in the world (stone, iron_ore, oak_log, etc.)
+      if (targetIsBlock && itemsArr.length > 0) {
+        const blocksFound =
+          perceptionResult.observations?.filter(
+            (o) =>
+              o.type === 'block' &&
+              itemsArr.some((t) => blockNameMatches(t, o.name))
+          ) || [];
+
+        console.log('[explore:block] perception block filter', {
+          targets: itemsArr,
+          blocksFoundCount: blocksFound.length,
+          sampleBlocks: blocksFound.slice(0, 2).map((b) => ({ name: b.name, pos: b.pos, distance: b.distance })),
+        });
+
+        if (blocksFound.length > 0) {
+          const closest = blocksFound.reduce((a, b) =>
+            a.distance < b.distance ? a : b
+          );
+          const blockPos = new Vec3(
+            Math.floor(closest.pos.x),
+            Math.floor(closest.pos.y),
+            Math.floor(closest.pos.z)
+          );
+          try {
+            const Goals = await getGoals();
+            const gotoResult = await this.withNavLease(
+              'action:explore_block',
+              'normal',
+              async () => {
+                await this.bot.pathfinder.goto(
+                  new Goals.GoalNear(blockPos.x, blockPos.y, blockPos.z, 2)
+                );
+                return { success: true };
+              },
+              { success: false, error: 'NAV_BUSY' },
+              { success: false, error: 'NAV_PREEMPTED' },
+            );
+            if (!gotoResult.success) {
+              return { success: false, error: 'Navigation busy — cannot reach block' };
+            }
+            const digResult = await this.executeDigBlock(
+              {
+                type: 'dig_block',
+                parameters: { pos: { x: blockPos.x, y: blockPos.y, z: blockPos.z } },
+                timeout: 5000,
+              },
+              5000
+            );
+            if (digResult.success) {
+              return {
+                success: true,
+                data: { blockType: closest.name ?? itemsArr[0], mined: true },
+              };
+            }
+          } catch (err) {
+            console.log(`Failed to reach or dig block at ${blockPos}:`, err);
+          }
+        }
+      }
+
+      // Item target: look for dropped items (fuzzy match for suffix patterns)
+      const perceptionItemIds = resolveItemIdsForItems(this.bot, itemsArr);
       const itemsFound =
         perceptionResult.observations?.filter(
-          (obs) =>
-            obs.type === 'item' &&
-            (perceptionItemIds === null || perceptionItemIds.has(Number(obs.itemId)))
+          (o) =>
+            o.type === 'item' &&
+            (perceptionItemIds === null || perceptionItemIds.has(Number(o.itemId)))
         ) || [];
+
+      console.log('[explore:block] perception item filter', {
+        targets: itemsArr,
+        perceptionItemIds: perceptionItemIds ? Array.from(perceptionItemIds) : null,
+        itemsFoundCount: itemsFound.length,
+      });
 
       if (itemsFound.length > 0) {
         console.log(
@@ -3538,7 +3797,7 @@ export class ActionTranslator {
           return await this.executePickup(
             {
               type: 'pickup_item',
-              parameters: { item, maxDistance: radius },
+              parameters: { items: itemsArr, maxDistance: radius },
               timeout: 5000,
             },
             5000
@@ -3550,7 +3809,7 @@ export class ActionTranslator {
 
       // If no items found via perception, fall back to spiral exploration
       return this.fallbackSpiralExploration(
-        item,
+        itemsArr,
         radius,
         maxTime - (Date.now() - startTime)
       );
@@ -3560,7 +3819,7 @@ export class ActionTranslator {
         error
       );
       return this.fallbackSpiralExploration(
-        item,
+        itemsArr,
         radius,
         maxTime - (Date.now() - startTime)
       );
@@ -3572,16 +3831,19 @@ export class ActionTranslator {
    *
    * Scans outward in a spiral, checking downward from the bot's y-level to
    * find solid ground. At each waypoint, the bot physically moves (via
-   * pathfinder) and scans for dropped items. The previous implementation
-   * checked blocks at the bot's exact y-level, which was typically air
-   * above the ground surface — causing the entire loop to skip every
-   * direction without attempting movement.
+   * pathfinder) and scans for dropped items. Accepts single item or array;
+   * searches for any matching resource.
    */
   private async fallbackSpiralExploration(
-    item: string | undefined,
+    items: string | string[] | undefined,
     radius: number,
     maxTime: number
   ): Promise<{ success: boolean; data?: any; error?: string; diagnostics?: CollectDiagnostics }> {
+    const itemsArr = Array.isArray(items)
+      ? items
+      : items
+        ? [items]
+        : [];
     const startTime = Date.now();
     const center = this.bot.entity.position.clone();
     const startPos = center.clone();
@@ -3592,6 +3854,14 @@ export class ActionTranslator {
     console.log(
       `🔄 Starting fallback spiral exploration within ${spiralRadius} blocks (budget: ${Math.round(effectiveMaxTime / 1000)}s)`
     );
+    console.log('[explore:block] fallbackSpiralExploration input', {
+      items: itemsArr,
+      radius,
+      maxTime,
+      targetIsBlock:
+        itemsArr.length > 0 && itemsArr.some((i) => isBlockTarget(this.bot, i)),
+      botPos: { x: center.x, y: center.y, z: center.z },
+    });
 
     let waypointsAttempted = 0;
     let waypointsReached = 0;
@@ -3675,6 +3945,95 @@ export class ActionTranslator {
           pathSuccesses++;
           waypointsReached++;
 
+          // Block target: scan for blocks in the world (stone, iron_ore, oak_log, etc.)
+          if (
+            itemsArr.length > 0 &&
+            itemsArr.some((i) => isBlockTarget(this.bot, i))
+          ) {
+            const scanRadius = Math.min(radius, 16);
+            const blockResults: Array<{ pos: Vec3; distance: number; blockType: string }> = [];
+            let blockAtCalls = 0;
+            let blockAtNonAir = 0;
+            for (let r = 1; r <= scanRadius && blockResults.length < 5; r++) {
+              for (let dx = -r; dx <= r; dx++) {
+                for (let dy = -r; dy <= r; dy++) {
+                  for (let dz = -r; dz <= r; dz++) {
+                    if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
+                    const p = this.bot.entity.position.offset(dx, dy, dz);
+                    const b = this.bot.blockAt(p);
+                    blockAtCalls++;
+                    if (!b || b.name === 'air' || b.name === 'cave_air') continue;
+                    blockAtNonAir++;
+                    if (blockMatchesAnyTag(itemsArr, b.name)) {
+                      blockResults.push({
+                        pos: p,
+                        distance: Math.sqrt(dx * dx + dy * dy + dz * dz),
+                        blockType: b.name,
+                      });
+                      if (blockResults.length >= 5) break;
+                    }
+                  }
+                  if (blockResults.length >= 5) break;
+                }
+                if (blockResults.length >= 5) break;
+              }
+            }
+            if (blockAtCalls > 0 || blockResults.length > 0) {
+              console.log('[explore:block] spiral block scan', {
+                waypoint: waypointsReached,
+                targets: itemsArr,
+                blockAtCalls,
+                blockAtNonAir,
+                blockResultsCount: blockResults.length,
+                sampleBlocks: blockResults.slice(0, 2).map((br) => ({ pos: { x: br.pos.x, y: br.pos.y, z: br.pos.z }, distance: br.distance })),
+              });
+            }
+            if (blockResults.length > 0) {
+              blockResults.sort((a, b) => a.distance - b.distance);
+              const nearest = blockResults[0].pos;
+              try {
+                const Goals = await getGoals();
+                const gotoResult = await this.withNavLease(
+                  'action:explore_spiral_block',
+                  'normal',
+                  async () => {
+                    await this.bot.pathfinder.goto(
+                      new Goals.GoalNear(nearest.x, nearest.y, nearest.z, 2)
+                    );
+                    return { success: true };
+                  },
+                  { success: false, error: 'NAV_BUSY' },
+                  { success: false, error: 'NAV_PREEMPTED' },
+                );
+                if (gotoResult.success) {
+                  const digResult = await this.executeDigBlock(
+                    {
+                      type: 'dig_block',
+                      parameters: { pos: { x: nearest.x, y: nearest.y, z: nearest.z } },
+                      timeout: 5000,
+                    },
+                    5000
+                  );
+                  if (digResult.success) {
+                    const matchedBlockType = blockResults[0]?.blockType ?? itemsArr[0];
+                    return {
+                      success: true,
+                      data: { blockType: matchedBlockType, mined: true },
+                      diagnostics: {
+                        _diag_version: 1,
+                        scan: { scan_scope: 'item_entities' as const, items_seen_count: 0, item_types_seen_count: 0, entities_seen_total: 0, closest_item_distance: null, item_types_seen: [], target_type_seen: true },
+                        explore: { enabled: true, waypoint_candidates: waypointCandidates, waypoints_planned: waypointsAttempted, waypoints_reached: waypointsReached, path_requests: pathRequests, path_successes: pathSuccesses, path_failures: pathFailures, net_position_delta: quantize1(this.bot.entity.position.distanceTo(startPos)), duration_ms: Date.now() - startTime },
+                        reason_code: 'collected_ok' as const,
+                      },
+                    };
+                  }
+                }
+              } catch {
+                // Fall through to item scan or next waypoint
+              }
+            }
+          }
+
           // Look for items from this new position — scan ALL item entities for diagnostics
           const allItemEntities = Object.values(this.bot.entities).filter(
             (entity) => entity.name === 'item'
@@ -3695,7 +4054,7 @@ export class ActionTranslator {
           }
 
           // Filter to target item for collection (fuzzy match for suffix patterns)
-          const spiralItemIds = resolveItemIds(this.bot, item);
+          const spiralItemIds = resolveItemIdsForItems(this.bot, itemsArr);
           const itemsFound = allItemEntities.filter(
             (entity) =>
               entityMatchesItem(entity, spiralItemIds) &&
@@ -3709,7 +4068,7 @@ export class ActionTranslator {
             const pickupResult = await this.executePickup(
               {
                 type: 'pickup_item',
-                parameters: { item, maxDistance: radius },
+                parameters: { items: itemsArr, maxDistance: radius },
                 timeout: 5000,
               },
               5000
@@ -3726,7 +4085,12 @@ export class ActionTranslator {
                   closest_item_distance:
                     closestItemDist !== null ? quantize1(closestItemDist) : null,
                   item_types_seen: [...itemTypesSeen].sort().slice(0, 20),
-                  target_type_seen: item ? [...itemTypesSeen].some(t => t === item || t.includes(item)) : false,
+                  target_type_seen:
+                    itemsArr.length > 0
+                      ? [...itemTypesSeen].some((t) =>
+                          itemsArr.some((i) => t === i || t.includes(i))
+                        )
+                      : false,
                 },
                 explore: {
                   enabled: true,
@@ -3765,7 +4129,12 @@ export class ActionTranslator {
         closest_item_distance:
           closestItemDist !== null ? quantize1(closestItemDist) : null,
         item_types_seen: [...itemTypesSeen].sort().slice(0, 20),
-        target_type_seen: item ? [...itemTypesSeen].some(t => t === item || t.includes(item)) : false,
+        target_type_seen:
+          itemsArr.length > 0
+            ? [...itemTypesSeen].some((seen) =>
+                itemsArr.some((tag) => seen === tag || seen.includes(tag))
+              )
+            : false,
       },
       explore: {
         enabled: true,
