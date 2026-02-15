@@ -102,7 +102,7 @@ export function useInitialDataFetch({
         const inventoryData = await inventoryRes.json();
         if (inventoryData.success) {
           // API returns inventory in 'data' or 'inventory' field
-          const items = inventoryData.inventory || inventoryData.data || [];
+          const items = inventoryData.data ?? inventoryData.inventory ?? [];
           setInventory(Array.isArray(items) ? items : []);
         }
       }
@@ -203,6 +203,21 @@ export function useInitialDataFetch({
           time: worldState.timeOfDay,
           weather: worldState.weather,
         });
+
+        // Enrich environment from bot state when minecraft /state returns biome
+        const env = botData.data?.worldState?.environment || botData.data?.data;
+        if (env?.biome && env.biome !== 'unknown') {
+          const currentEnv = useDashboardStore.getState().environment;
+          setEnvironment({
+            biome: env.biome,
+            biomeTemperature: env.biomeTemperature ?? currentEnv?.biomeTemperature,
+            biomeHumidity: env.biomeHumidity ?? currentEnv?.biomeHumidity,
+            biomeCategory: env.biomeCategory ?? currentEnv?.biomeCategory,
+            weather: env.weather || currentEnv?.weather || 'clear',
+            timeOfDay: currentEnv?.timeOfDay || 'day',
+            nearbyEntities: currentEnv?.nearbyEntities || [],
+          });
+        }
       }
 
       if (healthRes.status === 'fulfilled' && healthRes.value.ok) {

@@ -192,9 +192,12 @@ export function useWsBotState() {
 
         case 'inventory_changed': {
           const inventoryData = message.data;
-          const formattedInventory = inventoryData.items.map((item: any) => ({
+          const items = inventoryData?.items ?? [];
+          const formattedInventory: InventoryItem[] = items.map((item: { name?: string; type?: string | number; count?: number; slot?: number }) => ({
+            type: item.type ?? item.name ?? null,
             name: item.name,
-            count: item.count,
+            count: item.count ?? 0,
+            slot: typeof item.slot === 'number' ? item.slot : -1,
             displayName: item.name,
           }));
           setInventory(formattedInventory);
@@ -383,6 +386,8 @@ export function useWsBotState() {
       data?: {
         connected?: boolean;
         inventory?: unknown[];
+        eventType?: string;
+        items?: Array<{ name?: string; type?: string | number; count?: number; slot?: number }>;
         position?: [number, number, number] | null;
         vitals?: {
           health?: number;
@@ -409,6 +414,19 @@ export function useWsBotState() {
     }) => {
       const d = msg?.data;
       if (!d) return;
+
+      // Handle inventory_changed event (SSE broadcasts eventType + items)
+      if (d.eventType === 'inventory_changed' && Array.isArray(d.items)) {
+        const normalizedInventory: InventoryItem[] = d.items.map((item, idx) => ({
+          type: item.type ?? item.name ?? null,
+          count: item.count ?? 0,
+          slot: typeof item.slot === 'number' ? item.slot : idx,
+          displayName: item.name,
+        }));
+        setInventory(normalizedInventory);
+        setBotState((prev) => ({ ...prev, inventory: normalizedInventory }));
+      }
+
       if (d.vitals || d.intero || d.mood) {
         const defaultVitals = {
           health: 20,

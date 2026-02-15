@@ -39,6 +39,7 @@ export function usePeriodicRefresh({
     setMemories,
     setNotes,
     setHud,
+    setEnvironment,
   } = useDashboardStore();
 
   // Subscribe to memory-updates SSE so events/notes update via push
@@ -144,11 +145,33 @@ export function usePeriodicRefresh({
     return () => clearInterval(interval);
   }, [addThought]);
 
-  // Periodic refresh of bot state, inventory, memories, events, notes
+  // Periodic refresh of bot state, inventory, memories, events, notes, environment
   useEffect(() => {
     const refreshBotState = async () => {
       const timeout = config.api.timeout;
       try {
+        // Fetch world state for environment when planning pipeline has real biome data
+        const worldRes = await fetch(config.routes.world(), {
+          signal: AbortSignal.timeout(timeout),
+        });
+        if (worldRes.ok) {
+          const worldData = await worldRes.json();
+          const env = worldData.environment || {};
+          const perception = worldData.perception || {};
+          if (env.biome && env.biome !== 'unknown') {
+            const currentEnv = useDashboardStore.getState().environment;
+            setEnvironment({
+              biome: env.biome,
+              biomeTemperature: env.biomeTemperature ?? currentEnv?.biomeTemperature,
+              biomeHumidity: env.biomeHumidity ?? currentEnv?.biomeHumidity,
+              biomeCategory: env.biomeCategory ?? currentEnv?.biomeCategory,
+              weather: env.weather || currentEnv?.weather || 'clear',
+              timeOfDay: env.timeOfDay || currentEnv?.timeOfDay || 'day',
+              nearbyEntities: perception.visibleEntities || currentEnv?.nearbyEntities || [],
+            });
+          }
+        }
+
         // Fetch inventory
         const inventoryRes = await fetch(config.routes.inventory(), {
           signal: AbortSignal.timeout(timeout),
@@ -156,7 +179,8 @@ export function usePeriodicRefresh({
         if (inventoryRes.ok) {
           const inventoryData = await inventoryRes.json();
           if (inventoryData.success) {
-            setInventory(inventoryData.inventory);
+            const items = inventoryData.data ?? inventoryData.inventory ?? [];
+            setInventory(Array.isArray(items) ? items : []);
           }
         }
 
@@ -309,6 +333,21 @@ export function usePeriodicRefresh({
             time: worldState.timeOfDay,
             weather: worldState.weather,
           });
+
+          // Enrich environment from bot state when minecraft /state returns biome
+          const env = botData.data?.worldState?.environment || botData.data?.data;
+          if (env?.biome && env.biome !== 'unknown') {
+            const currentEnv = useDashboardStore.getState().environment;
+            setEnvironment({
+              biome: env.biome,
+              biomeTemperature: env.biomeTemperature ?? currentEnv?.biomeTemperature,
+              biomeHumidity: env.biomeHumidity ?? currentEnv?.biomeHumidity,
+              biomeCategory: env.biomeCategory ?? currentEnv?.biomeCategory,
+              weather: env.weather || currentEnv?.weather || 'clear',
+              timeOfDay: currentEnv?.timeOfDay || 'day',
+              nearbyEntities: currentEnv?.nearbyEntities || [],
+            });
+          }
         }
 
         if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
@@ -359,6 +398,7 @@ export function usePeriodicRefresh({
   }, [
     config,
     setInventory,
+    setEnvironment,
     thoughts,
     addThought,
     setEvents,
