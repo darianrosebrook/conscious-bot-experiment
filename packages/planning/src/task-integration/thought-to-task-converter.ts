@@ -496,9 +496,30 @@ export async function convertThoughtToTask(
       const deterministic = new Set<TaskDecision>([
         'dropped_missing_schema_version',
         'dropped_semantically_empty',
-        'dropped_no_goal_prop',
       ]);
-      if (deterministic.has(reductionCheck.decision)) {
+      // dropped_no_goal_prop is NOT deterministic for keep-alive thoughts:
+      // vitals may become re-routable when botState arrives.
+      // However, transient drops are bounded to prevent churn:
+      // - TTL: mark processed after 2 minutes (botState should have arrived by then)
+      // - Budget: mark processed after 3 conversion attempts
+      const isKeepAlive = (thought as any).metadata?.source === 'keepalive';
+      const isTransientKeepAliveDrop =
+        reductionCheck.decision === 'dropped_no_goal_prop' && isKeepAlive;
+
+      if (isTransientKeepAliveDrop) {
+        const KEEPALIVE_DROP_TTL_MS = 120_000; // 2 minutes
+        const KEEPALIVE_DROP_MAX_ATTEMPTS = 3;
+        const thoughtAge = Date.now() - (thought.timestamp ?? Date.now());
+        const attemptCount = ((thought as any).metadata?._vitalsDropAttempts as number ?? 0) + 1;
+        // Write attempt count back for next retry
+        if ((thought as any).metadata) {
+          (thought as any).metadata._vitalsDropAttempts = attemptCount;
+        }
+        if (thoughtAge > KEEPALIVE_DROP_TTL_MS || attemptCount >= KEEPALIVE_DROP_MAX_ATTEMPTS) {
+          await deps.markThoughtAsProcessed(thought.id);
+        }
+      } else if (deterministic.has(reductionCheck.decision) ||
+          (reductionCheck.decision === 'dropped_no_goal_prop' && !isKeepAlive)) {
         await deps.markThoughtAsProcessed(thought.id);
       }
       const r: ConvertThoughtResult = { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };

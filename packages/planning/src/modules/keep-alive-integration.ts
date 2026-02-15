@@ -144,6 +144,12 @@ export class KeepAliveIntegration {
   private lastTickTime = 0;
   private idleEpisodeInFlight = false;
   private lastIdleEpisodeAt = 0;
+  private lastBotState: BotState | null = null;
+  private lastVitalsRerouteAt = 0;
+  private static readonly HEALTH_URGENT_THRESHOLD = 8;
+  private static readonly FOOD_URGENT_THRESHOLD = 6;
+  /** Rate limit: at most one vitals reroute per window to prevent Sterling spam during sustained low vitals. */
+  private static readonly VITALS_REROUTE_COOLDOWN_MS = 30_000;
 
   // Track recent task conversions for idle detection
   private recentConversions: number[] = [];
@@ -218,6 +224,9 @@ export class KeepAliveIntegration {
     if (!this.config.enabled || !this.controller || !this.initialized) {
       return null;
     }
+
+    // Cache bot state for vitals re-routing in onThought()
+    this.lastBotState = botState;
 
     // Idle episodes fire when:
     // - 'no_tasks': true cognitive idle (no work exists)
@@ -383,6 +392,22 @@ export class KeepAliveIntegration {
       };
     }
 
+    // If Sterling returned null goal-prop and vitals are urgent,
+    // re-route through the structured idle-episode reducer path
+    // where Sterling's _select_idle_goal() handles health/food/hostiles.
+    if (
+      thought.sterlingUsed &&
+      (!reduction || !(reduction.reducerResult as any)?.committed_goal_prop_id)
+    ) {
+      const rerouted = await this.trySterlingVitalsReduce(thought);
+      if (rerouted) {
+        console.log(`[KeepAliveIntegration] vitals thought rerouted via Sterling reduce`);
+        return; // Already posted to cognition with real goal-prop
+      }
+      // Fall through: post original thought (may be dropped, that's ok —
+      // not treating as deterministic drop if botState is missing)
+    }
+
     await this.postThoughtToCognition({
       id: thought.id,
       type: 'observation',
@@ -396,6 +421,124 @@ export class KeepAliveIntegration {
       },
       convertEligible: thought.eligibility.convertEligible,
     });
+  }
+
+  /**
+   * Detect whether bot vitals are urgent (health/food below thresholds).
+   * Returns vitals snapshot if urgent, null otherwise.
+   */
+  private detectUrgentVitals(): { health: number; food: number; nearbyHostiles: number } | null {
+    if (!this.lastBotState) return null;
+    const health = this.lastBotState.health ?? 20;
+    const food = this.lastBotState.food ?? 20;
+    if (health < KeepAliveIntegration.HEALTH_URGENT_THRESHOLD ||
+        food < KeepAliveIntegration.FOOD_URGENT_THRESHOLD) {
+      return {
+        health,
+        food,
+        nearbyHostiles: this.lastBotState.nearbyHostiles ?? 0,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Re-route a vitals thought through Sterling's idle_episode_v1 reducer.
+   * Sterling's _select_idle_goal() already handles food/health/hostiles,
+   * so this produces a real committed_goal_prop_id instead of null.
+   */
+  private async trySterlingVitalsReduce(
+    thought: KeepAliveThought,
+  ): Promise<boolean> {
+    const vitals = this.detectUrgentVitals();
+    if (!vitals || !this.lastBotState) return false;
+
+    // Rate limit: prevent Sterling spam during sustained low vitals
+    const now = Date.now();
+    if (now - this.lastVitalsRerouteAt < KeepAliveIntegration.VITALS_REROUTE_COOLDOWN_MS) {
+      return false;
+    }
+
+    const client = getDefaultLanguageIOClient();
+    try {
+      await client.connect();
+    } catch {
+      return false;
+    }
+
+    // Deterministic run_id derived from thought identity — preserves replay verifiability.
+    // crypto.randomUUID() would produce different IR digests for identical state.
+    const runId = `keepalive-vitals:${thought.id}`;
+    // Canonicalize payload: sort inventory names, quantize position to whole blocks.
+    const pos = this.lastBotState.position;
+    const botStatePayload = {
+      health: vitals.health,
+      food: vitals.food,
+      nearby_hostiles: vitals.nearbyHostiles,
+      inventory_summary: (this.lastBotState.inventory ?? []).map(i => i.name).sort(),
+      position: pos ? { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) } : undefined,
+    };
+
+    const rawText = `[IDLE_EPISODE_V1]\n${JSON.stringify({
+      kind: 'idle_episode_v1',
+      run_id: runId,
+      idle_reason: 'vitals_urgent',
+      timestamp_ms: Date.now(),
+      bot_state: botStatePayload,
+    })}`;
+
+    try {
+      const result = await Promise.race([
+        client.reduce(rawText, {
+          modelId: 'idle-episode',
+          promptDigest: 'idle_episode_v1',
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('vitals_reduce_timeout')), this.config.idleEpisodeTimeoutMs)
+        ),
+      ]);
+
+      if ('code' in result || !result.result.is_executable) {
+        console.log(`[KeepAliveIntegration] vitals_reduce: not executable (${('code' in result) ? result.code : 'blocked'})`);
+        return false;
+      }
+
+      const reducer = result.result;
+      const reduction = {
+        sterlingProcessed: true,
+        envelopeId: result.envelope.envelope_id,
+        reducerResult: reducer,
+        isExecutable: true,
+        blockReason: null,
+        durationMs: result.durationMs,
+        sterlingError: null,
+      };
+
+      this.lastVitalsRerouteAt = Date.now();
+
+      console.log(
+        `[KeepAliveIntegration] keepalive_vitals_bound: ` +
+          `goalPropId=${reducer.committed_goal_prop_id} ` +
+          `health=${vitals.health} food=${vitals.food} hostiles=${vitals.nearbyHostiles}`
+      );
+
+      await this.postThoughtToCognition({
+        id: `vitals-${thought.id}`,
+        type: 'observation',
+        content: thought.content,
+        timestamp: thought.timestamp,
+        metadata: {
+          source: 'keepalive',
+          reduction,
+          vitals_rerouted: true,
+        },
+        convertEligible: true,
+      });
+      return true;
+    } catch (err) {
+      console.error('[KeepAliveIntegration] vitals reduce failed:', err);
+      return false;
+    }
   }
 
   private async postThoughtToCognition(thought: Record<string, unknown>): Promise<void> {
