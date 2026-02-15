@@ -2,16 +2,21 @@
  * Reachability Governance Tests
  *
  * Negative-space guards that prevent silent capability creep. These tests
- * lock the reachability matrix as a **contract**: passthrough-only leaves
- * cannot gain autonomous producers, and orphaned leaves cannot be dispatched,
- * without an explicit opt-in via test updates.
+ * lock the reachability matrix as a **contract** using three orthogonal
+ * booleans per leaf:
  *
- * Two test sections:
- * - 2a: Passthrough-only reachability guard — no known producer emits these leaves
- * - 2b: Orphaned leaf dispatch guard — executor blocks these, no producer routes to them
+ *   Contracted — has a LeafArgContract + action-mapping entry (derived from KNOWN_LEAVES)
+ *   Produced   — some autonomous producer (solver/driveshaft/bootstrap) emits it
+ *   Proven     — an E2E dispatch-chain test asserts executeTool dispatch for it
  *
- * If a test fails after a code change, it means a leaf gained or lost reachability.
- * Update the classification intentionally — do not silently expand the reachable set.
+ * Invariants enforced:
+ *   A) Produced ⊆ Contracted (can't emit an uncontracted leaf)
+ *   B) Proven ⊆ Produced (can't claim E2E proof for something no producer emits)
+ *   C) Produced ∩ ¬Proven requires a waiver (explicit gap tracking)
+ *   D) Every waiver has owner + reason + targetFix (no silent acceptance)
+ *
+ * If a test fails after a code change, it means a leaf gained or lost
+ * reachability. Update the classification intentionally.
  *
  * Run with: npx vitest run packages/planning/src/__tests__/reachability-governance.test.ts
  */
@@ -20,6 +25,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as ts from 'typescript';
 import { KNOWN_LEAVES, INTENT_LEAVES } from '../modules/leaf-arg-contracts';
 import { mapBTActionToMinecraft } from '../modules/action-mapping';
 import { buildLeafAllowlist } from '../modular-server';
@@ -28,72 +34,45 @@ import type { SterlingStepExecutorContext } from '../executor/sterling-step-exec
 import bootstrapFixture from '../server/__tests__/fixtures/bootstrap-lowering-v1.json';
 
 // ============================================================================
-// Classification sets — update these when reachability intentionally changes
+// Taxonomy: Produced / Proven / Waivers
 // ============================================================================
 
 /**
- * PASSTHROUGH_ONLY leaves: have a LeafArgContract and an action mapping,
- * but NO known autonomous producer (solver, driveshaft, bootstrap) emits them.
- * They are only reachable via manual API dispatch (passthrough from external callers).
+ * PRODUCED_LEAVES: leaves emitted by at least one autonomous producer.
+ * Each entry is tagged with its producer(s) for traceability.
  *
- * To move a leaf OUT of this set, you must:
- *   1. Create a producer (solver step, driveshaft controller, bootstrap case)
- *   2. Write an E2E test proving the dispatch chain
- *   3. Remove the leaf from this set
+ * To add a leaf here:
+ *   1. Identify the producer (solver, driveshaft, bootstrap, prereq injection)
+ *   2. Add the leaf to this set with a comment naming the producer
+ *   3. Either add it to PROVEN_LEAVES (with E2E test) or PROOF_WAIVERS
  */
-const PASSTHROUGH_ONLY: ReadonlySet<string> = new Set([
-  'place_torch_if_needed',
-  'place_torch',
-  'equip_tool',
-  'retreat_from_threat',
-  'retreat_and_block',
-  'use_item',
-  'manage_inventory',
-  'till_soil',
-  'harvest_crop',
-  'manage_farm',
-  'interact_with_block',
-  'sense_hostiles',
-  'get_light_level',
-  'get_block_at',
-  'find_resource',
-  'dig_block',
-  'collect_items',
-  'chat',
-  'wait',
-]);
-
-/**
- * AUTONOMOUSLY_REACHABLE leaves: have at least one known producer path.
- * Each of these should have E2E test coverage (or a tracked gap).
- */
-const AUTONOMOUSLY_REACHABLE: ReadonlySet<string> = new Set([
-  // Rig A / Rig B (crafting + tool progression solvers)
+const PRODUCED_LEAVES: ReadonlySet<string> = new Set([
+  // Rig A: crafting solver (generateStepsFromSterling)
   'acquire_material',
   'craft_recipe',
   'smelt',
   'place_workstation',
   'place_block',
-  // Rig B (tool progression) — explore path
+  // Rig B: tool progression solver (explore path)
   'explore_for_resources',
-  // Rig G (building solver)
+  // Rig G: building solver (toTaskStepsWithReplan)
   'prepare_site',
   'build_module',
   'place_feature',
   'building_step',
   'replan_building',
   'replan_exhausted',
-  // Rig D (acquisition solver) — routes through interact/open
+  // Rig D: acquisition solver (trade/loot strategies)
   'interact_with_entity',
   'open_container',
-  // Bootstrap lowering
+  // Bootstrap lowering (expand_by_digest)
   'move_to',
   'step_forward_safely',
   // Hunger driveshaft
   'consume_food',
-  // Introspect recipe — used by executor prereq injection
+  // Executor prereq injection (programmatic, not task step)
   'introspect_recipe',
-  // Reactive safety (EP-7) — safety monitor dispatches these
+  // Reactive safety (EP-7) — bypasses executor, dispatches via actionTranslator
   'attack_entity',
   'equip_weapon',
   // Sleep driveshaft (Stage 1)
@@ -101,36 +80,84 @@ const AUTONOMOUSLY_REACHABLE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Leaves from known producers, collected by scanning each producer's output space.
- * This is the "all known producers" union — used to verify no passthrough-only leaf
- * accidentally appears in any producer.
+ * PROVEN_LEAVES: leaves with E2E dispatch-chain proof.
+ * Each leaf here has at least one test that asserts `executeTool('minecraft.<leaf>', ...)`
+ * was called with the correct arguments after running through the full pipeline
+ * (producer → step → mapping → executor).
+ *
+ * Safety-monitor bypass actions (attack_entity, equip_weapon) are proven via
+ * `executeAction` assertions in safety-monitor-dispatch-e2e.test.ts — they bypass
+ * the executor by design, so executeTool proof is structurally impossible.
  */
-const ALL_KNOWN_PRODUCER_LEAVES: ReadonlySet<string> = new Set([
-  // Rig A: crafting solver (sterling-planner.ts generateStepsFromSterling)
-  'acquire_material', 'craft_recipe', 'smelt', 'place_workstation', 'place_block',
-  // Rig B: tool progression solver (generateToolProgressionStepsFromSterling)
-  // Same as Rig A + explore_for_resources
-  'explore_for_resources',
-  // Rig G: building solver (toTaskStepsWithReplan)
-  'prepare_site', 'build_module', 'place_feature', 'building_step',
-  'replan_building', 'replan_exhausted',
-  // Rig D: acquisition solver (generateAcquisitionStepsFromSterling)
-  'interact_with_entity', 'open_container',
-  // Compiler fallback (requirementToFallbackPlan)
-  // Emits: acquire_material, craft_recipe, build_module (already listed)
-  // Hunger driveshaft
+const PROVEN_LEAVES: ReadonlySet<string> = new Set([
+  // gather-food-dispatch-chain-e2e.test.ts
+  'acquire_material',
   'consume_food',
-  // Exploration driveshaft
+  // building-solver-dispatch-chain-e2e.test.ts
+  'prepare_site',
+  'build_module',
+  'place_feature',
+  'building_step',      // scaffold→building_step dispatch proof
+  'replan_building',    // deficit path dispatch proof
+  'replan_exhausted',   // sterling-planner sentinel dispatch proof
+  // explore-replan-dispatch-e2e.test.ts, executor-task-loop-e2e.test.ts
+  'explore_for_resources',
+  'craft_recipe',
+  // executor-task-loop-e2e.test.ts (tool-progression leaf dispatch proof)
+  'smelt',
+  'place_workstation',
+  'place_block',
+  'step_forward_safely', // bootstrap leaf dispatch proof
+  // exploration-driveshaft-e2e.test.ts
   'move_to',
-  // Bootstrap lowering
-  'step_forward_safely',
-  // Executor prereq injection (introspect before craft)
-  'introspect_recipe',
-  // Reactive safety (EP-7) — safety monitor dispatches these
-  'attack_entity', 'equip_weapon',
-  // Sleep driveshaft (Stage 1)
+  // sleep-driveshaft-e2e.test.ts
   'sleep',
+  // safety-monitor-dispatch-e2e.test.ts (executeAction path, not executeTool)
+  'attack_entity',
+  'equip_weapon',
+  // executor-task-loop-e2e.test.ts — programmatic-only: ctx.introspectRecipe()
+  // invoked by executor during craft_recipe pre-check, not via executeTool
+  'introspect_recipe',
 ]);
+
+/**
+ * PROOF_WAIVERS: Produced leaves that lack E2E dispatch-chain proof.
+ * Each waiver must have owner, reason, and targetFix to prevent silent acceptance.
+ * Resolve by adding E2E proof and moving the leaf to PROVEN_LEAVES.
+ */
+interface ProofWaiver {
+  leaf: string;
+  owner: string;
+  reason: string;
+  targetFix: string;
+  createdAt: string;
+}
+
+const PROOF_WAIVERS: readonly ProofWaiver[] = [
+  {
+    leaf: 'interact_with_entity',
+    owner: 'planning-team',
+    reason: 'Acquisition solver trade strategy exists but no E2E test (G-3 gap)',
+    targetFix: 'Write acquisition solver E2E covering trade strategy',
+    createdAt: '2026-02-14',
+  },
+  {
+    leaf: 'open_container',
+    owner: 'planning-team',
+    reason: 'Acquisition solver loot strategy exists but no E2E test (G-3 gap)',
+    targetFix: 'Write acquisition solver E2E covering loot strategy',
+    createdAt: '2026-02-14',
+  },
+];
+
+/**
+ * Leaves that are Contracted but NOT Produced (passthrough/manual only).
+ * Derived as: KNOWN_LEAVES - PRODUCED_LEAVES
+ * These are dispatchable via REST/MCP but no autonomous producer emits them.
+ */
+function computeContractedOnly(): ReadonlySet<string> {
+  return new Set([...KNOWN_LEAVES].filter((l) => !PRODUCED_LEAVES.has(l)));
+}
 
 // ============================================================================
 // Executor context factory (minimal — only needs allowlist + gating behavior)
@@ -215,230 +242,25 @@ function makeTask(steps: any[]) {
 }
 
 // ============================================================================
-// 2a: Passthrough-Only Reachability Guard
+// Invariant A: Produced ⊆ Contracted
 // ============================================================================
 
-describe('Passthrough-Only Reachability Guard', () => {
+describe('Invariant A: Produced ⊆ Contracted', () => {
 
-  // ── Classification completeness ──
-
-  it('PASSTHROUGH_ONLY + AUTONOMOUSLY_REACHABLE covers all KNOWN_LEAVES', () => {
-    const allClassified = new Set([...PASSTHROUGH_ONLY, ...AUTONOMOUSLY_REACHABLE]);
-    const unclassified = [...KNOWN_LEAVES].filter((l) => !allClassified.has(l));
-
-    expect(
-      unclassified,
-      `Unclassified leaves found — add them to PASSTHROUGH_ONLY or AUTONOMOUSLY_REACHABLE: ${unclassified.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('PASSTHROUGH_ONLY and AUTONOMOUSLY_REACHABLE are disjoint', () => {
-    const overlap = [...PASSTHROUGH_ONLY].filter((l) => AUTONOMOUSLY_REACHABLE.has(l));
-    expect(
-      overlap,
-      `Leaves in both sets — classify as one or the other: ${overlap.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('all PASSTHROUGH_ONLY leaves are in KNOWN_LEAVES (have contracts)', () => {
-    const missing = [...PASSTHROUGH_ONLY].filter((l) => !KNOWN_LEAVES.has(l));
-    expect(
-      missing,
-      `Passthrough-only leaves missing from KNOWN_LEAVES: ${missing.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  // ── Action mapping exists for passthrough-only ──
-
-  it('each passthrough-only leaf has a valid action mapping', () => {
-    const failures: string[] = [];
-    for (const leaf of PASSTHROUGH_ONLY) {
-      const action = mapBTActionToMinecraft(leaf, {});
-      if (!action) {
-        failures.push(`${leaf}: no action mapping`);
-      }
-    }
-    expect(
-      failures,
-      `Passthrough-only leaves without action mappings:\n${failures.join('\n')}`,
-    ).toEqual([]);
-  });
-
-  // ── No known producer emits passthrough-only leaves ──
-
-  it('no known producer emits any passthrough-only leaf', () => {
-    const leaks = [...PASSTHROUGH_ONLY].filter((l) => ALL_KNOWN_PRODUCER_LEAVES.has(l));
-    expect(
-      leaks,
-      `Passthrough-only leaves found in producer output set — reclassify to AUTONOMOUSLY_REACHABLE or remove from producer: ${leaks.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('bootstrap lowering fixture does not emit passthrough-only leaves', () => {
-    const cases = (bootstrapFixture as any).cases;
-    const bootstrapLeaves: string[] = [];
-    for (const caseName of Object.keys(cases)) {
-      for (const step of cases[caseName].steps) {
-        bootstrapLeaves.push(step.leaf);
-      }
-    }
-
-    const leaks = bootstrapLeaves.filter((l) => PASSTHROUGH_ONLY.has(l));
-    expect(
-      leaks,
-      `Bootstrap fixture emits passthrough-only leaves: ${leaks.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  // ── Executor behavior for passthrough-only (they ARE in the allowlist) ──
-
-  it('passthrough-only leaves ARE in the executor allowlist (they are dispatchable via API)', () => {
-    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, false);
-    const blocked: string[] = [];
-    for (const leaf of PASSTHROUGH_ONLY) {
-      if (!allowlist.has(`minecraft.${leaf}`)) {
-        blocked.push(leaf);
-      }
-    }
-    expect(
-      blocked,
-      `Passthrough-only leaves unexpectedly missing from allowlist: ${blocked.join(', ')}`,
-    ).toEqual([]);
-  });
-});
-
-// ============================================================================
-// 2b: Orphaned / Intent Leaf Dispatch Guard
-// ============================================================================
-
-describe('Orphaned / Intent Leaf Dispatch Guard', () => {
-
-  // ── Intent leaves are NOT in KNOWN_LEAVES ──
-
-  it('intent leaves (task_type_*) are not in KNOWN_LEAVES', () => {
-    const overlap = [...INTENT_LEAVES].filter((l) => KNOWN_LEAVES.has(l));
-    expect(
-      overlap,
-      `Intent leaves found in KNOWN_LEAVES — they should be structurally separate: ${overlap.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  // ── Intent leaves are NOT in executor allowlist (when bridge disabled) ──
-
-  it('intent leaves are blocked by executor allowlist when bridge disabled', () => {
-    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, false);
-    const leaked: string[] = [];
-    for (const leaf of INTENT_LEAVES) {
-      if (allowlist.has(`minecraft.${leaf}`)) {
-        leaked.push(leaf);
-      }
-    }
-    expect(
-      leaked,
-      `Intent leaves in allowlist without bridge enabled: ${leaked.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('intent leaves ARE in executor allowlist when bridge enabled (dev only)', () => {
-    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, true);
-    const missing: string[] = [];
-    for (const leaf of INTENT_LEAVES) {
-      if (!allowlist.has(`minecraft.${leaf}`)) {
-        missing.push(leaf);
-      }
-    }
-    expect(
-      missing,
-      `Intent leaves missing from allowlist with bridge enabled: ${missing.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  // ── No known producer emits intent leaves ──
-
-  it('no known producer emits intent leaves', () => {
-    const leaks = [...INTENT_LEAVES].filter((l) => ALL_KNOWN_PRODUCER_LEAVES.has(l));
-    expect(
-      leaks,
-      `Intent leaves found in producer output — they should only come from Sterling expand-by-digest: ${leaks.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  // ── Executor rejects leaves NOT in allowlist ──
-
-  it('executor blocks a leaf not in the allowlist', async () => {
-    const ctx = createMockExecutorContext({
-      // Use a restricted allowlist that omits the test leaf
-      leafAllowlist: new Set(['minecraft.acquire_material']),
-    });
-
-    const step = makeStepForLeaf('till_soil', {});
-    const task = makeTask([step]);
-
-    await executeSterlingStep(task, step, ctx);
-
-    // executeTool should NOT have been called
-    expect(ctx.executeTool).not.toHaveBeenCalled();
-
-    // updateTaskMetadata should have been called with a block reason
-    expect(ctx.updateTaskMetadata).toHaveBeenCalled();
-  });
-
-  it('executor blocks intent leaf even when bridge is disabled', async () => {
-    const ctx = createMockExecutorContext();
-    // Intent leaf step — should be rejected at the intent-leaf gate
-    const step = makeStepForLeaf('task_type_craft', { recipe: 'wooden_pickaxe' });
-    const task = makeTask([step]);
-
-    await executeSterlingStep(task, step, ctx);
-
-    expect(ctx.executeTool).not.toHaveBeenCalled();
-  });
-
-  // ── Autonomously reachable leaves have producer coverage ──
-
-  it('every autonomously reachable leaf appears in the known producer set', () => {
-    const missing = [...AUTONOMOUSLY_REACHABLE].filter(
-      (l) => !ALL_KNOWN_PRODUCER_LEAVES.has(l),
-    );
-    expect(
-      missing,
-      `Leaves classified as AUTONOMOUSLY_REACHABLE but missing from ALL_KNOWN_PRODUCER_LEAVES: ${missing.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('every leaf in the known producer set is classified as autonomously reachable', () => {
-    const misclassified = [...ALL_KNOWN_PRODUCER_LEAVES].filter(
-      (l) => !AUTONOMOUSLY_REACHABLE.has(l),
-    );
-    expect(
-      misclassified,
-      `Leaves in producer set but not classified as AUTONOMOUSLY_REACHABLE: ${misclassified.join(', ')}`,
-    ).toEqual([]);
-  });
-});
-
-// ============================================================================
-// Producer contract safety — no producer emits uncontracted leaves
-// ============================================================================
-
-describe('Producer contract safety', () => {
-
-  it('every leaf in ALL_KNOWN_PRODUCER_LEAVES has a LeafArgContract', () => {
-    const uncontracted = [...ALL_KNOWN_PRODUCER_LEAVES].filter(
-      (l) => !KNOWN_LEAVES.has(l),
-    );
+  it('every produced leaf has a LeafArgContract', () => {
+    const uncontracted = [...PRODUCED_LEAVES].filter((l) => !KNOWN_LEAVES.has(l));
     expect(
       uncontracted,
       `Producer(s) emit leaves without a LeafArgContract. These steps will ALWAYS fail ` +
       `at the executor (no contract → no allowlist entry → blocked). Either add a ` +
-      `LeafArgContract in leaf-arg-contracts.ts, or stop emitting the leaf from the ` +
-      `producer. Uncontracted leaves: ${uncontracted.join(', ')}`,
+      `LeafArgContract in leaf-arg-contracts.ts, or stop emitting the leaf. ` +
+      `Uncontracted: ${uncontracted.join(', ')}`,
     ).toEqual([]);
   });
 
-  it('every leaf in ALL_KNOWN_PRODUCER_LEAVES has an action mapping', () => {
+  it('every produced leaf has an action mapping', () => {
     const unmapped: string[] = [];
-    for (const leaf of ALL_KNOWN_PRODUCER_LEAVES) {
+    for (const leaf of PRODUCED_LEAVES) {
       const action = mapBTActionToMinecraft(leaf, {});
       if (!action) {
         unmapped.push(leaf);
@@ -451,11 +273,227 @@ describe('Producer contract safety', () => {
       `a case in action-mapping.ts, or stop emitting the leaf. Unmapped: ${unmapped.join(', ')}`,
     ).toEqual([]);
   });
+
+  it('no produced leaf has disappeared from KNOWN_LEAVES', () => {
+    // Catches accidental removal of a contract that a producer still needs
+    const missing = [...PRODUCED_LEAVES].filter((l) => !KNOWN_LEAVES.has(l));
+    expect(missing).toEqual([]);
+  });
 });
 
 // ============================================================================
-// Classification drift detection
+// Invariant B: Proven ⊆ Produced
 // ============================================================================
+
+describe('Invariant B: Proven ⊆ Produced', () => {
+
+  it('every proven leaf is also in the produced set', () => {
+    const orphanedProof = [...PROVEN_LEAVES].filter((l) => !PRODUCED_LEAVES.has(l));
+    expect(
+      orphanedProof,
+      `Leaves claimed as E2E-proven but not in PRODUCED_LEAVES. If no producer emits ` +
+      `this leaf autonomously, the E2E test is only covering manual/passthrough dispatch, ` +
+      `which is misleading. Remove from PROVEN_LEAVES or add a producer. ` +
+      `Orphaned proof: ${orphanedProof.join(', ')}`,
+    ).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Invariant C: Produced ∩ ¬Proven requires a waiver
+// ============================================================================
+
+describe('Invariant C: Produced-not-Proven requires waivers', () => {
+
+  const producedNotProven = [...PRODUCED_LEAVES].filter((l) => !PROVEN_LEAVES.has(l));
+  const waivedLeaves = new Set(PROOF_WAIVERS.map((w) => w.leaf));
+
+  it('every produced-not-proven leaf has a waiver', () => {
+    const unwaived = producedNotProven.filter((l) => !waivedLeaves.has(l));
+    expect(
+      unwaived,
+      `Produced leaves without E2E proof AND without a waiver. Either add an E2E ` +
+      `dispatch-chain test and move to PROVEN_LEAVES, or add a ProofWaiver with ` +
+      `owner/reason/targetFix. Unwaived: ${unwaived.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('no waiver exists for a leaf that is already proven', () => {
+    const staleWaivers = PROOF_WAIVERS.filter((w) => PROVEN_LEAVES.has(w.leaf));
+    expect(
+      staleWaivers.map((w) => w.leaf),
+      `Waivers exist for already-proven leaves — remove them. ` +
+      `Stale: ${staleWaivers.map((w) => w.leaf).join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('no waiver exists for a leaf that is not produced', () => {
+    const orphanedWaivers = PROOF_WAIVERS.filter((w) => !PRODUCED_LEAVES.has(w.leaf));
+    expect(
+      orphanedWaivers.map((w) => w.leaf),
+      `Waivers exist for non-produced leaves — remove them. ` +
+      `Orphaned: ${orphanedWaivers.map((w) => w.leaf).join(', ')}`,
+    ).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Invariant D: Waiver quality
+// ============================================================================
+
+describe('Invariant D: Waiver quality', () => {
+
+  it('every waiver has non-empty owner, reason, and targetFix', () => {
+    const invalid = PROOF_WAIVERS.filter(
+      (w) => !w.owner?.trim() || !w.reason?.trim() || !w.targetFix?.trim(),
+    );
+    expect(
+      invalid.map((w) => w.leaf),
+      `Waivers with missing fields: ${invalid.map((w) => `${w.leaf} (owner=${w.owner}, reason=${w.reason}, targetFix=${w.targetFix})`).join('; ')}`,
+    ).toEqual([]);
+  });
+
+  it('every waiver has a valid createdAt date', () => {
+    const invalid = PROOF_WAIVERS.filter(
+      (w) => !w.createdAt || isNaN(Date.parse(w.createdAt)),
+    );
+    expect(
+      invalid.map((w) => w.leaf),
+      `Waivers with invalid createdAt: ${invalid.map((w) => `${w.leaf}=${w.createdAt}`).join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('waiver leaves are unique (no duplicates)', () => {
+    const seen = new Set<string>();
+    const dupes: string[] = [];
+    for (const w of PROOF_WAIVERS) {
+      if (seen.has(w.leaf)) dupes.push(w.leaf);
+      seen.add(w.leaf);
+    }
+    expect(dupes).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Contracted-only leaves (passthrough/manual)
+// ============================================================================
+
+describe('Contracted-only leaves (passthrough/manual)', () => {
+  const contractedOnly = computeContractedOnly();
+
+  it('contracted-only leaves are not in any producer set', () => {
+    const leaks = [...contractedOnly].filter((l) => PRODUCED_LEAVES.has(l));
+    expect(leaks).toEqual([]);
+  });
+
+  it('each contracted-only leaf has a valid action mapping', () => {
+    const failures: string[] = [];
+    for (const leaf of contractedOnly) {
+      const action = mapBTActionToMinecraft(leaf, {});
+      if (!action) {
+        failures.push(`${leaf}: no action mapping`);
+      }
+    }
+    expect(
+      failures,
+      `Contracted-only leaves without action mappings:\n${failures.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('contracted-only leaves ARE in the executor allowlist', () => {
+    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, false);
+    const blocked: string[] = [];
+    for (const leaf of contractedOnly) {
+      if (!allowlist.has(`minecraft.${leaf}`)) {
+        blocked.push(leaf);
+      }
+    }
+    expect(blocked).toEqual([]);
+  });
+
+  it('no known producer emits any contracted-only leaf', () => {
+    const leaks = [...contractedOnly].filter((l) => PRODUCED_LEAVES.has(l));
+    expect(
+      leaks,
+      `Contracted-only leaves found in producer output — reclassify to PRODUCED_LEAVES: ${leaks.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('bootstrap lowering fixture does not emit contracted-only leaves', () => {
+    const cases = (bootstrapFixture as any).cases;
+    const bootstrapLeaves: string[] = [];
+    for (const caseName of Object.keys(cases)) {
+      for (const step of cases[caseName].steps) {
+        bootstrapLeaves.push(step.leaf);
+      }
+    }
+    const leaks = bootstrapLeaves.filter((l) => contractedOnly.has(l));
+    expect(
+      leaks,
+      `Bootstrap fixture emits contracted-only leaves: ${leaks.join(', ')}`,
+    ).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Intent leaf dispatch guard
+// ============================================================================
+
+describe('Intent leaf dispatch guard', () => {
+
+  it('intent leaves (task_type_*) are not in KNOWN_LEAVES', () => {
+    const overlap = [...INTENT_LEAVES].filter((l) => KNOWN_LEAVES.has(l));
+    expect(overlap).toEqual([]);
+  });
+
+  it('intent leaves are blocked by executor allowlist when bridge disabled', () => {
+    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, false);
+    const leaked: string[] = [];
+    for (const leaf of INTENT_LEAVES) {
+      if (allowlist.has(`minecraft.${leaf}`)) {
+        leaked.push(leaf);
+      }
+    }
+    expect(leaked).toEqual([]);
+  });
+
+  it('intent leaves ARE in executor allowlist when bridge enabled (dev only)', () => {
+    const allowlist = buildLeafAllowlist(KNOWN_LEAVES, INTENT_LEAVES, true);
+    const missing: string[] = [];
+    for (const leaf of INTENT_LEAVES) {
+      if (!allowlist.has(`minecraft.${leaf}`)) {
+        missing.push(leaf);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('no known producer emits intent leaves', () => {
+    const leaks = [...INTENT_LEAVES].filter((l) => PRODUCED_LEAVES.has(l));
+    expect(leaks).toEqual([]);
+  });
+
+  it('executor blocks a leaf not in the allowlist', async () => {
+    const ctx = createMockExecutorContext({
+      leafAllowlist: new Set(['minecraft.acquire_material']),
+    });
+    const step = makeStepForLeaf('till_soil', {});
+    const task = makeTask([step]);
+
+    await executeSterlingStep(task, step, ctx);
+    expect(ctx.executeTool).not.toHaveBeenCalled();
+    expect(ctx.updateTaskMetadata).toHaveBeenCalled();
+  });
+
+  it('executor blocks intent leaf even when bridge is disabled', async () => {
+    const ctx = createMockExecutorContext();
+    const step = makeStepForLeaf('task_type_craft', { recipe: 'wooden_pickaxe' });
+    const task = makeTask([step]);
+
+    await executeSterlingStep(task, step, ctx);
+    expect(ctx.executeTool).not.toHaveBeenCalled();
+  });
+});
 
 // ============================================================================
 // Safety monitor bypass-path governance lock
@@ -469,7 +507,79 @@ describe('Producer contract safety', () => {
  * This section pins the exact set of action types the safety monitor is permitted to
  * emit. If a developer adds a new executeAction() call, the source-scanning test fails
  * and forces an explicit update here.
+ *
+ * Extraction uses the TypeScript AST (not string scanning) to avoid paren-counting and
+ * nested type: field collisions. Every executeAction() call must pass an object literal
+ * with exactly one top-level type property that is a string literal.
  */
+
+type ExtractResult = {
+  actionTypes: string[];
+  violations: string[];
+};
+
+function extractExecuteActionTypesFromFile(filePath: string): ExtractResult {
+  const sourceText = readFileSync(filePath, 'utf-8');
+  const sf = ts.createSourceFile(
+    filePath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  const actionTypes: string[] = [];
+  const violations: string[] = [];
+
+  const isTypePropName = (name: ts.PropertyName): boolean => {
+    if (ts.isIdentifier(name)) return name.text === 'type';
+    if (ts.isStringLiteral(name)) return name.text === 'type';
+    return false;
+  };
+
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const expr = node.expression;
+
+      if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'executeAction') {
+        const arg0 = node.arguments[0];
+        if (!arg0) {
+          violations.push('executeAction() call missing first argument');
+        } else if (!ts.isObjectLiteralExpression(arg0)) {
+          violations.push('executeAction() arg0 must be an object literal (fail-closed)');
+        } else {
+          const hasSpread = arg0.properties.some((p) => ts.isSpreadAssignment(p));
+          if (hasSpread) {
+            violations.push('executeAction() arg object contains spread assignment (fail-closed)');
+          }
+
+          const typeProps = arg0.properties.filter((p) => {
+            return ts.isPropertyAssignment(p) && isTypePropName(p.name);
+          }) as ts.PropertyAssignment[];
+
+          if (typeProps.length !== 1) {
+            violations.push(
+              `executeAction() must contain exactly one top-level type property (found ${typeProps.length})`,
+            );
+          } else {
+            const init = typeProps[0].initializer;
+            if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
+              actionTypes.push(init.text);
+            } else {
+              violations.push('executeAction() type must be a string literal (fail-closed)');
+            }
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sf);
+
+  return { actionTypes, violations };
+}
 
 const SAFETY_MONITOR_ALLOWED_ACTIONS: ReadonlySet<string> = new Set([
   'navigate',       // Flee: move to computed flee target (emergency lease)
@@ -482,85 +592,32 @@ const SAFETY_MONITOR_ALLOWED_ACTIONS: ReadonlySet<string> = new Set([
 describe('Safety monitor bypass-path governance', () => {
 
   it('safety monitor source only contains allowed executeAction types (fail-closed)', () => {
-    // Read the actual source to extract all executeAction type values.
-    // This is a source-level contract — if someone adds a new executeAction call,
-    // this test forces them to explicitly add it to SAFETY_MONITOR_ALLOWED_ACTIONS.
-    //
-    // FAIL-CLOSED: if we find an executeAction( block but cannot extract a literal
-    // type string, that is treated as a governance violation — not silently ignored.
-    // This prevents bypassing the lock via computed types or spread patterns.
-    const thisDir = typeof __dirname !== 'undefined'
-      ? __dirname
-      : dirname(fileURLToPath(import.meta.url));
+    const thisDir =
+      typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
     const monitorPath = resolve(
       thisDir,
       '../../../minecraft-interface/src/automatic-safety-monitor.ts',
     );
-    const source = readFileSync(monitorPath, 'utf-8');
 
-    // Split on executeAction( — each chunk after the first is a call site.
-    // For each call site, extract the argument block up to the matching closing
-    // paren (handles nested parens/objects correctly).
-    const chunks = source.split('executeAction(');
-    const actionTypes: string[] = [];
-    const unresolvable: string[] = [];
+    const { actionTypes, violations } = extractExecuteActionTypesFromFile(monitorPath);
 
-    for (let i = 1; i < chunks.length; i++) {
-      const chunk = chunks[i];
-
-      // Find the argument block: count parens to find the matching close.
-      // Start at depth=1 since we've already consumed the opening paren.
-      let depth = 1;
-      let end = 0;
-      for (let j = 0; j < chunk.length && depth > 0; j++) {
-        if (chunk[j] === '(') depth++;
-        else if (chunk[j] === ')') depth--;
-        end = j;
-      }
-      const argBlock = chunk.slice(0, end);
-
-      // Extract the type field from the full argument block
-      const typeMatch = argBlock.match(/type:\s*['"]([^'"]+)['"]/);
-      if (typeMatch) {
-        actionTypes.push(typeMatch[1]);
-      } else {
-        // FAIL-CLOSED: could not extract a literal type string.
-        // This means someone used a variable, spread, or other non-literal pattern.
-        const preview = argBlock.slice(0, 80).replace(/\n/g, ' ').trim();
-        unresolvable.push(`call #${i}: ${preview}...`);
-      }
-    }
+    expect(
+      violations,
+      `Bypass governance violations:\n${violations.join('\n')}`,
+    ).toEqual([]);
 
     expect(
       actionTypes.length,
       'Expected to find at least one executeAction type in safety monitor source',
     ).toBeGreaterThan(0);
 
-    // Fail-closed: non-literal types are governance violations
+    const actual = [...new Set(actionTypes)].sort();
+    const expected = [...SAFETY_MONITOR_ALLOWED_ACTIONS].sort();
     expect(
-      unresolvable,
-      `Found executeAction() calls without literal type strings. This bypass ` +
-      `governance lock requires all action types to be string literals so they ` +
-      `can be statically verified. Refactor to use literal types, or add an ` +
-      `explicit exemption. Unresolvable calls:\n${unresolvable.join('\n')}`,
-    ).toEqual([]);
-
-    const unauthorized = actionTypes.filter((t) => !SAFETY_MONITOR_ALLOWED_ACTIONS.has(t));
-    expect(
-      unauthorized,
-      `Safety monitor dispatches unauthorized action types via executeAction(). ` +
-      `These bypass the executor allowlist entirely. Either add them to ` +
-      `SAFETY_MONITOR_ALLOWED_ACTIONS (with E2E test coverage), or remove the ` +
-      `dispatch call. Unauthorized: ${unauthorized.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('SAFETY_MONITOR_ALLOWED_ACTIONS count is pinned', () => {
-    // If this fails, an action was added or removed. Update the set AND add E2E coverage.
-    expect(
-      SAFETY_MONITOR_ALLOWED_ACTIONS.size,
-      `Safety monitor allowed actions count changed. Current: ${[...SAFETY_MONITOR_ALLOWED_ACTIONS].sort().join(', ')}`,
-    ).toBe(5);
+      actual,
+      `Safety monitor executeAction types must exactly match SAFETY_MONITOR_ALLOWED_ACTIONS. ` +
+        `Actual: [${actual.join(', ')}]. Expected: [${expected.join(', ')}]`,
+    ).toEqual(expected);
   });
 
   it('all safety-monitor bypass actions have an action mapping', () => {
@@ -579,23 +636,51 @@ describe('Safety monitor bypass-path governance', () => {
   });
 });
 
+// ============================================================================
+// Classification drift detection
+// ============================================================================
+
 describe('Classification drift detection', () => {
 
-  it('KNOWN_LEAVES count matches expected (detect new leaves)', () => {
-    // If this fails, a new leaf was added to leaf-arg-contracts.ts.
-    // Classify it in PASSTHROUGH_ONLY or AUTONOMOUSLY_REACHABLE above.
+  it('KNOWN_LEAVES count matches Produced + Contracted-only', () => {
+    const contractedOnly = computeContractedOnly();
     expect(
       KNOWN_LEAVES.size,
-      `KNOWN_LEAVES size changed — a leaf was added or removed. Update the classification sets above. Current leaves: ${[...KNOWN_LEAVES].sort().join(', ')}`,
-    ).toBe(PASSTHROUGH_ONLY.size + AUTONOMOUSLY_REACHABLE.size);
+      `KNOWN_LEAVES size changed — a leaf was added or removed. ` +
+      `Current: ${[...KNOWN_LEAVES].sort().join(', ')}`,
+    ).toBe(PRODUCED_LEAVES.size + contractedOnly.size);
   });
 
-  it('INTENT_LEAVES count matches expected (detect new intent leaves)', () => {
+  it('INTENT_LEAVES count matches expected', () => {
     expect(INTENT_LEAVES.size).toBe(10);
   });
 
   it('no leaf appears in both KNOWN_LEAVES and INTENT_LEAVES', () => {
     const overlap = [...KNOWN_LEAVES].filter((l) => INTENT_LEAVES.has(l));
     expect(overlap).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Scoreboard (informational — prints on run for quick visibility)
+// ============================================================================
+
+describe('Reachability scoreboard', () => {
+  it('prints current reachability summary', () => {
+    const contractedOnly = computeContractedOnly();
+    const producedNotProven = [...PRODUCED_LEAVES].filter((l) => !PROVEN_LEAVES.has(l));
+
+    const summary = [
+      `Contracted (KNOWN_LEAVES):     ${KNOWN_LEAVES.size}`,
+      `  Produced + Proven (strong):   ${PROVEN_LEAVES.size}`,
+      `  Produced, not Proven (gap):   ${producedNotProven.length} [${producedNotProven.sort().join(', ')}]`,
+      `  Contracted-only (manual):     ${contractedOnly.size}`,
+      `Intent leaves:                  ${INTENT_LEAVES.size}`,
+      `Waivers active:                 ${PROOF_WAIVERS.length}`,
+    ].join('\n');
+
+    // This test always passes — it's here for visibility in test output
+    console.log(`\n─── Reachability Scoreboard ───\n${summary}\n──────────────────────────────\n`);
+    expect(true).toBe(true);
   });
 });

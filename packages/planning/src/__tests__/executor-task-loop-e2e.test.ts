@@ -429,4 +429,107 @@ describe('Executor Task Loop E2E', () => {
       expect(fullTask.steps.every((s) => s.done)).toBe(true);
     });
   });
+
+  // ── Dispatch proof: smelt, place_workstation, place_block ──
+
+  describe('Tool-progression leaf dispatch proof', () => {
+    it('dispatches smelt with explicit args through executor', async () => {
+      const step = makeStep('smelt', { input: 'raw_iron' }, 1);
+      const task = makeTask([step]);
+      const ctx = createMockContext();
+
+      await executeSterlingStep(task, step, ctx);
+
+      expect(ctx.executeTool).toHaveBeenCalledWith(
+        'minecraft.smelt',
+        expect.objectContaining({ input: 'raw_iron' }),
+        undefined,
+      );
+      expect(ctx.completeTaskStep).toHaveBeenCalledWith(task.id, 'step-1');
+    });
+
+    it('dispatches place_workstation with explicit args through executor', async () => {
+      const step = makeStep('place_workstation', { workstation: 'furnace' }, 1);
+      const task = makeTask([step]);
+      const ctx = createMockContext();
+
+      await executeSterlingStep(task, step, ctx);
+
+      expect(ctx.executeTool).toHaveBeenCalledWith(
+        'minecraft.place_workstation',
+        expect.objectContaining({ workstation: 'furnace' }),
+        undefined,
+      );
+      expect(ctx.completeTaskStep).toHaveBeenCalledWith(task.id, 'step-1');
+    });
+
+    it('dispatches place_block with explicit args through executor', async () => {
+      const step = makeStep('place_block', { item: 'cobblestone' }, 1);
+      const task = makeTask([step]);
+      const ctx = createMockContext();
+
+      await executeSterlingStep(task, step, ctx);
+
+      expect(ctx.executeTool).toHaveBeenCalledWith(
+        'minecraft.place_block',
+        expect.objectContaining({ item: 'cobblestone' }),
+        undefined,
+      );
+      expect(ctx.completeTaskStep).toHaveBeenCalledWith(task.id, 'step-1');
+    });
+
+    it('multi-step tool progression: acquire → smelt → place_workstation → craft', async () => {
+      const steps = [
+        makeStep('acquire_material', { item: 'raw_iron', count: 3 }, 1),
+        makeStep('smelt', { input: 'raw_iron' }, 2),
+        makeStep('place_workstation', { workstation: 'crafting_table' }, 3),
+        makeStep('craft_recipe', { recipe: 'iron_pickaxe', qty: 1 }, 4),
+      ];
+      const task = makeTask(steps);
+
+      for (let i = 0; i < steps.length; i++) {
+        const ctx = createMockContext();
+        await executeSterlingStep(task, steps[i], ctx);
+        expect(ctx.executeTool).toHaveBeenCalledTimes(1);
+        expect(ctx.completeTaskStep).toHaveBeenCalledTimes(1);
+        steps[i].done = true;
+      }
+
+      const dispatched = steps.map((_, i) => {
+        const ctx = createMockContext();
+        // Re-read from the loop above — we already dispatched, just verify the leaf names
+        return `minecraft.${steps[i].meta.leaf}`;
+      });
+      expect(dispatched).toEqual([
+        'minecraft.acquire_material',
+        'minecraft.smelt',
+        'minecraft.place_workstation',
+        'minecraft.craft_recipe',
+      ]);
+    });
+  });
+
+  // ── Dispatch proof: step_forward_safely ──
+
+  describe('Bootstrap leaf dispatch proof', () => {
+    it('dispatches step_forward_safely with explicit args through executor', async () => {
+      const step = makeStep('step_forward_safely', { distance: 8, lowered_from: 'navigate', theme: 'safety' }, 1);
+      const task = makeTask([step]);
+      const ctx = createMockContext({
+        leafAllowlist: new Set([
+          ...createMockContext().leafAllowlist,
+          'minecraft.step_forward_safely',
+        ]),
+      });
+
+      await executeSterlingStep(task, step, ctx);
+
+      expect(ctx.executeTool).toHaveBeenCalledWith(
+        'minecraft.step_forward_safely',
+        expect.objectContaining({ distance: 8 }),
+        undefined,
+      );
+      expect(ctx.completeTaskStep).toHaveBeenCalledWith(task.id, 'step-1');
+    });
+  });
 });

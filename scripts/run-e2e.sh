@@ -105,7 +105,6 @@ trap cleanup EXIT
 
 # ── 1. Docker up ─────────────────────────────────────────────────────
 if should_run_category "infra"; then
-  DID_START_INFRA=true
   info "Starting Docker services..."
   if ! command -v docker &>/dev/null; then
     fail "Docker is not installed or not in PATH"
@@ -113,6 +112,7 @@ if should_run_category "infra"; then
   fi
 
   docker compose up -d
+  DID_START_INFRA=true
 
   # Wait for Postgres
   info "Waiting for Postgres..."
@@ -276,9 +276,11 @@ if ! should_run_category "core" && ! should_run_category "sterling"; then
   warn "No test suites selected (E2E_SUITES=$E2E_SUITES)"
   warn "Use E2E_SUITES=core for mocked tests, E2E_SUITES=all for everything"
   if [[ "$DID_START_INFRA" == true ]]; then
-    ok "Infrastructure is up — press Ctrl+C to tear down"
-    # Keep running until interrupted so infra-only mode is useful for manual testing
-    wait
+    ok "Infrastructure is up — Ctrl+C to exit; add --teardown to bring services down"
+    # Explicit keepalive: wait returns immediately if no background jobs; use sleep so infra-only mode stays alive
+    sleep 2147483647 &
+    WAIT_PID=$!
+    wait "$WAIT_PID"
   fi
   exit 0
 fi
