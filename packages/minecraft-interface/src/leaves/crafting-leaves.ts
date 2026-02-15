@@ -453,6 +453,45 @@ export class CraftRecipeLeaf implements LeafImpl {
       const hasTable = !!tableBlock;
       const invSnapshot = await ctx.inventory();
       const invCounts = countByName(invSnapshot);
+
+      // Compute actionable diagnostics: what's missing and does this need a workstation?
+      let missingInputs: Array<{ item: string; have: number; need: number }> = [];
+      let requiresWorkstation = false;
+      let hasWorkstationInInventory = false;
+      try {
+        // Recipe.find returns ALL recipes for this item regardless of inventory
+        const Recipe = (bot as any).Recipe || ((bot as any).constructor?.Recipe);
+        const allRecipes = Recipe?.find?.(item.id) ?? [];
+        if (allRecipes.length > 0) {
+          // Pick the first recipe to report missing inputs (simplest path)
+          const candidateRecipe = allRecipes[0];
+          // Mineflayer recipes: inShape is 2D array for shaped, ingredients for shapeless
+          // delta is an array of {id, metadata, count} for inputs (negative count) and outputs (positive)
+          requiresWorkstation = candidateRecipe.requiresTable === true
+            || (candidateRecipe.inShape && candidateRecipe.inShape.length > 2);
+          const inputItems: Record<string, number> = {};
+          if (candidateRecipe.delta) {
+            for (const d of candidateRecipe.delta) {
+              if (d.count < 0) {
+                const inputItem = mcData.items[d.id];
+                if (inputItem) {
+                  inputItems[inputItem.name] = (inputItems[inputItem.name] ?? 0) + Math.abs(d.count);
+                }
+              }
+            }
+          }
+          for (const [inputName, need] of Object.entries(inputItems)) {
+            const have = invCounts[inputName] ?? 0;
+            if (have < need) {
+              missingInputs.push({ item: inputName, have, need });
+            }
+          }
+        }
+        hasWorkstationInInventory = (invCounts['crafting_table'] ?? 0) > 0;
+      } catch {
+        // Non-critical — diagnostics are best-effort
+      }
+
       return {
         status: 'failure',
         error: {
@@ -465,10 +504,13 @@ export class CraftRecipeLeaf implements LeafImpl {
           crafted: 0,
           recipe,
           toolDiagnostics: {
-            _diag_version: 1,
+            _diag_version: 2,
             reason_code: 'no_recipe_available',
             recipe_requested: recipe,
             crafting_table_nearby: hasTable,
+            requires_workstation: requiresWorkstation,
+            has_workstation_in_inventory: hasWorkstationInInventory,
+            missing_inputs: missingInputs,
             search_radius: WORKSTATION_SEARCH_RADIUS,
             inventory_snapshot: invCounts,
           },

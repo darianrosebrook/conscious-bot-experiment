@@ -131,6 +131,13 @@ function setupMockLeafFactory(
     'prepare_site',
     'build_module',
     'place_feature',
+    // perception-driven exploration
+    'explore_for_resources',
+    // resource acquisition
+    'gather_resources',
+    // mining + scanning (ACTION_CONTRACTS handler dispatch)
+    'mine_block',
+    'scan_environment',
   ];
 
   for (const name of defaultLeaves) {
@@ -1120,6 +1127,10 @@ describe('action dispatch contract', () => {
         manage_farm: {},
         harvest_crop: {},
         interact_with_block: { position: { x: 0, y: 64, z: 0 } },
+        explore_for_resources: { resource_tags: ['oak_log'], goal_item: 'wooden_pickaxe' },
+        gather_resources: {},
+        mine_block: { block_type: 'stone', tool: 'pickaxe' },
+        scan_environment: {},
       };
 
       for (const actionType of Object.keys(ACTION_CONTRACTS)) {

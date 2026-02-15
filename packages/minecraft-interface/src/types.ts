@@ -241,7 +241,9 @@ export type MinecraftActionType =
   | 'acquire_material'
   | 'equip_weapon'
   | 'equip_tool'
-  | 'retreat_from_threat';
+  | 'retreat_from_threat'
+  | 'explore_for_resources'
+  | 'gather_resources';
 
 export interface MinecraftAction {
   type: MinecraftActionType;

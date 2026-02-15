@@ -48,7 +48,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private lastEntityObservation = new Map<string, { lastSeen: number; lastDistance: number }>();
   private readonly logThrottleMs = 1000;
   private readonly waterLogThrottleMs = 5000;
-  private readonly emergencyCooldownMs = 1000;
+  private readonly emergencyCooldownMs = 15000;
   private readonly entityObservationCooldownMs = 1000;
   private readonly entityDistanceDelta = 0.5;
   private observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
@@ -108,6 +108,11 @@ export class AutomaticSafetyMonitor extends EventEmitter {
 
     this.isMonitoring = true;
     // Safety monitoring started (verbose logging suppressed)
+
+    // Initialize lastHealth from the bot's actual health so we don't trigger
+    // a false health_drop on the first poll (e.g. bot reconnects at 5 HP,
+    // lastHealth was 20 → spurious 15 HP "drop" → constant flee loops).
+    this.lastHealth = this.bot.health ?? 20;
 
     // Set up health monitoring
     this.bot.on('health', () => {

@@ -1570,25 +1570,44 @@ type BiomeDetail = {
   dimension?: string;
 };
 
-// Detect current biome from mineflayer bot world data
+// Detect current biome from mineflayer bot world data.
+// minecraft-data has no data for 1.21.9; fall back to 1.21.4 for biome lookup.
 function detectBiome(bot: any): BiomeDetail {
   try {
     const pos = bot.entity?.position;
     if (!pos) return { name: 'unknown' };
-    const biomeId = (bot.world as any).getBiome?.(pos);
-    if (typeof biomeId === 'number') {
-      const mcDataModule = require('minecraft-data');
-      const mcData = (mcDataModule.default || mcDataModule)(bot.version);
-      const biomeData = mcData?.biomes?.[biomeId];
-      if (biomeData?.name) {
-        return {
-          name: biomeData.name,
-          temperature: biomeData.temperature,
-          humidity: biomeData.rainfall,
-          category: biomeData.category,
-          dimension: biomeData.dimension,
-        };
-      }
+    const raw = (bot.world as any).getBiome?.(pos);
+    if (raw == null) return { name: 'unknown' };
+
+    // Object with name: use directly (e.g. prismarine-biome)
+    if (typeof raw === 'object' && typeof (raw as { name?: string }).name === 'string') {
+      const o = raw as { name: string; temperature?: number; rainfall?: number; humidity?: number; category?: string; dimension?: string };
+      return {
+        name: o.name,
+        temperature: o.temperature,
+        humidity: o.rainfall ?? o.humidity,
+        category: o.category,
+        dimension: o.dimension,
+      };
+    }
+
+    const biomeId = typeof raw === 'number' ? raw : (typeof raw === 'object' && typeof (raw as { id?: number }).id === 'number' ? (raw as { id: number }).id : null);
+    if (biomeId === null) return { name: 'unknown' };
+
+    const mcDataModule = require('minecraft-data');
+    let mcData = (mcDataModule.default || mcDataModule)(bot.version);
+    if (!mcData?.biomes || Object.keys(mcData.biomes).length === 0) {
+      mcData = (mcDataModule.default || mcDataModule)('1.21.4');
+    }
+    const biomeData = mcData?.biomes?.[biomeId];
+    if (biomeData?.name) {
+      return {
+        name: biomeData.name,
+        temperature: biomeData.temperature,
+        humidity: biomeData.rainfall,
+        category: biomeData.category,
+        dimension: biomeData.dimension,
+      };
     }
   } catch {
     /* fall through */
@@ -1808,7 +1827,14 @@ app.get('/state', async (req, res) => {
         nearbyEntities: (
           ws._minecraftState?.environment?.nearbyEntities ?? []
         ).slice(0, 10),
-        nearbyBlocks: [], // keep empty — block list is large and not needed by cognition
+        nearbyBlocks: [], // keep empty — abstracted block list not useful for cognition
+        // Solver-facing block summary: raw type names + counts (pre-abstraction)
+        nearbyBlockSummary: {
+          known: ws._minecraftState?.environment != null,
+          types: Object.keys(ws._minecraftState?.environment?.nearbyBlockCounts ?? {}),
+          counts: ws._minecraftState?.environment?.nearbyBlockCounts ?? {},
+          scannedAt: Date.now(),
+        },
       },
       status: 'connected',
       data: {
@@ -2063,10 +2089,20 @@ app.post('/action', async (req, res) => {
     const abortController = new AbortController();
     res.on('close', () => abortController.abort());
 
+    // P0-B: Ingress log — trace action dispatch from planning
+    const actionStartTime = Date.now();
+    const paramPreview = JSON.stringify(parameters ?? {}).slice(0, 200);
+    console.log(`[MC/action] → type=${type} params=${paramPreview}`);
+
     const result = await actionTranslator.executeAction(
       action,
       abortController.signal
     );
+
+    // P0-B: Egress log — trace action result back to planning
+    const actionDuration = Date.now() - actionStartTime;
+    const actionStatus = result?.success ? 'ok' : 'fail';
+    console.log(`[MC/action] ← type=${type} status=${actionStatus} duration=${actionDuration}ms`);
 
     // S8: Post-sleep signals — minecraft-interface emits signals only; memory service owns policy
     if (type === 'sleep' && result?.success) {

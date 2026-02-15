@@ -216,11 +216,15 @@ export class ObservationMapper {
 
     const playerPos = bot.entity.position;
 
+    const { blocks, blockCounts } = this.findNearbyBlocks(bot, playerPos, radius);
+
     return {
       timeOfDay: bot.time.timeOfDay,
       isRaining: bot.isRaining,
-      nearbyBlocks: this.findNearbyBlocks(bot, playerPos, radius),
+      nearbyBlocks: blocks,
       nearbyEntities: this.findNearbyEntities(bot, playerPos, radius),
+      // Raw block type → count before abstraction (for solver use)
+      nearbyBlockCounts: blockCounts,
     };
   }
 
@@ -231,7 +235,7 @@ export class ObservationMapper {
     bot: Bot,
     center: Vec3,
     radius: number
-  ): MinecraftBlock[] {
+  ): { blocks: MinecraftBlock[]; blockCounts: Record<string, number> } {
     const blockGroups = new Map<
       string,
       {
@@ -245,22 +249,34 @@ export class ObservationMapper {
     >();
 
     const interestingBlocks = new Set([
+      // Wood — all overworld + nether log types (mcData 1.21.4 has 12 variants)
       'oak_log',
       'birch_log',
       'spruce_log',
       'jungle_log',
       'acacia_log',
       'dark_oak_log',
+      'pale_oak_log',
+      'cherry_log',
+      'mangrove_log',
+      'warped_stem',
+      'crimson_stem',
+      'bamboo_block',
+      // Ores
       'stone',
       'coal_ore',
       'iron_ore',
       'diamond_ore',
       'gold_ore',
+      'copper_ore',
+      // Workstations
       'crafting_table',
       'furnace',
       'chest',
+      // Fluids
       'water',
       'lava',
+      // Terrain
       'grass_block',
       'dirt',
       'sand',
@@ -331,7 +347,13 @@ export class ObservationMapper {
       }
     }
 
-    return blocks;
+    // Raw type → count (pre-abstraction) for solver use
+    const blockCounts: Record<string, number> = {};
+    for (const [blockType, group] of blockGroups) {
+      blockCounts[blockType] = group.count;
+    }
+
+    return { blocks, blockCounts };
   }
 
   /**

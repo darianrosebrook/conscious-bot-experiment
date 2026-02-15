@@ -23,9 +23,31 @@ import type {
   GeneratedAssets,
   CachedVersionInfo,
   DownloadProgressCallback,
+  TextureAtlas,
 } from './types.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.minecraft-assets-cache');
+
+/**
+ * Converts atlas.json.textures to Build tab AtlasIndex format.
+ * Maps texture name to { u, v, su, sv, col, row } for applyAtlasUVs compatibility.
+ */
+function convertAtlasToIndexFormat(atlas: TextureAtlas): Record<string, { u: number; v: number; su: number; sv: number; col: number; row: number }> {
+  const { textures } = atlas.json;
+  const size = atlas.json.size;
+  const result: Record<string, { u: number; v: number; su: number; sv: number; col: number; row: number }> = {};
+  for (const [name, uv] of Object.entries(textures)) {
+    result[name] = {
+      u: uv.u,
+      v: uv.v,
+      su: uv.su,
+      sv: uv.sv,
+      col: Math.floor(uv.u / size),
+      row: Math.floor(uv.v / size),
+    };
+  }
+  return result;
+}
 
 /**
  * Progress events emitted during pipeline execution.
@@ -66,10 +88,17 @@ export class AssetPipeline {
   /**
    * Gets the output paths for a version's generated assets.
    */
-  getOutputPaths(version: string): { texturePath: string; blockStatesPath: string; entitiesPath: string; rawAssetsPath: string } {
+  getOutputPaths(version: string): {
+    texturePath: string;
+    blockStatesPath: string;
+    atlasIndexPath: string;
+    entitiesPath: string;
+    rawAssetsPath: string;
+  } {
     return {
       texturePath: path.join(this.generatedDir, version, 'textures.png'),
       blockStatesPath: path.join(this.generatedDir, version, 'blockstates.json'),
+      atlasIndexPath: path.join(this.generatedDir, version, 'atlas-index.json'),
       entitiesPath: path.join(this.generatedDir, version, 'entities.json'),
       rawAssetsPath: path.join(this.cacheDir, 'extracted', version),
     };
@@ -213,6 +242,10 @@ export class AssetPipeline {
     await fs.promises.mkdir(path.dirname(paths.texturePath), { recursive: true });
     await fs.promises.writeFile(paths.texturePath, atlas.image);
     await fs.promises.writeFile(paths.blockStatesPath, JSON.stringify(blockStates));
+    await fs.promises.writeFile(
+      paths.atlasIndexPath,
+      JSON.stringify(convertAtlasToIndexFormat(atlas))
+    );
     await fs.promises.writeFile(
       metaPath,
       JSON.stringify({

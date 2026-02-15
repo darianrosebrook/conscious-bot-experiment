@@ -262,6 +262,15 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     defaults: {},
     dispatchMode: 'handler',
   },
+  // Emitted by Sterling solver when no observed mine targets match the goal's
+  // dependency chain. The bot should explore to find the needed resources,
+  // then the task will be re-planned with updated observations.
+  explore_for_resources: {
+    leafName: 'explore_for_resources',
+    aliases: {},
+    defaults: { radius: 64 },
+    dispatchMode: 'handler',
+  },
 };
 
 /**

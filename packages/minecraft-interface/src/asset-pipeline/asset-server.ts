@@ -277,6 +277,33 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
   });
 
   /**
+   * Serves atlas index JSON (texture name -> UV mapping) for Build tab.
+   * Build tab uses this to populate atlasIndex.textures when mc-assets is active,
+   * enabling correct fallback UVs for blocks that use applyAtlasUVs (e.g. vegetation).
+   */
+  router.get('/atlas-index/:version.json', async (req: Request, res: Response, next: NextFunction) => {
+    const version = req.params.version;
+
+    try {
+      const paths = pipeline.getOutputPaths(version);
+      if (fs.existsSync(paths.atlasIndexPath)) {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Asset-Source', 'generated');
+        return fs.createReadStream(paths.atlasIndexPath).pipe(res);
+      }
+
+      res.status(404).json({
+        error: 'Atlas index not found',
+        version,
+        hint: 'Run `pnpm mc:assets extract ' + version + '` to generate (atlas-index is created with blockStates)',
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
    * Bundled version fallback chain for entity textures.
    * entities.json models use Bedrock Edition UV layouts that match these older bundled textures.
    * 1.21.9 JAR textures use Java Edition layouts with different dimensions/UV organization.
