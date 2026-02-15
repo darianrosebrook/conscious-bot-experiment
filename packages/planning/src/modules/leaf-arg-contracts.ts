@@ -147,17 +147,17 @@ const CONTRACTS: Record<string, LeafArgContract> = {
     validate: (args) => {
       if (!args.entityType || typeof args.entityType !== 'string')
         return 'interact_with_entity requires entityType (string)';
-      if (!args.entityId && !args.entityPosition)
-        return 'interact_with_entity requires entityId or entityPosition';
+      // entityId/entityPosition optional — leaf resolves nearest matching entity at runtime.
+      // At planning time (acquisition solver), only entityType is known.
       return null;
     },
   },
   open_container: {
     leafName: 'open_container',
     fields: ['?containerType:string', '?position:any'],
-    validate: (args) => {
-      if (!args.containerType && !args.position)
-        return 'open_container requires containerType or position';
+    validate: (_args) => {
+      // containerType and position both optional — leaf resolves nearest container at runtime.
+      // If neither provided, defaults to containerType='chest'.
       return null;
     },
   },

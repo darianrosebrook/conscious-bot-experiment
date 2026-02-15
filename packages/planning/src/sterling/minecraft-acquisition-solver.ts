@@ -366,12 +366,35 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       meta: {
         domain: 'acquisition',
         leaf: actionTypeToLeaf(step.actionType, step.action),
+        args: this.buildExplicitArgs(step),
         action: step.action,
         actionType: step.actionType,
         produces: step.produces,
         consumes: step.consumes,
       },
     }));
+  }
+
+  /**
+   * Derive explicit args for the leaf contract from the acquisition step.
+   * Mirrors MinecraftCraftingSolver.buildExplicitArgs but handles acq:* prefixes.
+   */
+  private buildExplicitArgs(step: AcquisitionSolveStep): Record<string, unknown> {
+    const action = step.action;
+
+    // Trade strategy → interact_with_entity (resolver-style: entityType only)
+    if (action.startsWith('acq:trade:')) return { entityType: 'villager' };
+
+    // Loot strategy → open_container (resolver-style: containerType only)
+    if (action.startsWith('acq:loot:')) return { containerType: 'chest' };
+
+    // Mine/craft delegation — match crafting solver's pattern
+    const output = step.produces[0];
+    switch (step.actionType) {
+      case 'craft': return { recipe: output?.name ?? 'unknown', qty: 1 };
+      case 'mine': return { item: output?.name ?? 'unknown', count: output?.count ?? 1 };
+      default: return {};
+    }
   }
 
   // --------------------------------------------------------------------------
