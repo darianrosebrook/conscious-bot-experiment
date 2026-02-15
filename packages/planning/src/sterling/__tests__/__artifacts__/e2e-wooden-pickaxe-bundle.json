@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:c4005f5255b7c7b5",
-  "bundleHash": "c4005f5255b7c7b5",
-  "timestamp": 1770448094346,
+  "bundleId": "minecraft.tool_progression:a60610281d47691e",
+  "bundleHash": "a60610281d47691e",
+  "timestamp": 1771044981441,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -18,29 +18,32 @@
       "timeWeight": 0,
       "riskWeight": 0
     },
-    "objectiveWeightsSource": "default"
+    "objectiveWeightsSource": "default",
+    "leafRegistryDigest": "a3aa29420f52319f",
+    "leafContractRequiredDigest": "2f56371517ff6ce0",
+    "leafContractFullDigest": "a3aa29420f52319f"
   },
   "output": {
-    "planId": "860681a3f219c562",
+    "planId": "b1dcdc457547d1fb",
     "solved": true,
     "stepsDigest": "270c723b6b0c141e",
     "searchStats": {
-      "totalNodes": 130,
-      "durationMs": 18,
+      "totalNodes": 98,
+      "durationMs": 16,
       "solutionPathLength": 8
     },
     "searchHealth": {
-      "nodesExpanded": 66,
-      "frontierPeak": 64,
+      "nodesExpanded": 50,
+      "frontierPeak": 48,
       "hMin": 0,
       "hMax": 1,
-      "hMean": 0.9848484848484849,
-      "hVariance": 0.01492194674012856,
+      "hMean": 0.98,
+      "hVariance": 0.0196,
       "fMin": 1,
       "fMax": 13.5,
-      "pctSameH": 0.9848484848484849,
+      "pctSameH": 0.98,
       "terminationReason": "goal_found",
-      "branchingEstimate": 2.8636363636363638,
+      "branchingEstimate": 3,
       "searchHealthVersion": 1
     },
     "rationale": {
@@ -54,9 +57,9 @@
         "objectiveWeightsSource": "default"
       },
       "searchEffort": {
-        "nodesExpanded": 66,
-        "frontierPeak": 64,
-        "branchingEstimate": 2.8636363636363638
+        "nodesExpanded": 50,
+        "frontierPeak": 48,
+        "branchingEstimate": 3
       },
       "searchTermination": {
         "terminationReason": "goal_found",
@@ -71,9 +74,10 @@
         "errorCodes": []
       }
     },
+    "traceHash": "039b989d67ccc77a",
     "sterlingIdentity": {
-      "traceBundleHash": "c338bd3ac26ac476c437412e9a28e92c81a1ca4d09a9a42f1f06670e2718d519",
-      "engineCommitment": "5e20861e8f05702c664f9abad307cc3046f25c1b694d435487da67236a276f8c",
+      "traceBundleHash": "dea4857ffb4dea7de76d510cb19a83c517a4a59f5965fa3d2652194749082ddc",
+      "engineCommitment": "e5b59fe48ab2b47f73daac70e2a95f2df0b2fa63f8fc622127f29622b4ca7ec4",
       "operatorRegistryHash": "d6590a986f022faf77acda6bdb0f89508e021abfecae03141d87d0abcb5398a1",
       "completenessDeclaration": {
         "completenessVersion": 1,
@@ -87,13 +91,13 @@
           "no_decision_witnesses"
         ]
       },
-      "bindingHash": "121f5f23f2345ffb"
+      "bindingHash": "072575a2ac306301"
     }
   },
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1770448094319,
+    "checkedAt": 1771044981414,
     "definitionCount": 6
   }
 }

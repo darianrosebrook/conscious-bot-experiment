@@ -60,6 +60,7 @@ import type { TaskStep } from '../types/task-step';
 import {
   actionTypeToLeafExtended,
   parsePlaceAction,
+  WORKSTATION_TYPES,
   derivePlaceMeta,
   estimateDuration as sharedEstimateDuration,
 } from './leaf-routing';
@@ -453,6 +454,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       meta: {
         domain: 'tool_progression',
         leaf: this.actionTypeToLeaf(step.actionType, step.action),
+        args: this.buildExplicitArgs(step),
         action: step.action,
         targetTool: result.targetTool,
         targetTier: result.targetTier,
@@ -602,8 +604,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       }
       case 'craft': {
         const output = step.produces[0];
-        const qty = output?.count ?? 1;
-        return `Leaf: minecraft.craft_recipe (recipe=${output?.name ?? 'unknown'}, qty=${qty})`;
+        return `Leaf: minecraft.craft_recipe (recipe=${output?.name ?? 'unknown'}, qty=1)`;
       }
       case 'smelt': {
         const output = step.produces[0];
@@ -640,6 +641,40 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
    * Estimate duration in ms based on action type.
    * Delegates to shared leaf-routing module.
    */
+  /**
+   * Build explicit args for a solve step so the executor uses argsSource='explicit'.
+   * Without this, live mode blocks derived args (DERIVED_ARGS_NOT_ALLOWED_LIVE).
+   */
+  private buildExplicitArgs(step: ToolProgressionStep): Record<string, unknown> {
+    switch (step.actionType) {
+      case 'craft':
+      case 'upgrade': {
+        const output = step.produces[0];
+        // qty = number of craft executions (mineflayer loops), NOT output count.
+        // The solver emits one step per craft execution; each execution yields
+        // recipe.result.count items (e.g. 1 log → 4 planks in one execution).
+        return { recipe: output?.name ?? 'unknown', qty: 1 };
+      }
+      case 'mine': {
+        const item = step.produces[0];
+        return { item: item?.name ?? 'oak_log', count: item?.count ?? 1 };
+      }
+      case 'smelt': {
+        const consumed = step.consumes[0];
+        return { input: consumed?.name ?? 'unknown' };
+      }
+      case 'place': {
+        const item = parsePlaceAction(step.action);
+        if (item && WORKSTATION_TYPES.has(item)) {
+          return { workstation: item };
+        }
+        return { item: item ?? step.consumes[0]?.name ?? 'crafting_table' };
+      }
+      default:
+        return {};
+    }
+  }
+
   private estimateDuration(actionType: string): number {
     return sharedEstimateDuration(actionType);
   }

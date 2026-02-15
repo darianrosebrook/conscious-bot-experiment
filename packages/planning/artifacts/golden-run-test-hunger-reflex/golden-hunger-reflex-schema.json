@@ -1,0 +1,77 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "hunger-reflex-schema",
+  "created_at": 1771027623302,
+  "updated_at": 1771027623302,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [],
+    "reflex_proof": {
+      "schema_version": "autonomy_proof_v1",
+      "bundle_hash": "56bfb65fc3871f21",
+      "identity": {
+        "trigger": {
+          "hunger_value": 0.75,
+          "threshold": 12,
+          "food_level": 5
+        },
+        "preconditions": {
+          "food_available": true
+        },
+        "goal": {
+          "need_type": "survival",
+          "template_name": "eat_immediate",
+          "description": "Eat food to restore hunger"
+        },
+        "task": {
+          "steps": [
+            {
+              "leaf": "consume_food",
+              "args": {
+                "food_type": "any",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        "execution": {
+          "result": "ok"
+        },
+        "verification": {
+          "food_before": 5,
+          "food_after": 11,
+          "delta": 6,
+          "items_consumed": [
+            "bread"
+          ]
+        }
+      },
+      "evidence": {
+        "proof_id": "79ff88ff-f28f-4c72-9a11-17c659dae7c4",
+        "goal_id": "8650ed17beb9036c",
+        "task_id": "task-schema",
+        "homeostasis_sample_digest": "39e7216bb6add679",
+        "candidates_digest": "cd241f4ec8d6f19d",
+        "execution_receipt": {
+          "itemsConsumed": 1
+        },
+        "candidate_food_item": "bread",
+        "candidate_food_count": 5,
+        "timing": {
+          "trigger_to_goal_ms": 0,
+          "goal_to_task_ms": 0,
+          "task_to_execution_ms": 0,
+          "total_ms": 0
+        },
+        "triggered_at": 1771027623302
+      }
+    }
+  }
+}

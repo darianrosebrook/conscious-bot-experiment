@@ -825,7 +825,7 @@ export function createPlanningEndpoints(
         timestamp: Date.now(),
       });
     } catch (error) {
-      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', decision: 'error', reason: error instanceof Error ? error.message : 'unknown' });
+      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', decision: 'error', reason: error instanceof Error ? error.constructor.name : 'unknown' });
       console.error('Failed to add task:', error);
       res.status(500).json({
         success: false,

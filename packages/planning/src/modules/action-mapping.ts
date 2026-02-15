@@ -609,6 +609,9 @@ export function mapBTActionToMinecraft(
     case 'interact_with_block':
       return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
 
+    case 'explore_for_resources':
+      return { type: 'explore_for_resources', parameters: { ...args }, timeout: 30000 };
+
     default:
       if (strict) return null;
       return { type: normalizedTool, parameters: args, debug: debugInfo };

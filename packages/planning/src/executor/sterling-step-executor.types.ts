@@ -86,7 +86,7 @@ export interface SterlingStepExecutorContext {
   } | null>;
   fetchInventorySnapshot: () => Promise<Array<Record<string, unknown>>>;
   getCount: (inv: Array<Record<string, unknown>>, item: string) => number;
-  injectDynamicPrereqForCraft: (task: unknown) => Promise<boolean>;
+  injectDynamicPrereqForCraft: (task: unknown, opts?: { recipe?: string; qty?: number; toolDiagnostics?: any }) => Promise<boolean>;
 
   emitExecutorBudgetEvent: (
     taskId: string,

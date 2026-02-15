@@ -59,7 +59,7 @@ describe('validateE2EContract', () => {
     result.results.forEach((r) => expect(r.passed).toBe(true));
   });
 
-  it('empty report fails all checkpoints', () => {
+  it('empty report fails most checkpoints (tool_diagnostics and world_change pass conditionally)', () => {
     const empty: GoldenRunReport = {
       schema_version: 'golden_run_report_v1',
       run_id: 'empty',
@@ -68,7 +68,10 @@ describe('validateE2EContract', () => {
     };
     const result = validateE2EContract(empty);
     expect(result.passed).toBe(false);
-    expect(result.missing).toHaveLength(8);
+    // tool_diagnostics and world_change now pass conditionally when no steps exist
+    expect(result.missing).toHaveLength(6);
+    expect(result.missing).not.toContain('tool_diagnostics');
+    expect(result.missing).not.toContain('world_change');
   });
 
   it('reports specific missing checkpoints', () => {
@@ -161,5 +164,34 @@ describe('individual checkpoints', () => {
     const result = validateE2EContract(report);
     const cp = result.results.find((r) => r.checkpoint === 'loop_breaker_evaluated');
     expect(cp?.detail).toContain('loop_episodes=0');
+  });
+
+  it('tool_diagnostics: passes conditionally when no dispatched steps', () => {
+    const report = makeFullReport();
+    report.execution!.dispatched_steps = [];
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'tool_diagnostics');
+    expect(cp?.passed).toBe(true);
+    expect(cp?.detail).toContain('conditional pass');
+  });
+
+  it('world_change: passes conditionally when no dispatched results and no verification', () => {
+    const report = makeFullReport();
+    delete report.execution!.verification;
+    report.execution!.dispatched_steps = [{ step_id: 'step-1', leaf: 'dig_block' }];
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'world_change');
+    expect(cp?.passed).toBe(true);
+    expect(cp?.detail).toContain('conditional pass');
+  });
+
+  it('world_change: fails when dispatched results exist but no verification', () => {
+    const report = makeFullReport();
+    delete report.execution!.verification;
+    // Step has a result but no verification block — should fail
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'world_change');
+    expect(cp?.passed).toBe(false);
+    expect(cp?.detail).toContain('no verification block but dispatched steps have results');
   });
 });

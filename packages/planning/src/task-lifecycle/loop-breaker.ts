@@ -14,6 +14,7 @@
  */
 
 import type { FailureSignatureV1 } from './failure-signature';
+import { getPlanningRuntimeConfig } from '../planning-runtime-config';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -223,7 +224,8 @@ let defaultLoopBreaker: LoopBreaker | null = null;
  */
 export function getLoopBreaker(): LoopBreaker {
   if (!defaultLoopBreaker) {
-    const shadowMode = process.env.LOOP_BREAKER_ENABLED !== '1';
+    const config = getPlanningRuntimeConfig();
+    const shadowMode = !config.loopBreakerEnabled;
     defaultLoopBreaker = new LoopBreaker({ shadowMode });
   }
   return defaultLoopBreaker;

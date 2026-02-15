@@ -645,6 +645,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private async fetchBotContext(): Promise<{
     inventory: any[];
     nearbyBlocks: any[];
+    nearbyBlockCounts: Record<string, number>;
+    nearbyBlocksKnown: boolean;
+    biome: string | undefined;
+    _unavailable?: boolean;
   }> {
     return this.sterlingPlanner.fetchBotContext();
   }
@@ -1232,6 +1236,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     this.sterlingPlanner = new SterlingPlanner({
       minecraftGet: (path, opts) =>
         this.minecraftClient.get(path, { timeout: opts?.timeout ?? 5000 }),
+      worldPost: (path, body, opts) =>
+        serviceClients.world.post(path, body, { timeout: opts?.timeout ?? 2000 }),
     });
 
     this.cognitiveStreamClient = new CognitiveStreamClient();
@@ -2310,7 +2316,22 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // Different intent types have different prerequisites.
       // Split by category so blocked reasons are specific and debuggable.
       const mcData = this.getMcData();
-      const goalItem = (taskData.metadata as any)?.requirement?.item as string | undefined;
+      // goalItem: prefer task metadata, fall back to expansion step theme
+      // (Sterling's expand_by_digest emits args.theme = entity label)
+      const goalItemFromMeta = (taskData.metadata as any)?.requirement?.item as string | undefined;
+      const goalItemFromTheme = intentSteps.find((s) => s.args?.theme)?.args?.theme as string | undefined;
+      const goalItem = goalItemFromMeta ?? goalItemFromTheme;
+
+      // If we resolved goalItem from theme but not from metadata, populate
+      // metadata.requirement.item so downstream (retryExpansion, crafting solver)
+      // can find it without re-extracting from steps.
+      if (!goalItemFromMeta && goalItem && taskData.metadata) {
+        (taskData.metadata as any).requirement = { item: goalItem };
+        (taskData.metadata as any).sterling = {
+          ...(taskData.metadata as any).sterling,
+          goalItem,
+        };
+      }
 
       // Classify intent steps by category
       const craftingIntents = intentSteps.filter((s) =>
@@ -2397,20 +2418,37 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       try {
         const botCtx = await this.fetchBotContext();
         const inventory = this.buildInventoryIndex(botCtx.inventory);
-        const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
-          ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
+        const blockCounts = botCtx.nearbyBlockCounts ?? {};
+        const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
+          ? Object.keys(blockCounts)
           : [];
+
+        // Derive preferred_base_items: most abundant log types first
+        const preferredBaseItems = Object.entries(blockCounts)
+          .filter(([name]) => name.endsWith('_log'))
+          .sort(([, a], [, b]) => (b as number) - (a as number))
+          .map(([name]) => name);
 
         // Only build crafting rules when there are crafting intents AND mcData+goalItem
         // are available (guaranteed by the preflight guards above).
         const rules: Array<Record<string, unknown>> = craftingIntents.length > 0
           ? buildCraftingRules(mcData, goalItem!) as unknown as Array<Record<string, unknown>>
           : [];
-
         const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
           {
             intent_steps: intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
-            world_state: { inventory, nearby_blocks: nearbyBlocks },
+            world_state: {
+              inventory,
+              nearby_blocks: nearbyBlocks,
+              nearby_blocks_known: botCtx.nearbyBlocksKnown,
+              nearby_block_counts: botCtx.nearbyBlockCounts,
+              preferred_base_items: preferredBaseItems,
+              scan_meta: {
+                radius: 8,
+                scanned_at: Date.now(),
+                biome: botCtx.biome ?? 'unknown',
+              },
+            },
             rules,
             schema_version: schemaVersion,
             request_id: `${requestId}_resolve`,
@@ -3008,7 +3046,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (retryCount >= TaskIntegration.MAX_EXPANSION_RETRIES) {
       recordRetry({ reason: 'expansion_retries_exhausted', classification: 'exhausted' });
       // LoopBreaker: record expansion final failure (per-task, not per-retry)
-      const loopSig = buildFailureSignature({ category: 'expansion_blocked', blockedReason: 'expansion_retries_exhausted' });
+      const lastRealReason = (meta.blockedReason as string) || 'expansion_retries_exhausted';
+      const loopSig = buildFailureSignature({ category: 'expansion_blocked', blockedReason: lastRealReason });
       const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
       if (episode && runId && recorder) { recorder.recordLoopDetected(runId, episode); }
       if (runId && recorder) { recorder.markLoopBreakerEvaluated(runId); }
@@ -3146,9 +3185,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     try {
       const botCtx = await this.fetchBotContext();
       const inventory = this.buildInventoryIndex(botCtx.inventory);
-      const nearbyBlocks: string[] = Array.isArray(botCtx.nearbyBlocks)
-        ? botCtx.nearbyBlocks.map((b: any) => typeof b === 'string' ? b : String(b?.name ?? b))
+      const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
+        ? Object.keys(botCtx.nearbyBlockCounts)
         : [];
+
+      // Derive preferred_base_items: most abundant log types first
+      const preferredBaseItems = Object.entries(botCtx.nearbyBlockCounts)
+        .filter(([name]) => name.endsWith('_log'))
+        .sort(([, a], [, b]) => b - a)
+        .map(([name]) => name);
 
       // Find intent steps in current task steps
       const intentSteps = task.steps.filter((s) => s.meta?.leaf && isIntentLeaf(s.meta.leaf as string));
@@ -3169,7 +3214,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
         {
           intent_steps: intentSteps.map((s) => ({ leaf: s.meta!.leaf as string, args: s.meta!.args as any })),
-          world_state: { inventory, nearby_blocks: nearbyBlocks },
+          world_state: {
+            inventory,
+            nearby_blocks: nearbyBlocks,
+            nearby_blocks_known: botCtx.nearbyBlocksKnown,
+            nearby_block_counts: botCtx.nearbyBlockCounts,
+            preferred_base_items: preferredBaseItems,
+            scan_meta: {
+              radius: 8,
+              scanned_at: Date.now(),
+              biome: botCtx.biome ?? 'unknown',
+            },
+          },
           rules,
           schema_version: schemaVersion ?? '1',
           request_id: `retry_resolve_${task.id}_${Date.now()}`,
@@ -4343,7 +4399,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   }
 
   /**
-   * Verify a pickup by checking if inventory total increased since step start
+   * Verify a pickup by checking if inventory total increased since step start.
+   * Accepts total >= start: collect_items can legitimately succeed with 0 items
+   * collected when there are no dropped items nearby (e.g. find_resource found none).
    */
   private async verifyPickupFromInventoryDelta(
     taskId: string,
@@ -4356,7 +4414,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
         : 0;
       if (start && typeof start.inventoryTotal === 'number') {
-        const passed = total > start.inventoryTotal;
+        const passed = total >= start.inventoryTotal;
         if (!passed) {
           console.warn(
             `[verifyPickupFromInventoryDelta] FAIL startTotal=${start.inventoryTotal} nowTotal=${total}`
@@ -4364,8 +4422,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         }
         return passed;
       }
-      // No baseline; accept if any items present
-      return total > 0;
+      // No baseline; accept (leaf already reported success)
+      return true;
     } catch {
       return false;
     }

@@ -38,6 +38,7 @@ import type { TaskStep } from '../types/task-step';
 import {
   actionTypeToLeaf,
   parsePlaceAction,
+  WORKSTATION_TYPES,
   derivePlaceMeta,
   estimateDuration as sharedEstimateDuration,
 } from './leaf-routing';
@@ -352,6 +353,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       meta: {
         domain: 'crafting',
         leaf: this.actionTypeToLeaf(step.actionType, step.action),
+        args: this.buildExplicitArgs(step),
         action: step.action,
         actionType: step.actionType,
         produces: step.produces,
@@ -529,8 +531,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       }
       case 'craft': {
         const output = step.produces[0];
-        const qty = output?.count ?? 1;
-        return `Leaf: minecraft.craft_recipe (recipe=${output?.name ?? 'unknown'}, qty=${qty})`;
+        return `Leaf: minecraft.craft_recipe (recipe=${output?.name ?? 'unknown'}, qty=1)`;
       }
       case 'smelt': {
         const output = step.produces[0];
@@ -546,6 +547,39 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       }
       default:
         return `Leaf: minecraft.${step.action}`;
+    }
+  }
+
+  /**
+   * Build explicit args for a solve step so the executor uses argsSource='explicit'.
+   * Without this, live mode blocks derived args (DERIVED_ARGS_NOT_ALLOWED_LIVE).
+   */
+  private buildExplicitArgs(step: MinecraftSolveStep): Record<string, unknown> {
+    switch (step.actionType) {
+      case 'craft': {
+        const output = step.produces[0];
+        // qty = number of craft executions (mineflayer loops), NOT output count.
+        // The solver emits one step per craft execution; each execution yields
+        // recipe.result.count items (e.g. 1 log → 4 planks in one execution).
+        return { recipe: output?.name ?? 'unknown', qty: 1 };
+      }
+      case 'mine': {
+        const item = step.produces[0];
+        return { item: item?.name ?? 'oak_log', count: item?.count ?? 1 };
+      }
+      case 'smelt': {
+        const consumed = step.consumes[0];
+        return { input: consumed?.name ?? 'unknown' };
+      }
+      case 'place': {
+        const item = parsePlaceAction(step.action);
+        if (item && WORKSTATION_TYPES.has(item)) {
+          return { workstation: item };
+        }
+        return { item: item ?? step.consumes[0]?.name ?? 'crafting_table' };
+      }
+      default:
+        return {};
     }
   }
 

@@ -349,6 +349,16 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+
+  // ── Perception-driven exploration ──
+  // Emitted by the solver when no observed mine targets match the goal's
+  // dependency chain. The bot must explore/look to find the needed resources
+  // before re-planning.
+  explore_for_resources: {
+    leafName: 'explore_for_resources',
+    fields: ['?resource_tags:any', '?goal_item:string', '?reason:string'],
+    validate: () => null,
+  },
 };
 
 /** Canonical set of executable leaves the executor may dispatch. Unknown leaves are rejected in strict mode.

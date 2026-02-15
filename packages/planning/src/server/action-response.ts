@@ -10,6 +10,10 @@
  * This normalizer is the single source of truth for action-result
  * interpretation. All executor code paths that consume /action responses
  * must route through this function.
+ *
+ * P0-A: This module also hoists `toolDiagnostics` from the leaf result to the
+ * top-level response, so downstream consumers (loop breaker, golden-run recorder,
+ * prereq injector) never need to dig through nesting layers.
  */
 
 export interface NormalizedActionResponse {
@@ -21,6 +25,66 @@ export interface NormalizedActionResponse {
   failureCode?: string;
   /** The leaf-level result payload (whatever the leaf returned). */
   data: any;
+  /**
+   * Hoisted tool diagnostics from the leaf result.
+   * Only present when the leaf returned an object with a valid `_diag_version`.
+   * Consumers should use this instead of digging through `data` nesting.
+   */
+  toolDiagnostics?: Record<string, unknown>;
+  /** The leaf's own `status` field (e.g. 'success', 'failure'). */
+  leafStatus?: string;
+  /** The leaf's error code (e.g. 'craft.missingInput'). */
+  leafErrorCode?: string;
+}
+
+/**
+ * Unwrap the "best available leaf result" from any wrapper shape.
+ *
+ * The MC interface response passes through multiple wrapping layers:
+ *   1. _runLeaf: { success, data: { leafResult: { status, error, result: { toolDiagnostics } } } }
+ *   2. Direct leaf: { status, error, result: { toolDiagnostics } }
+ *   3. Legacy handler: { success, error } (no leaf result or diagnostics)
+ *
+ * This function identifies the innermost leaf result and extracts diagnostics.
+ */
+function unwrapLeafResult(rawData: any): {
+  leafStatus?: string;
+  leafErrorCode?: string;
+  toolDiagnostics?: Record<string, unknown>;
+} {
+  if (!rawData || typeof rawData !== 'object') {
+    return {};
+  }
+
+  // Path 1: _runLeaf wrapping — { data: { leafResult: { status, result: { toolDiagnostics } } } }
+  const wrappedLeaf = rawData.data?.leafResult;
+  if (wrappedLeaf && typeof wrappedLeaf === 'object') {
+    return {
+      leafStatus: wrappedLeaf.status,
+      leafErrorCode: wrappedLeaf.error?.code,
+      toolDiagnostics: extractValidDiagnostics(wrappedLeaf.result?.toolDiagnostics),
+    };
+  }
+
+  // Path 2: Direct leaf result — { status, result: { toolDiagnostics } }
+  if (rawData.status && ('result' in rawData || 'error' in rawData)) {
+    return {
+      leafStatus: rawData.status,
+      leafErrorCode: rawData.error?.code,
+      toolDiagnostics: extractValidDiagnostics(rawData.result?.toolDiagnostics),
+    };
+  }
+
+  // Path 3: Legacy handler — no leaf result structure
+  return {};
+}
+
+/** Accept diagnostics only if they have a valid `_diag_version` field. */
+function extractValidDiagnostics(candidate: any): Record<string, unknown> | undefined {
+  if (candidate && typeof candidate === 'object' && candidate._diag_version != null) {
+    return candidate;
+  }
+  return undefined;
 }
 
 /**
@@ -34,10 +98,13 @@ export function normalizeActionResponse(httpPayload: any): NormalizedActionRespo
 
   // Transport failure: MC interface returned success:false (HTTP handler caught an error)
   if (!httpPayload.success) {
+    const raw = httpPayload.result ?? null;
+    const unwrapped = unwrapLeafResult(raw);
     return {
       ok: false,
       error: httpPayload.error || httpPayload.message || 'Action execution failed',
-      data: httpPayload.result ?? null,
+      data: raw,
+      ...unwrapped,
     };
   }
 
@@ -50,6 +117,9 @@ export function normalizeActionResponse(httpPayload: any): NormalizedActionRespo
     return { ok: true, data: null };
   }
 
+  // Unwrap leaf metadata from whatever nesting shape we received
+  const unwrapped = unwrapLeafResult(leafResult);
+
   // Leaf reports failure via success:false
   if (leafResult.success === false) {
     return {
@@ -57,6 +127,7 @@ export function normalizeActionResponse(httpPayload: any): NormalizedActionRespo
       error: extractLeafError(leafResult),
       failureCode: extractFailureCode(leafResult),
       data: leafResult,
+      ...unwrapped,
     };
   }
 
@@ -67,6 +138,7 @@ export function normalizeActionResponse(httpPayload: any): NormalizedActionRespo
       error: extractLeafError(leafResult),
       failureCode: extractFailureCode(leafResult),
       data: leafResult,
+      ...unwrapped,
     };
   }
 
@@ -78,11 +150,12 @@ export function normalizeActionResponse(httpPayload: any): NormalizedActionRespo
       error: extractLeafError(leafResult),
       failureCode: extractFailureCode(leafResult),
       data: leafResult,
+      ...unwrapped,
     };
   }
 
-  // All checks passed — leaf-level success
-  return { ok: true, data: leafResult };
+  // All checks passed — leaf-level success (also hoist diagnostics for success path)
+  return { ok: true, data: leafResult, ...unwrapped };
 }
 
 /** Extract a human-readable error string from a leaf result. */

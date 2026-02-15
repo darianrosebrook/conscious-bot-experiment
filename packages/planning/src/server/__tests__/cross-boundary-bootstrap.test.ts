@@ -147,20 +147,25 @@ describe('cross-boundary bootstrap autonomy contract', () => {
   });
 
   describe('gather (food) → multi-step action mapping', () => {
-    it('maps all three gather-food steps to valid actions', () => {
+    it('maps all gather-food steps to valid, dispatchable actions', () => {
       for (const step of STERLING_GATHER_FOOD_STEPS) {
         const action = mapBTActionToMinecraft(step.leaf, step.args);
         expect(action, `Failed to map leaf: ${step.leaf}`).not.toBeNull();
         expect(action!.type).toBeTruthy();
+        expect(
+          action!.parameters?._error,
+          `Leaf "${step.leaf}" produced _error: ${action!.parameters?._error}`,
+        ).toBeUndefined();
       }
     });
 
-    it('find_resource maps with correct blockType', () => {
+    it('acquire_material maps with correct item name', () => {
       const action = mapBTActionToMinecraft(
         STERLING_GATHER_FOOD_STEPS[0].leaf,
         STERLING_GATHER_FOOD_STEPS[0].args,
       );
-      expect(action!.parameters.blockType).toBe('sweet_berry_bush');
+      expect(action!.type).toBe('acquire_material');
+      expect(action!.parameters.item).toBe('sweet_berry_bush');
     });
   });
 
@@ -178,8 +183,7 @@ describe('cross-boundary bootstrap autonomy contract', () => {
     const BOOTSTRAP_LEAVES = [
       'move_to',
       'step_forward_safely',
-      'find_resource',
-      'collect_items',
+      'acquire_material',
       'consume_food',
     ];
 
@@ -200,6 +204,18 @@ describe('cross-boundary bootstrap autonomy contract', () => {
             action,
             `Fixture case "${caseName}", leaf "${step.leaf}" has no action mapping`,
           ).not.toBeNull();
+        }
+      }
+    });
+
+    it('no fixture step maps to an _error marker action', () => {
+      for (const [caseName, caseData] of Object.entries(FIXTURE.cases) as [string, any][]) {
+        for (const step of caseData.steps) {
+          const action = mapBTActionToMinecraft(step.leaf, step.args);
+          expect(
+            action!.parameters?._error,
+            `Fixture case "${caseName}", leaf "${step.leaf}" produced _error: ${action!.parameters?._error}`,
+          ).toBeUndefined();
         }
       }
     });

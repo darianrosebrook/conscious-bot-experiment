@@ -10,20 +10,23 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReactiveExecutor } from '../reactive-executor';
 
-// Mock fetch globally
-global.fetch = vi.fn();
+const originalFetch = globalThis.fetch;
 
 describe('Action Task Execution Fix', () => {
   let executor: ReactiveExecutor;
+  let mockFetch: ReturnType<typeof vi.fn>;
   const prevExecutorMode = process.env.EXECUTOR_MODE;
   const prevLiveConfirm = process.env.EXECUTOR_LIVE_CONFIRM;
 
   beforeEach(() => {
+    // Ensure fetch is a vi.fn() mock before each test (other suites may restore real fetch).
+    mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+
     // These tests assert /action is dispatched. The gateway defaults to shadow
     // unless explicitly confirmed.
     process.env.EXECUTOR_MODE = 'live';
     process.env.EXECUTOR_LIVE_CONFIRM = 'YES';
-    vi.clearAllMocks();
     executor = new ReactiveExecutor({
       capabilities: [],
     } as any);
@@ -32,11 +35,11 @@ describe('Action Task Execution Fix', () => {
   afterEach(() => {
     process.env.EXECUTOR_MODE = prevExecutorMode;
     process.env.EXECUTOR_LIVE_CONFIRM = prevLiveConfirm;
+    globalThis.fetch = originalFetch;
   });
 
   it('should handle action task type with wood gathering', async () => {
     // Mock successful bot connection and health
-    const mockFetch = global.fetch as any;
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -112,7 +115,6 @@ describe('Action Task Execution Fix', () => {
   });
 
   it('should handle action task type with crafting', async () => {
-    const mockFetch = global.fetch as any;
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -178,7 +180,6 @@ describe('Action Task Execution Fix', () => {
   });
 
   it('should handle action task type with default exploration fallback', async () => {
-    const mockFetch = global.fetch as any;
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -237,7 +238,6 @@ describe('Action Task Execution Fix', () => {
   });
 
   it('should handle minecraft interface errors gracefully', async () => {
-    const mockFetch = global.fetch as any;
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -302,7 +302,6 @@ describe('Action Task Execution Fix', () => {
   });
 
   it('should detect bot disconnection and return appropriate error', async () => {
-    const mockFetch = global.fetch as any;
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>

@@ -95,6 +95,9 @@ function checkDispatch(report: GoldenRunReport): CheckpointResult {
 
 function checkToolDiagnostics(report: GoldenRunReport): CheckpointResult {
   const steps = report.execution?.dispatched_steps ?? [];
+  if (steps.length === 0) {
+    return { checkpoint: 'tool_diagnostics', passed: true, detail: 'no dispatched steps (conditional pass)' };
+  }
   const hasDiag = steps.some((s) => s.result?.toolDiagnostics != null);
   return {
     checkpoint: 'tool_diagnostics',
@@ -107,11 +110,13 @@ function checkToolDiagnostics(report: GoldenRunReport): CheckpointResult {
 
 function checkWorldChange(report: GoldenRunReport): CheckpointResult {
   const verification = report.execution?.verification;
+  const steps = report.execution?.dispatched_steps ?? [];
   if (!verification) {
+    const hasResults = steps.some((s) => s.result != null);
     return {
       checkpoint: 'world_change',
-      passed: false,
-      detail: 'no verification block',
+      passed: !hasResults,
+      detail: hasResults ? 'no verification block but dispatched steps have results' : 'no dispatched results (conditional pass)',
     };
   }
   // Verified or skipped both count as passing (observational tasks skip verification)

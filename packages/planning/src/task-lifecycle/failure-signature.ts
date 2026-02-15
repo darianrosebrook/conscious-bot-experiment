@@ -23,12 +23,16 @@ import { createHash } from 'node:crypto';
  * - executor_error: Executor-level failure (guard pipeline, dispatch)
  * - tool_failure: MC interface tool returned ok=false
  * - prereq_exhausted: Prerequisite injection cap reached
+ * - task_terminal: Task lifecycle reached 'failed' state (catch-all terminal surface)
+ * - dedup_repeat: Dedup suppression prevented a repeated task (phantom failure for LoopBreaker)
  */
 export type FailureCategory =
   | 'expansion_blocked'
   | 'executor_error'
   | 'tool_failure'
-  | 'prereq_exhausted';
+  | 'prereq_exhausted'
+  | 'task_terminal'
+  | 'dedup_repeat';
 
 export interface FailureSignatureV1 {
   _schema: 'failure_signature_v1';

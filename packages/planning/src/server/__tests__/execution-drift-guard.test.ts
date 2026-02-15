@@ -21,7 +21,11 @@ const COGNITION_SRC = path.resolve(PACKAGES_ROOT, 'cognition/src');
 
 /** Returns true if `p` is an existing directory. */
 function isDirectory(p: string): boolean {
-  try { return fs.statSync(p).isDirectory(); } catch { return false; }
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -35,12 +39,12 @@ function scanFiles(
   dir: string,
   ext: string,
   pattern: RegExp,
-  excludePatterns: string[] = [],
+  excludePatterns: string[] = []
 ): { file: string; line: number; text: string }[] {
   if (!isDirectory(dir)) {
     throw new Error(
       `scanFiles: not a directory (or does not exist): ${dir}\n` +
-      `This drift guard is fail-closed — if the directory moved, update the path constant.`
+        `This drift guard is fail-closed — if the directory moved, update the path constant.`
     );
   }
 
@@ -51,7 +55,8 @@ function scanFiles(
     for (const entry of entries) {
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
+        if (entry.name === 'node_modules' || entry.name === '__tests__')
+          continue;
         walk(full);
       } else if (entry.isFile() && entry.name.endsWith(ext)) {
         const rel = path.relative(PLANNING_SRC, full);
@@ -76,9 +81,18 @@ describe('Execution Drift Guard', () => {
   // If any of these fail, a path refactor broke the guard and all downstream
   // scans would silently pass against nothing. Fix the path constants above.
   it('scan roots are directories on disk', () => {
-    expect(isDirectory(PLANNING_SRC), `PLANNING_SRC not a directory: ${PLANNING_SRC}`).toBe(true);
-    expect(isDirectory(MC_INTERFACE_SRC), `MC_INTERFACE_SRC not a directory: ${MC_INTERFACE_SRC}`).toBe(true);
-    expect(isDirectory(COGNITION_SRC), `COGNITION_SRC not a directory: ${COGNITION_SRC}`).toBe(true);
+    expect(
+      isDirectory(PLANNING_SRC),
+      `PLANNING_SRC not a directory: ${PLANNING_SRC}`
+    ).toBe(true);
+    expect(
+      isDirectory(MC_INTERFACE_SRC),
+      `MC_INTERFACE_SRC not a directory: ${MC_INTERFACE_SRC}`
+    ).toBe(true);
+    expect(
+      isDirectory(COGNITION_SRC),
+      `COGNITION_SRC not a directory: ${COGNITION_SRC}`
+    ).toBe(true);
   });
 
   it('no direct fetch(/action) calls outside gateway in planning/src', () => {
@@ -94,8 +108,8 @@ describe('Execution Drift Guard', () => {
         .join('\n');
       expect.fail(
         `Found direct fetch(/action) calls outside the ExecutionGateway.\n` +
-        `All /action calls must go through executeViaGateway().\n` +
-        `Violations:\n${msg}`
+          `All /action calls must go through executeViaGateway().\n` +
+          `Violations:\n${msg}`
       );
     }
   });
@@ -112,8 +126,8 @@ describe('Execution Drift Guard', () => {
         .join('\n');
       expect.fail(
         `Found direct mcPostJson('/action') calls outside the ExecutionGateway.\n` +
-        `All /action calls must go through executeViaGateway().\n` +
-        `Violations:\n${msg}`
+          `All /action calls must go through executeViaGateway().\n` +
+          `Violations:\n${msg}`
       );
     }
   });
@@ -136,12 +150,15 @@ describe('Execution Drift Guard', () => {
 
     if (hits.length > 0) {
       const msg = hits
-        .map((h) => `  ${path.relative(MC_INTERFACE_SRC, '')}/${h.file}:${h.line}: ${h.text}`)
+        .map(
+          (h) =>
+            `  ${path.relative(MC_INTERFACE_SRC, '')}/${h.file}:${h.line}: ${h.text}`
+        )
         .join('\n');
       expect.fail(
         `Found new ActionTranslator() outside allowed modules.\n` +
-        `ActionTranslator must be obtained via getActionTranslator() singleton.\n` +
-        `Violations:\n${msg}`
+          `ActionTranslator must be obtained via getActionTranslator() singleton.\n` +
+          `Violations:\n${msg}`
       );
     }
   });
@@ -176,8 +193,8 @@ describe('Execution Drift Guard', () => {
         .join('\n');
       expect.fail(
         `Found direct fetch(/action) calls in cognition package.\n` +
-        `Cognition must route actions through the planning service, not MC interface.\n` +
-        `Violations:\n${msg}`
+          `Cognition must route actions through the planning service, not MC interface.\n` +
+          `Violations:\n${msg}`
       );
     }
   });
@@ -203,8 +220,8 @@ describe('Execution Drift Guard', () => {
         .join('\n');
       expect.fail(
         `Found pathfinder.goto() outside allowed files.\n` +
-        `Navigation must go through ActionTranslator.withNavLease() or executeNavigate().\n` +
-        `Violations:\n${msg}`
+          `Navigation must go through ActionTranslator.withNavLease() or executeNavigate().\n` +
+          `Violations:\n${msg}`
       );
     }
   });
@@ -243,18 +260,19 @@ describe('Execution Drift Guard', () => {
         .join('\n');
       expect.fail(
         `Found bare pathfinder.goto() in action-translator.ts not inside withNavLease().\n` +
-        `All pathfinder.goto() calls must be wrapped in withNavLease() to enforce the navigation lease.\n` +
-        `Violations:\n${msg}`
+          `All pathfinder.goto() calls must be wrapped in withNavLease() to enforce the navigation lease.\n` +
+          `Violations:\n${msg}`
       );
     }
   });
 
-  it('action-translator.ts has exactly 5 pathfinder.goto() calls (count ratchet)', () => {
+  it('action-translator.ts has exactly 7 pathfinder.goto() calls (count ratchet)', () => {
     // Complements the proximity heuristic: the heuristic catches ungated gotos,
     // this count lock catches "new goto added at all." If you legitimately add a
     // new goto, update this count AND ensure the proximity test passes (i.e. it's
     // inside withNavLease).
-    const EXPECTED_GOTO_COUNT = 5;
+    // 5 original + 2 for explore-for-resources block pathing (perception + spiral)
+    const EXPECTED_GOTO_COUNT = 7;
     const filePath = path.join(MC_INTERFACE_SRC, 'action-translator.ts');
     const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
     // Match the full call-site pattern (this.bot.pathfinder.goto) on non-comment lines
@@ -282,7 +300,8 @@ describe('Execution Drift Guard', () => {
 
     // Pattern: raw executeViaGateway({ origin: 'executor' ... }) calls
     // These should only exist inside executeActionWithBotCheck
-    const pattern = /executeViaGateway\s*\(\s*\{[^}]*origin:\s*['"]executor['"]/;
+    const pattern =
+      /executeViaGateway\s*\(\s*\{[^}]*origin:\s*['"]executor['"]/;
 
     // Count matches that are NOT inside the executeActionWithBotCheck function
     let outsideWrapperCount = 0;
@@ -300,7 +319,11 @@ describe('Execution Drift Guard', () => {
         insideWrapper = false;
       }
 
-      if (pattern.test(line) && !insideWrapper && !line.trimStart().startsWith('//')) {
+      if (
+        pattern.test(line) &&
+        !insideWrapper &&
+        !line.trimStart().startsWith('//')
+      ) {
         outsideWrapperCount++;
       }
     }
@@ -320,7 +343,8 @@ describe('Execution Drift Guard', () => {
 
       const content = fs.readFileSync(filePath, 'utf-8');
       // Pattern: raw executeViaGateway({ origin: 'reactive' ... }) calls
-      const pattern = /executeViaGateway\s*\(\s*\{[^}]*origin:\s*['"]reactive['"]/g;
+      const pattern =
+        /executeViaGateway\s*\(\s*\{[^}]*origin:\s*['"]reactive['"]/g;
       const matches = content.match(pattern) || [];
 
       expect(matches.length).toBe(0);

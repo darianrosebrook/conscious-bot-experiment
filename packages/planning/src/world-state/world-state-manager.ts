@@ -101,7 +101,9 @@ export class WorldStateManager extends EventEmitter {
       }
       const json = (await res.json()) as any;
       const data = json?.data || {};
-      const worldState = data.worldState || {};
+      // Minecraft interface puts worldState at top level (json.worldState), not inside data
+      const worldState = json?.worldState || data?.worldState || {};
+      const environment = worldState.environment || {};
       const player = worldState.player || {};
       // Minecraft interface /state returns inventory at data.data.inventory (object with .items) or data.data.inventory as array
       const nested = data.data as
@@ -132,13 +134,22 @@ export class WorldStateManager extends EventEmitter {
         agentHealth: data.health ?? inner?.health ?? player.health,
         inventory: inv,
         nearbyEntities: worldState.nearbyEntities || [],
-        timeOfDay: worldState.timeOfDay,
-        weather: worldState.weather,
+        timeOfDay: worldState.timeOfDay ?? environment.timeOfDay,
+        weather: worldState.weather ?? environment.weather,
         dimension: player.dimension || worldState.dimension,
-        biome: worldState.biome,
-        biomeTemperature: worldState.biomeTemperature ?? data.biomeTemperature,
-        biomeHumidity: worldState.biomeHumidity ?? data.biomeHumidity,
-        biomeCategory: worldState.biomeCategory ?? data.biomeCategory,
+        biome: environment.biome ?? worldState.biome ?? data.biome,
+        biomeTemperature:
+          environment.biomeTemperature ??
+          worldState.biomeTemperature ??
+          data.biomeTemperature,
+        biomeHumidity:
+          environment.biomeHumidity ??
+          worldState.biomeHumidity ??
+          data.biomeHumidity,
+        biomeCategory:
+          environment.biomeCategory ??
+          worldState.biomeCategory ??
+          data.biomeCategory,
         dangerLevel: 0, // Calculate based on environment
       };
 

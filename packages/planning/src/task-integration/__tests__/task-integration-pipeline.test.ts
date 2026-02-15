@@ -91,6 +91,8 @@ import type { Task } from '../../types/task';
 import type { RigGMetadata } from '../../constraints/execution-advisor';
 import type { RigGSignals } from '../../constraints/partial-order-plan';
 import { createMockSterlingService } from '../../sterling/__tests__/mock-sterling-service';
+import { MinecraftToolProgressionSolver } from '../../sterling/minecraft-tool-progression-solver';
+import type { SterlingReasoningService } from '../../sterling/sterling-reasoning-service';
 import * as stepOptionANormalizer from '../../modules/step-option-a-normalizer';
 
 // ---------------------------------------------------------------------------
@@ -2029,6 +2031,71 @@ describe('Task origin envelope', () => {
     expect(created.metadata.sterling?.committedIrDigest).toBe('deadbeef');
     expect(created.metadata.sterling?.envelopeId).toBe('env_123');
     expect(created.metadata.solver?.rigGChecked).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Epistemic flow: tool_progression needsBlocks -> explore_for_resources
+// ---------------------------------------------------------------------------
+// Verifies addTask with tool_progression + empty nearbyBlocks produces
+// explore_for_resources step (needsBlocks epistemic loop).
+describe('Epistemic flow: tool_progression needsBlocks', () => {
+  let ti: TaskIntegration;
+
+  beforeEach(() => {
+    ti = new TaskIntegration({
+      enableRealTimeUpdates: false,
+      enableProgressTracking: false,
+      enableTaskStatistics: false,
+      enableTaskHistory: false,
+    });
+    const mockSterling: SterlingReasoningService = {
+      isAvailable: vi.fn().mockReturnValue(true),
+      solve: vi.fn(),
+      getConnectionNonce: vi.fn().mockReturnValue(1),
+      registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      destroy: vi.fn(),
+      getHealthStatus: vi.fn().mockReturnValue({ enabled: true }),
+      verifyReachability: vi.fn(),
+      queryKnowledgeGraph: vi.fn(),
+      withFallback: vi.fn(),
+    } as unknown as SterlingReasoningService;
+    ti.registerSolver(new MinecraftToolProgressionSolver(mockSterling));
+  });
+
+  it('addTask with empty nearbyBlocks emits explore_for_resources step', async () => {
+    const task = await ti.addTask({
+      title: 'Get stone pickaxe',
+      description: 'Tool progression test',
+      type: 'tool_progression',
+      priority: 0.5,
+      urgency: 0.3,
+      source: 'epistemic_flow_test',
+      parameters: {
+        requirementCandidate: {
+          kind: 'tool_progression',
+          targetTool: 'stone_pickaxe',
+          toolType: 'pickaxe',
+          targetTier: 'stone',
+          quantity: 1,
+        },
+      },
+      metadata: {
+        category: 'tool_progression',
+        currentState: {
+          inventory: [{ name: 'wooden_pickaxe', count: 1 }],
+          nearbyBlocks: [],
+          nearbyEntities: [],
+        },
+      } as Task['metadata'],
+    });
+
+    expect(task.steps).toHaveLength(1);
+    expect(task.steps[0].meta?.leaf).toBe('explore_for_resources');
+    const args = task.steps[0].meta?.args as Record<string, unknown>;
+    expect(args?.resource_tags).toEqual(['stone']);
+    expect(args?.goal_item).toBe('stone_pickaxe');
   });
 });
 

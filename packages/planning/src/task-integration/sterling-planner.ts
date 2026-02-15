@@ -41,6 +41,15 @@ export interface SterlingPlannerOptions {
     path: string,
     opts?: { timeout?: number }
   ) => Promise<Response>;
+  /** Optional HTTP post for world service (path, body, opts) => Response.
+   *  When wired, fetchBotContext merges perception-observed block types into
+   *  nearbyBlockCounts so the solver sees what the bot has *looked at*, not
+   *  just an omniscient 8-block radius cube scan. */
+  worldPost?: (
+    path: string,
+    body: unknown,
+    opts?: { timeout?: number }
+  ) => Promise<Response>;
 }
 
 /** Returns the single goal item string for acquisition solver from a TaskRequirement. */
@@ -110,6 +119,15 @@ function deriveLeafArgs(
         ...((meta as any).args || {}),
       };
     }
+    case 'explore_for_resources': {
+      const args = (meta as any).args;
+      if (args && typeof args === 'object') return args;
+      return {
+        resource_tags: meta.resource_tags,
+        goal_item: meta.goal_item,
+        reason: meta.reason,
+      };
+    }
     default:
       return undefined;
   }
@@ -124,6 +142,7 @@ function ensureSolverMeta(taskData: Partial<Task>): NonNullable<NonNullable<Task
 
 export class SterlingPlanner {
   private readonly minecraftGet: SterlingPlannerOptions['minecraftGet'];
+  private readonly worldPost: SterlingPlannerOptions['worldPost'];
   private readonly solverRegistry = new Map<string, BaseDomainSolver>();
   private _mcDataCache: any = null;
 
@@ -136,6 +155,7 @@ export class SterlingPlanner {
 
   constructor(options: SterlingPlannerOptions) {
     this.minecraftGet = options.minecraftGet;
+    this.worldPost = options.worldPost;
   }
 
   /**
@@ -353,18 +373,65 @@ export class SterlingPlanner {
   async fetchBotContext(): Promise<{
     inventory: any[];
     nearbyBlocks: any[];
+    nearbyBlockCounts: Record<string, number>;
+    nearbyBlocksKnown: boolean;
+    biome: string | undefined;
     _unavailable?: boolean;
   }> {
+    const unavailable = { inventory: [], nearbyBlocks: [], nearbyBlockCounts: {}, nearbyBlocksKnown: false, biome: undefined, _unavailable: true as const };
     try {
       const stateRes = await this.minecraftGet('/state').catch(() => null);
-      if (!stateRes?.ok)
-        return { inventory: [], nearbyBlocks: [], _unavailable: true };
+      if (!stateRes?.ok) return unavailable;
       const stateData = (await stateRes.json()) as any;
       const inventory = stateData?.data?.data?.inventory?.items || [];
       const nearbyBlocks = stateData?.data?.worldState?.nearbyBlocks || [];
-      return { inventory, nearbyBlocks };
+      const blockSummary = stateData?.data?.worldState?.nearbyBlockSummary;
+      const nearbyBlockCounts: Record<string, number> = { ...(blockSummary?.counts ?? {}) };
+      const nearbyBlocksKnown: boolean = blockSummary?.known ?? false;
+      const biome: string | undefined = stateData?.data?.worldState?.environment?.biome
+        ?? stateData?.data?.data?.biome;
+
+      // Merge vision-observed blocks from the world perception system.
+      // The cubic scan only sees 8 blocks; vision raycasts see 50+ blocks
+      // in the bot's field of view (with occlusion discipline — no cheating).
+      if (this.worldPost) {
+        try {
+          const position = stateData?.data?.position ?? stateData?.data?.data?.position;
+          if (position) {
+            const perceptionRes = await this.worldPost(
+              '/api/perception/visual-field',
+              { position, maxDistance: 50 },
+              { timeout: 2000 },
+            ).catch(() => null);
+            if (perceptionRes?.ok) {
+              const perceptionData = (await perceptionRes.json()) as any;
+              const observations: any[] = perceptionData?.observations ?? [];
+              for (const obs of observations) {
+                const name = obs?.name;
+                if (name && typeof name === 'string' && obs.type === 'block') {
+                  // Vision-observed blocks contribute to nearbyBlockCounts.
+                  // Use count=1 as a floor — the cubic scan may have a higher
+                  // count for truly adjacent blocks, and we don't overwrite that.
+                  if (!nearbyBlockCounts[name]) {
+                    nearbyBlockCounts[name] = 1;
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          // Non-critical: vision augmentation is best-effort
+        }
+      }
+
+      // Test override: force empty nearbyBlocks to exercise needsBlocks -> explore_for_resources
+      if (process.env.TEST_EMPTY_NEARBY_BLOCKS === '1') {
+        return { inventory, nearbyBlocks: [], nearbyBlockCounts: {}, nearbyBlocksKnown: true, biome };
+      }
+
+      return { inventory, nearbyBlocks, nearbyBlockCounts, nearbyBlocksKnown, biome };
     } catch {
-      return { inventory: [], nearbyBlocks: [], _unavailable: true };
+      return unavailable;
     }
   }
 
@@ -684,7 +751,43 @@ export class SterlingPlanner {
       solverMeta.searchEdgeCollisions = result.searchEdgeCollisions;
     }
 
-    if (!result.solved) return [];
+    if (!result.solved) {
+      if (result.needsBlocks && result.needsBlocks.missingBlocks.length > 0) {
+        const missingBlocks = result.needsBlocks.missingBlocks;
+        const now = Date.now();
+        const exploreStep: TaskStep = {
+          id: `step-${now}-explore`,
+          label: `Leaf: minecraft.explore_for_resources (resource_tags=[${missingBlocks.join(',')}])`,
+          done: false,
+          order: 1,
+          estimatedDuration: 30000,
+          meta: {
+            domain: 'tool_progression',
+            leaf: 'explore_for_resources',
+            args: {
+              resource_tags: missingBlocks,
+              goal_item: targetTool,
+              reason: 'needs_blocks',
+            },
+            source: 'sterling',
+            solverId: SOLVER_IDS.TOOL_PROGRESSION,
+            executable: true,
+          },
+        };
+        const enrichedMeta: Record<string, unknown> = {
+          ...exploreStep.meta,
+          source: 'sterling',
+          solverId: this.toolProgressionSolver!.solverId,
+          planId: result.planId,
+          bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+          executable: true,
+        };
+        const args = deriveLeafArgs(enrichedMeta);
+        if (args) enrichedMeta.args = args;
+        return [{ ...exploreStep, meta: enrichedMeta }];
+      }
+      return [];
+    }
 
     const steps = this.toolProgressionSolver.toTaskSteps(result);
     return steps.map((s) => {

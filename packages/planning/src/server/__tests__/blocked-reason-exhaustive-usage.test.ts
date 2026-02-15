@@ -59,6 +59,12 @@ const SEPARATE_TAXONOMY_REASONS: Record<string, { taxonomy: string; definedIn: s
     taxonomy: 'FeatureFlag',
     definedIn: 'golden-run-recorder.ts',
   },
+
+  // modular-server.ts executor action validation (invalid leaf args)
+  blocked_invalid_action_args: {
+    taxonomy: 'ExecutorActionValidation',
+    definedIn: 'planning/src/modular-server.ts',
+  },
 };
 
 // ============================================================================

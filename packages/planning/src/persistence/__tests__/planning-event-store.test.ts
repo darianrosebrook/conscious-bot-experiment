@@ -1,14 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mock pg before any imports ───────────────────────────────────────
-const mockPoolQuery = vi.fn();
-const mockPoolConnectClient = { query: vi.fn(), release: vi.fn() };
-const mockPoolConnect = vi.fn();
-const mockPoolEnd = vi.fn();
-
-const mockClientConnect = vi.fn();
-const mockClientQuery = vi.fn();
-const mockClientEnd = vi.fn();
+// vi.hoisted ensures mocks exist when the mock factory runs (hoisting order).
+const {
+  mockPoolQuery,
+  mockPoolConnectClient,
+  mockPoolConnect,
+  mockPoolEnd,
+  mockClientConnect,
+  mockClientQuery,
+  mockClientEnd,
+} = vi.hoisted(() => {
+  const poolConnectClient = { query: vi.fn(), release: vi.fn() };
+  return {
+    mockPoolQuery: vi.fn(),
+    mockPoolConnectClient: poolConnectClient,
+    mockPoolConnect: vi.fn(),
+    mockPoolEnd: vi.fn(),
+    mockClientConnect: vi.fn(),
+    mockClientQuery: vi.fn(),
+    mockClientEnd: vi.fn(),
+  };
+});
 
 vi.mock('pg', () => ({
   Pool: vi.fn().mockImplementation(() => ({

@@ -6,12 +6,16 @@
  * - Steps are tagged with source: 'rig-d-acquisition'
  * - Falls through to compiler when acquisition solver not registered
  * - Falls through to compiler when acquisition solver returns no steps
+ * - needsBlocks from tool progression emits explore_for_resources step
  * - Leaf arg contracts for interact_with_entity and open_container
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateLeafArgs, KNOWN_LEAVES } from '../leaf-arg-contracts';
 import { SterlingPlanner } from '../../task-integration/sterling-planner';
+import { MinecraftToolProgressionSolver } from '../../sterling/minecraft-tool-progression-solver';
+import { SOLVER_IDS } from '../../sterling/solver-ids';
+import type { SterlingReasoningService } from '../../sterling/sterling-reasoning-service';
 import type { Task } from '../../types/task';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -72,16 +76,60 @@ function makeMineTask(item: string, quantity = 1): Partial<Task> {
   };
 }
 
+function makeToolProgressionTask(
+  targetTool: string,
+  inventory: Array<{ name: string; count: number }>,
+  nearbyBlocks: string[]
+): Partial<Task> {
+  const { toolType, targetTier } = (() => {
+    const m = targetTool.match(
+      /^(wooden|stone|iron|diamond)_(pickaxe|axe|shovel|hoe|sword)$/
+    );
+    return m
+      ? { toolType: m[2], targetTier: m[1] }
+      : { toolType: 'pickaxe', targetTier: 'stone' };
+  })();
+  return {
+    id: 'test-tp-1',
+    title: `Get ${targetTool}`,
+    parameters: {
+      requirementCandidate: {
+        kind: 'tool_progression',
+        targetTool,
+        toolType,
+        targetTier,
+        quantity: 1,
+      },
+    },
+    metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 3,
+      childTaskIds: [],
+      tags: [],
+      category: 'tool_progression',
+      currentState: {
+        inventory,
+        nearbyBlocks,
+        nearbyEntities: [],
+      },
+    } as Task['metadata'],
+  };
+}
+
 /** Build a mock acquisition solver that returns solved result with steps. */
-function makeMockAcquisitionSolver(steps: Array<{ action: string; actionType: string }> = [
-  { action: 'mine:iron_ore', actionType: 'mine' },
-]) {
+function makeMockAcquisitionSolver(
+  steps: Array<{ action: string; actionType: string }> = [
+    { action: 'mine:iron_ore', actionType: 'mine' },
+  ]
+) {
   const solvedResult = {
     solved: true,
     planId: 'acq-plan-001',
     selectedStrategy: 'mine',
     candidateSetDigest: 'digest-abc123',
-    steps: steps.map(s => ({
+    steps: steps.map((s) => ({
       ...s,
       produces: [{ name: 'iron_ore', count: 1 }],
       consumes: [],
@@ -105,7 +153,7 @@ function makeMockAcquisitionSolver(steps: Array<{ action: string; actionType: st
           action: s.action,
           actionType: s.actionType,
         },
-      })),
+      }))
     ),
   };
 }
@@ -114,12 +162,15 @@ function makeMockAcquisitionSolver(steps: Array<{ action: string; actionType: st
 function makeMockMinecraftGet() {
   return vi.fn().mockResolvedValue({
     ok: true,
-    json: () => Promise.resolve({
-      data: {
-        data: { inventory: { items: [{ name: 'wooden_pickaxe', count: 1 }] } },
-        worldState: { nearbyBlocks: ['oak_log', 'stone'] },
-      },
-    }),
+    json: () =>
+      Promise.resolve({
+        data: {
+          data: {
+            inventory: { items: [{ name: 'wooden_pickaxe', count: 1 }] },
+          },
+          worldState: { nearbyBlocks: ['oak_log', 'stone'] },
+        },
+      }),
   });
 }
 
@@ -138,7 +189,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
     const solver = makeMockAcquisitionSolver();
     planner.registerSolver(solver as any);
 
-    const result = await planner.generateDynamicSteps(makeCollectTask('oak_log', 3));
+    const result = await planner.generateDynamicSteps(
+      makeCollectTask('oak_log', 3)
+    );
 
     expect(solver.solveAcquisition).toHaveBeenCalledOnce();
     expect(solver.toTaskSteps).toHaveBeenCalledOnce();
@@ -151,7 +204,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
     const solver = makeMockAcquisitionSolver();
     planner.registerSolver(solver as any);
 
-    const result = await planner.generateDynamicSteps(makeMineTask('iron_ore', 2));
+    const result = await planner.generateDynamicSteps(
+      makeMineTask('iron_ore', 2)
+    );
 
     expect(solver.solveAcquisition).toHaveBeenCalledOnce();
     expect(result.steps.length).toBeGreaterThan(0);
@@ -162,7 +217,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
     const solver = makeMockAcquisitionSolver();
     planner.registerSolver(solver as any);
 
-    const result = await planner.generateDynamicSteps(makeCollectTask('oak_log'));
+    const result = await planner.generateDynamicSteps(
+      makeCollectTask('oak_log')
+    );
 
     for (const step of result.steps) {
       expect(step.meta?.source).toBe('rig-d-acquisition');
@@ -173,7 +230,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
 
   it('falls through to compiler when acquisition solver not registered', async () => {
     // No solver registered — should go through compiler path
-    const result = await planner.generateDynamicSteps(makeCollectTask('oak_log', 3));
+    const result = await planner.generateDynamicSteps(
+      makeCollectTask('oak_log', 3)
+    );
 
     // Compiler produces fallback steps (acquire_material)
     expect(result.steps.length).toBeGreaterThan(0);
@@ -187,7 +246,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
     solver.toTaskSteps.mockReturnValue([]);
     planner.registerSolver(solver as any);
 
-    const result = await planner.generateDynamicSteps(makeCollectTask('oak_log', 3));
+    const result = await planner.generateDynamicSteps(
+      makeCollectTask('oak_log', 3)
+    );
 
     // Should fall through to compiler
     expect(solver.solveAcquisition).toHaveBeenCalledOnce();
@@ -201,7 +262,9 @@ describe('SterlingPlanner Rig D dispatch', () => {
     solver.solveAcquisition.mockRejectedValue(new Error('solver crashed'));
     planner.registerSolver(solver as any);
 
-    const result = await planner.generateDynamicSteps(makeCollectTask('oak_log', 3));
+    const result = await planner.generateDynamicSteps(
+      makeCollectTask('oak_log', 3)
+    );
 
     // Should fall through to compiler
     expect(result.steps.length).toBeGreaterThan(0);
@@ -228,6 +291,53 @@ describe('SterlingPlanner Rig D dispatch', () => {
 
     // Craft goes to Rig A, not Rig D — acquisition solver should NOT be called
     expect(solver.solveAcquisition).not.toHaveBeenCalled();
+  });
+});
+
+// ── needsBlocks to explore_for_resources (tool progression) ─────────────────
+
+describe('needsBlocks to explore_for_resources (tool progression)', () => {
+  let planner: SterlingPlanner;
+  let mockGet: ReturnType<typeof makeMockMinecraftGet>;
+
+  beforeEach(() => {
+    mockGet = makeMockMinecraftGet();
+    planner = new SterlingPlanner({ minecraftGet: mockGet });
+  });
+
+  it('when tool progression returns needsBlocks, emits one explore_for_resources step with resource_tags', async () => {
+    const mockSterling: SterlingReasoningService = {
+      isAvailable: vi.fn().mockReturnValue(true),
+      solve: vi.fn(),
+      getConnectionNonce: vi.fn().mockReturnValue(1),
+      registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      destroy: vi.fn(),
+      getHealthStatus: vi.fn().mockReturnValue({ enabled: true }),
+      verifyReachability: vi.fn(),
+      queryKnowledgeGraph: vi.fn(),
+      withFallback: vi.fn(),
+    } as unknown as SterlingReasoningService;
+    const solver = new MinecraftToolProgressionSolver(mockSterling);
+    planner.registerSolver(solver);
+
+    const task = makeToolProgressionTask(
+      'stone_pickaxe',
+      [{ name: 'wooden_pickaxe', count: 1 }],
+      [] // no stone nearby — triggers needsBlocks
+    );
+
+    const result = await planner.generateDynamicSteps(task);
+
+    expect(result.steps).toHaveLength(1);
+    const step = result.steps[0];
+    expect(step.meta?.leaf).toBe('explore_for_resources');
+    expect(step.meta?.args).toBeDefined();
+    const args = step.meta?.args as Record<string, unknown>;
+    expect(args.resource_tags).toEqual(['stone']);
+    expect(args.goal_item).toBe('stone_pickaxe');
+    expect(args.reason).toBe('needs_blocks');
+    expect(result.route?.requiredRig).toBe('B');
   });
 });
 

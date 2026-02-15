@@ -12,6 +12,8 @@ import type { CognitiveStreamThought } from '../modules/cognitive-stream-client'
 import type { ManagementResult, SterlingManagementAction } from './task-management-handler';
 import type { ReductionProvenance } from '@conscious-bot/cognition';
 import { logTaskIngestion } from '../task-lifecycle/task-ingestion-logger';
+import { buildFailureSignature } from '../task-lifecycle/failure-signature';
+import { getLoopBreaker } from '../task-lifecycle/loop-breaker';
 
 /**
  * Explicit decision state for task creation — makes "why nothing happened" visible.
@@ -27,6 +29,8 @@ export type TaskDecision =
   | 'dropped_not_executable'
   | 'dropped_missing_digest'
   | 'dropped_missing_schema_version'
+  | 'dropped_semantically_empty'
+  | 'dropped_no_goal_prop'
   | 'management_applied'
   | 'management_needs_disambiguation'
   | 'management_failed'
@@ -67,27 +71,159 @@ const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 const MAX_DIGEST_DEDUP_ENTRIES = 200;
 
 /**
- * Recently-failed task category cooldown.
+ * Recently-failed task category cooldown (P0-C: classified).
  *
  * Digest-level dedup doesn't prevent the idle→task→fail loop because each
  * Sterling reduction produces a unique committed_ir_digest. This cooldown
  * tracks task *categories* (idle-episode source + content prefix) so that
  * tasks that repeatedly fail as "unplannable" are suppressed for a cooldown
  * window before a new identical task can be created.
+ *
+ * P0-C: Cooldown TTL is now tiered by failure classification:
+ *   - transient: 5s (world state may change — mcData missing, solver unsolved)
+ *   - durable: 30s (contract broken, invalid IR — needs code/config change)
+ *   - nonsensical: 120s (goal is likely impossible — retries exhausted)
  */
-const recentFailedCategories = new Map<string, number>();
-const FAILED_CATEGORY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+export type FailureClassification = 'transient' | 'durable' | 'nonsensical';
+
+interface FailedCategoryEntry {
+  lastFailedAt: number;
+  classification: FailureClassification;
+  reasonCode?: string;
+}
+
+const recentFailedCategories = new Map<string, FailedCategoryEntry>();
+
+/** Tiered TTLs by failure classification. */
+const COOLDOWN_TTL_MS: Record<FailureClassification, number> = {
+  transient:   5_000,   // 5s — world state may have changed
+  durable:     30_000,  // 30s — same as legacy default
+  nonsensical: 120_000, // 2min — goal is likely impossible
+};
+
+/** Longest possible TTL — used for pruning. */
+const MAX_COOLDOWN_TTL_MS = COOLDOWN_TTL_MS.nonsensical;
+
+/**
+ * Minimal blocked-reason classification table.
+ *
+ * Replicated from BLOCKED_REASON_REGISTRY in task-block-evaluator.ts to avoid
+ * import cycles. The tripwire test in category-cooldown-classification.test.ts
+ * asserts this map covers all registry keys.
+ */
+const BLOCKED_REASON_CLASSIFICATION: Record<string, FailureClassification> = {
+  // Transient — infrastructure/world will change
+  blocked_digest_unknown: 'transient',
+  blocked_executor_unavailable: 'transient',
+  blocked_executor_error: 'transient',
+  rig_e_solver_unimplemented: 'transient',
+  unresolved_intents: 'transient',
+  blocked_intent_resolution_unavailable: 'transient',
+  blocked_unresolved_intents: 'transient',
+  blocked_navigation_context_unavailable: 'transient',
+  blocked_resource_context_unavailable: 'transient',
+  blocked_crafting_context_unavailable: 'transient',
+  blocked_intent_resolution_failed: 'transient',
+  blocked_intent_resolution_error: 'transient',
+
+  // Durable — contract broken, needs code/config change
+  blocked_missing_digest: 'durable',
+  blocked_missing_schema_version: 'durable',
+  blocked_routing_disabled: 'durable',
+  blocked_invalid_steps_bundle: 'durable',
+  blocked_invalid_ir_bundle: 'durable',
+  blocked_envelope_id_mismatch: 'durable',
+  blocked_intent_resolution_disabled: 'durable',
+  blocked_undispatchable_steps: 'durable',
+  blocked_crafting_no_goal_item: 'durable',
+  no_mapped_action: 'durable',
+
+  // Nonsensical — already terminal
+  max_retries_exceeded: 'nonsensical',
+  expansion_retries_exhausted: 'nonsensical',
+
+  // Executor-managed — use durable as safe default
+  waiting_on_prereq: 'durable',
+  infra_error_tripped: 'transient',
+  shadow_mode: 'durable',
+  no_executable_plan: 'durable',
+};
+
+/**
+ * Classify a task failure for cooldown TTL selection.
+ *
+ * Precedence (P0-C):
+ *   1. toolDiagnostics.reason_code (closest to ground truth)
+ *   2. blockedReason from task metadata (expansion/executor classification)
+ *   3. noStepsReason from solver metadata (planning failure)
+ *   4. Default: durable
+ */
+export function classifyTaskFailure(task: { title?: string; metadata?: any }): FailureClassification {
+  const meta = (task.metadata ?? {}) as Record<string, unknown>;
+
+  // 1. toolDiagnostics.reason_code (post-P0-A, this is populated)
+  const lastDiagReason = meta.lastDiagReasonCode as string | undefined;
+  if (lastDiagReason) {
+    if (lastDiagReason === 'no_mcdata') return 'transient';
+    if (lastDiagReason === 'no_recipe_available') {
+      // Sub-classify using lastDiagDetail (stored by executor from toolDiagnostics)
+      const detail = meta.lastDiagDetail as Record<string, unknown> | undefined;
+      if (detail) {
+        // No workstation nearby but recipe requires one → transient (can place table)
+        if (detail.requires_workstation === true && detail.crafting_table_nearby === false) return 'transient';
+        // Missing inputs → transient (can acquire)
+        if ((detail.missing_inputs_count as number) > 0) return 'transient';
+      }
+      // Default for no_recipe_available without detail: transient (conservative)
+      return 'transient';
+    }
+    if (lastDiagReason === 'craft_timeout' || lastDiagReason === 'craft_aborted') return 'transient';
+    if (lastDiagReason === 'invalid_recipe_id' || lastDiagReason === 'unknown_item') return 'durable';
+  }
+
+  // 2. blockedReason from task metadata
+  const blockedReason = meta.blockedReason as string | undefined;
+  if (blockedReason) {
+    const mapped = BLOCKED_REASON_CLASSIFICATION[blockedReason];
+    if (mapped) return mapped;
+    // Parametric reasons (e.g., 'deterministic-failure:unknown_recipe')
+    if (blockedReason.startsWith('deterministic-failure:')) return 'durable';
+    if (blockedReason.startsWith('invalid_args:')) return 'durable';
+    if (blockedReason.startsWith('unknown-leaf:')) return 'durable';
+    if (blockedReason.startsWith('budget-exhausted:')) return 'nonsensical';
+  }
+
+  // 3. noStepsReason from solver metadata
+  const solverMeta = meta.solver as Record<string, unknown> | undefined;
+  const noStepsReason = solverMeta?.noStepsReason as string | undefined;
+  if (noStepsReason) {
+    if (noStepsReason === 'solver-unsolved') return 'transient';
+    if (noStepsReason === 'solver-error') return 'transient';
+    if (noStepsReason === 'no-requirement') return 'durable';
+    if (noStepsReason === 'unplannable') return 'durable';
+    if (noStepsReason === 'blocked-sentinel') return 'durable';
+    if (noStepsReason === 'compiler-empty') return 'durable';
+    if (noStepsReason === 'advisory-skip') return 'nonsensical';
+  }
+
+  // 4. Default: durable (safer to cool down longer than retry-storm)
+  return 'durable';
+}
 
 /** Call when a task transitions to unplannable/failed to register the cooldown. */
 export function registerFailedTaskCategory(task: { title?: string; metadata?: any }): void {
   const key = computeTaskCategoryKey(task);
-  if (key) recentFailedCategories.set(key, Date.now());
+  if (!key) return;
+  const classification = classifyTaskFailure(task);
+  const meta = (task.metadata ?? {}) as Record<string, unknown>;
+  const reasonCode = (meta.lastDiagReasonCode as string)
+    ?? (meta.blockedReason as string)
+    ?? ((meta.solver as Record<string, unknown> | undefined)?.noStepsReason as string)
+    ?? undefined;
+  recentFailedCategories.set(key, { lastFailedAt: Date.now(), classification, reasonCode });
 }
 
 function computeTaskCategoryKey(task: { title?: string; metadata?: any }): string | null {
-  // Use the source + a normalized prefix of the title as the category key.
-  // This groups "Idle episode (sterling executable)" tasks together regardless
-  // of their unique sterling digest.
   const source = task.metadata?.sterling?.dedupeNamespace ?? task.metadata?.category ?? 'unknown';
   const prefix = (task.title ?? '').slice(0, 60).toLowerCase().trim();
   if (!prefix) return null;
@@ -101,18 +237,66 @@ function isFailedCategoryCooldown(thought: CognitiveStreamThought): boolean {
   const source = reduction?.reducerResult?.schema_version ?? 'unknown';
   const key = `${source}:${prefix}`;
   const now = Date.now();
-  const lastFailed = recentFailedCategories.get(key);
-  if (lastFailed && now - lastFailed < FAILED_CATEGORY_COOLDOWN_MS) {
-    return true;
-  }
-  // Prune expired entries
+  const entry = recentFailedCategories.get(key);
+  if (!entry) return false;
+
+  const ttl = COOLDOWN_TTL_MS[entry.classification];
+  if (now - entry.lastFailedAt >= ttl) return false;
+
+  // Prune expired entries on occasional check
   if (recentFailedCategories.size > 50) {
-    for (const [k, ts] of recentFailedCategories) {
-      if (now - ts > FAILED_CATEGORY_COOLDOWN_MS) recentFailedCategories.delete(k);
+    pruneCooldownEntries();
+  }
+
+  return true;
+}
+
+/** Cooldown metrics for observability. */
+export function getCooldownMetrics(): {
+  size: number;
+  hitsByClassification: Record<FailureClassification, number>;
+} {
+  const now = Date.now();
+  const hits: Record<FailureClassification, number> = { transient: 0, durable: 0, nonsensical: 0 };
+  for (const entry of recentFailedCategories.values()) {
+    const ttl = COOLDOWN_TTL_MS[entry.classification];
+    if (now - entry.lastFailedAt < ttl) {
+      hits[entry.classification]++;
     }
   }
-  return false;
+  return { size: recentFailedCategories.size, hitsByClassification: hits };
 }
+
+/** Prune expired cooldown entries. Called from isFailedCategoryCooldown when map grows large. */
+function pruneCooldownEntries(): void {
+  const now = Date.now();
+  for (const [k, entry] of recentFailedCategories) {
+    const ttl = COOLDOWN_TTL_MS[entry.classification];
+    if (now - entry.lastFailedAt > ttl) {
+      recentFailedCategories.delete(k);
+    }
+  }
+}
+
+/**
+ * Reset all dedup/cooldown state. Test-only — prefixed with __ to signal intent.
+ * Replaces the random `runPrefix` workaround in E2E tests.
+ */
+export function __resetDedupStateForTests(): void {
+  recentDigestHashes.clear();
+  recentFailedCategories.clear();
+}
+
+/** Dedup metrics for observability. */
+export function getDedupMetrics(): { digestMapSize: number; categoryMapSize: number } {
+  return {
+    digestMapSize: recentDigestHashes.size,
+    categoryMapSize: recentFailedCategories.size,
+  };
+}
+
+/** Exported for tripwire test — maps blocked reason strings to classifications. */
+export const __BLOCKED_REASON_CLASSIFICATION_FOR_TESTS = BLOCKED_REASON_CLASSIFICATION;
 
 function isDigestDuplicate(digestKey: string): boolean {
   const now = Date.now();
@@ -230,6 +414,15 @@ function resolveReduction(thought: CognitiveStreamThought): {
   if (typeof result.schema_version !== 'string' || !result.schema_version) {
     return { ok: false, decision: 'dropped_missing_schema_version', reason: 'schema_version missing' };
   }
+  // Tighten IR commitment contract: reject bundles that will deterministically
+  // fail expansion. This prevents creating tasks that die immediately with
+  // blocked_invalid_ir_bundle, avoiding wasted lifecycle churn.
+  if (result.is_semantically_empty) {
+    return { ok: false, decision: 'dropped_semantically_empty', reason: 'IR is semantically empty (no propositions or goal)' };
+  }
+  if (!result.committed_goal_prop_id) {
+    return { ok: false, decision: 'dropped_no_goal_prop', reason: 'committed_goal_prop_id is null (expansion will fail without goal target)' };
+  }
   return { ok: true, decision: 'created', reason: 'sterling_executable', reduction };
 }
 
@@ -297,7 +490,15 @@ export async function convertThoughtToTask(
 
     const reductionCheck = resolveReduction(thought);
     if (!reductionCheck.ok) {
-      if (reductionCheck.decision === 'dropped_missing_schema_version') {
+      // Deterministic rejections: mark thought as processed to prevent retry churn.
+      // These checks (missing schema, empty IR, no goal prop) are structural failures
+      // that won't change on retry — the IR is committed and immutable.
+      const deterministic = new Set<TaskDecision>([
+        'dropped_missing_schema_version',
+        'dropped_semantically_empty',
+        'dropped_no_goal_prop',
+      ]);
+      if (deterministic.has(reductionCheck.decision)) {
         await deps.markThoughtAsProcessed(thought.id);
       }
       const r: ConvertThoughtResult = { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
@@ -338,6 +539,11 @@ export async function convertThoughtToTask(
     const schemaVersion = result.schema_version;
     const digestKey = `${schemaVersion}:${result.committed_ir_digest}`;
     if (isDigestDuplicate(digestKey)) {
+      // Treat dedup suppression as loop evidence — an attempted repetition
+      // that dedup prevented from becoming a task. Without this, LoopBreaker
+      // thresholds become unreachable when dedup prevents new taskIds.
+      const dedupSig = buildFailureSignature({ category: 'dedup_repeat', blockedReason: 'duplicate_digest' });
+      getLoopBreaker().recordFailure(dedupSig, { taskId: `dedup_phantom_${thought.id}` });
       const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `duplicate digest within ${DIGEST_DEDUP_WINDOW_MS / 1000}s window` };
       logConversionDecision(thought, r);
       return r;
@@ -347,7 +553,11 @@ export async function convertThoughtToTask(
     // as unplannable. This prevents the idle→task→fail loop where each
     // Sterling reduction is unique but the task semantics are identical.
     if (isFailedCategoryCooldown(thought)) {
-      const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (${FAILED_CATEGORY_COOLDOWN_MS / 1000}s cooldown)` };
+      // Same rationale as duplicate_digest above: category cooldown is a
+      // suppressed repetition that LoopBreaker must see to reach thresholds.
+      const cooldownSig = buildFailureSignature({ category: 'dedup_repeat', blockedReason: 'failed_category_cooldown' });
+      getLoopBreaker().recordFailure(cooldownSig, { taskId: `dedup_phantom_${thought.id}` });
+      const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (up to ${MAX_COOLDOWN_TTL_MS / 1000}s cooldown)` };
       logConversionDecision(thought, r);
       return r;
     }
@@ -402,7 +612,7 @@ export async function convertThoughtToTask(
     logConversionDecision(thought, r);
     return r;
   } catch (error) {
-    logTaskIngestion({ _diag_version: 1, source: 'thought_converter', decision: 'error', reason: error instanceof Error ? error.message : 'unknown', task_type: 'sterling_ir' });
+    logTaskIngestion({ _diag_version: 1, source: 'thought_converter', decision: 'error', reason: error instanceof Error ? error.constructor.name : 'unknown', task_type: 'sterling_ir' });
     console.error('Error converting thought to task:', error);
     const r: ConvertThoughtResult = { task: null, decision: 'error', reason: String(error) };
     logConversionDecision(thought, r);

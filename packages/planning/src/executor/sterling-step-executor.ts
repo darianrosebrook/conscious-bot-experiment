@@ -20,7 +20,11 @@ import { isDeterministicFailure } from '../server/task-action-resolver';
 import type { SterlingStepExecutorContext } from './sterling-step-executor.types';
 import { buildFailureSignature } from '../task-lifecycle/failure-signature';
 import { getLoopBreaker } from '../task-lifecycle/loop-breaker';
-import { extractDiagReasonCode, extractRetryHint } from '../golden-run-recorder';
+import {
+  extractDiagReasonCode,
+  extractRetryHint,
+  extractToolDiagnostics,
+} from '../golden-run-recorder';
 
 /** Backoff for deterministic blocks (planner/materializer must change). Eligibility logic respects nextEligibleAt. */
 const DETERMINISTIC_BLOCK_BACKOFF_MS = 300_000; // 5 minutes
@@ -68,17 +72,25 @@ export function unknownLeafReason(leafName: string): UnknownLeafReason {
 }
 
 /** Parametric reason: `deterministic-failure:${failureCode}` */
-export function deterministicFailureReason(failureCode: string): DeterministicFailureReason {
+export function deterministicFailureReason(
+  failureCode: string
+): DeterministicFailureReason {
   return `deterministic-failure:${failureCode}`;
 }
 
 /** Parametric reason: `budget-exhausted:time:${elapsed}>${max}` */
-export function budgetExhaustedTimeReason(elapsed: number, max: number): BudgetExhaustedTimeReason {
+export function budgetExhaustedTimeReason(
+  elapsed: number,
+  max: number
+): BudgetExhaustedTimeReason {
   return `${BLOCK_REASONS.BUDGET_EXHAUSTED_TIME}:${elapsed}>${max}`;
 }
 
 /** Parametric reason: `budget-exhausted:attempts:${attempts}>=${max}` */
-export function budgetExhaustedAttemptsReason(attempts: number, max: number): BudgetExhaustedAttemptsReason {
+export function budgetExhaustedAttemptsReason(
+  attempts: number,
+  max: number
+): BudgetExhaustedAttemptsReason {
   return `${BLOCK_REASONS.BUDGET_EXHAUSTED_ATTEMPTS}:${attempts}>=${max}`;
 }
 
@@ -87,7 +99,8 @@ export function budgetExhaustedAttemptsReason(attempts: number, max: number): Bu
 // ============================================================================
 
 /** Static block reasons from the BLOCK_REASONS registry. */
-export type ConstBlockReason = typeof BLOCK_REASONS[keyof typeof BLOCK_REASONS];
+export type ConstBlockReason =
+  (typeof BLOCK_REASONS)[keyof typeof BLOCK_REASONS];
 
 /** Parametric: `invalid-args:${string}` */
 export type InvalidArgsReason = `invalid-args:${string}`;
@@ -102,7 +115,8 @@ export type DeterministicFailureReason = `deterministic-failure:${string}`;
 export type BudgetExhaustedTimeReason = `budget-exhausted:time:${string}`;
 
 /** Parametric: `budget-exhausted:attempts:${string}` */
-export type BudgetExhaustedAttemptsReason = `budget-exhausted:attempts:${string}`;
+export type BudgetExhaustedAttemptsReason =
+  `budget-exhausted:attempts:${string}`;
 
 /** Parametric: `task_type_bridge_only_shadow:${string}` */
 export type TaskTypeBridgeReason = `task_type_bridge_only_shadow:${string}`;
@@ -264,15 +278,25 @@ function extractLeafReceipt(
       return null;
     case 'place_torch_if_needed':
       if (data.position)
-        return { position: data.position, torchPlaced: data.torchPlaced ?? false };
+        return {
+          position: data.position,
+          torchPlaced: data.torchPlaced ?? false,
+        };
       return null;
     case 'place_torch':
       if (data.position)
-        return { position: data.position, torchPlaced: data.torchPlaced ?? data.success ?? false };
+        return {
+          position: data.position,
+          torchPlaced: data.torchPlaced ?? data.success ?? false,
+        };
       return null;
     case 'place_workstation':
       if (data.position)
-        return { position: data.position, workstation: data.workstation, reused: data.reused };
+        return {
+          position: data.position,
+          workstation: data.workstation,
+          reused: data.reused,
+        };
       return null;
     default:
       return null;
@@ -302,9 +326,8 @@ export async function executeSterlingStep(
 ): Promise<void> {
   const stepId = String(nextStep.id || nextStep.order || 'unknown');
   const meta = (task.metadata ?? {}) as Record<string, unknown>;
-  const runId = (
-    (meta.goldenRun as Record<string, unknown> | undefined)
-  )?.runId as string | undefined;
+  const runId = (meta.goldenRun as Record<string, unknown> | undefined)
+    ?.runId as string | undefined;
 
   // Mark loop breaker as evaluated early — covers ALL paths (success + failure).
   // Individual failure paths still call recordLoopDetected/recordFailure as needed.
@@ -331,18 +354,22 @@ export async function executeSterlingStep(
 
   // Planning-incomplete: normalizer could not materialize Option A for at least one step (deterministic: condition does not clear without plan mutation). Check before leaf resolution so unknown-leaf steps also get backoff (no hot-loop).
   if ((task.metadata as Record<string, unknown>)?.planningIncomplete === true) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.PLANNING_INCOMPLETE,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.PLANNING_INCOMPLETE, {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
       const leafName = (nextStep.meta?.leaf as string) ?? 'unknown';
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.PLANNING_INCOMPLETE,
-        { leaf: leafName },
-        task.id
-      );
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.PLANNING_INCOMPLETE,
+          { leaf: leafName },
+          task.id
+        );
     }
     return;
   }
@@ -350,23 +377,27 @@ export async function executeSterlingStep(
   const leafExec = stepToLeafExecution(nextStep);
   if (!leafExec) {
     if (runId) {
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        'unknown_leaf',
-        { leaf: (nextStep.meta?.leaf as string) ?? 'unknown' },
-        task.id
-      );
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          'unknown_leaf',
+          { leaf: (nextStep.meta?.leaf as string) ?? 'unknown' },
+          task.id
+        );
     }
     return;
   }
 
   // ── Routing trace: log the dispatch chain for diagnostics ──
-  console.log(`[StepDispatch] task=${task.id} step=${nextStep.id ?? '?'} ` +
-    `planned_leaf=${(nextStep.meta?.leaf as string) ?? '?'} ` +
-    `resolved_leaf=${leafExec.leafName} ` +
-    `argsSource=${leafExec.argsSource} ` +
-    `args=${JSON.stringify(leafExec.args).slice(0, 200)}` +
-    (leafExec.originalLeaf ? ` original_leaf=${leafExec.originalLeaf}` : ''));
+  console.log(
+    `[StepDispatch] task=${task.id} step=${nextStep.id ?? '?'} ` +
+      `planned_leaf=${(nextStep.meta?.leaf as string) ?? '?'} ` +
+      `resolved_leaf=${leafExec.leafName} ` +
+      `argsSource=${leafExec.argsSource} ` +
+      `args=${JSON.stringify(leafExec.args).slice(0, 200)}` +
+      (leafExec.originalLeaf ? ` original_leaf=${leafExec.originalLeaf}` : '')
+  );
 
   const { config, leafAllowlist, mode } = ctx;
 
@@ -376,39 +407,48 @@ export async function executeSterlingStep(
     leafExec.originalLeaf &&
     !config.legacyLeafRewriteEnabled
   ) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.LEGACY_LEAF_REWRITE_DISABLED,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.LEGACY_LEAF_REWRITE_DISABLED, {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.LEGACY_LEAF_REWRITE_DISABLED,
-        { leaf: leafExec.leafName, original_leaf: leafExec.originalLeaf },
-        task.id
-      );
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.LEGACY_LEAF_REWRITE_DISABLED,
+          { leaf: leafExec.leafName, original_leaf: leafExec.originalLeaf },
+          task.id
+        );
     }
     return;
   }
 
   // Live mode: block derived args (Option A requires explicit executor-native args)
   if (mode === 'live' && leafExec.argsSource === 'derived') {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.DERIVED_ARGS_NOT_ALLOWED_LIVE,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.DERIVED_ARGS_NOT_ALLOWED_LIVE, {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
       const blockPayload: Record<string, unknown> = {
         leaf: leafExec.leafName,
         argsSource: leafExec.argsSource,
       };
-      if (leafExec.originalLeaf) blockPayload.original_leaf = leafExec.originalLeaf;
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.DERIVED_ARGS_NOT_ALLOWED_LIVE,
-        blockPayload,
-        task.id
-      );
+      if (leafExec.originalLeaf)
+        blockPayload.original_leaf = leafExec.originalLeaf;
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.DERIVED_ARGS_NOT_ALLOWED_LIVE,
+          blockPayload,
+          task.id
+        );
     }
     return;
   }
@@ -421,23 +461,28 @@ export async function executeSterlingStep(
     const inputSentinel =
       leafExec.leafName === 'smelt' && leafExec.args.input === SENTINEL_INPUT;
     if (recipeSentinel || inputSentinel) {
-      ctx.updateTaskMetadata(task.id, block(
-        BLOCK_REASONS.SENTINEL_ARGS_NOT_ALLOWED_LIVE,
-        { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-      ));
-      if (runId) {
-      const sentinelPayload: Record<string, unknown> = {
-        leaf: leafExec.leafName,
-        args: leafExec.args,
-        sentinel: recipeSentinel ? 'recipe' : 'input',
-      };
-      if (leafExec.originalLeaf) sentinelPayload.original_leaf = leafExec.originalLeaf;
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.SENTINEL_ARGS_NOT_ALLOWED_LIVE,
-        sentinelPayload,
-        task.id
+      ctx.updateTaskMetadata(
+        task.id,
+        block(BLOCK_REASONS.SENTINEL_ARGS_NOT_ALLOWED_LIVE, {
+          nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+        })
       );
+      if (runId) {
+        const sentinelPayload: Record<string, unknown> = {
+          leaf: leafExec.leafName,
+          args: leafExec.args,
+          sentinel: recipeSentinel ? 'recipe' : 'input',
+        };
+        if (leafExec.originalLeaf)
+          sentinelPayload.original_leaf = leafExec.originalLeaf;
+        ctx
+          .getGoldenRunRecorder()
+          .recordExecutorBlocked(
+            runId,
+            BLOCK_REASONS.SENTINEL_ARGS_NOT_ALLOWED_LIVE,
+            sentinelPayload,
+            task.id
+          );
       }
       return;
     }
@@ -453,21 +498,25 @@ export async function executeSterlingStep(
     let budgetDirty = created;
     const elapsed = now - (state.firstAt || now);
     if (elapsed > config.buildExecMaxElapsedMs) {
-      ctx.updateTaskMetadata(task.id, block(
-        `${BLOCK_REASONS.BUDGET_EXHAUSTED_TIME}:${leafExec.leafName}`
-      ));
+      ctx.updateTaskMetadata(
+        task.id,
+        block(`${BLOCK_REASONS.BUDGET_EXHAUSTED_TIME}:${leafExec.leafName}`)
+      );
       const runId = (
         (task.metadata as Record<string, unknown>)?.goldenRun as
           | Record<string, unknown>
           | undefined
       )?.runId as string | undefined;
       if (runId) {
-        ctx
-          .getGoldenRunRecorder()
-          .recordExecutorBlocked(runId, 'budget_exhausted', {
+        ctx.getGoldenRunRecorder().recordExecutorBlocked(
+          runId,
+          'budget_exhausted',
+          {
             leaf: leafExec.leafName,
             validation_error: `max_elapsed:${leafExec.leafName}`,
-          }, task.id);
+          },
+          task.id
+        );
       }
       ctx.emitExecutorBudgetEvent(
         task.id,
@@ -479,21 +528,25 @@ export async function executeSterlingStep(
       return;
     }
     if ((state.attempts ?? 0) >= config.buildExecMaxAttempts) {
-      ctx.updateTaskMetadata(task.id, block(
-        `${BLOCK_REASONS.BUDGET_EXHAUSTED_ATTEMPTS}:${leafExec.leafName}`
-      ));
+      ctx.updateTaskMetadata(
+        task.id,
+        block(`${BLOCK_REASONS.BUDGET_EXHAUSTED_ATTEMPTS}:${leafExec.leafName}`)
+      );
       const runId = (
         (task.metadata as Record<string, unknown>)?.goldenRun as
           | Record<string, unknown>
           | undefined
       )?.runId as string | undefined;
       if (runId) {
-        ctx
-          .getGoldenRunRecorder()
-          .recordExecutorBlocked(runId, 'budget_exhausted', {
+        ctx.getGoldenRunRecorder().recordExecutorBlocked(
+          runId,
+          'budget_exhausted',
+          {
             leaf: leafExec.leafName,
             validation_error: `max_attempts:${leafExec.leafName}`,
-          }, task.id);
+          },
+          task.id
+        );
       }
       ctx.emitExecutorBudgetEvent(
         task.id,
@@ -516,12 +569,15 @@ export async function executeSterlingStep(
           | undefined
       )?.runId as string | undefined;
       if (runId) {
-        ctx
-          .getGoldenRunRecorder()
-          .recordExecutorBlocked(runId, BLOCK_REASONS.RATE_LIMITED, {
+        ctx.getGoldenRunRecorder().recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.RATE_LIMITED,
+          {
             leaf: leafExec.leafName,
             validation_error: `min_interval:${delay}ms`,
-          }, task.id);
+          },
+          task.id
+        );
       }
       ctx.emitExecutorBudgetEvent(
         task.id,
@@ -547,10 +603,12 @@ export async function executeSterlingStep(
     true
   );
   if (validationError) {
-    ctx.updateTaskMetadata(task.id, block(
-      invalidArgsReason(validationError),
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(invalidArgsReason(validationError), {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     const runId = (
       (task.metadata as Record<string, unknown>)?.goldenRun as
         | Record<string, unknown>
@@ -562,13 +620,11 @@ export async function executeSterlingStep(
         args: leafExec.args,
         validation_error: validationError,
       };
-      if (leafExec.originalLeaf) invalidPayload.original_leaf = leafExec.originalLeaf;
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        'invalid_args',
-        invalidPayload,
-        task.id
-      );
+      if (leafExec.originalLeaf)
+        invalidPayload.original_leaf = leafExec.originalLeaf;
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(runId, 'invalid_args', invalidPayload, task.id);
     }
     return;
   }
@@ -583,7 +639,10 @@ export async function executeSterlingStep(
       for (const input of recipeInfo.inputs) {
         const have = ctx.getCount(inv, input.item);
         if (have < input.count) {
-          const injected = await ctx.injectDynamicPrereqForCraft(task);
+          const injected = await ctx.injectDynamicPrereqForCraft(task, {
+            recipe: leafExec.args.recipe as string,
+            qty: (leafExec.args.qty as number) || 1,
+          });
           if (injected) return;
           break;
         }
@@ -598,10 +657,12 @@ export async function executeSterlingStep(
       (nextStep.meta as Record<string, unknown>).executable = false;
       (nextStep.meta as Record<string, unknown>).blocked = true;
     }
-    ctx.updateTaskMetadata(task.id, block(
-      unknownLeafReason(leafExec.leafName),
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(unknownLeafReason(leafExec.leafName), {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     ctx.emit('taskLifecycleEvent', {
       type: 'unknown_leaf_rejected',
       taskId: task.id,
@@ -617,13 +678,11 @@ export async function executeSterlingStep(
         leaf: leafExec.leafName,
         args: leafExec.args,
       };
-      if (leafExec.originalLeaf) unknownPayload.original_leaf = leafExec.originalLeaf;
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        'unknown_leaf',
-        unknownPayload,
-        task.id
-      );
+      if (leafExec.originalLeaf)
+        unknownPayload.original_leaf = leafExec.originalLeaf;
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(runId, 'unknown_leaf', unknownPayload, task.id);
     }
     return;
   }
@@ -632,10 +691,13 @@ export async function executeSterlingStep(
     config.taskTypeBridgeLeafNames.has(leafExec.leafName) &&
     (mode !== 'shadow' || !config.enableTaskTypeBridge)
   ) {
-    ctx.updateTaskMetadata(task.id, block(
-      `${BLOCK_REASONS.TASK_TYPE_BRIDGE_ONLY_SHADOW}:${leafExec.leafName}`,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(
+        `${BLOCK_REASONS.TASK_TYPE_BRIDGE_ONLY_SHADOW}:${leafExec.leafName}`,
+        { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
+      )
+    );
     const runId = (
       (task.metadata as Record<string, unknown>)?.goldenRun as
         | Record<string, unknown>
@@ -695,10 +757,12 @@ export async function executeSterlingStep(
     typeof leafExec.args !== 'object' ||
     Array.isArray(leafExec.args)
   ) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.INVALID_ARGS_PLAIN_OBJECT,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.INVALID_ARGS_PLAIN_OBJECT, {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     const runId = (
       (task.metadata as Record<string, unknown>)?.goldenRun as
         | Record<string, unknown>
@@ -720,27 +784,33 @@ export async function executeSterlingStep(
   }
 
   if (!ctx.canExecuteStep()) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.RATE_LIMITED,
-      { nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.RATE_LIMITED, {
+        nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.RATE_LIMITED,
-        { leaf: leafExec.leafName },
-        task.id
-      );
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.RATE_LIMITED,
+          { leaf: leafExec.leafName },
+          task.id
+        );
     }
     return;
   }
 
   const stepStarted = await ctx.startTaskStep(task.id, nextStep.id);
   if (!stepStarted) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.RIG_G_BLOCKED,
-      { nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.RIG_G_BLOCKED, {
+        nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
       ctx.getGoldenRunRecorder().recordExecutorBlocked(
         runId,
@@ -796,26 +866,31 @@ export async function executeSterlingStep(
     }
   }
 
-  const actionMeta = (actionResult as Record<string, unknown> | null | undefined)
-    ?.metadata as Record<string, unknown> | undefined;
+  const actionMeta = (
+    actionResult as Record<string, unknown> | null | undefined
+  )?.metadata as Record<string, unknown> | undefined;
   const noMappedAction = actionMeta?.reason === BLOCK_REASONS.NO_MAPPED_ACTION;
   if (noMappedAction) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.NO_MAPPED_ACTION,
-      { nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.NO_MAPPED_ACTION, {
+        nextEligibleAt: Date.now() + DETERMINISTIC_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
       const payload: Record<string, unknown> = {
         leaf: leafExec.leafName,
         args: leafExec.args,
       };
       if (leafExec.originalLeaf) payload.original_leaf = leafExec.originalLeaf;
-      ctx.getGoldenRunRecorder().recordExecutorBlocked(
-        runId,
-        BLOCK_REASONS.NO_MAPPED_ACTION,
-        payload,
-        task.id
-      );
+      ctx
+        .getGoldenRunRecorder()
+        .recordExecutorBlocked(
+          runId,
+          BLOCK_REASONS.NO_MAPPED_ACTION,
+          payload,
+          task.id
+        );
     }
     return;
   }
@@ -836,6 +911,18 @@ export async function executeSterlingStep(
           repositionRetryCount: undefined,
           lastRetryHint: undefined,
         });
+      }
+      // Replan after explore_for_resources so tool progression solver runs again
+      // with updated nearbyBlocks from the exploration.
+      if (leafExec.leafName === 'explore_for_resources') {
+        try {
+          await ctx.regenerateSteps(task.id, {
+            failedLeaf: 'explore_for_resources',
+            reasonClass: 'explore_completed',
+          });
+        } catch {
+          // Regeneration failure is non-fatal; task continues with existing steps
+        }
       }
     } else {
       // Smoke tasks with noRetry: skip verification and finalize immediately.
@@ -878,10 +965,12 @@ export async function executeSterlingStep(
 
   // Safety preemption: navigation was interrupted by an emergency — back off 30s (no retry).
   if (isSafetyPreemptedError(actionResult?.error)) {
-    ctx.updateTaskMetadata(task.id, block(
-      BLOCK_REASONS.SAFETY_PREEMPTED,
-      { nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS }
-    ));
+    ctx.updateTaskMetadata(
+      task.id,
+      block(BLOCK_REASONS.SAFETY_PREEMPTED, {
+        nextEligibleAt: Date.now() + TRANSIENT_BLOCK_BACKOFF_MS,
+      })
+    );
     if (runId) {
       ctx.getGoldenRunRecorder().recordExecutorBlocked(
         runId,
@@ -918,19 +1007,55 @@ export async function executeSterlingStep(
         code?: string;
       }
     )?.code;
+
+  // Extract diagnostic metadata for cooldown classification (P0-C sub-classification).
+  // Stores lastDiagReasonCode and lastDiagDetail in task metadata so classifyTaskFailure
+  // can differentiate e.g. no_recipe_available with/without workstation.
+  const _diagForMeta = (() => {
+    const diag = actionResult
+      ? extractToolDiagnostics(actionResult as Record<string, unknown>)
+      : undefined;
+    if (!diag) return {};
+    const detail: Record<string, unknown> = {};
+    if (diag.crafting_table_nearby != null)
+      detail.crafting_table_nearby = diag.crafting_table_nearby;
+    if (diag.requires_workstation != null)
+      detail.requires_workstation = diag.requires_workstation;
+    if (Array.isArray(diag.missing_inputs))
+      detail.missing_inputs_count = diag.missing_inputs.length;
+    return {
+      lastDiagReasonCode: diag.reason_code as string | undefined,
+      ...(Object.keys(detail).length > 0 ? { lastDiagDetail: detail } : {}),
+    };
+  })();
+
   if (isDeterministicFailure(failureCode)) {
     ctx.updateTaskMetadata(task.id, {
       ...block(deterministicFailureReason(failureCode!)),
       failureCode,
       failureError: actionResult?.error,
+      ..._diagForMeta,
     });
     // LoopBreaker: record tool deterministic failure (per-task final failure)
     {
       const diagReason = extractDiagReasonCode(actionResult);
-      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
-      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode: failureCode!, diagReasonCode: diagReason });
-      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
-      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      const targetParam =
+        ((leafExec.args as Record<string, unknown>)?.blockType as string) ??
+        ((leafExec.args as Record<string, unknown>)?.itemType as string);
+      const loopSig = buildFailureSignature({
+        category: 'tool_failure',
+        leaf: leafExec.leafName,
+        targetParam,
+        failureCode: failureCode!,
+        diagReasonCode: diagReason,
+      });
+      const episode = getLoopBreaker().recordFailure(loopSig, {
+        taskId: task.id,
+        runId,
+      });
+      if (episode && runId) {
+        ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode);
+      }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     await ctx.recomputeProgressAndMaybeComplete(task);
@@ -943,19 +1068,22 @@ export async function executeSterlingStep(
   const retryHint = extractRetryHint(actionResult);
   if (retryHint === 'reposition_or_rescan') {
     const repositionBackoffMs = 60_000; // 60s — gives movement/idle system time to reposition
-    const repositionRetries = ((task.metadata?.repositionRetryCount as number) || 0) + 1;
+    const repositionRetries =
+      ((task.metadata?.repositionRetryCount as number) || 0) + 1;
     const maxRepositionRetries = 3;
     if (repositionRetries >= maxRepositionRetries) {
       ctx.updateTaskMetadata(task.id, {
         ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
         retryCount: repositionRetries,
         lastRetryHint: retryHint,
+        ..._diagForMeta,
       });
       // LoopBreaker: record reposition exhaustion
       {
         const diagReason = extractDiagReasonCode(actionResult);
-        const targetParam = (leafExec.args as Record<string, unknown>)?.item as string
-          ?? (leafExec.args as Record<string, unknown>)?.blockType as string;
+        const targetParam =
+          ((leafExec.args as Record<string, unknown>)?.item as string) ??
+          ((leafExec.args as Record<string, unknown>)?.blockType as string);
         const loopSig = buildFailureSignature({
           category: 'tool_failure',
           leaf: leafExec.leafName,
@@ -963,15 +1091,20 @@ export async function executeSterlingStep(
           failureCode: failureCode ?? 'reposition_exhausted',
           diagReasonCode: diagReason,
         });
-        const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
-        if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+        const episode = getLoopBreaker().recordFailure(loopSig, {
+          taskId: task.id,
+          runId,
+        });
+        if (episode && runId) {
+          ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode);
+        }
       }
       ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
       return;
     }
     console.log(
       `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
-      `(attempt ${repositionRetries}/${maxRepositionRetries}) — backing off ${repositionBackoffMs}ms`
+        `(attempt ${repositionRetries}/${maxRepositionRetries}) — backing off ${repositionBackoffMs}ms`
     );
     ctx.updateTaskMetadata(task.id, {
       repositionRetryCount: repositionRetries,
@@ -991,7 +1124,13 @@ export async function executeSterlingStep(
   }
 
   if (leafExec.leafName === 'craft_recipe') {
-    const injected = await ctx.injectDynamicPrereqForCraft(task);
+    const injected = await ctx.injectDynamicPrereqForCraft(task, {
+      recipe: leafExec.args.recipe as string,
+      qty: (leafExec.args.qty as number) || 1,
+      toolDiagnostics: actionResult
+        ? extractToolDiagnostics(actionResult as Record<string, unknown>)
+        : undefined,
+    });
     if (injected) return;
   }
 
@@ -1012,14 +1151,28 @@ export async function executeSterlingStep(
     ctx.updateTaskMetadata(task.id, {
       ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
       ...failNoRegenPatch,
+      ..._diagForMeta,
     });
     // LoopBreaker: record smoke no-retry failure (per-task final failure)
     {
       const diagReason = extractDiagReasonCode(actionResult);
-      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
-      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
-      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
-      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      const targetParam =
+        ((leafExec.args as Record<string, unknown>)?.blockType as string) ??
+        ((leafExec.args as Record<string, unknown>)?.itemType as string);
+      const loopSig = buildFailureSignature({
+        category: 'tool_failure',
+        leaf: leafExec.leafName,
+        targetParam,
+        failureCode,
+        diagReasonCode: diagReason,
+      });
+      const episode = getLoopBreaker().recordFailure(loopSig, {
+        taskId: task.id,
+        runId,
+      });
+      if (episode && runId) {
+        ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode);
+      }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
     return;
@@ -1071,9 +1224,13 @@ export async function executeSterlingStep(
             return;
           }
         }
-        if (!repairResult.success && repairResult.reason === BLOCK_REASONS.REGEN_NON_OPTION_A) {
+        if (
+          !repairResult.success &&
+          repairResult.reason === BLOCK_REASONS.REGEN_NON_OPTION_A
+        ) {
           const regenAttempts =
-            ((task.metadata as Record<string, unknown>)?.regenAttempts as number) ?? 0;
+            ((task.metadata as Record<string, unknown>)
+              ?.regenAttempts as number) ?? 0;
           ctx.updateTaskMetadata(task.id, {
             ...block(BLOCK_REASONS.REGEN_NON_OPTION_A, {
               nextEligibleAt: now + DETERMINISTIC_BLOCK_BACKOFF_MS,
@@ -1093,14 +1250,28 @@ export async function executeSterlingStep(
     ctx.updateTaskMetadata(task.id, {
       ...block(BLOCK_REASONS.MAX_RETRIES_EXCEEDED),
       retryCount: newRetryCount,
+      ..._diagForMeta,
     });
     // LoopBreaker: record max-retries-exceeded failure (per-task final failure)
     {
       const diagReason = extractDiagReasonCode(actionResult);
-      const targetParam = (leafExec.args as Record<string, unknown>)?.blockType as string ?? (leafExec.args as Record<string, unknown>)?.itemType as string;
-      const loopSig = buildFailureSignature({ category: 'tool_failure', leaf: leafExec.leafName, targetParam, failureCode, diagReasonCode: diagReason });
-      const episode = getLoopBreaker().recordFailure(loopSig, { taskId: task.id, runId });
-      if (episode && runId) { ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode); }
+      const targetParam =
+        ((leafExec.args as Record<string, unknown>)?.blockType as string) ??
+        ((leafExec.args as Record<string, unknown>)?.itemType as string);
+      const loopSig = buildFailureSignature({
+        category: 'tool_failure',
+        leaf: leafExec.leafName,
+        targetParam,
+        failureCode,
+        diagReasonCode: diagReason,
+      });
+      const episode = getLoopBreaker().recordFailure(loopSig, {
+        taskId: task.id,
+        runId,
+      });
+      if (episode && runId) {
+        ctx.getGoldenRunRecorder().recordLoopDetected(runId, episode);
+      }
     }
     ctx.updateTaskProgress(task.id, task.progress || 0, 'failed');
   } else {

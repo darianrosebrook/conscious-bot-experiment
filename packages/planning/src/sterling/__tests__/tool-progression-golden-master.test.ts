@@ -484,8 +484,8 @@ describe('MinecraftToolProgressionSolver', () => {
 
     expect(steps).toHaveLength(4);
     expect(steps[0].label).toBe('Leaf: minecraft.acquire_material (item=oak_log, count=1)');
-    expect(steps[1].label).toBe('Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=4)');
-    expect(steps[2].label).toBe('Leaf: minecraft.craft_recipe (recipe=stick, qty=4)');
+    expect(steps[1].label).toBe('Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=1)');
+    expect(steps[2].label).toBe('Leaf: minecraft.craft_recipe (recipe=stick, qty=1)');
     expect(steps[3].label).toBe('Leaf: minecraft.craft_recipe (recipe=wooden_pickaxe, qty=1)');
 
     // Order is 1-based sequential
@@ -502,6 +502,54 @@ describe('MinecraftToolProgressionSolver', () => {
     expect(steps[0].estimatedDuration).toBe(5000);  // mine
     expect(steps[1].estimatedDuration).toBe(2000);  // craft
     expect(steps[3].estimatedDuration).toBe(2000);  // upgrade (uses craft duration)
+  });
+
+  it('craft/upgrade step args always have qty=1 regardless of produces count', () => {
+    // Contract: qty means "number of craft executions" (mineflayer loops),
+    // NOT "desired output count". The solver emits one step per execution.
+    const result: ToolProgressionSolveResult = {
+      solved: true,
+      steps: [
+        {
+          action: 'tp:craft:oak_planks',
+          actionType: 'craft',
+          produces: [{ name: 'oak_planks', count: 4 }],
+          consumes: [{ name: 'oak_log', count: 1 }],
+          resultingInventory: { oak_planks: 4 },
+        },
+        {
+          action: 'tp:craft:stick',
+          actionType: 'craft',
+          produces: [{ name: 'stick', count: 4 }],
+          consumes: [{ name: 'oak_planks', count: 2 }],
+          resultingInventory: { oak_planks: 2, stick: 4 },
+        },
+        {
+          action: 'tp:upgrade:wooden_pickaxe',
+          actionType: 'upgrade',
+          produces: [{ name: 'wooden_pickaxe', count: 1 }],
+          consumes: [{ name: 'oak_planks', count: 3 }, { name: 'stick', count: 2 }],
+          resultingInventory: { wooden_pickaxe: 1 },
+        },
+      ],
+      totalNodes: 15,
+      durationMs: 40,
+      targetTier: 'wooden',
+      currentTier: null,
+      targetTool: 'wooden_pickaxe',
+    };
+
+    const steps = solver.toTaskSteps(result);
+
+    // Every craft/upgrade step must have qty=1
+    for (const step of steps) {
+      expect(step.meta?.args).toHaveProperty('qty', 1);
+    }
+
+    // Specifically: oak_planks produces 4 but qty must still be 1
+    expect(steps[0].meta?.args).toEqual({ recipe: 'oak_planks', qty: 1 });
+    expect(steps[1].meta?.args).toEqual({ recipe: 'stick', qty: 1 });
+    expect(steps[2].meta?.args).toEqual({ recipe: 'wooden_pickaxe', qty: 1 });
   });
 
   it('toTaskSteps produces correct labels for smelt and place steps', () => {

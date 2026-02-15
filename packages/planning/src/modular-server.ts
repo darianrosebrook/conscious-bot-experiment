@@ -649,6 +649,11 @@ const toolExecutor = {
       // Pass taskId if available in mappedAction parameters for proper context
       const params = mappedAction.parameters as Record<string, any> | undefined;
       const taskId = params?.__nav?.scope as string | undefined;
+
+      // P0-B: Post-mapping log — shows normalized action before dispatch
+      const mappedArgsPreview = JSON.stringify(mappedAction.parameters ?? {}).slice(0, 200);
+      console.log(`[toolExecutor] → ${mappedAction.type}${taskId ? ` task=${taskId}` : ''} args=${mappedArgsPreview}`);
+
       const result = await executeActionWithBotCheck(
         mappedAction,
         taskId,
@@ -656,11 +661,33 @@ const toolExecutor = {
       );
       const duration = Date.now() - startTime;
 
-      // Diagnostic: log gateway result for dispatch tracing
+      // P0-B: Result log — shows status, duration, and diagnostics reason on failure
       if (!result.ok) {
+        const diag = (result as any).toolDiagnostics;
+        const diagReason = diag?.reason_code;
+        let diagDetail = '';
+        if (diag) {
+          const parts: string[] = [];
+          if (diag.requires_workstation != null) parts.push(`workstation=${diag.requires_workstation}`);
+          if (diag.crafting_table_nearby != null) parts.push(`table_nearby=${diag.crafting_table_nearby}`);
+          if (Array.isArray(diag.missing_inputs) && diag.missing_inputs.length > 0) {
+            const missing = diag.missing_inputs.map(
+              (m: any) => `${m.item}(${m.have}/${m.need})`
+            ).join(',');
+            parts.push(`missing=[${missing}]`);
+          }
+          if (parts.length > 0) diagDetail = ` ${parts.join(' ')}`;
+        }
         console.warn(
-          `[toolExecutor] Action failed (${duration}ms): type=${mappedAction.type} error=${result.error} outcome=${(result as any).outcome}`
+          `[toolExecutor] ← ${mappedAction.type} FAIL (${duration}ms)` +
+          ` error=${result.error}` +
+          ((result as { failureCode?: string }).failureCode ? ` code=${(result as { failureCode?: string }).failureCode}` : '') +
+          (diagReason ? ` reason=${diagReason}` : '') +
+          diagDetail +
+          ` outcome=${(result as any).outcome}`
         );
+      } else {
+        console.log(`[toolExecutor] ← ${mappedAction.type} ok (${duration}ms)`);
       }
 
       // Enhance result with metrics
@@ -1000,8 +1027,14 @@ async function injectNextAcquisitionStep(
 }
 
 /** Cap-aware prereq injection for craft steps.
- *  Centralizes the prereqInjectionCount check so all call sites get the cap. */
-async function injectDynamicPrereqForCraft(task: any): Promise<boolean> {
+ *  Centralizes the prereqInjectionCount check so all call sites get the cap.
+ *  @param opts - Optional step-level args. When provided, these take priority
+ *    over task-level title/parameter inference. This is critical for sterling_ir
+ *    tasks where the task title may not contain the concrete recipe string. */
+async function injectDynamicPrereqForCraft(
+  task: any,
+  opts?: { recipe?: string; qty?: number; toolDiagnostics?: any }
+): Promise<boolean> {
   // Enforce cap at this layer — all call sites go through here
   const prereqAttempts = (task.metadata as any)?.prereqInjectionCount || 0;
   if (prereqAttempts >= 3) {
@@ -1011,22 +1044,28 @@ async function injectDynamicPrereqForCraft(task: any): Promise<boolean> {
     return false;
   }
 
+  // Priority: explicit step args > task parameters > title inference > hardcoded fallback
   const title = (task.title || '').toLowerCase();
   const recipe =
+    opts?.recipe ||
     task.parameters?.recipe ||
     inferRecipeFromTitle(task.title) ||
     (title.includes('pickaxe') ? 'wooden_pickaxe' : null);
   if (!recipe) return false;
+  const qty = opts?.qty || task.parameters?.qty || 1;
   const injected = await injectNextAcquisitionStep(
     task,
     recipe,
-    task.parameters?.qty || 1
+    qty
   );
   if (injected) {
     // Increment cap counter on successful injection
     taskIntegration.updateTaskMetadata(task.id, {
       prereqInjectionCount: prereqAttempts + 1,
     });
+    console.log(
+      `💉 [Prereq] injected_prereq=true goal=${recipe} count=${qty} prereqInjectionCount=${prereqAttempts + 1}/3 task=${task.id}`
+    );
   }
   return injected;
 }
@@ -1199,8 +1238,8 @@ function buildSterlingStepExecutorContext() {
     fetchInventorySnapshot: () => fetchInventorySnapshot(),
     getCount: (inv: Array<{ type?: string }>, item: string) =>
       getCount(inv, item),
-    injectDynamicPrereqForCraft: (task: unknown) =>
-      injectDynamicPrereqForCraft(task),
+    injectDynamicPrereqForCraft: (task: unknown, opts?: { recipe?: string; qty?: number; toolDiagnostics?: any }) =>
+      injectDynamicPrereqForCraft(task, opts),
     emitExecutorBudgetEvent: (
       taskId: string,
       stepId: string,

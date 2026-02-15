@@ -38,18 +38,10 @@
       "theme": "food",
       "steps": [
         {
-          "leaf": "find_resource",
+          "leaf": "acquire_material",
           "args": {
-            "blockType": "sweet_berry_bush",
-            "radius": 32,
-            "maxResults": 1,
-            "lowered_from": "gather",
-            "theme": "food"
-          }
-        },
-        {
-          "leaf": "collect_items",
-          "args": {
+            "item": "sweet_berry_bush",
+            "count": 1,
             "lowered_from": "gather",
             "theme": "food"
           }

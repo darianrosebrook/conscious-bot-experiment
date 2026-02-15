@@ -23,6 +23,8 @@ export type PlanningRuntimeConfig = {
   };
   /** Legacy leaf rewrites (dig_block -> acquire_material). Default false (Policy A: allow-but-measure). */
   legacyLeafRewriteEnabled: boolean;
+  /** Loop breaker suppression active when LOOP_BREAKER_ENABLED=1. Default false (shadow mode). */
+  loopBreakerEnabled: boolean;
   /** Stable digest of config slice for artifact evidence. */
   configDigest: string;
   /** For banner: human-readable capability list */
@@ -61,6 +63,9 @@ const ENV = {
   /** Legacy leaf rewrites (dig_block -> acquire_material). Default false (Policy A: allow-but-measure). */
   get legacyLeafRewriteEnabled(): boolean {
     return String(process.env.STERLING_LEGACY_LEAF_REWRITE_ENABLED || '') === '1';
+  },
+  get loopBreakerEnabled(): boolean {
+    return process.env.LOOP_BREAKER_ENABLED === '1';
   },
 };
 
@@ -145,6 +150,7 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     ENV.enableTaskTypeBridge;
 
   const legacyLeafRewriteEnabled = ENV.legacyLeafRewriteEnabled;
+  const loopBreakerEnabled = ENV.loopBreakerEnabled;
 
   const capabilitiesList: string[] = [];
   if (skipReadiness) capabilitiesList.push('skip_readiness');
@@ -159,6 +165,7 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     skipReadiness,
     taskTypeBridge,
     legacyLeafRewriteEnabled,
+    loopBreakerEnabled,
   };
   const configDigest = computeConfigDigest(canonical);
 
@@ -168,6 +175,7 @@ export function getPlanningRuntimeConfig(): PlanningRuntimeConfig {
     executorEnabled,
     capabilities: { skipReadiness, taskTypeBridge },
     legacyLeafRewriteEnabled,
+    loopBreakerEnabled,
     configDigest,
     capabilitiesList,
   };

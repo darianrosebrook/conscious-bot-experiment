@@ -67,6 +67,11 @@ export {
 } from './modules/action-plan-backend';
 export type { RouteOptions } from './modules/action-plan-backend';
 
+// Step-to-leaf and action mapping (used by minecraft-interface E2E)
+export { stepToLeafExecution } from './modules/step-to-leaf-execution';
+export type { StepToLeafResult } from './modules/step-to-leaf-execution';
+export { mapBTActionToMinecraft } from './modules/action-mapping';
+
 // Solve contract types
 export type {
   SolveInput,

@@ -522,8 +522,10 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       }
       case 'place_feature':
         return `Leaf: minecraft.place_feature (module=${step.moduleId})`;
-      case 'scaffold':
-        return `Leaf: minecraft.place_scaffold (module=${step.moduleId})`;
+      // 'scaffold' intentionally falls through to default (building_step).
+      // place_scaffold has no LeafArgContract or action mapping — emitting it
+      // would produce a step that always fails at the executor. If scaffold-specific
+      // behavior is needed, add a contract + action mapping first.
       default:
         return `Leaf: minecraft.building_step (module=${step.moduleId})`;
     }
@@ -540,8 +542,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         return 'build_module';
       case 'place_feature':
         return 'place_feature';
-      case 'scaffold':
-        return 'place_scaffold';
+      // 'scaffold' falls through to default — see stepToLeafLabel comment
       default:
         return 'building_step';
     }

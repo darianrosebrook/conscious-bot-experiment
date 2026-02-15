@@ -31,9 +31,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * - Explicit args (Option A): When meta.args exists and is a plain object, pass through; argsSource = 'explicit'.
  * - Derived (legacy): Derive args from meta.produces/consumes; argsSource = 'derived'. Not allowed in live mode.
  */
-export function stepToLeafExecution(
-  step: { meta?: Record<string, unknown> }
-): StepToLeafResult | null {
+export function stepToLeafExecution(step: {
+  meta?: Record<string, unknown>;
+}): StepToLeafResult | null {
   const meta = step.meta;
   if (!meta?.leaf) return null;
 
@@ -58,8 +58,8 @@ export function stepToLeafExecution(
       // Gated: emit diagnostic so we can track usage and remove once counter hits zero.
       console.warn(
         '[stepToLeafExecution] Legacy dig_block → acquire_material rewrite fired. ' +
-        'This path should not be hit by Sterling-resolved steps (they use explicit args). ' +
-        'If you see this in production, a producer is still emitting derived dig_block steps.'
+          'This path should not be hit by Sterling-resolved steps (they use explicit args). ' +
+          'If you see this in production, a producer is still emitting derived dig_block steps.'
       );
       const item = produces[0];
       return {
@@ -139,6 +139,20 @@ export function stepToLeafExecution(
           toleranceXZ: meta.toleranceXZ ?? argsAny?.toleranceXZ ?? 1,
           toleranceY: meta.toleranceY ?? argsAny?.toleranceY ?? 0,
           ...(argsAny || {}),
+        },
+        argsSource: 'derived',
+      };
+    }
+    case 'explore_for_resources': {
+      const resourceTags = meta.resource_tags as string[] | undefined;
+      const goalItem = meta.goal_item as string | undefined;
+      const reason = meta.reason as string | undefined;
+      return {
+        leafName: 'explore_for_resources',
+        args: {
+          resource_tags: resourceTags ?? [],
+          goal_item: goalItem,
+          reason: reason,
         },
         argsSource: 'derived',
       };

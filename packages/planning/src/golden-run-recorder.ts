@@ -223,13 +223,25 @@ export type GoldenRunDispatchResult = NonNullable<
 /**
  * Extract tool-level diagnostics from an action result.
  *
- * After normalizeActionResponse, diagnostics lives at `actionResult.data.diagnostics`.
- * Also checks top-level as fallback (in case a caller bypasses normalization).
+ * Primary path (P0-A): After normalizeActionResponse, diagnostics are hoisted to
+ * `actionResult.toolDiagnostics` with a valid `_diag_version` field.
+ *
+ * Legacy fallback paths (pre-P0-A callers or bypassed normalization):
+ *   - `actionResult.data.diagnostics`
+ *   - `actionResult.diagnostics`
+ *
  * Only accepts bounded, versioned objects (must have `_diag_version`).
  */
 export function extractToolDiagnostics(
   actionResult: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
+  // P0-A hoisted path (preferred — set by normalizeActionResponse)
+  const hoisted = actionResult.toolDiagnostics as Record<string, unknown> | undefined;
+  if (hoisted && typeof hoisted === 'object' && hoisted._diag_version != null) {
+    return hoisted;
+  }
+
+  // Legacy fallback paths
   const data = actionResult.data as Record<string, unknown> | undefined;
   const nested = data?.diagnostics as Record<string, unknown> | undefined;
   const topLevel = actionResult.diagnostics as Record<string, unknown> | undefined;

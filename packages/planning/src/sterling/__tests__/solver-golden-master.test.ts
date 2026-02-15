@@ -94,10 +94,10 @@ describe('MinecraftCraftingSolver — golden-master', () => {
       'Leaf: minecraft.acquire_material (item=oak_log, count=3)'
     );
     expect(steps[1].label).toBe(
-      'Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=4)'
+      'Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=1)'
     );
     expect(steps[2].label).toBe(
-      'Leaf: minecraft.craft_recipe (recipe=stick, qty=4)'
+      'Leaf: minecraft.craft_recipe (recipe=stick, qty=1)'
     );
 
     // Order is 1-based sequential
@@ -108,6 +108,51 @@ describe('MinecraftCraftingSolver — golden-master', () => {
     expect(steps[0].estimatedDuration).toBe(5000); // mine
     expect(steps[1].estimatedDuration).toBe(2000); // craft
     expect(steps[2].estimatedDuration).toBe(2000); // craft
+  });
+
+  it('craft step args always have qty=1 regardless of produces count', () => {
+    // Contract: qty means "number of craft executions" (mineflayer loops),
+    // NOT "desired output count". The solver emits one step per execution.
+    const result: MinecraftCraftingSolveResult = {
+      solved: true,
+      steps: [
+        {
+          action: 'craft:birch_planks',
+          actionType: 'craft',
+          produces: [{ name: 'birch_planks', count: 4 }],
+          consumes: [{ name: 'birch_log', count: 1 }],
+          resultingInventory: { birch_planks: 4 },
+        },
+        {
+          action: 'craft:stick',
+          actionType: 'craft',
+          produces: [{ name: 'stick', count: 4 }],
+          consumes: [{ name: 'birch_planks', count: 2 }],
+          resultingInventory: { birch_planks: 2, stick: 4 },
+        },
+        {
+          action: 'craft:wooden_pickaxe',
+          actionType: 'craft',
+          produces: [{ name: 'wooden_pickaxe', count: 1 }],
+          consumes: [{ name: 'birch_planks', count: 3 }, { name: 'stick', count: 2 }],
+          resultingInventory: { wooden_pickaxe: 1 },
+        },
+      ],
+      totalNodes: 10,
+      durationMs: 50,
+    };
+
+    const steps = solver.toTaskSteps(result);
+
+    // Every craft step must have qty=1
+    for (const step of steps) {
+      expect(step.meta?.args).toHaveProperty('qty', 1);
+    }
+
+    // Specifically: birch_planks produces 4 but qty must still be 1
+    expect(steps[0].meta?.args).toEqual({ recipe: 'birch_planks', qty: 1 });
+    expect(steps[1].meta?.args).toEqual({ recipe: 'stick', qty: 1 });
+    expect(steps[2].meta?.args).toEqual({ recipe: 'wooden_pickaxe', qty: 1 });
   });
 
   it('toTaskSteps returns empty array for unsolved result', () => {

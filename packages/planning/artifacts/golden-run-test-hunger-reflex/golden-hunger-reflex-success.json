@@ -1,0 +1,78 @@
+{
+  "schema_version": "golden_run_report_v1",
+  "schema_revision": 1,
+  "features": [
+    "original_leaf",
+    "blocked_throttle_v1",
+    "strict_mapping_v1",
+    "execution_decisions_v1"
+  ],
+  "run_id": "hunger-reflex-success",
+  "created_at": 1771027623294,
+  "updated_at": 1771027623295,
+  "execution": {
+    "dispatched_steps": [],
+    "decisions": [],
+    "reflex_proof": {
+      "schema_version": "autonomy_proof_v1",
+      "bundle_hash": "56bfb65fc3871f21",
+      "identity": {
+        "trigger": {
+          "hunger_value": 0.75,
+          "threshold": 12,
+          "food_level": 5
+        },
+        "preconditions": {
+          "food_available": true
+        },
+        "goal": {
+          "need_type": "survival",
+          "template_name": "eat_immediate",
+          "description": "Eat food to restore hunger"
+        },
+        "task": {
+          "steps": [
+            {
+              "leaf": "consume_food",
+              "args": {
+                "food_type": "any",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        "execution": {
+          "result": "ok"
+        },
+        "verification": {
+          "food_before": 5,
+          "food_after": 11,
+          "delta": 6,
+          "items_consumed": [
+            "bread"
+          ]
+        }
+      },
+      "evidence": {
+        "proof_id": "cfb26c6a-5e0f-4797-a203-8fcf692b2e74",
+        "goal_id": "8650ed17beb9036c",
+        "task_id": "task-smoke-1",
+        "homeostasis_sample_digest": "f0d8a88f84d6e5e1",
+        "candidates_digest": "d63b86a8f340e239",
+        "execution_receipt": {
+          "itemsConsumed": 1,
+          "foodConsumed": "bread"
+        },
+        "candidate_food_item": "bread",
+        "candidate_food_count": 5,
+        "timing": {
+          "trigger_to_goal_ms": 1,
+          "goal_to_task_ms": 0,
+          "task_to_execution_ms": 1,
+          "total_ms": 2
+        },
+        "triggered_at": 1771027623292
+      }
+    }
+  }
+}

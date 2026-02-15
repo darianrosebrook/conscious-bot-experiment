@@ -216,6 +216,20 @@ describe('validateLeafArgs', () => {
       'collect_items: itemName must be a string if provided'
     );
   });
+
+  it('accepts explore_for_resources with resource_tags', () => {
+    expect(
+      validateLeafArgs('explore_for_resources', {
+        resource_tags: ['stone', 'cobblestone'],
+        goal_item: 'stone_pickaxe',
+        reason: 'needs_blocks',
+      })
+    ).toBeNull();
+  });
+
+  it('accepts explore_for_resources with minimal args', () => {
+    expect(validateLeafArgs('explore_for_resources', {})).toBeNull();
+  });
 });
 
 describe('normalizeLeafArgs', () => {
@@ -383,6 +397,8 @@ describe('KNOWN_LEAVES', () => {
       'harvest_crop',
       // World interaction
       'interact_with_block',
+      // Perception-driven exploration
+      'explore_for_resources',
     ];
     expect(KNOWN_LEAVES.size).toBe(expected.length);
     for (const leaf of expected) {
@@ -454,34 +470,42 @@ describe('validateLeafArgs strict mode with intent leaves', () => {
 
 describe('isExecStepMeta', () => {
   it('returns true for valid executable step meta', () => {
-    expect(isExecStepMeta({
-      leaf: 'craft_recipe',
-      args: { recipe: 'oak_planks', qty: 4 },
-      executable: true,
-    })).toBe(true);
+    expect(
+      isExecStepMeta({
+        leaf: 'craft_recipe',
+        args: { recipe: 'oak_planks', qty: 4 },
+        executable: true,
+      })
+    ).toBe(true);
   });
 
   it('returns false when executable is not true', () => {
-    expect(isExecStepMeta({
-      leaf: 'craft_recipe',
-      args: { recipe: 'oak_planks' },
-      executable: false,
-    })).toBe(false);
+    expect(
+      isExecStepMeta({
+        leaf: 'craft_recipe',
+        args: { recipe: 'oak_planks' },
+        executable: false,
+      })
+    ).toBe(false);
   });
 
   it('returns false when leaf is missing', () => {
-    expect(isExecStepMeta({
-      args: { recipe: 'oak_planks' },
-      executable: true,
-    })).toBe(false);
+    expect(
+      isExecStepMeta({
+        args: { recipe: 'oak_planks' },
+        executable: true,
+      })
+    ).toBe(false);
   });
 
   it('returns false when args is not a plain object', () => {
-    expect(isExecStepMeta({
-      leaf: 'craft_recipe',
-      args: [1, 2, 3],
-      executable: true,
-    })).toBe(false);
+    expect(
+      isExecStepMeta({
+        leaf: 'craft_recipe',
+        args: [1, 2, 3],
+        executable: true,
+      })
+    ).toBe(false);
   });
 
   it('returns false for undefined meta', () => {
@@ -491,36 +515,44 @@ describe('isExecStepMeta', () => {
 
 describe('isIntentStepMeta', () => {
   it('returns true for valid intent step meta', () => {
-    expect(isIntentStepMeta({
-      intent: {
-        leafName: 'task_type_craft',
-        lemma: 'craft',
-        propositionId: 'p1',
-        routingDomain: 'planning',
-      },
-      source: 'expand_by_digest',
-    })).toBe(true);
+    expect(
+      isIntentStepMeta({
+        intent: {
+          leafName: 'task_type_craft',
+          lemma: 'craft',
+          propositionId: 'p1',
+          routingDomain: 'planning',
+        },
+        source: 'expand_by_digest',
+      })
+    ).toBe(true);
   });
 
   it('returns false when intent is missing', () => {
-    expect(isIntentStepMeta({
-      leaf: 'task_type_craft',
-      source: 'expand_by_digest',
-    })).toBe(false);
+    expect(
+      isIntentStepMeta({
+        leaf: 'task_type_craft',
+        source: 'expand_by_digest',
+      })
+    ).toBe(false);
   });
 
   it('returns false when intent.leafName is missing', () => {
-    expect(isIntentStepMeta({
-      intent: { lemma: 'craft', propositionId: 'p1' },
-      source: 'expand_by_digest',
-    })).toBe(false);
+    expect(
+      isIntentStepMeta({
+        intent: { lemma: 'craft', propositionId: 'p1' },
+        source: 'expand_by_digest',
+      })
+    ).toBe(false);
   });
 
   it('returns false when intent.lemma is missing', () => {
-    expect(isIntentStepMeta({
-      intent: { leafName: 'task_type_craft', propositionId: 'p1' },
-      source: 'expand_by_digest',
-    })).toBe(false);
+    expect(
+      isIntentStepMeta({
+        intent: { leafName: 'task_type_craft', propositionId: 'p1' },
+        source: 'expand_by_digest',
+      })
+    ).toBe(false);
   });
 
   it('returns false for undefined meta', () => {
@@ -534,7 +566,11 @@ describe('isIntentStepMeta', () => {
       executable: true,
     };
     const intentMeta = {
-      intent: { leafName: 'task_type_craft', lemma: 'craft', propositionId: 'p1' },
+      intent: {
+        leafName: 'task_type_craft',
+        lemma: 'craft',
+        propositionId: 'p1',
+      },
       source: 'expand_by_digest',
     };
     // exec is not intent
@@ -686,15 +722,23 @@ function stubValue(fieldType: string, fieldName: string): unknown {
   if (fieldName === 'workstation') return 'crafting_table';
   if (fieldName === 'action') return 'sort'; // manage_inventory enum
   switch (fieldType) {
-    case 'string': return 'test_value';
-    case 'number': return 1;
-    case 'any': return { x: 0, y: 64, z: 0 }; // position-like
-    default: return 'fallback';
+    case 'string':
+      return 'test_value';
+    case 'number':
+      return 1;
+    case 'any':
+      return { x: 0, y: 64, z: 0 }; // position-like
+    default:
+      return 'fallback';
   }
 }
 
 /** Parse a field descriptor like "recipe:string" or "?qty:number" */
-function parseField(descriptor: string): { name: string; type: string; required: boolean } {
+function parseField(descriptor: string): {
+  name: string;
+  type: string;
+  required: boolean;
+} {
   const required = !descriptor.startsWith('?');
   const clean = required ? descriptor : descriptor.slice(1);
   const [name, type] = clean.split(':');
@@ -752,8 +796,8 @@ describe('fields[] ↔ validate() coherence (contract invariant)', () => {
   for (const [leafName, fields] of entries) {
     describe(`${leafName}`, () => {
       const allParsed = fields.map(parseField);
-      const requiredFields = allParsed.filter(f => f.required);
-      const optionalFields = allParsed.filter(f => !f.required);
+      const requiredFields = allParsed.filter((f) => f.required);
+      const optionalFields = allParsed.filter((f) => !f.required);
       const isOrConstraint = OR_CONSTRAINT_LEAVES.has(leafName);
 
       if (isOrConstraint) {
@@ -786,7 +830,10 @@ describe('fields[] ↔ validate() coherence (contract invariant)', () => {
           const args = buildMinimalArgs(fields);
           // Add first optional field to satisfy OR constraint
           if (optionalFields.length > 0) {
-            args[optionalFields[0].name] = stubValue(optionalFields[0].type, optionalFields[0].name);
+            args[optionalFields[0].name] = stubValue(
+              optionalFields[0].type,
+              optionalFields[0].name
+            );
           }
           const result = validateLeafArgs(leafName, args);
           expect(result).toBeNull();
@@ -886,7 +933,11 @@ describe('KNOWN_LEAVES ↔ action-mapping alignment', () => {
         const error = validateLeafArgs(leaf, minimalArgs, true);
         expect(error).toBeNull();
         // But should NOT have an action mapping (yet)
-        const mapped = mapBTActionToMinecraft(`minecraft.${leaf}`, minimalArgs, { strict: true });
+        const mapped = mapBTActionToMinecraft(
+          `minecraft.${leaf}`,
+          minimalArgs,
+          { strict: true }
+        );
         expect(mapped).toBeNull();
       });
       continue;
@@ -956,6 +1007,11 @@ function getMinimalValidArgs(leaf: string): Record<string, unknown> {
     harvest_crop: {},
     // World interaction
     interact_with_block: { position: { x: 0, y: 64, z: 0 } },
+    // Perception-driven exploration
+    explore_for_resources: {
+      resource_tags: ['oak_log'],
+      goal_item: 'wooden_pickaxe',
+    },
   };
   return table[leaf] ?? {};
 }
