@@ -125,7 +125,6 @@ function setupMockLeafFactory(
     'interact_with_block',
     'operate_piston',
     'control_redstone',
-    'build_structure',
     'control_environment',
     // construction (stubs)
     'prepare_site',

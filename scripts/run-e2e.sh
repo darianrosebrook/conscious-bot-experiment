@@ -418,6 +418,11 @@ if should_run_category "core"; then
     "packages/minecraft-interface/src/__tests__/safety-monitor-dispatch-e2e.test.ts"
 
   run_suite \
+    "Acquisition Dispatch Chain" \
+    "" \
+    "packages/planning/src/__tests__/acquisition-dispatch-chain-e2e.test.ts"
+
+  run_suite \
     "Reachability Governance" \
     "" \
     "packages/planning/src/__tests__/reachability-governance.test.ts"

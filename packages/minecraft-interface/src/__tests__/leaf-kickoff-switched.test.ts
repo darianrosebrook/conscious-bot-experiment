@@ -74,7 +74,7 @@ function setupMockLeafFactory(
     'use_item', 'equip_tool', 'open_container', 'transfer_items',
     'close_container', 'manage_inventory', 'till_soil', 'plant_crop',
     'harvest_crop', 'manage_farm', 'interact_with_block', 'operate_piston',
-    'control_redstone', 'build_structure', 'control_environment',
+    'control_redstone', 'control_environment',
     'prepare_site', 'build_module', 'place_feature', 'explore_for_resources',
     'gather_resources',
   ];

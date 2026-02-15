@@ -51,7 +51,7 @@ These derive four leaf states:
 | **Produced + Proven** | Full autonomous pipeline with E2E dispatch proof | 21 |
 | **Produced, not Proven** | Producer exists but no E2E dispatch assertion (tracked via waiver) | 0 |
 | **Contracted-only** | Contract + mapping exist, but no autonomous producer emits it (manual/API only) | 19 |
-| **Orphaned** | Leaf class exists in MC interface but no contract, no producer, no mapping | 8 |
+| **Orphaned** | Leaf class exists in MC interface but no contract, no producer, no mapping | 7 |
 
 **Governance invariants** (enforced by `reachability-governance.test.ts`):
 - **A)** Produced ⊆ Contracted — can't emit an uncontracted leaf
@@ -62,7 +62,7 @@ These derive four leaf states:
 
 ---
 
-## Full Leaf Inventory (40 leaves in KNOWN_LEAVES + orphans)
+## Full Leaf Inventory (40 leaves in KNOWN_LEAVES + 7 orphans)
 
 ### Produced + Proven leaves (21) — Full E2E dispatch-chain proof
 
@@ -118,18 +118,21 @@ All previously waivered leaves are now proven. No active waivers remain.
 | 39 | `chat` | Yes | Yes | Smoke path only, not autonomous |
 | 40 | `wait` | Yes | Yes | Smoke path only, not autonomous |
 
-### ORPHANED leaves (8) — No contract, no producer, no action mapping
+### UNCONTRACTED leaves (7) — Not dispatchable (by design or by gap)
 
-| # | Leaf | File | Why Orphaned |
-|---|------|------|-------------|
-| 41 | `follow_entity` | movement-leaves.ts | No contract, no producer, no action-mapping case |
-| 42 | `transfer_items` | container-leaves.ts | No contract, no producer |
-| 43 | `close_container` | container-leaves.ts | No contract, no producer |
-| 44 | `plant_crop` | farming-leaves.ts | No contract, no producer |
-| 45 | `operate_piston` | world-interaction-leaves.ts | No contract, no producer |
-| 46 | `control_redstone` | world-interaction-leaves.ts | No contract, no producer |
-| 47 | `build_structure` | world-interaction-leaves.ts | No contract, no producer |
-| 48 | `control_environment` | world-interaction-leaves.ts | No contract, no producer |
+| # | Leaf | File | Classification | Notes |
+|---|------|------|----------------|-------|
+| 41 | `follow_entity` | movement-leaves.ts | **Future work (P2)** | Full leaf implementation exists. Needs contract + mapping + producer. Gated on combat/retreat stability. See Gap G-9. |
+| 42 | `transfer_items` | container-leaves.ts | **Sub-leaf / helper** | Internal to container workflows. Not standalone. |
+| 43 | `close_container` | container-leaves.ts | **Sub-leaf / helper** | Cleanup paired with `open_container`. Not standalone. |
+| 44 | `plant_crop` | farming-leaves.ts | **Sub-leaf / helper** | Called internally by `ManageFarmLeaf`. Not standalone. |
+| 45 | `operate_piston` | world-interaction-leaves.ts | **Future work (P5)** | Redstone automation. No gameplay need yet. |
+| 46 | `control_redstone` | world-interaction-leaves.ts | **Future work (P5)** | Power management. No gameplay need yet. |
+| 47 | `control_environment` | world-interaction-leaves.ts | **Admin-only** | Weather/time control. Requires op permissions. |
+
+**Promotion rule**: Do not contract or promote a leaf classified as "Sub-leaf / helper" or "Admin-only" without first adding an explicit Producer Roadmap entry below. Only "Future work" leaves have a defined promotion path.
+
+**Removed**: `build_structure` — legacy leaf class deleted. Replaced by modular building system (`build_module` + `prepare_site` + `place_feature`). The goal type `'build_structure'` is retained as a semantic alias for intent routing through the Sterling building solver.
 
 **Note**: `place_scaffold` was previously emitted by the building solver for `moduleType=scaffold`, but had no `LeafArgContract` or action mapping — making it always fail at the executor. This was fixed: scaffold now falls through to `building_step` (the default case). The `reachability-governance.test.ts` "producer contract safety" section prevents this class of bug from recurring.
 
@@ -374,6 +377,64 @@ Addressed by `sleep-driveshaft-controller.ts` (Phase 3a). Stage 1: sleep in exis
 ### ~~Gap G-8: Exploration driveshaft has no test~~ — RESOLVED
 Addressed by `exploration-driveshaft-e2e.test.ts` (Phase 1c). Tests controller → action mapping → executor dispatch chain.
 
+### Gap G-9: `follow_entity` pipeline wiring
+**Impact**: Bot can't follow players or track entities for combat/loot.
+**Leaf status**: Fully implemented (movement-leaves.ts:391-528) with GoalFollow pathfinding.
+**Needed**: LeafArgContract, action-mapping entry, entity-tracking producer.
+**Gated on**: Combat/retreat loop stable (P1 threat driveshaft), entity selection strategy decided.
+**Promotion bar**: When contracted, must ship with (1) contract, (2) mapping, (3) producer, (4) E2E dispatch proof in the same changeset, or include a time-bounded waiver.
+
+---
+
+## Producer Roadmap
+
+Remaining leaves that need autonomous producers to become Produced + Proven. Priority ordered by "unblocks other capabilities."
+
+### P1: Threat/Retreat Driveshaft
+**Leaves:** `retreat_and_block`, `retreat_from_threat`
+**Outcome:** Bot can disengage reliably; unblocks pursuit/follow behaviors without suicidal loops.
+**Status:** Fully spec'd (REFLEX-REVIEW-CHECKLIST.md Part 3, lines 222-283). Leaves + contracts + mappings exist.
+**Done when:** Producer emits retreat leaves under defined threat predicates, E2E proof asserts payload + dispatch.
+
+### P2: follow_entity Pipeline (see Gap G-9)
+**Leaves:** `follow_entity`
+**Outcome:** Bot can follow a player or track a target entity for loot/recovery.
+**Status:** Leaf implemented. No contract, no mapping, no producer.
+**Gated on:** P1 threat driveshaft (safe pursuit requires reliable disengage).
+**Done when:** Contract encodes selection inputs knowable at planning time (entityType, label/name, optional selector), runtime resolves concrete entity instance. Ships with contract + mapping + producer + E2E proof in one PR.
+
+### P3: Inventory Pressure Driveshaft
+**Leaves:** `manage_inventory`
+**Outcome:** Fewer long-run stalls; makes farming/mining loops more robust.
+**Status:** Leaf implemented. Contract + mapping exist. No producer.
+**Done when:** Driveshaft emits `manage_inventory` under full-inventory conditions, proof that it terminates (bounded steps/retries).
+
+### P4: Farming Driveshaft (after inventory is sane)
+**Leaves:** `till_soil`, `harvest_crop`, `manage_farm`
+**Outcome:** Sustainable food, less foraging.
+**Status:** Leaves implemented. Contracts + mappings exist. Goal template `maintain_farm` exists but no controller.
+**Done when:** One closed loop exists end-to-end (acquire seeds/tools → till → plant → grow → harvest → store/consume), each promoted leaf proven via dispatch-chain test.
+
+### P5: Item Usage (coupled to combat)
+**Leaves:** `use_item`
+**Outcome:** Potion/consumable usage in combat or survival.
+**Status:** Leaf implemented. Contract + mapping exist. No producer.
+**Gated on:** Combat system design (P1).
+
+### P6: Redstone/Mechanisms (no gameplay need yet)
+**Leaves:** `operate_piston`, `control_redstone`
+**Contracted-only utility:** `interact_with_block` — has contract but no producer; usable as a manual utility leaf.
+**Status:** `operate_piston` and `control_redstone` are uncontracted orphans. `interact_with_block` is contracted-only.
+**Deferred:** No scenario requires these yet.
+
+### Not producers — Internal helpers (stay uncontracted)
+
+**Contracted-only utilities (11):** `dig_block`, `collect_items`, `place_torch_if_needed`, `place_torch`, `sense_hostiles`, `get_light_level`, `get_block_at`, `find_resource`, `equip_tool`, `chat`, `wait` — runtime-active, called internally by other leaves, the safety system, or smoke/API paths. No autonomous producers needed.
+
+**Orphaned sub-leaves (3):** `transfer_items`, `close_container`, `plant_crop` — called by composite leaves. Keep uncontracted.
+
+**Admin-only (1):** `control_environment` — weather/time control, requires op permissions. Keep orphaned.
+
 ---
 
 ## Run Commands
@@ -481,5 +542,5 @@ When a new producer starts emitting a contracted-only leaf:
 
 ---
 
-*Last updated: 2026-02-14 (all 21/21 produced leaves now proven; 0 waivers; G-3 resolved)*
+*Last updated: 2026-02-14 (21/21 produced leaves proven; 0 waivers; BuildStructureLeaf removed; producer roadmap added; G-9 follow_entity tagged)*
 *Source: Reachability audit of `leaf-arg-contracts.ts`, `action-mapping.ts`, `step-to-leaf-execution.ts`, `leaf-routing.ts`, `expand_by_digest_v1.py`, `automatic-safety-monitor.ts`, all solver files, all driveshaft controllers, `reachability-governance.test.ts`.*

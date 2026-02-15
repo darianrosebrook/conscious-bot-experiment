@@ -287,7 +287,7 @@ setblock ~5 ~-1 ~ minecraft:iron_ore
   → acquire_material(oak_log) × 4             ← interaction leaf (verified)
   → craft_recipe(oak_planks)                   ← crafting leaf (verified)
   → craft_recipe(oak_door)                     ← crafting leaf (needs verification)
-  → build_structure(house, position, ...)      ← world-interaction leaf (STUB)
+  → build_module(house, ...)                    ← construction leaf (P0 stub — no world mutation)
   → place_block(door)                          ← interaction leaf (verified)
   → sleep(placeBed: true)                      ← interaction leaf (needs night test)
 ```
@@ -296,7 +296,7 @@ setblock ~5 ~-1 ~ minecraft:iron_ore
 
 | Gap | Component | Fix Required |
 |-----|-----------|-------------|
-| `build_structure` is real but unverified | `world-interaction-leaves.ts:863` | Needs end-to-end test with materials in inventory |
+| `build_structure` leaf removed (replaced by `build_module`) | `construction-leaves.ts` | Goal type `build_structure` routes to building solver → `prepare_site` → `build_module` → `place_feature` |
 | Construction stubs (`prepare_site`, `build_module`, `place_feature`) | `construction-leaves.ts` | P0 stubs return success without world mutation. Need real implementations. |
 | No time-triggered task creation | No component watches MC time and creates tasks proactively | Need a `TimeAwareGoalGenerator` that emits shelter goals when dusk approaches |
 | No shelter BT wired | `shelter_basic.json` exists but BT runner isn't active for this scenario | Wire BT definition to goal activation |
@@ -640,7 +640,7 @@ These are the atomic permissions and capabilities that gate scenario execution.
 |------------|---------|-------------|
 | `movement` | move_to, follow_entity, step_forward, retreat, pathfinding leaves | Bot can change position |
 | `dig` | dig_block, acquire_material, harvest_crop | Bot can break blocks |
-| `place` | place_block, place_workstation, place_torch, build_structure | Bot can place blocks |
+| `place` | place_block, place_workstation, place_torch, build_module | Bot can place blocks |
 | `craft` | craft_recipe, smelt | Bot can use crafting/furnace interfaces |
 | `sense` | sense_hostiles, find_resource, get_light_level, introspect_recipe | Bot can read world state |
 | `container.read` | open_container, manage_inventory, equip_weapon, equip_tool | Bot can read container/inventory |

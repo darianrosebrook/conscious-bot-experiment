@@ -641,16 +641,10 @@ All normalization is data-driven — no switch statements.
 - **Status**: Real implementation
 - **confirmed_working**: NOT VERIFIED
 
-#### build_structure
-- **Class**: `BuildStructureLeaf` (line 863)
-- **Spec**: timeout=300000ms, retries=5, permissions=[movement, dig, place, container.read, container.write]
-- **Args**: `{ structureType: string, position: {x,y,z}, dimensions?, material?, autoGather? }`
-- **Bot actions**: `bot.equip()`, `bot.placeBlock()`, types: house/tower/wall/platform
-- **Limitation**: `autoGather` flag exists but is NOT implemented. Does not check inventory for materials before attempting placement.
-- **Task Prerequisites:** [bot connected, building material in inventory (sufficient qty for structure), clear building area]
-- **Docker Command to set situation:** `give Sterling cobblestone 256 && give Sterling oak_planks 128 && give Sterling oak_door 1`
-- **Status**: Real implementation (no material pre-check)
-- **confirmed_working**: NOT VERIFIED
+#### ~~build_structure~~ — REMOVED
+- **Status**: `BuildStructureLeaf` class deleted. Replaced by modular building system.
+- Goal type `'build_structure'` routes through Sterling building solver → `prepare_site` → `build_module` → `place_feature`.
+- See `building-solver-dispatch-chain-e2e.test.ts` for dispatch proof.
 
 #### control_environment
 - **Class**: `EnvironmentalControlLeaf` (line 1295)
@@ -870,7 +864,7 @@ Inconclusive timeout → **accept** (not reject). Rationale: the leaf already co
 | Gap | Description | Impact | Mitigation |
 |-----|-------------|--------|------------|
 | **Workstation sprawl blocks crafting** | `place_workstation` fails if >=3 crafting tables within 6 blocks (retryable=true) | Infinite retry loop | Need "remove old workstation" leaf or smarter placement |
-| **build_structure no material check** | May attempt to place blocks not in inventory | Placement fails silently | Planner should inject `acquire_material` prereqs |
+| ~~**build_structure no material check**~~ | ~~May attempt to place blocks not in inventory~~ | ~~Placement fails silently~~ | RESOLVED — leaf removed, building solver handles deficit via `replan_building` |
 | **Construction leaves are stubs** | `prepare_site`, `build_module`, `place_feature` return success without world mutation | Building solver plans execute as no-ops | Implement real construction logic |
 
 ### P2 -- Future improvements

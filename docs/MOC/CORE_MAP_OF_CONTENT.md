@@ -1506,7 +1506,7 @@ Each entry includes path, description, classes, functions, and staleness assessm
 
 **Description**: Provides block interaction detection for redstone components, doors, and trapdoors using the LeafImpl interface in the consciousness-bot Minecraft leaves module. Implements methods to identify and interact with redstone devices and structural entry points.
 
-**Classes**: `InteractWithBlockLeaf`, `OperatePistonLeaf`, `ControlRedstoneLeaf`, `BuildStructureLeaf`, `EnvironmentalControlLeaf`
+**Classes**: `InteractWithBlockLeaf`, `OperatePistonLeaf`, `ControlRedstoneLeaf`, `EnvironmentalControlLeaf`
 
 **Key Functions**: `isRedstoneComponent`, `isDoor`, `isInteractable`, `isContainer`, `isPiston`
 

@@ -111,7 +111,6 @@ import {
   InteractWithBlockLeaf,
   OperatePistonLeaf,
   ControlRedstoneLeaf,
-  BuildStructureLeaf,
   EnvironmentalControlLeaf,
 } from './leaves/world-interaction-leaves';
 import {
@@ -1149,7 +1148,6 @@ async function registerCoreLeaves() {
       new InteractWithBlockLeaf(),
       new OperatePistonLeaf(),
       new ControlRedstoneLeaf(),
-      new BuildStructureLeaf(),
       new EnvironmentalControlLeaf(),
     ];
 
