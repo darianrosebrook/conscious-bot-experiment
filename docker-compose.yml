@@ -12,6 +12,7 @@ services:
       POSTGRES_USER: conscious_bot
       POSTGRES_PASSWORD: secure_password
       POSTGRES_DB: conscious_bot
+      WORLD_SEED: ${WORLD_SEED:-1234567890}
     ports:
       - "5432:5432"
     volumes:

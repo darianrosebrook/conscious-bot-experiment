@@ -29,6 +29,7 @@
     "e2e": "bash scripts/run-e2e.sh",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d",
     "docker:ps": "docker compose ps",
     "docker:logs": "docker compose logs -f",
     "benchmark:mlx": "node scripts/benchmark-mlx.js",
