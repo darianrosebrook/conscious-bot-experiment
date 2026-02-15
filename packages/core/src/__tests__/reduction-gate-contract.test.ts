@@ -35,7 +35,7 @@ const MOCK_PROPOSAL: OptionProposalResponse = {
 };
 
 const MOCK_FAILURE: ExecError = {
-  code: 'test_failure',
+  code: 'unknown',
   detail: 'test failure detail',
   retryable: false,
 };

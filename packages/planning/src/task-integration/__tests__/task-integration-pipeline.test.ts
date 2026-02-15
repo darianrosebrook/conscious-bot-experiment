@@ -2165,7 +2165,7 @@ describe('Epistemic flow: tool_progression needsBlocks', () => {
       type: 'tool_progression',
       priority: 0.5,
       urgency: 0.3,
-      source: 'epistemic_flow_test',
+      source: 'autonomous',
       parameters: {
         requirementCandidate: {
           kind: 'tool_progression',
@@ -2176,6 +2176,12 @@ describe('Epistemic flow: tool_progression needsBlocks', () => {
         },
       },
       metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
         category: 'tool_progression',
         currentState: {
           inventory: [{ name: 'wooden_pickaxe', count: 1 }],

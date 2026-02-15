@@ -179,8 +179,8 @@ afterAll(() => {
     },
     surfaceResults,
   });
-  manifest.results.timestamp = new Date().toISOString();
-  manifest.results.runtime = `node@${process.versions.node} / ${process.platform}-${process.arch}`;
+  (manifest.results as { timestamp?: string }).timestamp = new Date().toISOString();
+  (manifest.results as { runtime?: string }).runtime = `node@${process.versions.node} / ${process.platform}-${process.arch}`;
 
   // Patch execution truth from handle and validate consistency
   finalizeManifest(handle, manifest);

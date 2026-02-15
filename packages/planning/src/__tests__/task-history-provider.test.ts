@@ -219,7 +219,7 @@ describe('DirectTaskHistoryProvider', () => {
       id: 'map-test',
       title: 'A'.repeat(200), // Should be truncated to 120
       status: 'completed',
-      steps: [{ id: 'step-1', label: 'Final step label', status: 'completed', action: { type: 'gather' as any, parameters: {} }, order: 0 }],
+      steps: [{ id: 'step-1', label: 'Final step label', done: true, order: 0 }],
       metadata: {
         createdAt: now - 5000,
         updatedAt: now,
@@ -344,7 +344,8 @@ describe('DirectTaskHistoryProvider', () => {
 // ============================================================================
 
 describe('HttpTaskHistoryProvider', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch');

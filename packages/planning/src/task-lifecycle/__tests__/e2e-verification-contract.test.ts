@@ -19,15 +19,14 @@ function makeFullReport(): GoldenRunReport {
     created_at: Date.now(),
     updated_at: Date.now(),
     idle_episode: {
-      idle_reason: 'no_tasks',
+      reason: 'no_tasks',
     },
     task: {
       task_id: 'task-1',
-      task_type: 'sterling_ir',
+      status: 'active',
     },
     expansion: {
       status: 'ok',
-      steps_count: 3,
     },
     execution: {
       dispatched_steps: [

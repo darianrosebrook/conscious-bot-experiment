@@ -255,7 +255,6 @@ declare global {
   /** Metadata drop counter for diagnostics (P11) */
   var metadataDropCount: number | undefined;
   /** Planning event store instance (gated by PLANNING_EVENT_STORE=1) */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   var planningEventStore: import('./persistence/planning-event-store').PlanningEventStore | undefined;
 }
 

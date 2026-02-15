@@ -32,7 +32,7 @@ describe('logTaskIngestion', () => {
     });
 
     expect(consoleSpy).toHaveBeenCalledOnce();
-    const [prefix, payload] = consoleSpy.mock.calls[0];
+    const [prefix, payload] = consoleSpy.mock.calls[0] as [string, string];
     expect(prefix).toBe('[TaskIngestion]');
 
     const parsed = JSON.parse(payload);
@@ -51,7 +51,7 @@ describe('logTaskIngestion', () => {
       reason: 'connection_refused',
     });
 
-    const parsed = JSON.parse(consoleSpy.mock.calls[0][1]);
+    const parsed = JSON.parse(consoleSpy.mock.calls[0][1] as string);
     expect(parsed.decision).toBe('error');
     expect(parsed.reason).toBe('connection_refused');
     expect(parsed.task_id).toBeUndefined();
@@ -65,7 +65,7 @@ describe('logTaskIngestion', () => {
       reason: 'goalKey_guard',
     });
 
-    const parsed = JSON.parse(consoleSpy.mock.calls[0][1]);
+    const parsed = JSON.parse(consoleSpy.mock.calls[0][1] as string);
     expect(parsed.decision).toBe('deduped');
   });
 
@@ -79,7 +79,7 @@ describe('logTaskIngestion', () => {
       task_type: 'crafting',
     });
 
-    const parsed = JSON.parse(consoleSpy.mock.calls[0][1]);
+    const parsed = JSON.parse(consoleSpy.mock.calls[0][1] as string);
     expect(parsed.parent_task_id).toBe('parent-1');
   });
 

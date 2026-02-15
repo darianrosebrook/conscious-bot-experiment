@@ -558,6 +558,9 @@ function setupBotStateWebSocket() {
           ),
         ]);
 
+        if (!reflectionResponse) {
+          throw new Error('Reflection generation returned null response');
+        }
         const generatedReflection = (await reflectionResponse.json()) as Record<string, any>;
 
         if (generatedReflection?.generated && !generatedReflection?.isPlaceholder) {
@@ -2162,6 +2165,9 @@ app.post('/action', async (req, res) => {
           ),
         ]);
 
+        if (!reflectionResponse) {
+          throw new Error('Sleep reflection generation returned null response');
+        }
         const generatedReflection = (await reflectionResponse.json()) as Record<string, any>;
 
         if (generatedReflection?.generated && !generatedReflection?.isPlaceholder) {

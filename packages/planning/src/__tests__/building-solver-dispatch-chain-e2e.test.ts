@@ -24,32 +24,33 @@ import { executeSterlingStep } from '../executor/sterling-step-executor';
 import type { SterlingStepExecutorContext } from '../executor/sterling-step-executor.types';
 import { createMockSterlingService } from '../sterling/__tests__/mock-sterling-service';
 import { mapBTActionToMinecraft } from '../modules/action-mapping';
+import type { BuildingSolveResult, BuildingModuleType } from '../sterling/minecraft-building-types';
 
 // ============================================================================
 // Mock solve results — mirrors what Sterling returns for building solves
 // ============================================================================
 
-function makeSolvedBuildingResult() {
+function makeSolvedBuildingResult(): BuildingSolveResult {
   return {
     solved: true,
     steps: [
       {
         moduleId: 'mod-foundation',
-        moduleType: 'prep_site',
+        moduleType: 'prep_site' as BuildingModuleType,
         materialsNeeded: [{ name: 'cobblestone', count: 16 }],
         resultingProgress: 0.33,
         resultingInventory: { cobblestone: 48 },
       },
       {
         moduleId: 'mod-walls',
-        moduleType: 'apply_module',
+        moduleType: 'apply_module' as BuildingModuleType,
         materialsNeeded: [{ name: 'cobblestone', count: 32 }],
         resultingProgress: 0.66,
         resultingInventory: { cobblestone: 16 },
       },
       {
         moduleId: 'mod-door',
-        moduleType: 'place_feature',
+        moduleType: 'place_feature' as BuildingModuleType,
         materialsNeeded: [{ name: 'oak_door', count: 1 }],
         resultingProgress: 1.0,
         resultingInventory: { cobblestone: 16, oak_door: 0 },
@@ -61,7 +62,7 @@ function makeSolvedBuildingResult() {
   };
 }
 
-function makeDeficitBuildingResult() {
+function makeDeficitBuildingResult(): BuildingSolveResult {
   return {
     solved: false,
     steps: [],
@@ -321,7 +322,7 @@ describe('Building Solver Dispatch Chain E2E', () => {
             moduleType: s.meta?.moduleType,
             templateId: s.meta?.templateId,
           },
-        },
+        } as Record<string, unknown>,
       }));
 
       const ctx = createMockExecutorContext();
@@ -363,7 +364,7 @@ describe('Building Solver Dispatch Chain E2E', () => {
             moduleType: s.meta?.moduleType,
             templateId: s.meta?.templateId,
           },
-        },
+        } as Record<string, unknown>,
       }));
 
       const ctx = createMockExecutorContext();
@@ -451,7 +452,7 @@ describe('Building Solver Dispatch Chain E2E', () => {
             : s.meta?.leaf === 'replan_building'
               ? { templateId: s.meta?.templateId }
               : undefined,
-        },
+        } as Record<string, unknown>,
       }));
 
       const ctx = createMockExecutorContext();
@@ -543,7 +544,7 @@ describe('Building Solver Dispatch Chain E2E', () => {
             moduleType: bsStep!.meta?.moduleType,
             templateId: bsStep!.meta?.templateId,
           },
-        },
+        } as Record<string, unknown>,
       };
 
       const ctx = createMockExecutorContext();
@@ -577,7 +578,7 @@ describe('Building Solver Dispatch Chain E2E', () => {
         meta: {
           ...replanStep!.meta,
           args: { templateId: replanStep!.meta?.templateId },
-        },
+        } as Record<string, unknown>,
       };
 
       const ctx = createMockExecutorContext();

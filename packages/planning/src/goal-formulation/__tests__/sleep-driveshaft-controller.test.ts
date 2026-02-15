@@ -292,7 +292,7 @@ describe('SleepDriveshaftController', () => {
         { dryRun: false },
       );
 
-      const events = emitter.events;
+      const events = emitter.getEvents();
       expect(events.some((e) => e.type === 'goal_formulated')).toBe(true);
       expect(events.some((e) => e.type === 'task_planned')).toBe(true);
 
@@ -307,7 +307,7 @@ describe('SleepDriveshaftController', () => {
         { dryRun: true },
       );
 
-      const events = emitter.events;
+      const events = emitter.getEvents();
       expect(events.some((e) => e.type === 'goal_formulated')).toBe(true);
       expect(events.some((e) => e.type === 'task_planned')).toBe(false);
     });
@@ -352,12 +352,12 @@ describe('SleepDriveshaftController', () => {
   describe('Lifecycle bridge methods', () => {
     it('emitTaskEnqueued emits correct event', () => {
       controller.emitTaskEnqueued('reflex-1', 'task-1', 'survival:sleep');
-      expect(emitter.events.some((e) => e.type === 'task_enqueued')).toBe(true);
+      expect(emitter.getEvents().some((e) => e.type === 'task_enqueued')).toBe(true);
     });
 
     it('emitTaskEnqueueSkipped emits correct event', () => {
       controller.emitTaskEnqueueSkipped('reflex-1', 'survival:sleep', 'duplicate');
-      expect(emitter.events.some((e) => e.type === 'task_enqueue_skipped')).toBe(true);
+      expect(emitter.getEvents().some((e) => e.type === 'task_enqueue_skipped')).toBe(true);
     });
   });
 });

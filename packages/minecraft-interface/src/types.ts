@@ -243,7 +243,12 @@ export type MinecraftActionType =
   | 'equip_tool'
   | 'retreat_from_threat'
   | 'explore_for_resources'
-  | 'gather_resources';
+  | 'gather_resources'
+  | 'craft_recipe'
+  | 'find_resource'
+  | 'get_block_at'
+  | 'interact_with_block'
+  | 'introspect_recipe';
 
 export interface MinecraftAction {
   type: MinecraftActionType;
