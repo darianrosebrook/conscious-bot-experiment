@@ -70,8 +70,18 @@ function BlockMesh({
   const variantState = toVariantState(blockState);
   const geometry = useMemo(() => {
     const geo = createBlockGeometry(blockType, atlasIndex, blockStates, variantState).clone();
-    // Apply per-block AO to the cloned geometry's vertex colors
-    const aoColors = bakeBlockAO(position, blockIndex);
+    // Multiply per-block AO into existing vertex colors (which may include biome tint
+    // from mc-assets models). mc-assets models can have more than 24 vertices
+    // (e.g. grass_block overlay), so pass actual vertex count.
+    const vertexCount = geo.getAttribute('position').count;
+    const aoColors = bakeBlockAO(position, blockIndex, vertexCount);
+    const existingColors = geo.getAttribute('color');
+    if (existingColors) {
+      // Multiply AO with existing tint colors (e.g. grass green)
+      for (let i = 0; i < vertexCount * 3; i++) {
+        aoColors[i] *= existingColors.array[i] as number;
+      }
+    }
     geo.setAttribute('color', new THREE.BufferAttribute(aoColors, 3));
     return geo;
   }, [blockType, atlasIndex, blockStates, variantState, position, blockIndex]);
@@ -423,7 +433,7 @@ function SceneContent({
         <ambientLight intensity={0.9} />
         <Grid
           args={[gridSize.x, gridSize.z]}
-          position={[gridSize.x / 2, 1.02, gridSize.z / 2]}
+          position={[gridSize.x / 2, 0.02, gridSize.z / 2]}
           cellSize={1}
           cellThickness={0.5}
           cellColor="#1a3a5c"
@@ -444,10 +454,10 @@ function SceneContent({
       <directionalLight position={[1, 2, 0.5]} intensity={1.0} />
       <directionalLight position={[-1, 1, -0.5]} intensity={0.4} />
 
-      {/* Grid overlay (raised above platform surface) */}
+      {/* Grid overlay (at build surface y=0, slightly above grass_block top at y=-1) */}
       <Grid
         args={[gridSize.x, gridSize.z]}
-        position={[gridSize.x / 2, 1.02, gridSize.z / 2]}
+        position={[gridSize.x / 2, 0.02, gridSize.z / 2]}
         cellSize={1}
         cellThickness={0.5}
         cellColor="#1a3a5c"
@@ -458,9 +468,9 @@ function SceneContent({
         infiniteGrid={false}
       />
 
-      {/* Invisible click plane for floor (top of platform at y=1) */}
+      {/* Invisible click plane for floor (build surface at y=0) */}
       <mesh
-        position={[gridSize.x / 2, 1, gridSize.z / 2]}
+        position={[gridSize.x / 2, 0, gridSize.z / 2]}
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerDown={handleFloorPointerDown}
         onPointerMove={handleFloorPointerMove}
@@ -589,7 +599,7 @@ function SceneContent({
           Left-click is reserved for block placement. */}
       <OrbitControls
         makeDefault
-        target={[gridSize.x / 2, 2, gridSize.z / 2]}
+        target={[gridSize.x / 2, 1, gridSize.z / 2]}
         minDistance={3}
         maxDistance={40}
         maxPolarAngle={Math.PI / 2 - 0.05}
@@ -646,7 +656,7 @@ export function BlockCanvas({ mcVersion }: BlockCanvasProps = {}) {
   return (
     <div className={s.canvasContainer} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
-        camera={{ position: [12, 10, 12], fov: 50, near: 0.1, far: 200 }}
+        camera={{ position: [14, 12, 14], fov: 50, near: 0.1, far: 200 }}
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.setClearColor('#09090b');

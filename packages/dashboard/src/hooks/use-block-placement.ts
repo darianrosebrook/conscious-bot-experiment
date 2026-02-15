@@ -161,9 +161,9 @@ export function useBlockPlacement() {
       }
       if (buildMode === 'erase') return;
 
-      const base = snapToGrid({ x: e.point.x, y: 1, z: e.point.z });
+      const base = snapToGrid({ x: e.point.x, y: 0, z: e.point.z });
       if (base.x < 0 || base.z < 0) return;
-      const pos = { ...base, y: 2 };
+      const pos = { ...base, y: 0 };
 
       dragStartRef.current = pos;
       dragFaceNormalRef.current = { x: 0, y: 1, z: 0 };
@@ -191,8 +191,8 @@ export function useBlockPlacement() {
       } else {
         current = snapToGrid({ x: e.point.x, y: e.point.y, z: e.point.z });
         if (dragIsFloorRef.current) {
-          const base = snapToGrid({ x: e.point.x, y: 1, z: e.point.z });
-          current = { ...base, y: 2 };
+          const base = snapToGrid({ x: e.point.x, y: 0, z: e.point.z });
+          current = { ...base, y: 0 };
         } else if (current.y < 0) {
           current.y = 0;
         }
@@ -258,9 +258,9 @@ export function useBlockPlacement() {
       if (buildMode === 'erase') return null;
 
       if (isFloor) {
-        const base = snapToGrid({ x: e.point.x, y: 1, z: e.point.z });
+        const base = snapToGrid({ x: e.point.x, y: 0, z: e.point.z });
         if (base.x < 0 || base.z < 0) return null;
-        return { ...base, y: 2 };
+        return { ...base, y: 0 };
       }
 
       if (!e.face) return null;

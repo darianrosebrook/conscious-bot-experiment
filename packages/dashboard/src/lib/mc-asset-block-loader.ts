@@ -12,6 +12,10 @@ import * as THREE from 'three';
 
 const S = (n: number) => n / 16;
 
+// Default plains biome grass color (#91BD59) normalized to 0–1 RGB.
+// Used for faces with tintindex=0 (grass_block top, side overlay, vegetation).
+const GRASS_TINT: [number, number, number] = [0x91 / 255, 0xBD / 255, 0x59 / 255];
+
 /** Resolved blockStates model element (from asset pipeline) */
 interface ResolvedElement {
   from: [number, number, number];
@@ -23,7 +27,7 @@ interface ResolvedElement {
   };
   faces: Record<
     string,
-    { texture: { u: number; v: number; su: number; sv: number }; uv?: number[] }
+    { texture: { u: number; v: number; su: number; sv: number }; uv?: number[]; tintindex?: number }
   >;
 }
 
@@ -226,6 +230,7 @@ function buildGeometryFromModel(model: ResolvedModel): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
 
   for (const element of model.elements) {
@@ -258,10 +263,11 @@ function buildGeometryFromModel(model: ResolvedModel): THREE.BufferGeometry {
     const ATLAS_PIXEL_SIZE = 4096;
     const halfTexelNorm = 0.5 / ATLAS_PIXEL_SIZE;
 
-    // V convention: mc-assets texture is loaded with flipY=true so pipeline (v=0 at top) matches.
-    // Use pipeline (u,v) directly; no per-face V flip here.
+    // V convention: mc-assets texture is loaded with flipY=false so GPU v=0 maps to the
+    // image top, matching the pipeline's canvas convention (v=0 at top). No per-face V flip.
     for (const faceName of Object.keys(element.faces)) {
       const face = element.faces[faceName];
+      const tint = face.tintindex === 0 ? GRASS_TINT : null;
       const { dir, corners } = FACE_CORNERS[faceName];
 
       const u = face.texture.u + halfTexelNorm;
@@ -300,6 +306,7 @@ function buildGeometryFromModel(model: ResolvedModel): THREE.BufferGeometry {
         const baseu = pos[3];
         const basev = pos[4];
         uvs.push(baseu * su + u, basev * sv + v);
+        colors.push(tint ? tint[0] : 1, tint ? tint[1] : 1, tint ? tint[2] : 1);
       }
 
       indices.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
@@ -314,9 +321,7 @@ function buildGeometryFromModel(model: ResolvedModel): THREE.BufferGeometry {
   const indicesTyped = new Uint32Array(indices);
   geo.setIndex(new THREE.BufferAttribute(indicesTyped, 1));
 
-  const colorArray = new Float32Array(positions.length);
-  colorArray.fill(1.0);
-  geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
   return geo;
 }

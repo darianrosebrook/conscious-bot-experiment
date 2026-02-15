@@ -126,14 +126,18 @@ Completed per Builder-Viewer texture fidelity triage plan.
 ### Changes Made
 
 1. **Diagnostic overlay** (`?diagnostic=1`): Shows asset path, version, atlas-index key count, blockStates key count, and grass_block geometry source (model vs applyAtlasUVs). See `block-canvas.tsx` and `block-canvas.module.scss`.
-2. **useAtlasMaterial:** Returns `version`; logs atlas-index 200 (key count) or 404 with extract hint.
-3. **mc-asset-block-loader:** `canBuildFromAssets(blockType, blockStates)` for overlay; grass_block logging when resolving model; multipart apply array handling; half-texel inset in `buildGeometryFromModel` (4096 atlas).
-4. **building-tab-render-triage.md:** This section.
+2. **useAtlasMaterial:** Returns `version`; logs atlas-index 200 (key count) or 404 with extract hint. `flipY = false` for mc-assets path (pipeline UVs use v=0 at image top). `alphaTest: 0.5` on both mc-assets and legacy materials for transparent textures (vegetation, glass, leaves).
+3. **mc-asset-block-loader:** `canBuildFromAssets(blockType, blockStates)` for overlay; grass_block logging when resolving model; multipart apply array handling; half-texel inset in `buildGeometryFromModel` (4096 atlas). Per-vertex biome tint colors for faces with `tintindex=0` (plains grass #91BD59).
+4. **ambient-occlusion:** `bakeBlockAO()` accepts `vertexCount` parameter for mc-assets models with non-standard vertex counts. `BlockMesh` multiplies AO with existing tint colors.
+5. **building-tab-render-triage.md:** This section.
 
 ### Success Criteria Met
 
 - Diagnostic overlay (or dev-mode) shows asset path, version, atlas-index status, blockStates keys, and geometry source for grass_block.
-- Grass block tops should show green grass when mc-assets is used and blockStates/model path is used; half-texel inset avoids boundary sampling.
+- Grass block tops show green grass when mc-assets is used and blockStates/model path is used; half-texel inset avoids boundary sampling.
+- Vegetation (short_grass, tall_grass, fern) renders with transparent backgrounds and green biome tint.
+- Glass and other semi-transparent blocks render correctly with alpha cutout.
+- No WebGL errors in console.
 
 ### Verification
 
@@ -174,4 +178,34 @@ Completed per Builder-Viewer texture fidelity triage plan.
 2. **Atlas builder:** In minecraft-interface asset-pipeline, confirm texture name to atlas position for `grass_block_top` and that blockstates-builder resolves the grass_block model’s `#top` to that texture’s UVs.
 3. **Optional:** Add a one-off log in `buildGeometryFromModel` for grass_block’s "up" face: log `face.texture` (u, v, su, sv) to confirm what the builder receives.
 
-**Root cause (confirmed):** Pipeline atlas is built with 2D canvas (v = y / atlasSize), so v=0 at image top. Three.js texture with flipY = false uses v=0 at image bottom. Using pipeline (u,v) directly sampled the wrong atlas row. Fix: flip V in the builder so v_webgl = 1 - v - sv (applied in mc-asset-block-loader.ts buildGeometryFromModel).
+**Root cause (confirmed):** Pipeline atlas is built with 2D canvas (v = y / atlasSize), so v=0 at image top. The correct fix is to load the texture with `flipY = false` (in `use-atlas-material.ts`) so GPU v=0 also maps to image top — pipeline UVs then sample the correct atlas row with no per-face math. The initial attempt used `flipY = true` which is backwards: it flips the image so GPU v=0 maps to image bottom, causing pipeline UVs to sample the wrong row (e.g. stone at row 85 would hit row 43 instead).
+
+**Additional fix:** `bakeBlockAO()` (ambient-occlusion.ts) was hardcoded for 24 vertices (standard BoxGeometry). Mc-assets models like `grass_block` have more vertices (40 for grass_block's overlay element), causing WebGL `GL_INVALID_OPERATION: Vertex buffer is not big enough` errors. Fixed by passing `vertexCount` from the geometry's actual position attribute count.
+
+---
+
+## Platform Lowering (completed)
+
+**Goal:** Lower the platform below the build surface so template buildings build on top of the platform, not inside it. Grid at layer 0, platform below, builds start at y=0.
+
+### Y-coordinate layout (after change)
+
+| Y | Content |
+|---|---------|
+| -2 | Stone base (inside ellipse) |
+| -1 | `grass_block` — green top, dirt sides (inside ellipse) |
+| 0 | Vegetation (edge band); **build surface** (grid overlay, click plane) |
+| 1 | `tall_grass` upper half (when tall_grass); placed blocks start here |
+
+### Changes made
+
+1. **platform-terrain.ts**: Shifted stone to y=-2, grass_block to y=-1, vegetation to y=0/1. Extended ellipse with 3-block padding past grid edges for natural island look.
+2. **block-canvas.tsx**: Grid position y=1.02→0.02, click plane y=1→0, camera target y=2→1, camera position [12,10,12]→[14,12,14] for better overview angle.
+3. **use-block-placement.ts**: Floor snap y=1→0, floor placement y=2→0 in handleFloorPointerDown, handlePointerMove, and getGhostPosition.
+
+### Verification
+
+- Platform stone/grass visible below the blue grid overlay
+- Vegetation renders at grid level with transparent backgrounds
+- Block placement on floor starts at y=0 (on the grass surface)
+- No WebGL errors; zero type errors

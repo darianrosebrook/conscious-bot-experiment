@@ -68,10 +68,15 @@ const VERTEX_TO_CORNER: number[] = [
  *
  * @param position Block position in the grid
  * @param blockIndex Set of "x,y,z" position keys for occupied blocks
- * @returns Float32Array of 24×3 vertex color values (RGB, range 0.5–1.0)
+ * @param vertexCount Number of vertices in the target geometry. When the
+ *   geometry comes from the mc-assets pipeline it may have more than 24
+ *   vertices (e.g. grass_block has an overlay element → 40 verts). AO is
+ *   applied to the first 24 (standard cube) and extra vertices get 1.0.
+ * @returns Float32Array of vertexCount×3 vertex color values (RGB, range 0.5–1.0)
  */
-export function bakeBlockAO(position: Vec3, blockIndex: Set<string>): Float32Array {
-  const colors = new Float32Array(24 * 3);
+export function bakeBlockAO(position: Vec3, blockIndex: Set<string>, vertexCount = 24): Float32Array {
+  const colors = new Float32Array(vertexCount * 3);
+  colors.fill(1.0); // default: fully lit (no AO)
   const { x, y, z } = position;
 
   // Compute AO factor for each of the 8 corners
@@ -98,8 +103,9 @@ export function bakeBlockAO(position: Vec3, blockIndex: Set<string>): Float32Arr
     cornerAO[c] = 0.5 + (openSides / 4) * 0.5;
   }
 
-  // Map corner AO to vertex colors
-  for (let v = 0; v < 24; v++) {
+  // Map corner AO to vertex colors (only for the first 24 standard-cube vertices)
+  const aoVerts = Math.min(vertexCount, 24);
+  for (let v = 0; v < aoVerts; v++) {
     const corner = VERTEX_TO_CORNER[v];
     const ao = cornerAO[corner];
     colors[v * 3 + 0] = ao; // R

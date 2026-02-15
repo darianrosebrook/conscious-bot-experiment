@@ -58,6 +58,11 @@ const VEGETATION_TYPES = ['grass', 'fern', 'tall_grass'] as const;
 /**
  * Generate platform terrain blocks.
  *
+ * The platform sits below the build grid: stone at y=-2, grass_block at y=-1,
+ * vegetation at y=0/1. The grid and build area start at y=0 (on top of grass).
+ * The ellipse extends past the grid edges so the platform looks like a natural
+ * island that the build sits on.
+ *
  * @param gridSize — x, z extent of the grid
  * @param seed — for reproducible vegetation placement
  */
@@ -66,26 +71,31 @@ export function generatePlatformTerrain(
   seed: number = 42,
 ): TerrainBlock[] {
   const blocks: TerrainBlock[] = [];
+
+  // Platform extends 3 blocks past each edge so it's visible beyond the grid
+  const pad = 3;
   const cx = (gridSize.x - 1) / 2;
   const cz = (gridSize.z - 1) / 2;
-  const rx = Math.max(2, gridSize.x * 0.45);
-  const rz = Math.max(2, gridSize.z * 0.45);
+  const rx = Math.max(2, (gridSize.x + pad * 2) * 0.48);
+  const rz = Math.max(2, (gridSize.z + pad * 2) * 0.48);
 
   const innerRx = rx * 0.7;
   const innerRz = rz * 0.7;
   const rnd = seededRandom(seed);
 
-  for (let x = 0; x < gridSize.x; x++) {
-    for (let z = 0; z < gridSize.z; z++) {
+  // Scan wider area (pad beyond grid on each side)
+  for (let x = -pad; x < gridSize.x + pad; x++) {
+    for (let z = -pad; z < gridSize.z + pad; z++) {
       if (!isInEllipse(x + 0.5, z + 0.5, cx, cz, rx, rz)) continue;
 
-      blocks.push({ position: { x, y: 0, z }, blockType: 'stone' });
-      blocks.push({ position: { x, y: 1, z }, blockType: 'grass_block' });
+      blocks.push({ position: { x, y: -2, z }, blockType: 'stone' });
+      blocks.push({ position: { x, y: -1, z }, blockType: 'grass_block' });
     }
   }
 
-  for (let x = 0; x < gridSize.x; x++) {
-    for (let z = 0; z < gridSize.z; z++) {
+  // Vegetation only on the edge band (outside grid area to avoid blocking builds)
+  for (let x = -pad; x < gridSize.x + pad; x++) {
+    for (let z = -pad; z < gridSize.z + pad; z++) {
       const px = x + 0.5;
       const pz = z + 0.5;
       if (!isInEdgeBand(px, pz, cx, cz, innerRx, innerRz, rx, rz)) continue;
@@ -96,10 +106,10 @@ export function generatePlatformTerrain(
 
       const vegType = VEGETATION_TYPES[Math.floor(rnd() * VEGETATION_TYPES.length)];
       if (vegType === 'tall_grass') {
-        blocks.push({ position: { x, y: 2, z }, blockType: 'tall_grass', blockState: { half: 'lower' } });
-        blocks.push({ position: { x, y: 3, z }, blockType: 'tall_grass', blockState: { half: 'upper' } });
+        blocks.push({ position: { x, y: 0, z }, blockType: 'tall_grass', blockState: { half: 'lower' } });
+        blocks.push({ position: { x, y: 1, z }, blockType: 'tall_grass', blockState: { half: 'upper' } });
       } else {
-        blocks.push({ position: { x, y: 2, z }, blockType: vegType });
+        blocks.push({ position: { x, y: 0, z }, blockType: vegType });
       }
     }
   }

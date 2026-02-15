@@ -69,9 +69,10 @@ async function loadMcAssets(version: string): Promise<{
         objectUrl,
         (tex) => {
           URL.revokeObjectURL(objectUrl);
-          // Pipeline atlas is built with canvas coords (v=0 at image top). Three.js default
-          // has v=0 at bottom. Set flipY=true so pipeline UVs match without per-face flip.
-          tex.flipY = true;
+          // Pipeline atlas uses canvas coords (v=0 at image top). With flipY=false,
+          // GPU v=0 also maps to the image top, so pipeline UVs sample correctly.
+          // (flipY=true would flip the image, making v=0 the bottom → wrong row.)
+          tex.flipY = false;
           tex.magFilter = THREE.NearestFilter;
           tex.minFilter = THREE.NearestFilter;
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -85,6 +86,7 @@ async function loadMcAssets(version: string): Promise<{
     const material = new THREE.MeshLambertMaterial({
       map: texture,
       vertexColors: true,
+      alphaTest: 0.5,
     });
 
     // AtlasIndex for legacy fallback compat; mc-assets uses blockStates for UVs
@@ -187,6 +189,7 @@ async function loadLegacyAtlas(version: string): Promise<{
   const material = new THREE.MeshLambertMaterial({
     map: texture,
     vertexColors: true,
+    alphaTest: 0.5,
   });
 
   return { material, atlasIndex: index, blockStates: null, source: 'legacy', version };
