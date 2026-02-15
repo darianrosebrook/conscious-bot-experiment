@@ -7,13 +7,17 @@
  *
  *   Contracted — has a LeafArgContract + action-mapping entry (derived from KNOWN_LEAVES)
  *   Produced   — some autonomous producer (solver/driveshaft/bootstrap) emits it
- *   Proven     — an E2E dispatch-chain test asserts executeTool dispatch for it
+ *   Proven     — at least one machine-checkable proof anchor exists (ProofSpec)
  *
  * Invariants enforced:
  *   A) Produced ⊆ Contracted (can't emit an uncontracted leaf)
- *   B) Proven ⊆ Produced (can't claim E2E proof for something no producer emits)
+ *   B) Proven ⊆ Produced (can't claim proof for something no producer emits)
  *   C) Produced ∩ ¬Proven requires a waiver (explicit gap tracking)
- *   D) Every waiver has owner + reason + targetFix (no silent acceptance)
+ *   D) Every waiver has owner + reason + targetFix + reviewBy (no silent acceptance)
+ *
+ * Machine-checkable proof anchors:
+ *   Each proof spec references a test file + dispatch string. The governance test
+ *   validates the file exists and contains the string — no test execution needed.
  *
  * If a test fails after a code change, it means a leaf gained or lost
  * reachability. Update the classification intentionally.
@@ -22,7 +26,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ts from 'typescript';
@@ -34,96 +38,241 @@ import type { SterlingStepExecutorContext } from '../executor/sterling-step-exec
 import bootstrapFixture from '../server/__tests__/fixtures/bootstrap-lowering-v1.json';
 
 // ============================================================================
+// Type definitions: ProofKind, ProofSpec, EntryPointId, ProducedBySpec
+// ============================================================================
+
+/**
+ * ProofKind: categorizes how a leaf's dispatch is proven.
+ * Keep this taxonomy small — add kinds only when a concrete leaf needs one.
+ */
+type ProofKind = 'executor_executeTool' | 'safety_executeAction' | 'programmatic_call';
+
+/**
+ * ProofSpec: machine-checkable proof anchor.
+ * Points to a specific test file and a dispatch string the governance test can
+ * verify exists via file IO + string matching (no test execution).
+ */
+interface ProofSpec {
+  kind: ProofKind;
+  testFile: string;         // relative to repo root
+  expectedDispatch: string; // string that must appear in testFile content
+}
+
+/**
+ * EntryPointId: which pipeline path produces this leaf.
+ * Maps to the entry point numbers in leaf-reachability-runbook.md.
+ */
+type EntryPointId =
+  | 'EP-1'  // Sterling Bootstrap Lowering
+  | 'EP-2'  // Sterling Solver
+  | 'EP-3'  // Fallback Planner
+  | 'EP-4'  // Dynamic Prereq Injection
+  | 'EP-5'  // Hunger Driveshaft
+  | 'EP-6'  // Exploration Driveshaft
+  | 'EP-7'  // Reactive Safety Pipeline
+  | 'EP-8'  // Acquisition Solver
+  | 'EP-9'; // Sleep Driveshaft
+
+/**
+ * ProducedBySpec: provenance metadata for a produced leaf.
+ * Every produced leaf must declare which entry points emit it.
+ */
+interface ProducedBySpec {
+  entryPoints: EntryPointId[];
+}
+
+// ============================================================================
 // Taxonomy: Produced / Proven / Waivers
 // ============================================================================
 
 /**
- * PRODUCED_LEAVES: leaves emitted by at least one autonomous producer.
- * Each entry is tagged with its producer(s) for traceability.
+ * PRODUCED_LEAVES: provenance-tracked producer registry.
+ * Each entry maps a leaf to the pipeline entry points that emit it.
  *
  * To add a leaf here:
  *   1. Identify the producer (solver, driveshaft, bootstrap, prereq injection)
- *   2. Add the leaf to this set with a comment naming the producer
- *   3. Either add it to PROVEN_LEAVES (with E2E test) or PROOF_WAIVERS
+ *   2. Add the leaf with its entryPoints
+ *   3. Either add proof specs to PROOFS (with E2E test) or add a ProofWaiver
  */
-const PRODUCED_LEAVES: ReadonlySet<string> = new Set([
-  // Rig A: crafting solver (generateStepsFromSterling)
-  'acquire_material',
-  'craft_recipe',
-  'smelt',
-  'place_workstation',
-  'place_block',
-  // Rig B: tool progression solver (explore path)
-  'explore_for_resources',
-  // Rig G: building solver (toTaskStepsWithReplan)
-  'prepare_site',
-  'build_module',
-  'place_feature',
-  'building_step',
-  'replan_building',
-  'replan_exhausted',
-  // Rig D: acquisition solver (trade/loot strategies)
-  'interact_with_entity',
-  'open_container',
-  // Bootstrap lowering (expand_by_digest)
-  'move_to',
-  'step_forward_safely',
-  // Hunger driveshaft
-  'consume_food',
-  // Executor prereq injection (programmatic, not task step)
-  'introspect_recipe',
-  // Reactive safety (EP-7) — bypasses executor, dispatches via actionTranslator
-  'attack_entity',
-  'equip_weapon',
-  // Sleep driveshaft (Stage 1)
-  'sleep',
-]);
+const PRODUCED_LEAVES: Readonly<Record<string, ProducedBySpec>> = {
+  // EP-1: Sterling Bootstrap Lowering (expand_by_digest)
+  move_to:              { entryPoints: ['EP-1', 'EP-6'] },
+  step_forward_safely:  { entryPoints: ['EP-1'] },
+  // EP-1 + EP-2 + EP-3 + EP-4: multiple producers
+  acquire_material:     { entryPoints: ['EP-1', 'EP-2', 'EP-3', 'EP-4'] },
+  // EP-1 + EP-5: bootstrap (food) + hunger driveshaft
+  consume_food:         { entryPoints: ['EP-1', 'EP-5'] },
+  // EP-2: Sterling Solver (crafting, tool progression, building)
+  craft_recipe:         { entryPoints: ['EP-2', 'EP-3', 'EP-4'] },
+  smelt:                { entryPoints: ['EP-2'] },
+  place_workstation:    { entryPoints: ['EP-2', 'EP-4'] },
+  place_block:          { entryPoints: ['EP-2'] },
+  explore_for_resources: { entryPoints: ['EP-2'] },
+  prepare_site:         { entryPoints: ['EP-2'] },
+  build_module:         { entryPoints: ['EP-2', 'EP-3'] },
+  place_feature:        { entryPoints: ['EP-2'] },
+  building_step:        { entryPoints: ['EP-2'] },
+  replan_building:      { entryPoints: ['EP-2'] },
+  replan_exhausted:     { entryPoints: ['EP-2'] },
+  // EP-2: executor prereq injection (programmatic, not task step)
+  introspect_recipe:    { entryPoints: ['EP-2'] },
+  // EP-7: Reactive Safety Pipeline (bypasses executor)
+  attack_entity:        { entryPoints: ['EP-7'] },
+  equip_weapon:         { entryPoints: ['EP-7'] },
+  // EP-8: Acquisition Solver (trade/loot strategies)
+  interact_with_entity: { entryPoints: ['EP-8'] },
+  open_container:       { entryPoints: ['EP-8'] },
+  // EP-9: Sleep Driveshaft (Stage 1)
+  sleep:                { entryPoints: ['EP-9'] },
+};
 
 /**
- * PROVEN_LEAVES: leaves with E2E dispatch-chain proof.
- * Each leaf here has at least one test that asserts `executeTool('minecraft.<leaf>', ...)`
- * was called with the correct arguments after running through the full pipeline
- * (producer → step → mapping → executor).
+ * PROOFS: machine-checkable proof registry.
+ * Each leaf maps to an array of ProofSpec entries. A leaf is "proven" if it
+ * has at least one proof spec whose anchor is valid.
  *
- * Safety-monitor bypass actions (attack_entity, equip_weapon) are proven via
- * `executeAction` assertions in safety-monitor-dispatch-e2e.test.ts — they bypass
- * the executor by design, so executeTool proof is structurally impossible.
+ * Proof patterns per kind:
+ *   executor_executeTool:  expectedDispatch = 'minecraft.<leaf>'
+ *   safety_executeAction:  expectedDispatch = action type string
+ *   programmatic_call:     expectedDispatch = call site marker string
  */
-const PROVEN_LEAVES: ReadonlySet<string> = new Set([
+const PROOFS: Readonly<Record<string, readonly ProofSpec[]>> = {
   // gather-food-dispatch-chain-e2e.test.ts
-  'acquire_material',
-  'consume_food',
+  acquire_material: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/gather-food-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.acquire_material',
+  }],
+  consume_food: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/gather-food-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.consume_food',
+  }],
   // building-solver-dispatch-chain-e2e.test.ts
-  'prepare_site',
-  'build_module',
-  'place_feature',
-  'building_step',      // scaffold→building_step dispatch proof
-  'replan_building',    // deficit path dispatch proof
-  'replan_exhausted',   // sterling-planner sentinel dispatch proof
-  // explore-replan-dispatch-e2e.test.ts, executor-task-loop-e2e.test.ts
-  'explore_for_resources',
-  'craft_recipe',
-  // executor-task-loop-e2e.test.ts (tool-progression leaf dispatch proof)
-  'smelt',
-  'place_workstation',
-  'place_block',
-  'step_forward_safely', // bootstrap leaf dispatch proof
+  prepare_site: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.prepare_site',
+  }],
+  build_module: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.build_module',
+  }],
+  place_feature: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.place_feature',
+  }],
+  building_step: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.building_step',
+  }],
+  replan_building: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.replan_building',
+  }],
+  replan_exhausted: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/building-solver-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.replan_exhausted',
+  }],
+  // explore-replan-dispatch-e2e.test.ts
+  explore_for_resources: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/explore-replan-dispatch-e2e.test.ts',
+    expectedDispatch: 'minecraft.explore_for_resources',
+  }],
+  craft_recipe: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/explore-replan-dispatch-e2e.test.ts',
+    expectedDispatch: 'minecraft.craft_recipe',
+  }],
+  // executor-task-loop-e2e.test.ts
+  smelt: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/executor-task-loop-e2e.test.ts',
+    expectedDispatch: 'minecraft.smelt',
+  }],
+  place_workstation: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/executor-task-loop-e2e.test.ts',
+    expectedDispatch: 'minecraft.place_workstation',
+  }],
+  place_block: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/executor-task-loop-e2e.test.ts',
+    expectedDispatch: 'minecraft.place_block',
+  }],
+  step_forward_safely: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/executor-task-loop-e2e.test.ts',
+    expectedDispatch: 'minecraft.step_forward_safely',
+  }],
   // exploration-driveshaft-e2e.test.ts
-  'move_to',
+  move_to: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/goal-formulation/__tests__/exploration-driveshaft-e2e.test.ts',
+    expectedDispatch: 'minecraft.move_to',
+  }],
   // sleep-driveshaft-e2e.test.ts
-  'sleep',
+  sleep: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/goal-formulation/__tests__/sleep-driveshaft-e2e.test.ts',
+    expectedDispatch: 'minecraft.sleep',
+  }],
   // safety-monitor-dispatch-e2e.test.ts (executeAction path, not executeTool)
-  'attack_entity',
-  'equip_weapon',
+  attack_entity: [{
+    kind: 'safety_executeAction',
+    testFile: 'packages/minecraft-interface/src/__tests__/safety-monitor-dispatch-e2e.test.ts',
+    expectedDispatch: 'attack_entity',
+  }],
+  equip_weapon: [{
+    kind: 'safety_executeAction',
+    testFile: 'packages/minecraft-interface/src/__tests__/safety-monitor-dispatch-e2e.test.ts',
+    expectedDispatch: 'equip_weapon',
+  }],
   // executor-task-loop-e2e.test.ts — programmatic-only: ctx.introspectRecipe()
   // invoked by executor during craft_recipe pre-check, not via executeTool
-  'introspect_recipe',
-]);
+  introspect_recipe: [{
+    kind: 'programmatic_call',
+    testFile: 'packages/planning/src/__tests__/executor-task-loop-e2e.test.ts',
+    expectedDispatch: 'introspectRecipe',
+  }],
+  // acquisition-dispatch-chain-e2e.test.ts (trade/loot strategies, EP-8)
+  interact_with_entity: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/acquisition-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.interact_with_entity',
+  }],
+  open_container: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/acquisition-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.open_container',
+  }],
+};
+
+/**
+ * Computed: set of proven leaf names (derived from PROOFS).
+ */
+function computeProvenLeaves(): ReadonlySet<string> {
+  return new Set(Object.keys(PROOFS).filter((k) => PROOFS[k].length > 0));
+}
+
+/**
+ * Computed: set of produced leaf names (derived from PRODUCED_LEAVES).
+ */
+function computeProducedLeaves(): ReadonlySet<string> {
+  return new Set(Object.keys(PRODUCED_LEAVES));
+}
 
 /**
  * PROOF_WAIVERS: Produced leaves that lack E2E dispatch-chain proof.
- * Each waiver must have owner, reason, and targetFix to prevent silent acceptance.
- * Resolve by adding E2E proof and moving the leaf to PROVEN_LEAVES.
+ * Each waiver must have owner, reason, targetFix, and reviewBy.
+ * Governance test fails if reviewBy is in the past.
+ * Resolve by adding proof specs to PROOFS and removing the waiver.
  */
 interface ProofWaiver {
   leaf: string;
@@ -131,23 +280,12 @@ interface ProofWaiver {
   reason: string;
   targetFix: string;
   createdAt: string;
+  reviewBy: string;   // YYYY-MM-DD — governance test fails if this date is past
 }
 
 const PROOF_WAIVERS: readonly ProofWaiver[] = [
-  {
-    leaf: 'interact_with_entity',
-    owner: 'planning-team',
-    reason: 'Acquisition solver trade strategy exists but no E2E test (G-3 gap)',
-    targetFix: 'Write acquisition solver E2E covering trade strategy',
-    createdAt: '2026-02-14',
-  },
-  {
-    leaf: 'open_container',
-    owner: 'planning-team',
-    reason: 'Acquisition solver loot strategy exists but no E2E test (G-3 gap)',
-    targetFix: 'Write acquisition solver E2E covering loot strategy',
-    createdAt: '2026-02-14',
-  },
+  // All waivers resolved — interact_with_entity and open_container now proven
+  // via acquisition-dispatch-chain-e2e.test.ts (G-3 gap closed).
 ];
 
 /**
@@ -156,7 +294,8 @@ const PROOF_WAIVERS: readonly ProofWaiver[] = [
  * These are dispatchable via REST/MCP but no autonomous producer emits them.
  */
 function computeContractedOnly(): ReadonlySet<string> {
-  return new Set([...KNOWN_LEAVES].filter((l) => !PRODUCED_LEAVES.has(l)));
+  const produced = computeProducedLeaves();
+  return new Set([...KNOWN_LEAVES].filter((l) => !produced.has(l)));
 }
 
 // ============================================================================
@@ -246,9 +385,10 @@ function makeTask(steps: any[]) {
 // ============================================================================
 
 describe('Invariant A: Produced ⊆ Contracted', () => {
+  const produced = computeProducedLeaves();
 
   it('every produced leaf has a LeafArgContract', () => {
-    const uncontracted = [...PRODUCED_LEAVES].filter((l) => !KNOWN_LEAVES.has(l));
+    const uncontracted = [...produced].filter((l) => !KNOWN_LEAVES.has(l));
     expect(
       uncontracted,
       `Producer(s) emit leaves without a LeafArgContract. These steps will ALWAYS fail ` +
@@ -260,7 +400,7 @@ describe('Invariant A: Produced ⊆ Contracted', () => {
 
   it('every produced leaf has an action mapping', () => {
     const unmapped: string[] = [];
-    for (const leaf of PRODUCED_LEAVES) {
+    for (const leaf of produced) {
       const action = mapBTActionToMinecraft(leaf, {});
       if (!action) {
         unmapped.push(leaf);
@@ -275,8 +415,7 @@ describe('Invariant A: Produced ⊆ Contracted', () => {
   });
 
   it('no produced leaf has disappeared from KNOWN_LEAVES', () => {
-    // Catches accidental removal of a contract that a producer still needs
-    const missing = [...PRODUCED_LEAVES].filter((l) => !KNOWN_LEAVES.has(l));
+    const missing = [...produced].filter((l) => !KNOWN_LEAVES.has(l));
     expect(missing).toEqual([]);
   });
 });
@@ -286,14 +425,16 @@ describe('Invariant A: Produced ⊆ Contracted', () => {
 // ============================================================================
 
 describe('Invariant B: Proven ⊆ Produced', () => {
+  const produced = computeProducedLeaves();
+  const proven = computeProvenLeaves();
 
   it('every proven leaf is also in the produced set', () => {
-    const orphanedProof = [...PROVEN_LEAVES].filter((l) => !PRODUCED_LEAVES.has(l));
+    const orphanedProof = [...proven].filter((l) => !produced.has(l));
     expect(
       orphanedProof,
-      `Leaves claimed as E2E-proven but not in PRODUCED_LEAVES. If no producer emits ` +
-      `this leaf autonomously, the E2E test is only covering manual/passthrough dispatch, ` +
-      `which is misleading. Remove from PROVEN_LEAVES or add a producer. ` +
+      `Leaves claimed as proven but not in PRODUCED_LEAVES. If no producer emits ` +
+      `this leaf autonomously, the proof is only covering manual/passthrough dispatch, ` +
+      `which is misleading. Remove from PROOFS or add a producer. ` +
       `Orphaned proof: ${orphanedProof.join(', ')}`,
     ).toEqual([]);
   });
@@ -304,22 +445,23 @@ describe('Invariant B: Proven ⊆ Produced', () => {
 // ============================================================================
 
 describe('Invariant C: Produced-not-Proven requires waivers', () => {
-
-  const producedNotProven = [...PRODUCED_LEAVES].filter((l) => !PROVEN_LEAVES.has(l));
+  const produced = computeProducedLeaves();
+  const proven = computeProvenLeaves();
+  const producedNotProven = [...produced].filter((l) => !proven.has(l));
   const waivedLeaves = new Set(PROOF_WAIVERS.map((w) => w.leaf));
 
   it('every produced-not-proven leaf has a waiver', () => {
     const unwaived = producedNotProven.filter((l) => !waivedLeaves.has(l));
     expect(
       unwaived,
-      `Produced leaves without E2E proof AND without a waiver. Either add an E2E ` +
-      `dispatch-chain test and move to PROVEN_LEAVES, or add a ProofWaiver with ` +
-      `owner/reason/targetFix. Unwaived: ${unwaived.join(', ')}`,
+      `Produced leaves without proof AND without a waiver. Either add proof specs ` +
+      `to PROOFS, or add a ProofWaiver with owner/reason/targetFix/reviewBy. ` +
+      `Unwaived: ${unwaived.join(', ')}`,
     ).toEqual([]);
   });
 
   it('no waiver exists for a leaf that is already proven', () => {
-    const staleWaivers = PROOF_WAIVERS.filter((w) => PROVEN_LEAVES.has(w.leaf));
+    const staleWaivers = PROOF_WAIVERS.filter((w) => proven.has(w.leaf));
     expect(
       staleWaivers.map((w) => w.leaf),
       `Waivers exist for already-proven leaves — remove them. ` +
@@ -328,7 +470,7 @@ describe('Invariant C: Produced-not-Proven requires waivers', () => {
   });
 
   it('no waiver exists for a leaf that is not produced', () => {
-    const orphanedWaivers = PROOF_WAIVERS.filter((w) => !PRODUCED_LEAVES.has(w.leaf));
+    const orphanedWaivers = PROOF_WAIVERS.filter((w) => !produced.has(w.leaf));
     expect(
       orphanedWaivers.map((w) => w.leaf),
       `Waivers exist for non-produced leaves — remove them. ` +
@@ -338,18 +480,18 @@ describe('Invariant C: Produced-not-Proven requires waivers', () => {
 });
 
 // ============================================================================
-// Invariant D: Waiver quality
+// Invariant D: Waiver quality + lifecycle
 // ============================================================================
 
-describe('Invariant D: Waiver quality', () => {
+describe('Invariant D: Waiver quality and lifecycle', () => {
 
-  it('every waiver has non-empty owner, reason, and targetFix', () => {
+  it('every waiver has non-empty owner, reason, targetFix, and reviewBy', () => {
     const invalid = PROOF_WAIVERS.filter(
-      (w) => !w.owner?.trim() || !w.reason?.trim() || !w.targetFix?.trim(),
+      (w) => !w.owner?.trim() || !w.reason?.trim() || !w.targetFix?.trim() || !w.reviewBy?.trim(),
     );
     expect(
       invalid.map((w) => w.leaf),
-      `Waivers with missing fields: ${invalid.map((w) => `${w.leaf} (owner=${w.owner}, reason=${w.reason}, targetFix=${w.targetFix})`).join('; ')}`,
+      `Waivers with missing fields: ${invalid.map((w) => `${w.leaf} (owner=${w.owner}, reason=${w.reason}, targetFix=${w.targetFix}, reviewBy=${w.reviewBy})`).join('; ')}`,
     ).toEqual([]);
   });
 
@@ -360,6 +502,31 @@ describe('Invariant D: Waiver quality', () => {
     expect(
       invalid.map((w) => w.leaf),
       `Waivers with invalid createdAt: ${invalid.map((w) => `${w.leaf}=${w.createdAt}`).join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('every waiver has a valid reviewBy date', () => {
+    const invalid = PROOF_WAIVERS.filter(
+      (w) => !w.reviewBy || isNaN(Date.parse(w.reviewBy)),
+    );
+    expect(
+      invalid.map((w) => w.leaf),
+      `Waivers with invalid reviewBy: ${invalid.map((w) => `${w.leaf}=${w.reviewBy}`).join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('no waiver has expired (reviewBy in the past)', () => {
+    const now = new Date();
+    const expired = PROOF_WAIVERS.filter((w) => new Date(w.reviewBy) < now);
+    expect(
+      expired.map((w) => `${w.leaf} (reviewBy: ${w.reviewBy})`),
+      `Expired waivers must be reviewed and either renewed (extend reviewBy) or resolved ` +
+      `(add proof to PROOFS and remove waiver):\n` +
+      expired.map((w) =>
+        `  ${w.leaf}: created ${w.createdAt}, review by ${w.reviewBy}\n` +
+        `    Reason: ${w.reason}\n` +
+        `    Fix: ${w.targetFix}`
+      ).join('\n'),
     ).toEqual([]);
   });
 
@@ -375,14 +542,109 @@ describe('Invariant D: Waiver quality', () => {
 });
 
 // ============================================================================
+// Machine-checkable proof anchors
+// ============================================================================
+
+describe('Machine-checkable proof anchors', () => {
+  const thisDir =
+    typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
+  const repoRoot = resolve(thisDir, '../../../..');
+
+  it('every proof spec points to an existing test file', () => {
+    const missing: string[] = [];
+
+    for (const [leaf, proofs] of Object.entries(PROOFS)) {
+      for (const proof of proofs) {
+        const fullPath = resolve(repoRoot, proof.testFile);
+        if (!existsSync(fullPath)) {
+          missing.push(`${leaf} → ${proof.testFile} (file not found)`);
+        }
+      }
+    }
+
+    expect(
+      missing,
+      `Proof anchors point to non-existent test files:\n${missing.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('every proof spec expectedDispatch string exists in the test file', () => {
+    const missing: string[] = [];
+
+    for (const [leaf, proofs] of Object.entries(PROOFS)) {
+      for (const proof of proofs) {
+        const fullPath = resolve(repoRoot, proof.testFile);
+        if (!existsSync(fullPath)) continue; // caught by previous test
+
+        const content = readFileSync(fullPath, 'utf-8');
+        if (!content.includes(proof.expectedDispatch)) {
+          missing.push(
+            `${leaf} → ${proof.testFile}: expected "${proof.expectedDispatch}" not found in file`,
+          );
+        }
+      }
+    }
+
+    expect(
+      missing,
+      `Proof anchors claim dispatches that don't exist in test files:\n${missing.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('every proven leaf has at least one proof spec', () => {
+    const emptyProofs = Object.entries(PROOFS).filter(([, specs]) => specs.length === 0);
+    expect(
+      emptyProofs.map(([leaf]) => leaf),
+      `PROOFS entries with empty spec arrays: ${emptyProofs.map(([l]) => l).join(', ')}`,
+    ).toEqual([]);
+  });
+});
+
+// ============================================================================
+// ProducedBy provenance
+// ============================================================================
+
+describe('ProducedBy provenance', () => {
+  const validEPs: ReadonlySet<EntryPointId> = new Set([
+    'EP-1', 'EP-2', 'EP-3', 'EP-4', 'EP-5', 'EP-6', 'EP-7', 'EP-8', 'EP-9',
+  ]);
+
+  it('every produced leaf has at least one entry point', () => {
+    const missing: string[] = [];
+    for (const [leaf, spec] of Object.entries(PRODUCED_LEAVES)) {
+      if (!spec.entryPoints || spec.entryPoints.length === 0) {
+        missing.push(leaf);
+      }
+    }
+    expect(
+      missing,
+      `Produced leaves without entry point provenance: ${missing.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('every entry point ID is from the valid set', () => {
+    const invalid: string[] = [];
+    for (const [leaf, spec] of Object.entries(PRODUCED_LEAVES)) {
+      for (const ep of spec.entryPoints) {
+        if (!validEPs.has(ep)) {
+          invalid.push(`${leaf}: invalid EP "${ep}"`);
+        }
+      }
+    }
+    expect(invalid).toEqual([]);
+  });
+});
+
+// ============================================================================
 // Contracted-only leaves (passthrough/manual)
 // ============================================================================
 
 describe('Contracted-only leaves (passthrough/manual)', () => {
   const contractedOnly = computeContractedOnly();
+  const produced = computeProducedLeaves();
 
   it('contracted-only leaves are not in any producer set', () => {
-    const leaks = [...contractedOnly].filter((l) => PRODUCED_LEAVES.has(l));
+    const leaks = [...contractedOnly].filter((l) => produced.has(l));
     expect(leaks).toEqual([]);
   });
 
@@ -412,7 +674,7 @@ describe('Contracted-only leaves (passthrough/manual)', () => {
   });
 
   it('no known producer emits any contracted-only leaf', () => {
-    const leaks = [...contractedOnly].filter((l) => PRODUCED_LEAVES.has(l));
+    const leaks = [...contractedOnly].filter((l) => produced.has(l));
     expect(
       leaks,
       `Contracted-only leaves found in producer output — reclassify to PRODUCED_LEAVES: ${leaks.join(', ')}`,
@@ -469,7 +731,8 @@ describe('Intent leaf dispatch guard', () => {
   });
 
   it('no known producer emits intent leaves', () => {
-    const leaks = [...INTENT_LEAVES].filter((l) => PRODUCED_LEAVES.has(l));
+    const produced = computeProducedLeaves();
+    const leaks = [...INTENT_LEAVES].filter((l) => produced.has(l));
     expect(leaks).toEqual([]);
   });
 
@@ -641,14 +904,15 @@ describe('Safety monitor bypass-path governance', () => {
 // ============================================================================
 
 describe('Classification drift detection', () => {
+  const produced = computeProducedLeaves();
+  const contractedOnly = computeContractedOnly();
 
   it('KNOWN_LEAVES count matches Produced + Contracted-only', () => {
-    const contractedOnly = computeContractedOnly();
     expect(
       KNOWN_LEAVES.size,
       `KNOWN_LEAVES size changed — a leaf was added or removed. ` +
       `Current: ${[...KNOWN_LEAVES].sort().join(', ')}`,
-    ).toBe(PRODUCED_LEAVES.size + contractedOnly.size);
+    ).toBe(produced.size + contractedOnly.size);
   });
 
   it('INTENT_LEAVES count matches expected', () => {
@@ -662,25 +926,193 @@ describe('Classification drift detection', () => {
 });
 
 // ============================================================================
-// Scoreboard (informational — prints on run for quick visibility)
+// Deterministic scoreboard (diff-friendly, explains "what changed")
 // ============================================================================
 
-describe('Reachability scoreboard', () => {
-  it('prints current reachability summary', () => {
+describe('Reachability scoreboard (deterministic)', () => {
+  interface ScoreboardRow {
+    leaf: string;
+    contracted: boolean;
+    produced: boolean;
+    proven: boolean;
+    proofKinds: ProofKind[];
+    waiver: string | null;
+    entryPoints: EntryPointId[];
+  }
+
+  function buildScoreboardRows(): ScoreboardRow[] {
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
+    const waiverByLeaf = new Map(PROOF_WAIVERS.map((w) => [w.leaf, w.owner]));
+
+    const rows: ScoreboardRow[] = [];
+    for (const leaf of [...KNOWN_LEAVES].sort()) {
+      rows.push({
+        leaf,
+        contracted: true,
+        produced: produced.has(leaf),
+        proven: proven.has(leaf),
+        proofKinds: (PROOFS[leaf] ?? []).map((p) => p.kind),
+        waiver: waiverByLeaf.get(leaf) ?? null,
+        entryPoints: PRODUCED_LEAVES[leaf]?.entryPoints ?? [],
+      });
+    }
+    return rows;
+  }
+
+  it('prints current reachability scoreboard (deterministic, sorted)', () => {
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
     const contractedOnly = computeContractedOnly();
-    const producedNotProven = [...PRODUCED_LEAVES].filter((l) => !PROVEN_LEAVES.has(l));
+    const producedNotProven = [...produced].filter((l) => !proven.has(l));
+    const rows = buildScoreboardRows();
 
     const summary = [
       `Contracted (KNOWN_LEAVES):     ${KNOWN_LEAVES.size}`,
-      `  Produced + Proven (strong):   ${PROVEN_LEAVES.size}`,
+      `  Produced + Proven (strong):   ${proven.size}`,
       `  Produced, not Proven (gap):   ${producedNotProven.length} [${producedNotProven.sort().join(', ')}]`,
       `  Contracted-only (manual):     ${contractedOnly.size}`,
       `Intent leaves:                  ${INTENT_LEAVES.size}`,
       `Waivers active:                 ${PROOF_WAIVERS.length}`,
     ].join('\n');
 
-    // This test always passes — it's here for visibility in test output
-    console.log(`\n─── Reachability Scoreboard ───\n${summary}\n──────────────────────────────\n`);
+    const header = 'Leaf | C | P | V | ProofKinds | Waiver | EntryPoints';
+    const sep =    '---- | - | - | - | ---------- | ------ | -----------';
+    const table = rows.map((r) => [
+      r.leaf,
+      r.contracted ? 'Y' : 'N',
+      r.produced ? 'Y' : 'N',
+      r.proven ? 'Y' : 'N',
+      r.proofKinds.join(',') || '-',
+      r.waiver ?? '-',
+      r.entryPoints.join(',') || '-',
+    ].join(' | ')).join('\n');
+
+    console.log(`\n─── Reachability Scoreboard ───\n${summary}\n\n${header}\n${sep}\n${table}\n──────────────────────────────\n`);
     expect(true).toBe(true);
+  });
+
+  it('detects missing proofs (produced-but-unproven without waiver)', () => {
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
+    const waivedLeaves = new Set(PROOF_WAIVERS.map((w) => w.leaf));
+
+    const missing = [...produced].filter((l) => !proven.has(l) && !waivedLeaves.has(l));
+    expect(
+      missing,
+      `Produced leaves without proofs AND without waivers:\n` +
+      `  ${missing.join(', ')}\n` +
+      `Add proof specs to PROOFS, or add a ProofWaiver.`,
+    ).toEqual([]);
+  });
+
+  it('detects unexpected proofs (proven-but-not-produced)', () => {
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
+
+    const unexpected = [...proven].filter((l) => !produced.has(l));
+    expect(
+      unexpected,
+      `Leaves with proofs but no autonomous producer:\n` +
+      `  ${unexpected.join(', ')}\n` +
+      `Either add to PRODUCED_LEAVES or remove from PROOFS.`,
+    ).toEqual([]);
+  });
+
+  it('detects stale waivers (waiver for proven or non-produced leaf)', () => {
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
+
+    const stale = PROOF_WAIVERS.filter(
+      (w) => proven.has(w.leaf) || !produced.has(w.leaf),
+    );
+    expect(
+      stale.map((w) => w.leaf),
+      `Stale waivers:\n` +
+      stale.map((w) =>
+        `  ${w.leaf}: ${proven.has(w.leaf) ? 'now proven' : 'no longer produced'} — ${w.reason}`
+      ).join('\n') +
+      `\nRemove these waivers.`,
+    ).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Runbook sync (doc-drift detection)
+// ============================================================================
+
+describe('Runbook sync (doc-drift detection)', () => {
+  const thisDir =
+    typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
+  const runbookPath = resolve(thisDir, '../../../../docs/runbooks/leaf-reachability-runbook.md');
+
+  function extractRunbookCounts(): {
+    producedAndProven: number;
+    producedNotProven: number;
+    contractedOnly: number;
+    orphaned: number;
+  } | null {
+    if (!existsSync(runbookPath)) return null;
+    const content = readFileSync(runbookPath, 'utf-8');
+
+    const ppMatch = content.match(/\|\s*\*\*Produced \+ Proven\*\*\s*\|[^|]*\|\s*(\d+)\s*\|/);
+    const pnpMatch = content.match(/\|\s*\*\*Produced, not Proven\*\*\s*\|[^|]*\|\s*(\d+)\s*\|/);
+    const coMatch = content.match(/\|\s*\*\*Contracted-only\*\*\s*\|[^|]*\|\s*(\d+)\s*\|/);
+    const oMatch = content.match(/\|\s*\*\*Orphaned\*\*\s*\|[^|]*\|\s*(\d+)\s*\|/);
+
+    if (!ppMatch || !pnpMatch || !coMatch || !oMatch) return null;
+
+    return {
+      producedAndProven: parseInt(ppMatch[1], 10),
+      producedNotProven: parseInt(pnpMatch[1], 10),
+      contractedOnly: parseInt(coMatch[1], 10),
+      orphaned: parseInt(oMatch[1], 10),
+    };
+  }
+
+  it('runbook file exists', () => {
+    expect(
+      existsSync(runbookPath),
+      `Runbook not found: ${runbookPath}`,
+    ).toBe(true);
+  });
+
+  it('runbook counts match governance data structures', () => {
+    const counts = extractRunbookCounts();
+    if (!counts) {
+      throw new Error(
+        'Failed to extract counts from runbook. Check docs/runbooks/leaf-reachability-runbook.md ' +
+        '"These derive four leaf states" table pattern.',
+      );
+    }
+
+    const produced = computeProducedLeaves();
+    const proven = computeProvenLeaves();
+    const contractedOnly = computeContractedOnly();
+    const producedNotProven = [...produced].filter((l) => !proven.has(l)).length;
+
+    const mismatches: string[] = [];
+    if (proven.size !== counts.producedAndProven) {
+      mismatches.push(
+        `Produced + Proven: governance=${proven.size}, runbook=${counts.producedAndProven}`,
+      );
+    }
+    if (producedNotProven !== counts.producedNotProven) {
+      mismatches.push(
+        `Produced, not Proven: governance=${producedNotProven}, runbook=${counts.producedNotProven}`,
+      );
+    }
+    if (contractedOnly.size !== counts.contractedOnly) {
+      mismatches.push(
+        `Contracted-only: governance=${contractedOnly.size}, runbook=${counts.contractedOnly}`,
+      );
+    }
+
+    expect(
+      mismatches,
+      `Runbook counts don't match governance data:\n` +
+      mismatches.map((m) => `  ${m}`).join('\n') +
+      `\nUpdate docs/runbooks/leaf-reachability-runbook.md "Four states" table.`,
+    ).toEqual([]);
   });
 });

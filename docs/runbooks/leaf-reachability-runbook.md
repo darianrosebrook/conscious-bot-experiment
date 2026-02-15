@@ -48,8 +48,8 @@ These derive four leaf states:
 
 | State | Meaning | Count |
 |-------|---------|-------|
-| **Produced + Proven** | Full autonomous pipeline with E2E dispatch proof | 19 |
-| **Produced, not Proven** | Producer exists but no E2E dispatch assertion (tracked via waiver) | 2 |
+| **Produced + Proven** | Full autonomous pipeline with E2E dispatch proof | 21 |
+| **Produced, not Proven** | Producer exists but no E2E dispatch assertion (tracked via waiver) | 0 |
 | **Contracted-only** | Contract + mapping exist, but no autonomous producer emits it (manual/API only) | 19 |
 | **Orphaned** | Leaf class exists in MC interface but no contract, no producer, no mapping | 8 |
 
@@ -64,7 +64,7 @@ These derive four leaf states:
 
 ## Full Leaf Inventory (40 leaves in KNOWN_LEAVES + orphans)
 
-### Produced + Proven leaves (19) — Full E2E dispatch-chain proof
+### Produced + Proven leaves (21) — Full E2E dispatch-chain proof
 
 | # | Leaf | Producer(s) | Dispatch Proof Test | Notes |
 |---|------|-------------|---------------------|-------|
@@ -87,15 +87,12 @@ These derive four leaf states:
 | 17 | `replan_exhausted` | Sterling planner (max replans exhausted) | `building-solver-dispatch-chain-e2e` | Terminal lifecycle marker |
 | 18 | `step_forward_safely` | Sterling bootstrap (theme=safety) | `executor-task-loop-e2e` | Maps to `move_forward` via action-mapping remap |
 | 19 | `introspect_recipe` | Executor prereq injection (programmatic) | `executor-task-loop-e2e` | Programmatic-only: `ctx.introspectRecipe()` during craft_recipe pre-check |
+| 20 | `interact_with_entity` | Acquisition solver (trade strategy) | `acquisition-dispatch-chain-e2e` | Resolver-style: `entityType` only at planning time |
+| 21 | `open_container` | Acquisition solver (loot strategy) | `acquisition-dispatch-chain-e2e` | Resolver-style: `containerType` only at planning time |
 
-### Produced, not Proven leaves (2) — Waiver required
+### Produced, not Proven leaves (0) — Waiver required
 
-Each of these has an active `ProofWaiver` in `reachability-governance.test.ts` with owner, reason, and targetFix.
-
-| # | Leaf | Producer(s) | Waiver Reason | Target Fix |
-|---|------|-------------|---------------|------------|
-| 20 | `interact_with_entity` | Acquisition solver (trade strategy) | No E2E test (G-3 gap) | Write acquisition solver E2E for trade |
-| 21 | `open_container` | Acquisition solver (loot strategy) | No E2E test (G-3 gap) | Write acquisition solver E2E for loot |
+All previously waivered leaves are now proven. No active waivers remain.
 
 ### Contracted-only leaves (19) — No autonomous producer
 
@@ -326,6 +323,7 @@ npx vitest run packages/planning/src/goal-formulation/__tests__/sleep-driveshaft
 | Explore-Replan Dispatch Chain | `packages/planning/src/__tests__/explore-replan-dispatch-e2e.test.ts` | EP-2 | explore_for_resources, acquire_material, craft_recipe |
 | Exploration Driveshaft E2E | `packages/planning/src/goal-formulation/__tests__/exploration-driveshaft-e2e.test.ts` | EP-6 | move_to |
 | Safety Monitor Dispatch | `packages/minecraft-interface/src/__tests__/safety-monitor-dispatch-e2e.test.ts` | EP-7 | equip_weapon, attack_entity, navigate, move_forward, find_shelter |
+| Acquisition Dispatch Chain | `packages/planning/src/__tests__/acquisition-dispatch-chain-e2e.test.ts` | EP-8 | interact_with_entity (trade), open_container (loot) |
 | Reachability Governance | `packages/planning/src/__tests__/reachability-governance.test.ts` | — | (negative-space: locks classification, prevents capability creep) |
 | Sleep Driveshaft | `packages/planning/src/goal-formulation/__tests__/sleep-driveshaft-controller.test.ts` | EP-9 | sleep |
 | Sleep Driveshaft E2E | `packages/planning/src/goal-formulation/__tests__/sleep-driveshaft-e2e.test.ts` | EP-9 | sleep (controller → action mapping → executor dispatch) |
@@ -356,11 +354,8 @@ Addressed by `safety-monitor-dispatch-e2e.test.ts` (Phase 1d). Tests equip → a
 ### ~~Gap G-2: Building solver leaves~~ — RESOLVED
 Addressed by `building-solver-dispatch-chain-e2e.test.ts` (Phase 1a). Tests module-type → leaf mapping, happy path dispatch, deficit path, and documents Option A policy (derived args blocked in live mode).
 
-### Gap G-3: Acquisition solver strategies have no E2E test
-**Impact**: `interact_with_entity` (trade) and `open_container` (loot) are Produced but not Proven.
-**Tracked**: Via `ProofWaiver` entries in `reachability-governance.test.ts` (owner: planning-team).
-**Needed**: Acquisition solver E2E test covering trade/loot/salvage strategies.
-**Deferred**: Trade/loot/salvage require Sterling backend rules that don't exist yet.
+### ~~Gap G-3: Acquisition solver strategies have no E2E test~~ — RESOLVED
+Addressed by `acquisition-dispatch-chain-e2e.test.ts`. Tests trade strategy (`acq:trade:*` → `interact_with_entity`) and loot strategy (`acq:loot:*` → `open_container`) dispatch chains. Contracts relaxed to resolver-style: `entityType`-only for trade, `containerType`-only for loot (leaf resolves nearest matching entity/container at runtime).
 
 ### ~~Gap G-4: `explore_for_resources` dispatch~~ — RESOLVED
 Addressed by `explore-replan-dispatch-e2e.test.ts` (Phase 1b). Tests needsBlocks → explore → replan → dispatch chain.
@@ -403,6 +398,7 @@ npx vitest run \
   packages/planning/src/__tests__/explore-replan-dispatch-e2e.test.ts \
   packages/planning/src/goal-formulation/__tests__/exploration-driveshaft-e2e.test.ts \
   packages/minecraft-interface/src/__tests__/safety-monitor-dispatch-e2e.test.ts \
+  packages/planning/src/__tests__/acquisition-dispatch-chain-e2e.test.ts \
   packages/planning/src/__tests__/reachability-governance.test.ts \
   packages/planning/src/goal-formulation/__tests__/sleep-driveshaft-controller.test.ts \
   packages/planning/src/goal-formulation/__tests__/sleep-driveshaft-e2e.test.ts
@@ -485,5 +481,5 @@ When a new producer starts emitting a contracted-only leaf:
 
 ---
 
-*Last updated: 2026-02-14 (waivers reduced 10→2; 19/21 produced leaves now proven)*
+*Last updated: 2026-02-14 (all 21/21 produced leaves now proven; 0 waivers; G-3 resolved)*
 *Source: Reachability audit of `leaf-arg-contracts.ts`, `action-mapping.ts`, `step-to-leaf-execution.ts`, `leaf-routing.ts`, `expand_by_digest_v1.py`, `automatic-safety-monitor.ts`, all solver files, all driveshaft controllers, `reachability-governance.test.ts`.*
