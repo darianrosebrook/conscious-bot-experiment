@@ -34,6 +34,11 @@ const cacheByVersion = new Map<
 >();
 const loadPromisesByVersion = new Map<string, Promise<void>>();
 
+function getCacheKey(version: string): string {
+  const forceLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('atlas') === 'legacy';
+  return forceLegacy ? `${version}:legacy` : version;
+}
+
 /** Load atlas and blockStates from Minecraft asset pipeline (same as viewer) */
 async function loadMcAssets(version: string): Promise<{
   material: THREE.MeshLambertMaterial;
@@ -180,9 +185,12 @@ async function loadAtlas(version: string): Promise<{
   blockStates: BlockStatesData | null;
   source: 'mc-assets' | 'legacy';
 }> {
-  const mc = await loadMcAssets(version);
-  if (mc) {
-    return mc;
+  const forceLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('atlas') === 'legacy';
+  if (!forceLegacy) {
+    const mc = await loadMcAssets(version);
+    if (mc) {
+      return mc;
+    }
   }
   return loadLegacyAtlas();
 }
@@ -195,7 +203,8 @@ export function useAtlasMaterial(mcVersion?: string | null): {
   atlasSource: 'mc-assets' | 'legacy' | null;
 } {
   const version = mcVersion ?? DEFAULT_MC_VERSION;
-  const cached = cacheByVersion.get(version);
+  const cacheKey = getCacheKey(version);
+  const cached = cacheByVersion.get(cacheKey);
   const [ready, setReady] = useState(!!cached);
   const [source, setSource] = useState<'mc-assets' | 'legacy' | null>(
     cached?.source ?? null
@@ -214,18 +223,19 @@ export function useAtlasMaterial(mcVersion?: string | null): {
     }
 
     const loadVersion = version;
-    let loadPromise = loadPromisesByVersion.get(loadVersion);
+    const loadCacheKey = getCacheKey(loadVersion);
+    let loadPromise = loadPromisesByVersion.get(loadCacheKey);
     if (!loadPromise) {
       loadPromise = loadAtlas(loadVersion).then((entry) => {
-        cacheByVersion.set(loadVersion, entry);
+        cacheByVersion.set(loadCacheKey, entry);
       });
-      loadPromisesByVersion.set(loadVersion, loadPromise);
+      loadPromisesByVersion.set(loadCacheKey, loadPromise);
     }
 
     loadPromise
       .then(() => {
         if (!mountedRef.current || versionRef.current !== loadVersion) return;
-        const entry = cacheByVersion.get(loadVersion);
+        const entry = cacheByVersion.get(loadCacheKey);
         if (entry) {
           setReady(true);
           setSource(entry.source);
@@ -238,9 +248,9 @@ export function useAtlasMaterial(mcVersion?: string | null): {
     return () => {
       mountedRef.current = false;
     };
-  }, [version]);
+  }, [version, cacheKey]);
 
-  const entry = cacheByVersion.get(version);
+  const entry = cacheByVersion.get(cacheKey);
   return {
     material: entry?.material ?? null,
     atlasIndex: entry?.atlasIndex ?? null,

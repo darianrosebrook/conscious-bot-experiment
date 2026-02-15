@@ -293,6 +293,26 @@ export function createAssetServer(options: AssetServerOptions = {}): Router {
         return fs.createReadStream(paths.atlasIndexPath).pipe(res);
       }
 
+      if (autoGenerate && !generatingVersions.has(version)) {
+        generatingVersions.add(version);
+        console.log(`[asset-server] Auto-generating assets for ${version} (atlas-index)`);
+
+        try {
+          await pipeline.generate(version, { ensureRawAssets: ['entity'] });
+          generatingVersions.delete(version);
+
+          if (fs.existsSync(paths.atlasIndexPath)) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('X-Asset-Source', 'generated');
+            return fs.createReadStream(paths.atlasIndexPath).pipe(res);
+          }
+        } catch (error) {
+          generatingVersions.delete(version);
+          console.error(`[asset-server] Failed to generate assets for ${version}:`, error);
+        }
+      }
+
       res.status(404).json({
         error: 'Atlas index not found',
         version,

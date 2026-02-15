@@ -117,7 +117,8 @@ export function resolveBlockTextures(blockType: string): BlockFaceTextures {
     return { top: 'tnt_top', side: 'tnt_side', bottom: 'tnt_bottom' };
   }
 
-  // Vegetation: use grass_block_top when texture missing (grass, fern, tall_grass)
+  // Vegetation: use grass_block_top (same as Live viewer when atlas has it).
+  // Avoid grass/fern/tall_grass texture names until atlas-index is confirmed to include them.
   if (blockType === 'grass' || blockType === 'fern' || blockType === 'tall_grass') {
     return { top: 'grass_block_top', side: 'grass_block_side', bottom: 'grass_block_top' };
   }

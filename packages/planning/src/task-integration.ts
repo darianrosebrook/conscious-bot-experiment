@@ -98,6 +98,27 @@ import { getLoopBreaker } from './task-lifecycle/loop-breaker';
 const PLANNING_INGEST_DEBUG_400 =
   process.env.PLANNING_INGEST_DEBUG_400 === '1';
 const DEBUG_ACK_DEFERRAL_LIMIT = 3;
+
+const GATHER_FOOD_BLOCK_PRIORITY = [
+  'sweet_berry_bush',
+  'carrots',
+  'potatoes',
+  'beetroots',
+  'melon',
+  'pumpkin',
+  'cocoa',
+  'wheat',
+] as const;
+
+const GATHER_FOOD_BLOCK_ALIAS_TO_CANONICAL: Record<string, string> = {
+  carrot: 'carrots',
+  potato: 'potatoes',
+  beetroot: 'beetroots',
+  melon_block: 'melon',
+  pumpkin_stem: 'pumpkin',
+  attached_pumpkin_stem: 'pumpkin',
+  cocoa_beans: 'cocoa',
+};
 import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
@@ -1080,6 +1101,140 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       idx[name] = (idx[name] || 0) + (it?.count || 0);
     }
     return idx;
+  }
+
+  private normalizeNearbyBlockName(raw: unknown): string | null {
+    const value =
+      typeof raw === 'string'
+        ? raw
+        : raw && typeof raw === 'object'
+          ? ((raw as any).name ??
+            (raw as any).type ??
+            (raw as any).blockType ??
+            (raw as any).block_type)
+          : undefined;
+    if (!value) return null;
+    let name = this.canonicalItemId(value);
+    if (name.startsWith('minecraft:')) name = name.slice('minecraft:'.length);
+    return name || null;
+  }
+
+  private normalizeFoodGatherBlockName(raw: string): string {
+    return GATHER_FOOD_BLOCK_ALIAS_TO_CANONICAL[raw] ?? raw;
+  }
+
+  private getNearbyBlockNamesFromTaskMetadata(taskData: Partial<Task>): string[] | null {
+    const nearbyRaw = (taskData.metadata as any)?.currentState?.nearbyBlocks;
+    if (!Array.isArray(nearbyRaw)) return null;
+    const names: string[] = [];
+    for (const block of nearbyRaw) {
+      const name = this.normalizeNearbyBlockName(block);
+      if (name) names.push(this.normalizeFoodGatherBlockName(name));
+    }
+    return names;
+  }
+
+  private async getNearbyBlockNamesForFoodResolution(
+    taskData: Partial<Task>
+  ): Promise<string[]> {
+    const metadataNearby = this.getNearbyBlockNamesFromTaskMetadata(taskData);
+    if (metadataNearby !== null) return metadataNearby;
+
+    const botCtx = await this.fetchBotContext();
+    if (botCtx._unavailable || !Array.isArray(botCtx.nearbyBlocks)) return [];
+    const names: string[] = [];
+    for (const block of botCtx.nearbyBlocks) {
+      const name = this.normalizeNearbyBlockName(block);
+      if (name) names.push(this.normalizeFoodGatherBlockName(name));
+    }
+    return names;
+  }
+
+  private pickGatherFoodNearbyBlock(
+    requestedItem: string | undefined,
+    nearbyBlocks: string[]
+  ): string | undefined {
+    const nearbySet = new Set(
+      nearbyBlocks
+        .map((b) => this.normalizeFoodGatherBlockName(this.canonicalItemId(b)))
+        .filter((b) => b.length > 0)
+    );
+
+    if (requestedItem && nearbySet.has(requestedItem)) {
+      return requestedItem;
+    }
+
+    for (const candidate of GATHER_FOOD_BLOCK_PRIORITY) {
+      if (nearbySet.has(candidate)) return candidate;
+    }
+
+    return requestedItem;
+  }
+
+  private async resolveGatherFoodAcquireSteps(
+    taskData: Partial<Task>,
+    steps: Array<{
+      id?: string;
+      order?: number;
+      leaf: string;
+      args: Record<string, unknown>;
+      meta?: Record<string, unknown>;
+    }>
+  ): Promise<{
+    steps: Array<{
+      id?: string;
+      order?: number;
+      leaf: string;
+      args: Record<string, unknown>;
+      meta?: Record<string, unknown>;
+    }>;
+    substitutions: number;
+  }> {
+    const hasGatherFoodAcquire = steps.some((step) => {
+      if (step.leaf !== 'acquire_material') return false;
+      const args = step.args ?? {};
+      return args.lowered_from === 'gather' && args.theme === 'food';
+    });
+    if (!hasGatherFoodAcquire) return { steps, substitutions: 0 };
+
+    const nearbyBlocks = await this.getNearbyBlockNamesForFoodResolution(taskData);
+    if (nearbyBlocks.length === 0) return { steps, substitutions: 0 };
+
+    let substitutions = 0;
+    const rewritten = steps.map((step) => {
+      if (step.leaf !== 'acquire_material') return step;
+
+      const args = step.args ?? {};
+      const loweredFrom = typeof args.lowered_from === 'string' ? args.lowered_from : '';
+      const theme = typeof args.theme === 'string' ? args.theme : '';
+      if (loweredFrom !== 'gather' || theme !== 'food') return step;
+
+      const requestedRaw = typeof args.item === 'string' ? args.item : undefined;
+      const requestedItem = requestedRaw
+        ? this.normalizeFoodGatherBlockName(this.canonicalItemId(requestedRaw))
+        : undefined;
+      const selectedItem = this.pickGatherFoodNearbyBlock(requestedItem, nearbyBlocks);
+      if (!selectedItem || (requestedItem && selectedItem === requestedItem)) return step;
+
+      substitutions += 1;
+      return {
+        ...step,
+        args: {
+          ...args,
+          item: selectedItem,
+          requested_item: requestedRaw ?? null,
+          resolution: 'nearby_food_substitution',
+        },
+        meta: {
+          ...(step.meta ?? {}),
+          gatherFoodItemSubstitutedFrom: requestedRaw ?? null,
+          gatherFoodItemSubstitutedTo: selectedItem,
+          gatherFoodItemResolution: 'nearby_blocks',
+        },
+      };
+    });
+
+    return { steps: rewritten, substitutions };
   }
 
   /**
@@ -2639,6 +2794,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         };
       }
     }
+
+    const gatherFoodResolution = await this.resolveGatherFoodAcquireSteps(
+      taskData,
+      finalSteps
+    );
+    finalSteps = gatherFoodResolution.steps;
 
     // Compute executor plan digest: SHA-256 of the canonical JSON of the
     // final step list being executed. Always defined so downstream code

@@ -333,6 +333,100 @@ describe('Sterling IR routing', () => {
     expect((created.metadata as any).sterling?.exec?.planBundleDigest).toBe('bundle_1');
   });
 
+  it('rewrites gather-food acquire_material item to a nearby food block when fixture item is unavailable', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_food_sub',
+      steps: [
+        {
+          leaf: 'acquire_material',
+          args: {
+            item: 'sweet_berry_bush',
+            count: 1,
+            lowered_from: 'gather',
+            theme: 'food',
+          },
+        },
+      ],
+      schema_version: 'v1',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'sterling_ir',
+        currentState: {
+          nearbyBlocks: ['stone', 'carrots', 'dirt'],
+        },
+        sterling: {
+          committedIrDigest: 'deadbeef',
+          schemaVersion: 'v1',
+          envelopeId: 'env_food_sub',
+        },
+      } as any,
+    }));
+
+    expect(created.status).toBe('pending');
+    expect(created.steps.length).toBe(1);
+    expect(created.steps[0].meta?.leaf).toBe('acquire_material');
+    expect((created.steps[0].meta?.args as any)?.item).toBe('carrots');
+    expect((created.steps[0].meta?.args as any)?.requested_item).toBe('sweet_berry_bush');
+    expect((created.steps[0].meta as any)?.gatherFoodItemResolution).toBe('nearby_blocks');
+  });
+
+  it('keeps gather-food acquire_material item when requested block is already nearby', async () => {
+    const expandByDigest = vi.fn().mockResolvedValue({
+      status: 'ok',
+      plan_bundle_digest: 'bundle_food_keep',
+      steps: [
+        {
+          leaf: 'acquire_material',
+          args: {
+            item: 'sweet_berry_bush',
+            count: 1,
+            lowered_from: 'gather',
+            theme: 'food',
+          },
+        },
+      ],
+      schema_version: 'v1',
+    });
+    const service = createMockSterlingService({ overrides: { expandByDigest } });
+    ti.setSterlingExecutorService(service as any);
+
+    const created = await ti.addTask(makeSterlingTask({
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'sterling_ir',
+        currentState: {
+          nearbyBlocks: ['sweet_berry_bush', 'grass_block'],
+        },
+        sterling: {
+          committedIrDigest: 'deadbeef',
+          schemaVersion: 'v1',
+          envelopeId: 'env_food_keep',
+        },
+      } as any,
+    }));
+
+    expect(created.status).toBe('pending');
+    expect(created.steps.length).toBe(1);
+    expect((created.steps[0].meta?.args as any)?.item).toBe('sweet_berry_bush');
+    expect((created.steps[0].meta?.args as any)?.requested_item).toBeUndefined();
+  });
+
   it('blocks when digest is missing', async () => {
     const findSimilarSpy = vi.spyOn((ti as any).taskStore, 'findSimilarTask');
     const created = await ti.addTask(makeSterlingTask({
