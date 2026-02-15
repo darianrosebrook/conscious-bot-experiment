@@ -847,7 +847,14 @@ export class SterlingClient extends EventEmitter {
   async resolveIntentSteps(
     request: {
       intent_steps: Array<{ leaf: string; args: Record<string, unknown> }>;
-      world_state: { inventory: Record<string, number>; nearby_blocks: string[] };
+      world_state: {
+        inventory: Record<string, number>;
+        nearby_blocks: string[];
+        nearby_blocks_known?: boolean;
+        nearby_block_counts?: Record<string, number>;
+        preferred_base_items?: string[];
+        scan_meta?: { radius: number; scanned_at: number; biome: string };
+      };
       rules?: Array<Record<string, unknown>>;
       schema_version?: string;
       request_id?: string;

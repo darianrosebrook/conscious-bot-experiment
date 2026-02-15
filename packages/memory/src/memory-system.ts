@@ -264,6 +264,8 @@ export class EnhancedMemorySystem extends EventEmitter {
 
   private searchStats: Array<{ timestamp: number; latency: number }> = [];
   private initialized = false;
+  /** Timestamp when initialize() completed. Used for bootstrap grace period. */
+  private initializedAt: number = 0;
 
   /** Persistent mode flag: 'hybrid' if KG init succeeded, 'vector_only' if it failed. */
   knowledgeGraphMode: 'hybrid' | 'vector_only' | 'uninitialized' = 'uninitialized';
@@ -498,6 +500,7 @@ export class EnhancedMemorySystem extends EventEmitter {
     }
 
     this.initialized = true;
+    this.initializedAt = Date.now();
 
     // Start reflection persistence write loop (S1)
     this.startReflectionWriteLoop();
@@ -2180,8 +2183,12 @@ export class EnhancedMemorySystem extends EventEmitter {
       const issues: string[] = [];
       let corruptionDetected = false;
 
-      // Check memory count consistency
-      if (memoryCount < 10 && this.initialized) {
+      // Check memory count consistency (skip during bootstrap grace period)
+      const BOOTSTRAP_GRACE_MS = 600_000; // 10 minutes
+      const isPastBootstrap =
+        this.initializedAt > 0 &&
+        Date.now() - this.initializedAt > BOOTSTRAP_GRACE_MS;
+      if (memoryCount < 10 && this.initialized && isPastBootstrap) {
         issues.push('Memory count suspiciously low');
         corruptionDetected = true;
       }

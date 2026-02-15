@@ -85,6 +85,14 @@ let currentWorldState: WorldState = {
 // Event emitter for world state updates
 const worldStateEmitter = new EventEmitter();
 
+function toEntityNames(
+  entities: Array<{ type?: string; name?: string; displayName?: string } | string>
+): string[] {
+  return entities.map((e) =>
+    typeof e === 'string' ? e : e?.name ?? e?.type ?? e?.displayName ?? 'unknown'
+  ).filter(Boolean);
+}
+
 // Fetch world state from planning server
 async function fetchWorldStateFromPlanning(): Promise<WorldState | null> {
   try {
@@ -118,7 +126,9 @@ async function fetchWorldStateFromPlanning(): Promise<WorldState | null> {
         pathfindingActive: data.navigation?.pathfindingActive,
       },
       perception: {
-        visibleEntities: data.perception?.visibleEntities || [],
+        visibleEntities: toEntityNames(
+          data.nearbyEntities ?? data.perception?.visibleEntities ?? []
+        ),
         recognizedObjects: data.perception?.recognizedObjects || [],
         perceptionQuality: data.perception?.perceptionQuality || 0.5,
       },

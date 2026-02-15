@@ -425,8 +425,8 @@ export class EnhancedKnowledgeGraphCore {
         if ((hasVector.rowCount ?? 0) === 0) {
           throw new Error(
             `pgvector extension is not installed and could not be created: ${extErr.message}. ` +
-            `Ensure the 'conscious_bot_seed_template' database exists with pgvector, ` +
-            `or install pgvector manually in this database.`
+              `Ensure the 'conscious_bot_seed_template' database exists with pgvector, ` +
+              `or install pgvector manually in this database.`
           );
         }
       }
@@ -1065,11 +1065,11 @@ export class EnhancedKnowledgeGraphCore {
       const basicResult = await client.query(`
         SELECT
           COUNT(*) as entity_count,
-          COUNT(DISTINCT type) as entity_types,
+          COUNT(DISTINCT e.type) as entity_types,
           COUNT(*) as relationship_count,
           COUNT(DISTINCT r.type) as relationship_types,
-          AVG(confidence) as avg_confidence,
-          MAX(updated_at) as last_updated
+          AVG(e.confidence) as avg_confidence,
+          MAX(e.updated_at) as last_updated
         FROM ${this.entityTable} e
         LEFT JOIN ${this.relationshipTable} r ON (
           r.source_entity_id = e.id OR r.target_entity_id = e.id
@@ -1082,7 +1082,7 @@ export class EnhancedKnowledgeGraphCore {
       const vectorResult = await client.query(`
         SELECT
           COUNT(*) as embedding_count,
-          AVG(array_length(embedding::float[], 1)) as avg_dimension
+          AVG(vector_dims(embedding)) as avg_dimension
         FROM ${this.entityTable}
         WHERE embedding IS NOT NULL
       `);
@@ -1830,7 +1830,11 @@ export class EnhancedKnowledgeGraphCore {
 
       case QueryType.PATH: {
         if (typeof p.source === 'string' && typeof p.target === 'string') {
-          const paths = await this.findPath(p.source, p.target, p.maxDepth ?? 3);
+          const paths = await this.findPath(
+            p.source,
+            p.target,
+            p.maxDepth ?? 3
+          );
           if (paths.length > 0) {
             confidence = paths[0].confidence;
           }
@@ -1841,7 +1845,10 @@ export class EnhancedKnowledgeGraphCore {
       case QueryType.NEIGHBORHOOD: {
         const targetId = typeof p.target === 'string' ? p.target : undefined;
         if (targetId) {
-          const neighborhood = await this.getEntityNeighborhood(targetId, p.maxDepth ?? 1);
+          const neighborhood = await this.getEntityNeighborhood(
+            targetId,
+            p.maxDepth ?? 1
+          );
           if (neighborhood.entity) {
             entities = [neighborhood.entity];
             for (const n of neighborhood.neighbors) {
