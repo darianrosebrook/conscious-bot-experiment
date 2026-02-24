@@ -860,6 +860,13 @@ export class NavigationBridge extends EventEmitter {
       return { success: false, error: 'Pathfinder plugin not initialized' };
     }
 
+    // Refresh Movements before each navigation attempt — ensures the
+    // pathfinder uses current world state for cost calculations.
+    try {
+      this.movements = new this.pf.Movements(this.bot);
+      this.bot.pathfinder.setMovements(this.movements);
+    } catch { /* non-fatal: pathfinder will use existing movements */ }
+
     // Use GoalNear with range=2 for normal terrain navigation.
     // GoalNear includes Y in distance calculation, which works well when the
     // caller provides an accurate Y. For cases where Y is uncertain, the
@@ -876,49 +883,59 @@ export class NavigationBridge extends EventEmitter {
       };
 
       // --- Position-history sliding window for stuck detection ---
+      // Stuck detection is DEFERRED until the pathfinder has computed at least
+      // one path (signalled by the first path_update event). Before that point,
+      // zero movement is expected — the A* is still computing. Without this
+      // deferral, the 6-second window fires before the bot has had a chance to
+      // move, producing false "Stuck: moved 0.00 blocks" on every attempt.
       const POLL_INTERVAL = 2000; // ms
-      const STUCK_WINDOW = 3; // number of samples (6 s at 2 s intervals)
+      const STUCK_WINDOW = 4; // number of samples (8 s at 2 s intervals)
       const STUCK_THRESHOLD = 0.5; // blocks
       const positionHistory: Vec3[] = [];
+      let pathComputedOnce = false;
+      let stuckPoll: ReturnType<typeof setInterval> | null = null;
 
-      const stuckPoll = setInterval(() => {
-        if (resolved) return;
-        const pos = this.bot.entity.position.clone();
-        positionHistory.push(pos);
-        if (positionHistory.length > STUCK_WINDOW) {
-          positionHistory.shift();
-        }
-        if (positionHistory.length === STUCK_WINDOW) {
-          const oldest = positionHistory[0];
-          const newest = positionHistory[positionHistory.length - 1];
-          const moved = oldest.distanceTo(newest);
-          if (moved < STUCK_THRESHOLD) {
-            // Check if we're close enough to the target to call it success
-            const distToTarget = newest.distanceTo(step);
-            if (distToTarget <= 3) {
-              console.log(
-                `✅ Close enough to target (${distToTarget.toFixed(2)} blocks), treating as success`
-              );
-              try {
-                this.bot.pathfinder.stop();
-              } catch {}
-              finish({ success: true });
-            } else {
-              console.log(
-                `🚫 Stuck detected: moved ${moved.toFixed(2)} blocks in ${STUCK_WINDOW * (POLL_INTERVAL / 1000)}s, ${distToTarget.toFixed(1)} blocks from target`
-              );
-              try {
-                this.bot.pathfinder.stop();
-              } catch {}
-              finish({ success: false, error: 'Stuck: insufficient movement progress' });
+      const startStuckDetection = () => {
+        if (stuckPoll !== null) return; // already started
+        stuckPoll = setInterval(() => {
+          if (resolved) return;
+          const pos = this.bot.entity.position.clone();
+          positionHistory.push(pos);
+          if (positionHistory.length > STUCK_WINDOW) {
+            positionHistory.shift();
+          }
+          if (positionHistory.length === STUCK_WINDOW) {
+            const oldest = positionHistory[0];
+            const newest = positionHistory[positionHistory.length - 1];
+            const moved = oldest.distanceTo(newest);
+            if (moved < STUCK_THRESHOLD) {
+              // Check if we're close enough to the target to call it success
+              const distToTarget = newest.distanceTo(step);
+              if (distToTarget <= 3) {
+                console.log(
+                  `[NavigationBridge] Close enough to target (${distToTarget.toFixed(2)} blocks), treating as success`
+                );
+                try {
+                  this.bot.pathfinder.stop();
+                } catch {}
+                finish({ success: true });
+              } else {
+                console.log(
+                  `[NavigationBridge] Stuck detected: moved ${moved.toFixed(2)} blocks in ${STUCK_WINDOW * (POLL_INTERVAL / 1000)}s, ${distToTarget.toFixed(1)} blocks from target`
+                );
+                try {
+                  this.bot.pathfinder.stop();
+                } catch {}
+                finish({ success: false, error: 'Stuck: insufficient movement progress' });
+              }
             }
           }
-        }
-      }, POLL_INTERVAL);
+        }, POLL_INTERVAL);
+      };
 
       // --- Hard timeout safety net ---
       const hardTimeout = setTimeout(() => {
-        console.log(`⏰ Hard timeout reached (${timeoutMs}ms)`);
+        console.log(`[NavigationBridge] Hard timeout reached (${timeoutMs}ms)`);
         try {
           this.bot.pathfinder.stop();
         } catch {}
@@ -932,11 +949,16 @@ export class NavigationBridge extends EventEmitter {
 
       const onPathUpdate = (results: any) => {
         if (results?.status === 'noPath') {
-          console.log('🚫 Path unreachable (noPath)');
+          console.log('[NavigationBridge] Path unreachable (noPath)');
           try {
             this.bot.pathfinder.stop();
           } catch {}
           finish({ success: false, error: 'Path unreachable' });
+        } else if (!pathComputedOnce) {
+          // First successful path computation — now the bot should start moving.
+          // Begin stuck detection from this point forward.
+          pathComputedOnce = true;
+          startStuckDetection();
         }
       };
 
@@ -944,11 +966,10 @@ export class NavigationBridge extends EventEmitter {
       const MAX_PATH_RESETS = 5;
       const onPathReset = () => {
         pathResetCount++;
-        console.log(`🔄 Path reset #${pathResetCount} (pathfinder replanning)`);
         // path_reset is normal on complex terrain — pathfinder recalculates
         // automatically. Only treat as stuck if it resets excessively.
         if (pathResetCount >= MAX_PATH_RESETS) {
-          console.log(`🚫 Too many path resets (${pathResetCount}), giving up`);
+          console.log(`[NavigationBridge] Too many path resets (${pathResetCount}), giving up`);
           try {
             this.bot.pathfinder.stop();
           } catch {}
@@ -958,7 +979,7 @@ export class NavigationBridge extends EventEmitter {
 
       // --- Cleanup ---
       const cleanup = () => {
-        clearInterval(stuckPoll);
+        if (stuckPoll !== null) clearInterval(stuckPoll);
         clearTimeout(hardTimeout);
         try { this.bot.removeListener('goal_reached' as any, onGoalReached); } catch {}
         try { this.bot.removeListener('path_update' as any, onPathUpdate); } catch {}
@@ -970,8 +991,20 @@ export class NavigationBridge extends EventEmitter {
       this.bot.on('path_update' as any, onPathUpdate);
       this.bot.on('path_reset' as any, onPathReset);
 
+      // Start a fallback stuck detection timer in case path_update never fires
+      // (pathfinder silently fails to compute a path without emitting noPath).
+      // This fires after 10 seconds — enough time for A* on complex terrain.
+      setTimeout(() => {
+        if (!pathComputedOnce && !resolved) {
+          console.log('[NavigationBridge] No path_update received after 10s — starting stuck detection as fallback');
+          startStuckDetection();
+        }
+      }, 10_000);
+
       try {
-        this.bot.pathfinder.setGoal(goal);
+        // Pass false for dynamic mode — prevents continuous replanning that
+        // causes path thrashing. Matches the pattern in movement-leaves.ts.
+        this.bot.pathfinder.setGoal(goal, false);
       } catch (err: any) {
         finish({ success: false, error: err?.message ?? String(err) });
       }

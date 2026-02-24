@@ -1408,18 +1408,25 @@ export class AcquireMaterialLeaf implements LeafImpl {
         }
         lastToolUsed = equippedTool.name;
 
-        const inventoryBefore = bot.inventory.items().reduce(
-          (sum: number, it: any) => sum + (it.count || 1),
+        // Capture per-item inventory counts before dig (more precise than total sum)
+        const inventoryBeforeMap = new Map<string, number>();
+        for (const it of bot.inventory.items()) {
+          const n = it.name;
+          inventoryBeforeMap.set(n, (inventoryBeforeMap.get(n) ?? 0) + (it.count || 1));
+        }
+        const inventoryTotalBefore = [...inventoryBeforeMap.values()].reduce(
+          (s, c) => s + c,
           0
         );
 
         const blockName = block.name;
+        const digSitePos = resolvedPos.clone();
         await bot.dig(block);
 
         // --- Phase 3: Collect dropped items ---
-        // Use playerCollect event as the primary signal, with inventory-delta
-        // as the authoritative check.  If the item isn't auto-collected within
-        // 2s, walk toward the dig site at ground level to trigger proximity pickup.
+        // Primary: listen for playerCollect event.
+        // Secondary: walk toward dig site to trigger proximity pickup.
+        // Final: bounded confirm loop checks inventory delta per-item.
 
         let pickupDetected = false;
         const onCollect = (collector: any, _entity: any) => {
@@ -1427,42 +1434,118 @@ export class AcquireMaterialLeaf implements LeafImpl {
         };
         bot.on('playerCollect' as any, onCollect);
 
-        // Wait up to 2s for auto-pickup (items within ~2 blocks are collected automatically)
-        for (let w = 0; w < 8 && !pickupDetected; w++) {
-          await new Promise((r) => setTimeout(r, 250));
-        }
+        // Cleanup fence: guarantees listener removal and motion/goal reset
+        // even if an await throws or the leaf is aborted mid-pickup.
+        const cleanupPickup = () => {
+          bot.removeListener('playerCollect' as any, onCollect);
+          (bot as any).setControlState?.('forward', false);
+          (bot as any).setControlState?.('back', false);
+          try { (bot as any).pathfinder?.setGoal(null); } catch { /* best-effort */ }
+        };
 
-        if (!pickupDetected) {
-          // Walk toward where the item likely landed (dig site X/Z at bot's Y).
-          // Items from blocks above the bot fall to ground level.
-          const botY = bot.entity.position.y;
-          const dropTarget = resolvedPos.offset(0.5, botY - resolvedPos.y, 0.5);
-          await bot.lookAt(dropTarget);
-          (bot as any).setControlState('forward', true);
-          // Walk for up to 2s or until pickup is detected
-          for (let w = 0; w < 8 && !pickupDetected; w++) {
+        try {
+          // Wait up to 1.5s for auto-pickup (items within ~2 blocks are collected automatically)
+          for (let w = 0; w < 6 && !pickupDetected; w++) {
             await new Promise((r) => setTimeout(r, 250));
-            const dxz = Math.hypot(
-              bot.entity.position.x - resolvedPos.x,
-              bot.entity.position.z - resolvedPos.z,
-            );
-            if (dxz < 1.5) break;
           }
-          (bot as any).setControlState('forward', false);
-          // Final wait for pickup registration
-          await new Promise((r) => setTimeout(r, 300));
+
+          if (!pickupDetected) {
+            // Use pathfinder to reach the likely drop zone instead of raw "walk forward".
+            // This handles height differences (tree logs dropping to ground),
+            // slopes, and obstacles that defeat straight-line movement.
+            const botWithPf = bot as BotWithPathfinder;
+            const fx = Math.floor(digSitePos.x);
+            const fz = Math.floor(digSitePos.z);
+            let groundY = Math.floor(digSitePos.y);
+            for (let dy = 0; dy < 12; dy++) {
+              const b = bot.blockAt(new Vec3(fx, groundY - dy, fz));
+              if (b && b.boundingBox === 'block') {
+                groundY = (groundY - dy) + 1;
+                break;
+              }
+            }
+            const dropPos = new Vec3(fx + 0.5, groundY, fz + 0.5);
+
+            let gotoTimedOut = false;
+            await Promise.race([
+              botWithPf.pathfinder?.goto(
+                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 1)
+              ) ?? Promise.resolve(),
+              new Promise<void>((r) =>
+                setTimeout(() => { gotoTimedOut = true; r(); }, 2500)
+              ),
+            ]).catch(() => { /* pathfinder failure is non-fatal here */ });
+            if (gotoTimedOut) {
+              try { botWithPf.pathfinder?.setGoal(null); } catch { /* best-effort */ }
+            }
+
+            // Short settle window for playerCollect/inventory to reflect pickup.
+            for (let w = 0; w < 6 && !pickupDetected; w++) {
+              await new Promise((r) => setTimeout(r, 150));
+            }
+
+            // If still no event, do a micro-shuffle: step back then forward
+            // to trigger pickup for items on block edges/slopes
+            if (!pickupDetected) {
+              (bot as any).setControlState('back', true);
+              await new Promise((r) => setTimeout(r, 150));
+              (bot as any).setControlState('back', false);
+              (bot as any).setControlState('forward', true);
+              await new Promise((r) => setTimeout(r, 200));
+              (bot as any).setControlState('forward', false);
+            }
+          }
+        } finally {
+          cleanupPickup();
         }
 
-        bot.removeListener('playerCollect' as any, onCollect);
+        // Bounded confirm-pickup loop: poll inventory for up to 500ms
+        // to close the race between pickup occurring and inventory reflecting it.
+        let confirmed = false;
+        let confirmPolls = 0;
+        const confirmStart = Date.now();
+        while (Date.now() - confirmStart < 500) {
+          const inventoryTotalAfter = bot.inventory.items().reduce(
+            (sum: number, it: any) => sum + (it.count || 1),
+            0
+          );
+          if (inventoryTotalAfter > inventoryTotalBefore) {
+            confirmed = true;
+            break;
+          }
+          confirmPolls++;
+          await new Promise((r) => setTimeout(r, 50));
+        }
 
-        // Inventory delta is the authoritative pickup check
-        const inventoryAfter = bot.inventory.items().reduce(
-          (sum: number, it: any) => sum + (it.count || 1),
-          0
-        );
-        if (inventoryAfter > inventoryBefore) {
+        if (confirmed) {
           totalAcquired++;
           collected.push({ name: blockName, count: 1 });
+        } else {
+          // Structured diagnostics for failure analysis
+          const inventoryAfterMap = new Map<string, number>();
+          for (const it of bot.inventory.items()) {
+            const n = it.name;
+            inventoryAfterMap.set(n, (inventoryAfterMap.get(n) ?? 0) + (it.count || 1));
+          }
+          // Count nearby item entities matching expected drops
+          const nearbyItems = Object.values((bot as any).entities ?? {}).filter(
+            (e: any) =>
+              e.entityType === 'item' &&
+              e.position &&
+              e.position.distanceTo(digSitePos) < 6
+          );
+          const distToBlock = bot.entity.position.distanceTo(digSitePos);
+          console.warn(
+            `[acquire_material] pickup_diag: target=${blockName} ` +
+              `digPos=(${digSitePos.x.toFixed(1)},${digSitePos.y.toFixed(1)},${digSitePos.z.toFixed(1)}) ` +
+              `distAtEnd=${distToBlock.toFixed(1)} ` +
+              `eventFired=${pickupDetected} confirmPolls=${confirmPolls} ` +
+              `nearbyItemEntities=${nearbyItems.length} ` +
+              `invDelta=${[...inventoryAfterMap.entries()]
+                .filter(([k, v]) => v !== (inventoryBeforeMap.get(k) ?? 0))
+                .map(([k, v]) => `${k}:${(inventoryBeforeMap.get(k) ?? 0)}->${v}`)
+                .join(',') || 'none'}`
+          );
         }
       }
 
@@ -1781,30 +1864,57 @@ export class PlaceBlockLeaf implements LeafImpl {
         const againstPos = new Vec3(against.x, against.y, against.z);
         placementPos = againstPos.offset(1, 0, 0);
       } else {
-        // Auto-select a nearby valid placement position: choose the block at feet level in front if empty with solid below
-        const origin = bot.entity.position.clone();
-        const candidates = [
-          origin.offset(1, 0, 0),
-          origin.offset(-1, 0, 0),
-          origin.offset(0, 0, 1),
-          origin.offset(0, 0, -1),
-          origin.offset(1, 0, 1),
-          origin.offset(-1, 0, -1),
+        // Auto-select a nearby valid placement position.
+        // Use floored block coordinates (not floating-point entity pos)
+        // so offsets reliably target distinct adjacent block cells.
+        const bf = bot.entity.position.floored();
+        const REPLACEABLE = new Set([
+          'air', 'cave_air', 'void_air', 'tall_grass', 'short_grass',
+          'grass', 'fern', 'dead_bush', 'snow', 'snow_layer',
+        ]);
+        // Ring 1 (cardinal + diagonal) then ring 2 for wider search
+        const offsets: Array<[number, number, number]> = [
+          // Ring 1 cardinal
+          [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+          // Ring 1 diagonal
+          [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+          // One block up (trees, slopes)
+          [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
+          // Ring 2 cardinal
+          [2, 0, 0], [-2, 0, 0], [0, 0, 2], [0, 0, -2],
         ];
-        for (const c of candidates) {
+        const rejections: string[] = [];
+        for (const [dx, dy, dz] of offsets) {
+          const c = bf.offset(dx, dy, dz);
           const here = bot.blockAt(c);
           const below = bot.blockAt(c.offset(0, -1, 0));
-          if (
-            here &&
-            here.name === 'air' &&
-            below &&
-            below.boundingBox === 'block'
-          ) {
-            placementPos = c;
-            break;
+          if (!here || !REPLACEABLE.has(here.name)) {
+            rejections.push(`(${dx},${dy},${dz}):target=${here?.name ?? 'null'}`);
+            continue;
           }
+          if (!below || below.boundingBox !== 'block') {
+            rejections.push(`(${dx},${dy},${dz}):support=${below?.name ?? 'null'}`);
+            continue;
+          }
+          placementPos = c;
+          break;
         }
         if (!placementPos) {
+          // Log nearby block grid for diagnosis
+          const grid: string[] = [];
+          for (let dy = 1; dy >= -1; dy--) {
+            for (let dx = -1; dx <= 1; dx++) {
+              for (let dz = -1; dz <= 1; dz++) {
+                const b = bot.blockAt(bf.offset(dx, dy, dz));
+                grid.push(`(${dx},${dy},${dz})=${b?.name ?? 'null'}`);
+              }
+            }
+          }
+          console.warn(
+            `[place_block] No suitable position. botBlock=(${bf.x},${bf.y},${bf.z}) ` +
+              `candidates=${offsets.length} rejections=[${rejections.slice(0, 6).join(' ')}] ` +
+              `grid=[${grid.join(' ')}]`
+          );
           return {
             status: 'failure',
             error: {
@@ -1862,25 +1972,94 @@ export class PlaceBlockLeaf implements LeafImpl {
       // Equip the item in hand before placing
       await bot.equip(itemToPlace, 'hand');
 
-      // Place the block against the reference block
-      await bot.placeBlock(refBlock, faceVec);
+      // Face the *face center* we intend to click. Some servers reject placements
+      // if the client isn't plausibly looking at the target face. Using the face
+      // center (not block center) ensures the gaze ray intersects the exact face
+      // that placeBlock() claims the client clicked.
+      const faceCenter = refBlock.position.offset(
+        0.5 + 0.5 * faceVec.x,
+        0.5 + 0.5 * faceVec.y,
+        0.5 + 0.5 * faceVec.z
+      );
+      await bot.lookAt(faceCenter);
 
-      // Verify placement
-      const placedBlock = bot.blockAt(placementPos);
-      const blockPlaced = placedBlock && placedBlock.name === item;
+      // Place the block against the reference block.
+      // Mineflayer waits for a blockUpdate event at the target coords — if the
+      // server doesn't confirm within ~5s, it throws. We catch this and fall
+      // back to a world-state poll (the event may have been lost/misrouted).
+      let placeError: Error | null = null;
+      try {
+        await bot.placeBlock(refBlock, faceVec);
+      } catch (err) {
+        placeError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      // Verify placement — poll briefly to let the local world view settle even
+      // when we don't receive the expected blockUpdate signal.
+      let placedBlock = bot.blockAt(placementPos);
+      let blockPlaced = !!placedBlock && placedBlock.name === item;
+      let verifyPolls = 0;
+      const verifyStart = Date.now();
+      while (!blockPlaced && Date.now() - verifyStart < 500) {
+        verifyPolls++;
+        await new Promise((r) => setTimeout(r, 50));
+        placedBlock = bot.blockAt(placementPos);
+        blockPlaced = !!placedBlock && placedBlock.name === item;
+      }
+
+      if (placeError && blockPlaced) {
+        // Block appeared despite the timeout — event was lost but placement succeeded.
+        console.log(
+          `[place_block] placeBlock threw (${placeError.message}) but target became ${item} ` +
+            `after ${verifyPolls} polls — treating as success`
+        );
+      }
+
+      if (!blockPlaced) {
+        // True failure. Log rich diagnostics so we can distinguish reach issues,
+        // held-item mismatches, and non-replaceable targets.
+        const distToRef = bot.entity.position.distanceTo(refBlock.position);
+        const distToTarget = bot.entity.position.distanceTo(placementPos);
+        console.warn(
+          `[place_block] placement_diag: item=${item} ` +
+            `target=(${placementPos.x},${placementPos.y},${placementPos.z}) ` +
+            `ref=${refBlock.name}@(${refBlock.position.x},${refBlock.position.y},${refBlock.position.z}) ` +
+            `face=(${faceVec.x},${faceVec.y},${faceVec.z}) ` +
+            `held=${bot.heldItem?.name ?? 'null'} ` +
+            `distRef=${distToRef.toFixed(2)} distTarget=${distToTarget.toFixed(2)} ` +
+            `targetNow=${placedBlock?.name ?? 'null'} verifyPolls=${verifyPolls} ` +
+            `error=${placeError?.message ?? 'none'}`
+        );
+        return {
+          status: 'failure',
+          error: {
+            code: 'place.invalidFace',
+            retryable: true,
+            detail:
+              placeError?.message ??
+              `Block placement failed: expected ${item}, got ${placedBlock?.name ?? 'null'}`,
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
+        };
+      }
 
       const endTime = ctx.now();
       const duration = endTime - startTime;
 
-      // Emit metrics
       ctx.emitMetric('place_block_duration', duration);
       ctx.emitMetric('place_block_success', blockPlaced ? 1 : 0);
 
+      // If we reach here, blockPlaced is true — the !blockPlaced guard above
+      // already returned failure. Report authoritative success.
       return {
         status: 'success',
         result: {
           success: true,
-          blockPlaced: blockPlaced ? item : 'unknown',
+          blockPlaced: item,
           position: {
             x: placementPos.x,
             y: placementPos.y,
