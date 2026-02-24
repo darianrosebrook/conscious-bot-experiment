@@ -10,8 +10,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Activity,
   Brain,
-  ChevronDown,
-  ChevronUp,
   FileText,
   History,
   ListChecks,
@@ -45,6 +43,7 @@ import { StressHexHeatmap } from '@/components/stress-hex-heatmap';
 import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
+import { StreamCard } from '@/components/stream-card';
 import { InventoryDisplay } from '@/components/inventory-display';
 import { EvaluationTab } from '@/components/evaluation-tab';
 import { DatabasePanel } from '@/components/database-panel';
@@ -565,64 +564,42 @@ export default function Dashboard() {
     const showExpandTrigger = wouldOverflow || isExpanded;
 
     return (
-      <div
-        className={cn(
-          styles.thoughtCard,
-          !showExpandTrigger && styles.thoughtCardNoExpand,
-          colors.border,
-          colors.bg
-        )}
-      >
-        <div className={styles.thoughtHeader}>
-          <span className={styles.thoughtTypeLabel}>{typeLabel}</span>
-          <time className={styles.tabularNums}>{formatTime(thought.ts)}</time>
-        </div>
-        <p
-          className={cn(
-            isExpanded
-              ? styles.thoughtTextExpanded
-              : styles.thoughtTextTruncated,
-            colors.text
-          )}
-        >
-          {displayText || '\u00A0'}
-        </p>
-        {hasTags && (
-          <div className={styles.thoughtGoalTags}>
-            <Tag className={styles.thoughtGoalTagIcon} aria-hidden />
-            {goals.map((goal, i) => (
-              <span
-                key={`${thought.id}-goal-${i}`}
-                className={styles.thoughtGoalChip}
-              >
-                [GOAL] {goalToLabel(goal)}
-              </span>
-            ))}
-            {intents.map((intent, i) => (
-              <span
-                key={`${thought.id}-intent-${i}`}
-                className={styles.thoughtIntentChip}
-              >
-                INTENT: {intentToLabel(intent)}
-              </span>
-            ))}
-          </div>
-        )}
-        {showExpandTrigger && (
-          <button
-            type="button"
-            onClick={toggleExpanded}
-            className={styles.thoughtExpandBtn}
-            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {isExpanded ? (
-              <ChevronUp className={styles.thoughtExpandIcon} />
-            ) : (
-              <ChevronDown className={styles.thoughtExpandIcon} />
-            )}
-          </button>
-        )}
-      </div>
+      <StreamCard
+        colorClasses={{ border: colors.border, bg: colors.bg }}
+        headerLeft={<span className={styles.thoughtTypeLabel}>{typeLabel}</span>}
+        headerRight={<time className={styles.tabularNums}>{formatTime(thought.ts)}</time>}
+        body={displayText || '\u00A0'}
+        bodyColorClass={colors.text}
+        truncated={!isExpanded}
+        tags={
+          hasTags ? (
+            <>
+              <Tag className={styles.thoughtGoalTagIcon} aria-hidden />
+              {goals.map((goal, i) => (
+                <span
+                  key={`${thought.id}-goal-${i}`}
+                  className={styles.thoughtGoalChip}
+                >
+                  [GOAL] {goalToLabel(goal)}
+                </span>
+              ))}
+              {intents.map((intent, i) => (
+                <span
+                  key={`${thought.id}-intent-${i}`}
+                  className={styles.thoughtIntentChip}
+                >
+                  INTENT: {intentToLabel(intent)}
+                </span>
+              ))}
+            </>
+          ) : undefined
+        }
+        expandable={
+          showExpandTrigger
+            ? { expanded: isExpanded, onToggle: toggleExpanded }
+            : undefined
+        }
+      />
     );
   };
 
@@ -1036,24 +1013,26 @@ export default function Dashboard() {
                   {notes.length > 0 ? (
                     <div className={styles.notesList}>
                       {notes.slice(0, 5).map((note) => (
-                        <div key={note.id} className={styles.noteCard}>
-                          <div className={styles.noteHeader}>
-                            <Pill>{note.type}</Pill>
+                        <StreamCard
+                          key={note.id}
+                          headerLeft={<Pill>{note.type}</Pill>}
+                          headerRight={
                             <time className={styles.tabularNums}>
                               {formatTime(note.ts)}
                             </time>
-                          </div>
-                          {note.title && (
-                            <div className={styles.noteTitle}>{note.title}</div>
-                          )}
-                          <p className={styles.noteContent}>{note.content}</p>
-                          <div className={styles.noteFooter}>
-                            <Pill>{note.source}</Pill>
-                            <span className={styles.noteConfidence}>
-                              {Math.round(note.confidence * 100)}%
-                            </span>
-                          </div>
-                        </div>
+                          }
+                          title={note.title}
+                          body={note.content}
+                          bodySize="compact"
+                          footer={
+                            <>
+                              <Pill>{note.source}</Pill>
+                              <span className={styles.noteConfidence}>
+                                {Math.round(note.confidence * 100)}%
+                              </span>
+                            </>
+                          }
+                        />
                       ))}
                     </div>
                   ) : (
