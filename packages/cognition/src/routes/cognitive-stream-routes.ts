@@ -36,10 +36,10 @@ const sseClients: Set<Response> = new Set();
 
 // ── Retention Rules ──────────────────────────────────────────────────
 // Prevents unbounded thought queue growth under high-frequency awareness
-const THOUGHT_QUEUE_MAX_LENGTH = 500;  // Hard cap on queue size
-const NON_ACTIONABLE_MAX_AGE_MS = 10 * 60 * 1000;  // 10 minutes for non-actionable
-const ACTIONABLE_MAX_AGE_MS = 30 * 60 * 1000;  // 30 minutes for actionable unacked
-const PROCESSED_MAX_AGE_MS = 24 * 60 * 60 * 1000;  // 24 hours for processed (dashboard history)
+const THOUGHT_QUEUE_MAX_LENGTH = 500; // Hard cap on queue size
+const NON_ACTIONABLE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes for non-actionable
+const ACTIONABLE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes for actionable unacked
+const PROCESSED_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours for processed (dashboard history)
 
 /**
  * Prune thought queue by age and cap.
@@ -62,7 +62,9 @@ function pruneThoughtQueue(thoughts: any[]): any[] {
 
     // Unprocessed: age depends on actionability
     const isActionable = t.convertEligible === true;
-    const maxAge = isActionable ? ACTIONABLE_MAX_AGE_MS : NON_ACTIONABLE_MAX_AGE_MS;
+    const maxAge = isActionable
+      ? ACTIONABLE_MAX_AGE_MS
+      : NON_ACTIONABLE_MAX_AGE_MS;
     return now - t.timestamp < maxAge;
   });
 
@@ -95,7 +97,9 @@ export function broadcastThought(thought: any): void {
   }
 }
 
-export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Router {
+export function createCognitiveStreamRoutes(
+  deps: CognitiveStreamRouteDeps
+): Router {
   const router = Router();
 
   // ── GET /api/cognitive-stream ──
@@ -114,7 +118,8 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
     // Send initial batch of recent thoughts
     const recentThoughts = deps.state.cognitiveThoughts.slice(-20);
-    const generatedThoughts = deps.enhancedThoughtGenerator.getThoughtHistory(10);
+    const generatedThoughts =
+      deps.enhancedThoughtGenerator.getThoughtHistory(10);
     const allThoughts = [...recentThoughts, ...generatedThoughts]
       .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
       .slice(-20);
@@ -196,7 +201,11 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       const ackedIds = new Set(thoughtIds);
       let ackedCount = 0;
       let mismatchCount = 0;
-      const mismatches: Array<{ thoughtId: string; expected: string; actual: string | null }> = [];
+      const mismatches: Array<{
+        thoughtId: string;
+        expected: string;
+        actual: string | null;
+      }> = [];
       const now = Date.now();
 
       // Mark matching thoughts as processed with provenance
@@ -204,7 +213,9 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         if (ackedIds.has(thought.id) && !thought.processed) {
           // If evalRunId is provided, verify metadata match (LF-3, AC-ISO-03)
           if (evalRunId) {
-            const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+            const evalMeta = (thought as any).metadata?.eval as
+              | EvalThoughtMetadata['eval']
+              | undefined;
             const actualRunId = evalMeta?.run_id ?? null;
 
             if (actualRunId !== evalRunId) {
@@ -224,14 +235,16 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
           thought.processed = true;
           (thought as any).processedAt = now;
-          (thought as any).processedBy = evalRunId ? `eval:${evalRunId}` : 'planning';
+          (thought as any).processedBy = evalRunId
+            ? `eval:${evalRunId}`
+            : 'planning';
           ackedCount++;
         }
       }
 
       console.log(
         `[CognitiveStream] Acked ${ackedCount}/${thoughtIds.length} thoughts` +
-        (mismatchCount > 0 ? ` (${mismatchCount} mismatches)` : '')
+          (mismatchCount > 0 ? ` (${mismatchCount} mismatches)` : '')
       );
 
       res.json({
@@ -264,7 +277,9 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       const now = Date.now();
 
       // Apply retention rules on read to prevent unbounded growth
-      deps.state.cognitiveThoughts = pruneThoughtQueue(deps.state.cognitiveThoughts);
+      deps.state.cognitiveThoughts = pruneThoughtQueue(
+        deps.state.cognitiveThoughts
+      );
 
       // IMPORTANT: Only pull from the main thought queue, not generator history.
       // This ensures a single ack/retention model for planning.
@@ -280,7 +295,9 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
         // Eval isolation filter (AC-ISO-02)
         if (evalRunId) {
-          const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+          const evalMeta = (thought as any).metadata?.eval as
+            | EvalThoughtMetadata['eval']
+            | undefined;
           if (evalMeta?.run_id !== evalRunId) return false;
         }
 
@@ -343,7 +360,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       const { thought } = req.body;
 
       console.log(
-        '🧠 Received thought from planning system:',
+        'Received thought from planning system:',
         thought.type,
         '-',
         thought.content.substring(0, 60)
@@ -366,8 +383,12 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         metadata: thought.metadata,
       });
 
-      console.log(`✅ Thought broadcast to ${sseClients.size} SSE clients`);
-      res.json({ success: true, message: 'Thought broadcast via SSE', clients: sseClients.size });
+      console.log(`Thought broadcast to ${sseClients.size} SSE clients`);
+      res.json({
+        success: true,
+        message: 'Thought broadcast via SSE',
+        clients: sseClients.size,
+      });
     } catch (error) {
       console.error('❌ Error processing thought generation:', error);
       res.status(500).json({ error: 'Failed to process thought generation' });
@@ -382,7 +403,9 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       // Generate unique ID if not provided
       const thoughtWithId = {
         ...thought,
-        id: thought.id || `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id:
+          thought.id ||
+          `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: thought.timestamp || Date.now(),
       };
 
@@ -404,13 +427,15 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       // Dashboard-injected thoughts skip the consideration step (user explicitly chose to inject).
       const content = thoughtWithId.content;
       if (
-        (thoughtWithId.type === 'intrusive' || thoughtWithId.attribution === 'intrusive') &&
+        (thoughtWithId.type === 'intrusive' ||
+          thoughtWithId.attribution === 'intrusive') &&
         typeof content === 'string' &&
         content.trim().length > 0
       ) {
         const processor = deps.intrusiveThoughtProcessor;
         const processPromise =
-          processor?.processIntrusiveThought?.(content.trim()) ?? Promise.resolve({ accepted: false });
+          processor?.processIntrusiveThought?.(content.trim()) ??
+          Promise.resolve({ accepted: false });
         processPromise
           .then((result) => {
             updateStressFromIntrusion({
@@ -423,14 +448,20 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
             );
           })
           .catch((err) => {
-            console.error('[CognitiveStream] Error processing intrusive thought:', err);
+            console.error(
+              '[CognitiveStream] Error processing intrusive thought:',
+              err
+            );
           });
       }
 
       // Intrusive thought broadcast (verbose logging suppressed)
       res.json({ success: true, thoughtId: thoughtWithId.id });
     } catch (error) {
-      console.error('[CognitiveStream] Error processing intrusive thought:', error);
+      console.error(
+        '[CognitiveStream] Error processing intrusive thought:',
+        error
+      );
       res.status(500).json({ error: 'Failed to process intrusive thought' });
     }
   });
@@ -454,13 +485,16 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
       // Apply retention rules on read to prevent unbounded growth
       // (replaces simple 24-hour cutoff with three-tier age limits + hard cap)
-      deps.state.cognitiveThoughts = pruneThoughtQueue(deps.state.cognitiveThoughts);
+      deps.state.cognitiveThoughts = pruneThoughtQueue(
+        deps.state.cognitiveThoughts
+      );
 
       // 1. Combine all thought sources
       let recentThoughts = deps.state.cognitiveThoughts.slice();
 
       // Also get thoughts from enhanced thought generator (limit to recent ones)
-      const generatedThoughts = deps.enhancedThoughtGenerator.getThoughtHistory(5);
+      const generatedThoughts =
+        deps.enhancedThoughtGenerator.getThoughtHistory(5);
       // Verbose logging suppressed - routine endpoint polling
 
       recentThoughts = [...recentThoughts, ...generatedThoughts];
@@ -475,7 +509,9 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       // 3. Eval isolation filter (AC-ISO-02)
       if (evalRunId) {
         recentThoughts = recentThoughts.filter((thought) => {
-          const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+          const evalMeta = (thought as any).metadata?.eval as
+            | EvalThoughtMetadata['eval']
+            | undefined;
           return evalMeta?.run_id === evalRunId;
         });
       }
@@ -515,24 +551,27 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
   });
 
   // Mark thought as processed
-  router.post('/api/cognitive-stream/:thoughtId/processed', async (req, res) => {
-    try {
-      const { thoughtId } = req.params;
-      const { processed } = req.body;
+  router.post(
+    '/api/cognitive-stream/:thoughtId/processed',
+    async (req, res) => {
+      try {
+        const { thoughtId } = req.params;
+        const { processed } = req.body;
 
-      console.log(`📝 Marking thought ${thoughtId} as processed: ${processed}`);
+        console.log(`Marking thought ${thoughtId} as processed: ${processed}`);
 
-      res.json({
-        success: true,
-        thoughtId,
-        processed,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      console.error('Error marking thought as processed:', error);
-      res.status(500).json({ error: 'Failed to mark thought as processed' });
+        res.json({
+          success: true,
+          thoughtId,
+          processed,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error('Error marking thought as processed:', error);
+        res.status(500).json({ error: 'Failed to mark thought as processed' });
+      }
     }
-  });
+  );
 
   return router;
 }

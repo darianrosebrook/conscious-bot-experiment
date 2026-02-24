@@ -529,7 +529,10 @@ export async function convertThoughtToTask(
         const parsedTs = typeof rawTs === 'number' ? rawTs
           : typeof rawTs === 'string' ? Date.parse(rawTs)
           : NaN;
-        const ts = Number.isFinite(parsedTs) ? parsedTs : now;
+        // Floor at Sept 2020 — a timestamp of 0 (uninitialized field) would cause
+        // immediate TTL expiry (elapsed ≈ 56 years) and silent thought drop.
+        const MIN_VALID_TIMESTAMP = 1_600_000_000_000;
+        const ts = Number.isFinite(parsedTs) && parsedTs > MIN_VALID_TIMESTAMP ? parsedTs : now;
 
         // Use whichever is older: thought creation time or first time we saw this drop
         if (!keepaliveDropRegistry.has(thought.id)) {

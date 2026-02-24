@@ -1230,10 +1230,15 @@ describe('recovery step injection on reposition_or_rescan', () => {
     };
   }
 
+  /** Recovery tool result with evidence of actual movement/effect. */
+  function recoverySuccess() {
+    return { ok: true, data: { retreated: true, moved_blocks: 5 } };
+  }
+
   it('dispatches explore_for_resources for acquire_material failure (low threat)', async () => {
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())  // original leaf fails
-      .mockResolvedValueOnce({ ok: true });              // recovery step succeeds
+      .mockResolvedValueOnce(recoverySuccess());         // recovery step succeeds with effect
 
     const ctx = createMockContext({ executeTool });
     const testTask = { id: 'task-r1', steps: [], metadata: {}, progress: 0 };
@@ -1266,16 +1271,16 @@ describe('recovery step injection on reposition_or_rescan', () => {
     expect(patch.nextEligibleAt).toBeLessThanOrEqual(Date.now() + 5_000 + 100);
   });
 
-  it('dispatches retreat_from_threat when threat >= medium', async () => {
+  it('dispatches retreat_from_threat when threat >= high', async () => {
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(recoverySuccess());
 
     const ctx = createMockContext({
       executeTool,
       getThreatSnapshot: vi.fn().mockResolvedValue({
-        overallThreatLevel: 'medium',
-        threats: [{ type: 'zombie', distance: 8 }],
+        overallThreatLevel: 'high',
+        threats: [{ type: 'zombie', distance: 4 }],
       }),
     });
     const testTask = { id: 'task-r2', steps: [], metadata: {}, progress: 0 };
@@ -1295,10 +1300,39 @@ describe('recovery step injection on reposition_or_rescan', () => {
     );
   });
 
+  it('allows exploration under medium threat (ambient risk)', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce(failWithRepositionHint())
+      .mockResolvedValueOnce(recoverySuccess());
+
+    const ctx = createMockContext({
+      executeTool,
+      getThreatSnapshot: vi.fn().mockResolvedValue({
+        overallThreatLevel: 'medium',
+        threats: [{ type: 'skeleton', distance: 20 }],
+      }),
+    });
+    const testTask = { id: 'task-r2b', steps: [], metadata: {}, progress: 0 };
+
+    await executeSterlingStep(testTask, acquireStep, ctx);
+
+    expect(executeTool).toHaveBeenNthCalledWith(2,
+      'minecraft.explore_for_resources',
+      expect.objectContaining({ resource_tags: ['sweet_berries'] }),
+      undefined,
+    );
+    expect(ctx.updateTaskMetadata).toHaveBeenCalledWith(
+      'task-r2b',
+      expect.objectContaining({
+        lastRecoveryMode: 'explore',
+      }),
+    );
+  });
+
   it('broadens exploration tags after 2 repeat failures', async () => {
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(recoverySuccess());
 
     const ctx = createMockContext({ executeTool });
     // repositionRetryCount=1 → incremented to 2 (inside budget, past <2 threshold)
@@ -1352,7 +1386,7 @@ describe('recovery step injection on reposition_or_rescan', () => {
   it('uses step_forward_safely for non-acquisition leaf', async () => {
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(recoverySuccess());
 
     const ctx = createMockContext({ executeTool });
     const testTask = { id: 'task-r5', steps: [], metadata: {}, progress: 0 };
@@ -1401,7 +1435,7 @@ describe('recovery step injection on reposition_or_rescan', () => {
     const recordDispatch = vi.fn();
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(recoverySuccess());
 
     const ctx = createMockContext({
       executeTool,
@@ -1441,7 +1475,7 @@ describe('recovery step injection on reposition_or_rescan', () => {
     const abortController = new AbortController();
     const executeTool = vi.fn()
       .mockResolvedValueOnce(failWithRepositionHint())
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(recoverySuccess());
 
     const ctx = createMockContext({
       executeTool,

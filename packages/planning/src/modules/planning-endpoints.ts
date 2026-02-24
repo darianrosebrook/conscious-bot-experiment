@@ -172,6 +172,7 @@ export function inferRequirementFromEndpointParams(
   if (typeof params.item === 'string' && params.item) {
     const kindFromType: Record<string, string> = {
       crafting: 'craft',
+      building: 'craft',
       mining: 'mine',
       gathering: 'collect',
     };
@@ -209,6 +210,35 @@ export function inferRequirementFromEndpointParams(
         outputPattern,
         quantity: params.quantity || params.targetQuantity || 1,
       };
+    }
+  }
+
+  // Fallback: metadata.action from intrusive-thought (target + category)
+  const action = taskData.metadata?.action;
+  if (
+    action &&
+    typeof action.target === 'string' &&
+    action.target.trim().length > 0
+  ) {
+    const item = action.target
+      .replace(/^(a|an|some|the)\s+/i, '')
+      .trim()
+      .split(/\s+/)[0]
+      ?.toLowerCase()
+      .replace(/\s+/g, '_');
+    if (item && item.length >= 2) {
+      const cat = (action.category || '').toLowerCase();
+      const kindMap: Record<string, string> = {
+        crafting: 'craft',
+        building: 'craft',
+        mining: 'mine',
+        gathering: 'collect',
+        exploration: 'collect',
+      };
+      const kind = kindMap[cat];
+      if (kind) {
+        return { kind, outputPattern: item, quantity: 1 };
+      }
     }
   }
 
@@ -622,9 +652,25 @@ export function createPlanningEndpoints(
                 childTaskIds: [],
               },
             });
-            logTaskIngestion({ _diag_version: 1, source: 'http_post_goal', task_id: goalTask?.id, parent_task_id: goal.id, decision: goalTask?.id ? 'created' : 'rejected', task_type: inferTaskType(t.type, t.description || t.title || name || '') });
+            logTaskIngestion({
+              _diag_version: 1,
+              source: 'http_post_goal',
+              task_id: goalTask?.id,
+              parent_task_id: goal.id,
+              decision: goalTask?.id ? 'created' : 'rejected',
+              task_type: inferTaskType(
+                t.type,
+                t.description || t.title || name || ''
+              ),
+            });
           } catch (e) {
-            logTaskIngestion({ _diag_version: 1, source: 'http_post_goal', parent_task_id: goal.id, decision: 'error', reason: e instanceof Error ? e.message : 'unknown' });
+            logTaskIngestion({
+              _diag_version: 1,
+              source: 'http_post_goal',
+              parent_task_id: goal.id,
+              decision: 'error',
+              reason: e instanceof Error ? e.message : 'unknown',
+            });
             // Continue; one bad task shouldn't block goal creation
           }
         }
@@ -817,7 +863,13 @@ export function createPlanningEndpoints(
       }
 
       const task = await planningSystem.goalFormulation.addTask(taskData);
-      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', task_id: task?.id, decision: task?.id ? 'created' : 'rejected', task_type: taskData.type });
+      logTaskIngestion({
+        _diag_version: 1,
+        source: 'http_post_task',
+        task_id: task?.id,
+        decision: task?.id ? 'created' : 'rejected',
+        task_type: taskData.type,
+      });
       res.json({
         success: true,
         taskId: task?.id,
@@ -825,7 +877,12 @@ export function createPlanningEndpoints(
         timestamp: Date.now(),
       });
     } catch (error) {
-      logTaskIngestion({ _diag_version: 1, source: 'http_post_task', decision: 'error', reason: error instanceof Error ? error.constructor.name : 'unknown' });
+      logTaskIngestion({
+        _diag_version: 1,
+        source: 'http_post_task',
+        decision: 'error',
+        reason: error instanceof Error ? error.constructor.name : 'unknown',
+      });
       console.error('Failed to add task:', error);
       res.status(500).json({
         success: false,
@@ -906,8 +963,10 @@ export function createPlanningEndpoints(
       const MAX_TITLE = 120;
       const MAX_SUMMARY = 200;
 
-      const currentTasks: any[] = planningSystem.goalFormulation.getCurrentTasks();
-      const completedTasks: any[] = planningSystem.goalFormulation.getCompletedTasks();
+      const currentTasks: any[] =
+        planningSystem.goalFormulation.getCurrentTasks();
+      const completedTasks: any[] =
+        planningSystem.goalFormulation.getCompletedTasks();
 
       // Combine, deduplicate by id
       const seen = new Set<string>();
@@ -940,7 +999,8 @@ export function createPlanningEndpoints(
 
         if (t.status === 'completed') {
           const lastStep = t.steps?.[t.steps.length - 1];
-          item.outcomeSummary = lastStep?.label?.slice(0, MAX_SUMMARY) || 'completed';
+          item.outcomeSummary =
+            lastStep?.label?.slice(0, MAX_SUMMARY) || 'completed';
         } else if (t.status === 'failed') {
           item.errorSummary =
             t.metadata?.failureError?.message?.slice(0, MAX_SUMMARY) ||
@@ -1466,7 +1526,9 @@ export function createPlanningEndpoints(
           );
 
           const execStateReduce = (globalThis as any).__planningExecutorState;
-          const loopStartedRunReduce = Boolean(execStateReduce?.intervalRegistered);
+          const loopStartedRunReduce = Boolean(
+            execStateReduce?.intervalRegistered
+          );
           recorder.recordRuntime(runId, {
             executor: {
               enabled: planningConfigReduce.executorEnabled,
@@ -1741,9 +1803,7 @@ export function createPlanningEndpoints(
       const expansion = report?.expansion;
       const B_expansion = expansion
         ? {
-            ok:
-              expansion.status === 'ok' &&
-              (expansion.steps?.length ?? 0) > 0,
+            ok: expansion.status === 'ok' && (expansion.steps?.length ?? 0) > 0,
             executor_plan_digest: expansion.executor_plan_digest,
             step_count: expansion.steps?.length ?? 0,
           }
@@ -1754,14 +1814,17 @@ export function createPlanningEndpoints(
       // routed correctly — they indicate environmental/leaf-level issues.
       const dispatched = report?.execution?.dispatched_steps ?? [];
       const anyOk = dispatched.some((s: any) => s.result?.status === 'ok');
-      const allOk = dispatched.length > 0 &&
+      const allOk =
+        dispatched.length > 0 &&
         dispatched.every((s: any) => s.result?.status === 'ok');
       const C_dispatch = {
         ok: dispatched.length > 0 && anyOk,
         all_ok: allOk,
         count: dispatched.length,
-        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok').length,
-        error_count: dispatched.filter((s: any) => s.result?.status !== 'ok').length,
+        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok')
+          .length,
+        error_count: dispatched.filter((s: any) => s.result?.status !== 'ok')
+          .length,
         steps: dispatched.map((s: any) => ({
           leaf: s.leaf,
           status: s.result?.status ?? 'pending',
@@ -1790,12 +1853,14 @@ export function createPlanningEndpoints(
         .find((s: any) => s.result?.status !== 'ok');
       return {
         dispatched_count: dispatched.length,
-        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok').length,
+        ok_count: dispatched.filter((s: any) => s.result?.status === 'ok')
+          .length,
         verification_status: verification?.status ?? null,
         last_error_code: lastError?.result?.error ?? null,
         retry_count: Math.max(0, dispatched.length - 1),
         regen_attempted: decisions.some(
-          (d: any) => d.reason === 'regen_failed' || d.reason === 'regen_success'
+          (d: any) =>
+            d.reason === 'regen_failed' || d.reason === 'regen_success'
         ),
       };
     };
@@ -1804,10 +1869,16 @@ export function createPlanningEndpoints(
     const classifyFailureMode = (
       cp: ReturnType<typeof buildCheckpointProof>,
       timedOut: boolean,
-      artifactState: ReturnType<typeof buildArtifactState>,
+      artifactState: ReturnType<typeof buildArtifactState>
     ): SmokeFailureMode => {
-      if (cp.A_requested.ok && cp.A_result.ok && cp.B_expansion.ok &&
-          cp.C_dispatch.ok && cp.D_verification.ok && !timedOut) {
+      if (
+        cp.A_requested.ok &&
+        cp.A_result.ok &&
+        cp.B_expansion.ok &&
+        cp.C_dispatch.ok &&
+        cp.D_verification.ok &&
+        !timedOut
+      ) {
         return 'none';
       }
       if (!cp.A_result.ok) return 'expand_failed';
@@ -1838,18 +1909,24 @@ export function createPlanningEndpoints(
       }
 
       try {
-        const activeTasks = planningSystem.goalFormulation?.getCurrentTasks?.() ?? [];
-        const eligibleTasks = activeTasks.filter((t: any) =>
-          t.status === 'active' && !t.blockedReason && !t.metadata?.blockedReason
+        const activeTasks =
+          planningSystem.goalFormulation?.getCurrentTasks?.() ?? [];
+        const eligibleTasks = activeTasks.filter(
+          (t: any) =>
+            t.status === 'active' &&
+            !t.blockedReason &&
+            !t.metadata?.blockedReason
         );
-        const blockedTasks = activeTasks.filter((t: any) =>
-          t.metadata?.blockedReason || t.blockedReason
+        const blockedTasks = activeTasks.filter(
+          (t: any) => t.metadata?.blockedReason || t.blockedReason
         );
 
         let idleReason: string | null = null;
         if (activeTasks.length === 0) idleReason = 'no_tasks';
-        else if (eligibleTasks.length === 0 && blockedTasks.length > 0) idleReason = 'blocked_on_prereq';
-        else if (eligibleTasks.length === 0) idleReason = 'all_completed_or_blocked';
+        else if (eligibleTasks.length === 0 && blockedTasks.length > 0)
+          idleReason = 'blocked_on_prereq';
+        else if (eligibleTasks.length === 0)
+          idleReason = 'all_completed_or_blocked';
 
         res.json({
           idle: eligibleTasks.length === 0,
@@ -1887,62 +1964,195 @@ export function createPlanningEndpoints(
     //   - 'ok_fresh_01'..'ok_fresh_03': static pool (legacy, prefer ok_fresh)
     //   - 'slow_wait_fresh': generates unique slow_wait digest per run (never dedupes)
     const SMOKE_VARIANTS: Record<string, { digest: string; label: string }> = {
-      ok: { digest: 'smoke_e2e_chat_wait_v1', label: 'happy path (stub present)' },
-      ok_fresh_01: { digest: 'smoke_e2e_chat_wait_v1_fresh_01', label: 'fresh happy path 01 (static pool)' },
-      ok_fresh_02: { digest: 'smoke_e2e_chat_wait_v1_fresh_02', label: 'fresh happy path 02 (static pool)' },
-      ok_fresh_03: { digest: 'smoke_e2e_chat_wait_v1_fresh_03', label: 'fresh happy path 03 (static pool)' },
-      unknown_digest: { digest: 'smoke_e2e_NONEXISTENT_v1', label: 'F2: digest unknown (blocked)' },
-      slow_wait: { digest: 'smoke_e2e_slow_wait_v1', label: 'F6: expand ok, dispatch exceeds poll timeout' },
+      ok: {
+        digest: 'smoke_e2e_chat_wait_v1',
+        label: 'happy path (stub present)',
+      },
+      ok_fresh_01: {
+        digest: 'smoke_e2e_chat_wait_v1_fresh_01',
+        label: 'fresh happy path 01 (static pool)',
+      },
+      ok_fresh_02: {
+        digest: 'smoke_e2e_chat_wait_v1_fresh_02',
+        label: 'fresh happy path 02 (static pool)',
+      },
+      ok_fresh_03: {
+        digest: 'smoke_e2e_chat_wait_v1_fresh_03',
+        label: 'fresh happy path 03 (static pool)',
+      },
+      unknown_digest: {
+        digest: 'smoke_e2e_NONEXISTENT_v1',
+        label: 'F2: digest unknown (blocked)',
+      },
+      slow_wait: {
+        digest: 'smoke_e2e_slow_wait_v1',
+        label: 'F6: expand ok, dispatch exceeds poll timeout',
+      },
       // Tier 1: Safe/read-only sensing
-      t1_sense_hostiles: { digest: 'smoke_sense_hostiles_v1', label: 'T1: sense_hostiles (read-only)' },
-      t1_get_light_level: { digest: 'smoke_get_light_level_v1', label: 'T1: get_light_level (read-only)' },
-      t1_find_resource: { digest: 'smoke_find_resource_v1', label: 'T1: find_resource (read-only)' },
-      t1_introspect_recipe: { digest: 'smoke_introspect_recipe_v1', label: 'T1: introspect_recipe (read-only)' },
-      t1_step_forward: { digest: 'smoke_step_forward_v1', label: 'T1: step_forward_safely (movement)' },
+      t1_sense_hostiles: {
+        digest: 'smoke_sense_hostiles_v1',
+        label: 'T1: sense_hostiles (read-only)',
+      },
+      t1_get_light_level: {
+        digest: 'smoke_get_light_level_v1',
+        label: 'T1: get_light_level (read-only)',
+      },
+      t1_find_resource: {
+        digest: 'smoke_find_resource_v1',
+        label: 'T1: find_resource (read-only)',
+      },
+      t1_introspect_recipe: {
+        digest: 'smoke_introspect_recipe_v1',
+        label: 'T1: introspect_recipe (read-only)',
+      },
+      t1_step_forward: {
+        digest: 'smoke_step_forward_v1',
+        label: 'T1: step_forward_safely (movement)',
+      },
       // Tier 2: Inventory-only
-      t2_equip_weapon: { digest: 'smoke_equip_weapon_v1', label: 'T2: equip_weapon (needs weapon)' },
-      t2_equip_tool: { digest: 'smoke_equip_tool_v1', label: 'T2: equip_tool (needs tool)' },
-      t2_manage_inventory: { digest: 'smoke_manage_inventory_v1', label: 'T2: manage_inventory sort' },
-      t2_consume_food: { digest: 'smoke_consume_food_v1', label: 'T2: consume_food (needs food)' },
+      t2_equip_weapon: {
+        digest: 'smoke_equip_weapon_v1',
+        label: 'T2: equip_weapon (needs weapon)',
+      },
+      t2_equip_tool: {
+        digest: 'smoke_equip_tool_v1',
+        label: 'T2: equip_tool (needs tool)',
+      },
+      t2_manage_inventory: {
+        digest: 'smoke_manage_inventory_v1',
+        label: 'T2: manage_inventory sort',
+      },
+      t2_consume_food: {
+        digest: 'smoke_consume_food_v1',
+        label: 'T2: consume_food (needs food)',
+      },
       // Tier 3: World-mutating
-      t3_acquire_material: { digest: 'smoke_acquire_material_v1', label: 'T3: acquire_material (mine)' },
-      t3_place_block: { digest: 'smoke_place_block_v1', label: 'T3: place_block (needs item)' },
-      t3_craft_recipe: { digest: 'smoke_craft_recipe_v1', label: 'T3: craft_recipe (needs ingredients)' },
-      t3_place_workstation: { digest: 'smoke_place_workstation_v1', label: 'T3: place_workstation (needs item)' },
-      t3_till_soil: { digest: 'smoke_till_soil_v1', label: 'T3: till_soil (needs hoe + dirt)' },
-      t3_place_torch: { digest: 'smoke_place_torch_v1', label: 'T3: place_torch (needs torch)' },
+      t3_acquire_material: {
+        digest: 'smoke_acquire_material_v1',
+        label: 'T3: acquire_material (mine)',
+      },
+      t3_place_block: {
+        digest: 'smoke_place_block_v1',
+        label: 'T3: place_block (needs item)',
+      },
+      t3_craft_recipe: {
+        digest: 'smoke_craft_recipe_v1',
+        label: 'T3: craft_recipe (needs ingredients)',
+      },
+      t3_place_workstation: {
+        digest: 'smoke_place_workstation_v1',
+        label: 'T3: place_workstation (needs item)',
+      },
+      t3_till_soil: {
+        digest: 'smoke_till_soil_v1',
+        label: 'T3: till_soil (needs hoe + dirt)',
+      },
+      t3_place_torch: {
+        digest: 'smoke_place_torch_v1',
+        label: 'T3: place_torch (needs torch)',
+      },
       // Tier B: Multi-step inventory→craft→world chain
-      tb_craft_build_torch: { digest: 'smoke_chain_craft_build_torch_v1', label: 'TB: craft→build→torch chain' },
+      tb_craft_build_torch: {
+        digest: 'smoke_chain_craft_build_torch_v1',
+        label: 'TB: craft→build→torch chain',
+      },
       // Tier 4: Combat
-      t4_attack_entity: { digest: 'smoke_attack_entity_v1', label: 'T4: attack_entity (needs hostile)' },
-      t4_retreat: { digest: 'smoke_retreat_v1', label: 'T4: retreat_from_threat (needs hostile)' },
+      t4_attack_entity: {
+        digest: 'smoke_attack_entity_v1',
+        label: 'T4: attack_entity (needs hostile)',
+      },
+      t4_retreat: {
+        digest: 'smoke_retreat_v1',
+        label: 'T4: retreat_from_threat (needs hostile)',
+      },
     };
     // Dynamic variants: generate a unique digest per run via prefix-wildcard.
     // Sterling resolves these by matching the prefix to the base entry and
     // returning the same steps with a derived plan_bundle_digest.
-    const DYNAMIC_VARIANTS: Record<string, { prefix: string; label: string }> = {
-      ok_fresh: { prefix: 'smoke_e2e_chat_wait_v1_', label: 'fresh happy path (prefix-wildcard, never dedupes)' },
-      slow_wait_fresh: { prefix: 'smoke_e2e_slow_wait_v1_', label: 'fresh slow_wait (prefix-wildcard, never dedupes)' },
-      // Fresh (re-runnable) variants for every tier — bypasses task deduplication.
-      t1_sense_hostiles_fresh: { prefix: 'smoke_sense_hostiles_v1_', label: 'T1: sense_hostiles (fresh)' },
-      t1_get_light_level_fresh: { prefix: 'smoke_get_light_level_v1_', label: 'T1: get_light_level (fresh)' },
-      t1_find_resource_fresh: { prefix: 'smoke_find_resource_v1_', label: 'T1: find_resource (fresh)' },
-      t1_introspect_recipe_fresh: { prefix: 'smoke_introspect_recipe_v1_', label: 'T1: introspect_recipe (fresh)' },
-      t1_step_forward_fresh: { prefix: 'smoke_step_forward_v1_', label: 'T1: step_forward_safely (fresh)' },
-      t2_equip_weapon_fresh: { prefix: 'smoke_equip_weapon_v1_', label: 'T2: equip_weapon (fresh)' },
-      t2_equip_tool_fresh: { prefix: 'smoke_equip_tool_v1_', label: 'T2: equip_tool (fresh)' },
-      t2_manage_inventory_fresh: { prefix: 'smoke_manage_inventory_v1_', label: 'T2: manage_inventory (fresh)' },
-      t2_consume_food_fresh: { prefix: 'smoke_consume_food_v1_', label: 'T2: consume_food (fresh)' },
-      t3_craft_recipe_fresh: { prefix: 'smoke_craft_recipe_v1_', label: 'T3: craft_recipe (fresh)' },
-      t3_place_workstation_fresh: { prefix: 'smoke_place_workstation_v1_', label: 'T3: place_workstation (fresh)' },
-      t3_till_soil_fresh: { prefix: 'smoke_till_soil_v1_', label: 'T3: till_soil (fresh)' },
-      t3_place_block_fresh: { prefix: 'smoke_place_block_v1_', label: 'T3: place_block (fresh)' },
-      t3_place_torch_fresh: { prefix: 'smoke_place_torch_v1_', label: 'T3: place_torch (fresh)' },
-      t3_acquire_material_fresh: { prefix: 'smoke_acquire_material_v1_', label: 'T3: acquire_material (fresh)' },
-      tb_craft_build_torch_fresh: { prefix: 'smoke_chain_craft_build_torch_v1_', label: 'TB: craft→build→torch chain (fresh)' },
-      t4_attack_entity_fresh: { prefix: 'smoke_attack_entity_v1_', label: 'T4: attack_entity (fresh)' },
-      t4_retreat_fresh: { prefix: 'smoke_retreat_v1_', label: 'T4: retreat (fresh)' },
-    };
+    const DYNAMIC_VARIANTS: Record<string, { prefix: string; label: string }> =
+      {
+        ok_fresh: {
+          prefix: 'smoke_e2e_chat_wait_v1_',
+          label: 'fresh happy path (prefix-wildcard, never dedupes)',
+        },
+        slow_wait_fresh: {
+          prefix: 'smoke_e2e_slow_wait_v1_',
+          label: 'fresh slow_wait (prefix-wildcard, never dedupes)',
+        },
+        // Fresh (re-runnable) variants for every tier — bypasses task deduplication.
+        t1_sense_hostiles_fresh: {
+          prefix: 'smoke_sense_hostiles_v1_',
+          label: 'T1: sense_hostiles (fresh)',
+        },
+        t1_get_light_level_fresh: {
+          prefix: 'smoke_get_light_level_v1_',
+          label: 'T1: get_light_level (fresh)',
+        },
+        t1_find_resource_fresh: {
+          prefix: 'smoke_find_resource_v1_',
+          label: 'T1: find_resource (fresh)',
+        },
+        t1_introspect_recipe_fresh: {
+          prefix: 'smoke_introspect_recipe_v1_',
+          label: 'T1: introspect_recipe (fresh)',
+        },
+        t1_step_forward_fresh: {
+          prefix: 'smoke_step_forward_v1_',
+          label: 'T1: step_forward_safely (fresh)',
+        },
+        t2_equip_weapon_fresh: {
+          prefix: 'smoke_equip_weapon_v1_',
+          label: 'T2: equip_weapon (fresh)',
+        },
+        t2_equip_tool_fresh: {
+          prefix: 'smoke_equip_tool_v1_',
+          label: 'T2: equip_tool (fresh)',
+        },
+        t2_manage_inventory_fresh: {
+          prefix: 'smoke_manage_inventory_v1_',
+          label: 'T2: manage_inventory (fresh)',
+        },
+        t2_consume_food_fresh: {
+          prefix: 'smoke_consume_food_v1_',
+          label: 'T2: consume_food (fresh)',
+        },
+        t3_craft_recipe_fresh: {
+          prefix: 'smoke_craft_recipe_v1_',
+          label: 'T3: craft_recipe (fresh)',
+        },
+        t3_place_workstation_fresh: {
+          prefix: 'smoke_place_workstation_v1_',
+          label: 'T3: place_workstation (fresh)',
+        },
+        t3_till_soil_fresh: {
+          prefix: 'smoke_till_soil_v1_',
+          label: 'T3: till_soil (fresh)',
+        },
+        t3_place_block_fresh: {
+          prefix: 'smoke_place_block_v1_',
+          label: 'T3: place_block (fresh)',
+        },
+        t3_place_torch_fresh: {
+          prefix: 'smoke_place_torch_v1_',
+          label: 'T3: place_torch (fresh)',
+        },
+        t3_acquire_material_fresh: {
+          prefix: 'smoke_acquire_material_v1_',
+          label: 'T3: acquire_material (fresh)',
+        },
+        tb_craft_build_torch_fresh: {
+          prefix: 'smoke_chain_craft_build_torch_v1_',
+          label: 'TB: craft→build→torch chain (fresh)',
+        },
+        t4_attack_entity_fresh: {
+          prefix: 'smoke_attack_entity_v1_',
+          label: 'T4: attack_entity (fresh)',
+        },
+        t4_retreat_fresh: {
+          prefix: 'smoke_retreat_v1_',
+          label: 'T4: retreat (fresh)',
+        },
+      };
 
     router.post(
       '/api/dev/sterling-smoke',
@@ -1965,15 +2175,17 @@ export function createPlanningEndpoints(
           }
 
           // Resolve variant (default: ok)
-          const variantKey = typeof req.body?.variant === 'string'
-            ? req.body.variant
-            : 'ok';
+          const variantKey =
+            typeof req.body?.variant === 'string' ? req.body.variant : 'ok';
           let smokeDigest: string;
           if (SMOKE_VARIANTS[variantKey]) {
             smokeDigest = SMOKE_VARIANTS[variantKey].digest;
           } else if (DYNAMIC_VARIANTS[variantKey]) {
             // Generate unique digest per run via prefix-wildcard
-            const runSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+            const runSuffix = crypto
+              .randomUUID()
+              .replace(/-/g, '')
+              .slice(0, 12);
             smokeDigest = `${DYNAMIC_VARIANTS[variantKey].prefix}${runSuffix}`;
           } else {
             const allVariants = [
@@ -2075,14 +2287,16 @@ export function createPlanningEndpoints(
           // Read the ORIGINAL task's golden-run artifact for checkpoint data.
           if (dedupeHit) {
             const origRunId = (task.metadata as any)?.goldenRun?.runId;
-            const origReport = origRunId
-              ? recorder.getReport(origRunId)
-              : null;
+            const origReport = origRunId ? recorder.getReport(origRunId) : null;
             const origTaskStatus = task.status ?? 'unknown';
             const allOk = origReport ? isAllCheckpointsOk(origReport) : false;
             // Flush original run's artifact if it exists in memory
             if (origRunId) {
-              try { await recorder.flushRun(origRunId); } catch { /* best-effort */ }
+              try {
+                await recorder.flushRun(origRunId);
+              } catch {
+                /* best-effort */
+              }
             }
             return res.json({
               proof_passed: allOk,
@@ -2117,10 +2331,14 @@ export function createPlanningEndpoints(
           // Early-exit: if A_result already shows non-ok, no need to wait for dispatch.
           // Bounded override: poll_timeout_ms in request body (min 5000, max 45000).
           const POLL_INTERVAL_MS = 3000;
-          const rawPollTimeout = typeof req.body?.poll_timeout_ms === 'number'
-            ? req.body.poll_timeout_ms
-            : 45000;
-          const POLL_TIMEOUT_MS = Math.max(5000, Math.min(120000, rawPollTimeout));
+          const rawPollTimeout =
+            typeof req.body?.poll_timeout_ms === 'number'
+              ? req.body.poll_timeout_ms
+              : 45000;
+          const POLL_TIMEOUT_MS = Math.max(
+            5000,
+            Math.min(120000, rawPollTimeout)
+          );
           const pollStart = Date.now();
           let timedOut = false;
           let finalTaskStatus: string | undefined;
@@ -2190,19 +2408,27 @@ export function createPlanningEndpoints(
           const checkpoints = buildCheckpointProof(report);
           const allOk = isAllCheckpointsOk(report);
           const artifactState = buildArtifactState(report);
-          const failureMode = classifyFailureMode(checkpoints, timedOut, artifactState);
+          const failureMode = classifyFailureMode(
+            checkpoints,
+            timedOut,
+            artifactState
+          );
 
           // Key invariant: if the golden-run artifact shows verified success,
           // report proof_passed=true even if the poll window expired before we
           // could observe it. The artifact is the source of truth, not the poll.
-          const artifactVerified = artifactState.verification_status === 'verified';
+          const artifactVerified =
+            artifactState.verification_status === 'verified';
           const proofPassed = allOk || (timedOut && artifactVerified);
 
           // Persist artifact to disk (awaitable — ensures file exists before returning path)
           try {
             await recorder.flushRun(runId);
           } catch (flushErr) {
-            console.warn('[dev sterling-smoke] Artifact flush failed:', flushErr);
+            console.warn(
+              '[dev sterling-smoke] Artifact flush failed:',
+              flushErr
+            );
           }
 
           const artifactAbsPath = recorder.getArtifactPath(runId);
@@ -2218,7 +2444,8 @@ export function createPlanningEndpoints(
             checkpoints,
             all_checkpoints_ok: allOk,
             artifact_state: artifactState,
-            observed_after_poll: timedOut && artifactVerified ? true : undefined,
+            observed_after_poll:
+              timedOut && artifactVerified ? true : undefined,
             timed_out: timedOut,
             elapsed_ms: Date.now() - endpointStart,
             artifact_path: `artifacts/golden-run/golden-${runId}.json`,
@@ -2228,8 +2455,7 @@ export function createPlanningEndpoints(
           console.error('[dev sterling-smoke] Failed:', error);
           return res.status(500).json({
             error: 'sterling-smoke failed',
-            details:
-              error instanceof Error ? error.message : String(error),
+            details: error instanceof Error ? error.message : String(error),
             elapsed_ms: Date.now() - endpointStart,
           });
         }

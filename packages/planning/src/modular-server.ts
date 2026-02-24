@@ -3231,13 +3231,12 @@ cognitiveThoughtProcessor.setTaskHistoryProvider(
   new DirectTaskHistoryProvider(taskIntegration)
 );
 
-// Wire cached inventory provider so verification can skip HTTP when fresh data exists
-taskIntegration.setInventoryProvider?.(() => {
-  const snapshot = worldStateManager.getSnapshot();
-  const items = worldStateManager.getInventory();
-  if (!items) return undefined;
-  return { items, ts: snapshot.ts };
-});
+// Verification needs post-action freshness. The worldState snapshot can lag by
+// one action (craft completes, verify runs before the next 3s poll tick),
+// producing false-negative before=0 after=0 FAILs. Leaving the provider unset
+// forces getInventoryItems() to fall through to live HTTP /inventory reads,
+// which reflect the worker's current mineflayer state immediately.
+// Keep worldState caching for UI/telemetry — just don't use it for proof.
 
 // Rig E: Wire hierarchical planner when enabled via env config.
 // With ENABLE_RIG_E=1, navigate/explore/find tasks are planned via the

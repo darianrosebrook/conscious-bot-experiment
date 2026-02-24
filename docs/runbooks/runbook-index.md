@@ -19,7 +19,7 @@ Quick-reference index of operational runbooks for conscious-bot development and 
 **Key variants**: `ok` (happy path), `ok_fresh` (never dedupes), `unknown_digest` (F2 test), `slow_wait` (F6 test)
 **Source**: `docs/leaf-execution-pipeline.md` → Sterling→Leaf Correlation Proof section
 
-#### [Golden Run Test](./golden-run-runbook.md)
+#### [Golden Run Test](../planning/golden-run-runbook.md)
 **Purpose**: Prove end-to-end routing and execution for `sterling_ir` tasks with durable artifacts
 **Use when**: Full pipeline proof including idle episodes and reduce→digest selection
 **Key stages**: Stage 1 (manual injection), Stage 2 (idle → Sterling → task)
@@ -47,20 +47,18 @@ Quick-reference index of operational runbooks for conscious-bot development and 
 **Key sections**: Tri-state model, receipt flow diagram, per-leaf verification table, adding receipt verification to new leaves
 **Source**: `docs/leaf-execution-pipeline.md` → Receipt-Anchored Verification section; `packages/planning/src/task-integration.ts`
 
----
-
-## Planned Runbooks
-
-#### Leaf Contract Alignment Check
+#### [Leaf Contract Alignment Check](./contract-alignment-runbook.md)
 **Purpose**: Verify planning ↔ MC normalization agreement for action parameters
 **Use when**: Adding new action types, debugging parameter mismatch errors, CI contract tests
-**Will cover**: Running contract-alignment tests, fixing alias mismatches, requiredKeys enforcement, idempotency
+**Key sections**: Alias agreement tests, KNOWN_LEAVES coverage, idempotency checks, normalization semantics reference
 **Source**: `packages/planning/src/modules/__tests__/contract-alignment.test.ts`, `packages/minecraft-interface/src/action-contract-registry.ts`
 
-#### Composability Gap Workarounds
+### Operational Workflows
+
+#### [Composability Gap Workarounds](./composability-gap-workarounds-runbook.md)
 **Purpose**: Known gaps and their mitigations until proper fixes land
 **Use when**: Hitting known issues like workstation sprawl, auto-equip missing, block→drop name mismatch
-**Will cover**: P0/P1/P2 gaps, planner-side workarounds, manual workarounds for testing
+**Key sections**: P0 gaps (4 critical), P1 gaps (3 quality-of-life), P2 gaps (3 future), diagnostic quick reference, bugs fixed
 **Source**: `docs/leaf-execution-pipeline.md` → Known Composability Gaps section; `docs/runbooks/leaf-reachability-runbook.md` → Coverage Gaps G-1..G-8
 
 ---
@@ -108,11 +106,11 @@ When creating a new runbook, follow this structure (see `sterling-smoke-runbook.
 
 To add a new runbook:
 
-1. Create `docs/planning/<runbook-name>-runbook.md`
+1. Create `docs/runbooks/<runbook-name>-runbook.md`
 2. Follow the runbook template above
 3. Add entry to this index under "Available Runbooks" with the appropriate category
 4. Link to source sections in pipeline docs (use section names, not line numbers)
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-14*

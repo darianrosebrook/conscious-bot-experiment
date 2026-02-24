@@ -13,7 +13,7 @@ Prove end-to-end Sterling → leaf execution through the full pipeline: expand �
 
 **Does NOT prove**:
 - The reduce→digest selection path (Sterling choosing WHICH digest to commit)
-- That requires `run-golden-reduce` or a live reduce call (see [golden-run-runbook.md](./golden-run-runbook.md))
+- That requires `run-golden-reduce` or a live reduce call (see [golden-run-runbook.md](../planning/golden-run-runbook.md))
 
 ## Required Env
 
@@ -252,7 +252,7 @@ cat "$ARTIFACT" | jq '.execution.dispatched_steps'
 
 ## Related Runbooks
 
-- **[golden-run-runbook.md](./golden-run-runbook.md)**: Full end-to-end proof including idle episodes and reduce→digest selection
+- **[golden-run-runbook.md](../planning/golden-run-runbook.md)**: Full end-to-end proof including idle episodes and reduce→digest selection
 - **[leaf-creation-runbook.md](./leaf-creation-runbook.md)**: Step-by-step guide to implementing new leaves
 - **[debugging-leaf-dispatch-runbook.md](./debugging-leaf-dispatch-runbook.md)**: Trace points and failure mode diagnostics
 - **[receipt-anchored-verification-runbook.md](./receipt-anchored-verification-runbook.md)**: Tri-state verification for placement leaves

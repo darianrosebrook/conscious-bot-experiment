@@ -308,7 +308,9 @@ function startThoughtGeneration() {
       serverLogger.warn('Failed to log thought generation start', {
         event: 'thought_generation_log_start_failed',
         tags: ['thought-generation', 'log', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     });
 
@@ -440,7 +442,9 @@ function startThoughtGeneration() {
       serverLogger.error('Error generating periodic thought', {
         event: 'thought_generation_error',
         tags: ['thought-generation', 'error'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
 
       cognitiveLogger
@@ -583,7 +587,9 @@ intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
       serverLogger.warn('Failed to log intrusive thought generation', {
         event: 'intrusive_thought_log_failed',
         tags: ['intrusive', 'thought', 'log', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     });
 
@@ -691,7 +697,9 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
       serverLogger.warn('Failed to log social consideration', {
         event: 'social_consideration_log_failed',
         tags: ['social', 'consideration', 'log', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     });
 
@@ -744,7 +752,9 @@ socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
       serverLogger.warn('Failed to log chat consideration', {
         event: 'chat_consideration_log_failed',
         tags: ['social', 'chat', 'log', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     });
 
@@ -843,7 +853,9 @@ eventDrivenThoughtGenerator.on(
       serverLogger.warn('Failed to forward generated thought to dashboard', {
         event: 'dashboard_forward_failed',
         tags: ['dashboard', 'thought', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
   }
@@ -881,18 +893,18 @@ app.use((req, res, next) => {
     cognitiveStateTracker.recordOperation(operationType, success, startTime);
 
     const durationMs = Date.now() - startTime;
-    serverLogger.info('Request completed', {
-      event: 'middleware_request',
-      tags: ['middleware', 'request'],
-      fields: {
-        method: req.method,
-        path: req.path,
-        statusCode: res.statusCode,
-        durationMs,
-        operationType,
-        success,
-      },
-    });
+    // serverLogger.info('Request completed', {
+    //   event: 'middleware_request',
+    //   tags: ['middleware', 'request'],
+    //   fields: {
+    //     method: req.method,
+    //     path: req.path,
+    //     statusCode: res.statusCode,
+    //     durationMs,
+    //     operationType,
+    //     success,
+    //   },
+    // });
   });
 
   next();
@@ -920,7 +932,9 @@ app.use(
       }
     },
     getTtsEnabled: () => state.ttsEnabled,
-    setTtsEnabled: (enabled: boolean) => { state.ttsEnabled = enabled; },
+    setTtsEnabled: (enabled: boolean) => {
+      state.ttsEnabled = enabled;
+    },
   })
 );
 
@@ -1067,7 +1081,9 @@ process.on('unhandledRejection', (reason: any) => {
   serverLogger.error('Unhandled rejection', {
     event: 'process_unhandled_rejection',
     tags: ['process', 'error'],
-    fields: { error: reason instanceof Error ? reason.message : String(reason) },
+    fields: {
+      error: reason instanceof Error ? reason.message : String(reason),
+    },
   });
 });
 
@@ -1089,7 +1105,9 @@ const server = app.listen(port, () => {
       serverLogger.warn('Failed to log server startup', {
         event: 'server_startup_log_failed',
         tags: ['server', 'startup', 'log', 'warn'],
-        fields: { error: error instanceof Error ? error.message : String(error) },
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     });
 
@@ -1143,18 +1161,51 @@ const server = app.listen(port, () => {
 
   const endpoints = [
     { name: 'metrics', url: `http://localhost:${port}/metrics` },
-    { name: 'thought_generation', url: `http://localhost:${port}/generate-thoughts` },
+    {
+      name: 'thought_generation',
+      url: `http://localhost:${port}/generate-thoughts`,
+    },
     { name: 'react_arbiter', url: `http://localhost:${port}/react-arbiter` },
-    { name: 'social_cognition', url: `http://localhost:${port}/social-cognition` },
-    { name: 'social_consideration', url: `http://localhost:${port}/consider-social` },
-    { name: 'nearby_entities', url: `http://localhost:${port}/process-nearby-entities` },
-    { name: 'chat_consideration', url: `http://localhost:${port}/consider-chat` },
-    { name: 'departure_communication', url: `http://localhost:${port}/consider-departure` },
-    { name: 'cognitive_stream_recent', url: `http://localhost:${port}/api/cognitive-stream/recent` },
-    { name: 'cognitive_stream_processed', url: `http://localhost:${port}/api/cognitive-stream/:id/processed` },
-    { name: 'social_memory_entities', url: `http://localhost:${port}/social-memory/entities` },
-    { name: 'social_memory_search', url: `http://localhost:${port}/social-memory/search` },
-    { name: 'social_memory_stats', url: `http://localhost:${port}/social-memory/stats` },
+    {
+      name: 'social_cognition',
+      url: `http://localhost:${port}/social-cognition`,
+    },
+    {
+      name: 'social_consideration',
+      url: `http://localhost:${port}/consider-social`,
+    },
+    {
+      name: 'nearby_entities',
+      url: `http://localhost:${port}/process-nearby-entities`,
+    },
+    {
+      name: 'chat_consideration',
+      url: `http://localhost:${port}/consider-chat`,
+    },
+    {
+      name: 'departure_communication',
+      url: `http://localhost:${port}/consider-departure`,
+    },
+    {
+      name: 'cognitive_stream_recent',
+      url: `http://localhost:${port}/api/cognitive-stream/recent`,
+    },
+    {
+      name: 'cognitive_stream_processed',
+      url: `http://localhost:${port}/api/cognitive-stream/:id/processed`,
+    },
+    {
+      name: 'social_memory_entities',
+      url: `http://localhost:${port}/social-memory/entities`,
+    },
+    {
+      name: 'social_memory_search',
+      url: `http://localhost:${port}/social-memory/search`,
+    },
+    {
+      name: 'social_memory_stats',
+      url: `http://localhost:${port}/social-memory/stats`,
+    },
   ];
 
   // Log endpoints summary (collapsed) - detailed listing only in debug mode

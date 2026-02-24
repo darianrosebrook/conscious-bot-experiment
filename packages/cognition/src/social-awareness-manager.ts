@@ -796,7 +796,7 @@ export class SocialAwarenessManager extends EventEmitter {
 
       if (response.ok) {
         const goalData = (await response.json()) as { id: string };
-        console.log(`🎯 Created chat response goal: ${goalData.id}`);
+        console.log(`Created chat response goal: ${goalData.id}`);
       } else {
         console.error(
           '❌ Failed to create chat response goal:',

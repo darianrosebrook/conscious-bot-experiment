@@ -459,6 +459,11 @@ export class KeepAliveIntegration {
       return false;
     }
 
+    // Stamp cooldown before the call — prevents hammering Sterling during outages.
+    // If the call succeeds, this is harmless (already stamped). If it fails, the
+    // rate limiter still applies, matching the stated "at most one per window" contract.
+    this.lastVitalsRerouteAt = now;
+
     const client = getDefaultLanguageIOClient();
     try {
       await client.connect();
@@ -469,22 +474,37 @@ export class KeepAliveIntegration {
     // Deterministic run_id derived from thought identity — preserves replay verifiability.
     // crypto.randomUUID() would produce different IR digests for identical state.
     const runId = `keepalive-vitals:${thought.id}`;
-    // Canonicalize payload: sort inventory names, quantize position to whole blocks.
-    const pos = this.lastBotState.position;
-    const botStatePayload = {
-      health: vitals.health,
-      food: vitals.food,
-      nearby_hostiles: vitals.nearbyHostiles,
-      inventory_summary: (this.lastBotState.inventory ?? []).map(i => i.name).sort(),
-      position: pos ? { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) } : undefined,
-    };
 
-    const rawText = `[IDLE_EPISODE_V1]\n${JSON.stringify({
+    // Build payload matching the canonical buildIdleEpisodeText() format exactly.
+    // The previous implementation used "[IDLE_EPISODE_V1]" (bracketed) and a minimal
+    // bot_state. Sterling's parser routes on the header prefix — the brackets caused
+    // it to take a different path that yielded is_executable without committed_goal_prop_id.
+    const pos = this.lastBotState.position;
+    const rawText = `IDLE_EPISODE_V1\n${JSON.stringify({
       kind: 'idle_episode_v1',
       run_id: runId,
       idle_reason: 'vitals_urgent',
-      timestamp_ms: Date.now(),
-      bot_state: botStatePayload,
+      timestamp_ms: thought.timestamp ?? Date.now(),
+      bot_state: {
+        position: pos ? { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) } : undefined,
+        health: vitals.health,
+        food: vitals.food,
+        time_of_day: this.lastBotState.timeOfDay,
+        weather: this.lastBotState.weather,
+        biome: this.lastBotState.biome,
+        dimension: this.lastBotState.dimension,
+        nearby_hostiles: vitals.nearbyHostiles,
+        nearby_passives: this.lastBotState.nearbyPassives ?? 0,
+        inventory_summary: (this.lastBotState.inventory ?? []).map(i => ({
+          name: i.name,
+          count: i.count,
+        })),
+      },
+      blocked_tasks: [],
+      budgets: {
+        max_steps: 8,
+        max_ms: 2000,
+      },
     })}`;
 
     try {
@@ -504,6 +524,19 @@ export class KeepAliveIntegration {
       }
 
       const reducer = result.result;
+
+      // Guard: Sterling returned is_executable but no committed_goal_prop_id.
+      // Posting this thought would just produce dropped_no_goal_prop downstream.
+      // Log it explicitly and return false so the original thought falls through.
+      if (!reducer.committed_goal_prop_id) {
+        console.log(
+          `[KeepAliveIntegration] vitals_reduce: executable_without_goal_prop ` +
+            `(is_executable=${reducer.is_executable} goalPropId=null) — ` +
+            `Sterling did not commit a goal; falling through`
+        );
+        return false;
+      }
+
       const reduction = {
         sterlingProcessed: true,
         envelopeId: result.envelope.envelope_id,
@@ -513,8 +546,6 @@ export class KeepAliveIntegration {
         durationMs: result.durationMs,
         sterlingError: null,
       };
-
-      this.lastVitalsRerouteAt = Date.now();
 
       console.log(
         `[KeepAliveIntegration] keepalive_vitals_bound: ` +

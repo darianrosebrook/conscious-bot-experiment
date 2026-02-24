@@ -85,3 +85,47 @@ describe('ORE_DROP_MAP (regression)', () => {
     expect(ORE_DROP_MAP.deepslate_diamond_ore.item).toBe('diamond');
   });
 });
+
+/**
+ * Variant suffix stripping — P0-A fix.
+ *
+ * Sterling emits recipe identifiers with variant suffixes (e.g. "stick:v10").
+ * The verification boundary must strip these so inventory lookups match
+ * Minecraft's actual item names (e.g. "stick").
+ */
+describe('variant suffix normalization (:v\\d+)', () => {
+  // This regex must match what task-integration uses in both
+  // getInventoryNamesForVerification and buildInventoryIndex.
+  const stripVariant = (s: string) => s.toLowerCase().replace(/:v\d+$/u, '');
+
+  it('strips :v10 suffix', () => {
+    expect(stripVariant('stick:v10')).toBe('stick');
+  });
+
+  it('strips :v0 suffix', () => {
+    expect(stripVariant('crafting_table:v0')).toBe('crafting_table');
+  });
+
+  it('strips higher variant numbers', () => {
+    expect(stripVariant('wooden_pickaxe:v123')).toBe('wooden_pickaxe');
+  });
+
+  it('leaves items without suffix unchanged', () => {
+    expect(stripVariant('spruce_planks')).toBe('spruce_planks');
+    expect(stripVariant('diamond')).toBe('diamond');
+  });
+
+  it('does not strip non-variant colons (minecraft: prefix)', () => {
+    // The minecraft: prefix is handled separately; this regex should not touch it
+    expect(stripVariant('minecraft:coal')).toBe('minecraft:coal');
+  });
+
+  it('accepted=["stick:v10"] matches inventory key "stick"', () => {
+    // End-to-end scenario from run-log.md F1
+    const accepted = ['stick:v10'].map(stripVariant);
+    const inventoryKeys: Record<string, number> = { spruce_planks: 4, crafting_table: 1, stick: 4 };
+    const total = accepted.reduce((sum, name) => sum + (inventoryKeys[name] ?? 0), 0);
+    expect(total).toBe(4);
+    expect(accepted).toEqual(['stick']);
+  });
+});

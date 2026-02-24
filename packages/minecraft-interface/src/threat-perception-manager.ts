@@ -408,7 +408,7 @@ export class ThreatPerceptionManager {
         .map(([type, count]) => `${type}:${count}`)
         .join(', ');
       console.log(
-        `[ThreatPerception] suppressed ${suppressedTotal} LOS logs in last ${this.losSummaryIntervalMs}ms` +
+        `[ThreatPerception] ${suppressedTotal} entities failed LOS check in last ${this.losSummaryIntervalMs}ms` +
           (byType ? ` (${byType})` : '')
       );
       this.losSuppressedCount.clear();

@@ -1098,6 +1098,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       if (!name) continue;
       // Minecraft API may return "minecraft:coal"; normalize so verification matches
       if (name.startsWith('minecraft:')) name = name.slice('minecraft:'.length);
+      // Strip Sterling variant suffixes (e.g. "stick:v10" → "stick") — belt-and-suspenders
+      name = name.replace(/:v\d+$/u, '');
       idx[name] = (idx[name] || 0) + (it?.count || 0);
     }
     return idx;
@@ -4520,9 +4522,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         | StepSnapshot
         | undefined;
 
-      const inventory = await this.getInventoryItems();
-      const afterIdx = this.buildInventoryIndex(inventory);
-
       const acceptedNames = this.getInventoryNamesForVerification(
         itemId,
         isMineStep
@@ -4531,11 +4530,33 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         (sum, name) => sum + (start?.inventoryByName?.[name] ?? 0),
         0
       );
-      const after = acceptedNames.reduce(
-        (sum, name) => sum + (afterIdx[name] ?? 0),
-        0
-      );
 
+      // Settle barrier: Mineflayer may not have committed the craft/acquire
+      // result to its window by the time we read inventory. Poll up to 500ms
+      // (10 × 50ms) for the expected item to appear, then evaluate once.
+      const SETTLE_TIMEOUT = 500;
+      const SETTLE_POLL = 50;
+      const settleStart = Date.now();
+      let afterIdx: Record<string, number> = {};
+      let after = 0;
+      let settlePolls = 0;
+
+      do {
+        if (settlePolls > 0) {
+          await new Promise((r) => setTimeout(r, SETTLE_POLL));
+        }
+        const inventory = await this.getInventoryItems();
+        afterIdx = this.buildInventoryIndex(inventory);
+        after = acceptedNames.reduce(
+          (sum, name) => sum + (afterIdx[name] ?? 0),
+          0
+        );
+        settlePolls++;
+        // Stop as soon as we see a positive delta
+        if (after - before >= minDelta) break;
+      } while (Date.now() - settleStart < SETTLE_TIMEOUT);
+
+      const settleMs = Date.now() - settleStart;
       const passed = after - before >= minDelta;
       if (!passed) {
         // Include per-name breakdown and full inventory keys for disambiguation
@@ -4549,7 +4570,21 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         console.warn(
           `[verifyInventoryDelta] FAIL item=${itemId} accepted=[${acceptedNames}] ` +
             `before=${before} after=${after} delta=${after - before} need=${minDelta} ` +
-            `hasSnapshot=${!!start} breakdown=[${perName}] inventoryKeys=[${invKeys}]`
+            `hasSnapshot=${!!start} settlePolls=${settlePolls} settleMs=${settleMs} ` +
+            `breakdown=[${perName}] inventoryKeys=[${invKeys}]`
+        );
+      } else if (settlePolls > 1 || process.env.LOG_VERIFY_PASSES === '1') {
+        // Log when settle barrier was needed, or always when LOG_VERIFY_PASSES=1
+        const perName = acceptedNames
+          .map(
+            (n) =>
+              `${n}(before=${start?.inventoryByName?.[n] ?? 0},after=${afterIdx[n] ?? 0})`
+          )
+          .join(' ');
+        console.log(
+          `[verifyInventoryDelta] PASS item=${itemId} accepted=[${acceptedNames}] ` +
+            `before=${before} after=${after} delta=${after - before} ` +
+            `settlePolls=${settlePolls} settleMs=${settleMs} breakdown=[${perName}]`
         );
       }
       return passed;
@@ -4677,7 +4712,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     resourceType: string,
     isMineStep = false
   ): string[] {
-    const lower = resourceType.toLowerCase();
+    // Strip Sterling variant suffixes (e.g. "stick:v10" → "stick") so
+    // accepted names match what Minecraft actually stores in inventory.
+    const lower = resourceType.toLowerCase().replace(/:v\d+$/u, '');
     const names = [lower];
     const drop = ORE_DROP_MAP[lower as keyof typeof ORE_DROP_MAP];
     if (drop) {

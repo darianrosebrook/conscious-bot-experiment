@@ -10,10 +10,12 @@
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
 
-const PLANNING_INGEST_DEBUG_400 =
-  process.env.PLANNING_INGEST_DEBUG_400 === '1';
+const PLANNING_INGEST_DEBUG_400 = process.env.PLANNING_INGEST_DEBUG_400 === '1';
 
-function buildResponseDebug(bodyText: string): { truncated: string; sha256: string } {
+function buildResponseDebug(bodyText: string): {
+  truncated: string;
+  sha256: string;
+} {
   const truncated = bodyText.length > 2048 ? bodyText.slice(0, 2048) : bodyText;
   const sha256 = crypto.createHash('sha256').update(bodyText).digest('hex');
   return { truncated, sha256 };
@@ -999,7 +1001,9 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     action: Action,
     originalThought: string
   ): string {
-    const cleanThought = originalThought.replace(/\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi, '').trim();
+    const cleanThought = originalThought
+      .replace(/\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi, '')
+      .trim();
     return `Task created from intrusive thought: "${cleanThought}". ${action.type} ${action.target}.`;
   }
 
@@ -1301,10 +1305,65 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   }
 
   /**
+   * Infer requirementCandidate from action for goal-task types.
+   * Planning endpoint requires this for crafting/building/mining/gathering.
+   */
+  private inferRequirementFromAction(
+    action: Action
+  ): { kind: string; outputPattern: string; quantity: number } | null {
+    const target = (action.target || '').trim();
+    if (!target) return null;
+
+    const item = target
+      .replace(/^(a|an|some|the)\s+/i, '')
+      .split(/\s+/)[0]
+      ?.toLowerCase()
+      .replace(/\s+/g, '_');
+    if (!item || item.length < 2) return null;
+
+    const cat = (action.category || '').toLowerCase();
+    const kindMap: Record<string, string> = {
+      crafting: 'craft',
+      building: 'craft',
+      mining: 'mine',
+      gathering: 'collect',
+      exploration: 'collect',
+    };
+    const kind = kindMap[cat];
+    if (!kind) return null;
+
+    return { kind, outputPattern: item, quantity: 1 };
+  }
+
+  /**
    * Update the planning system with a new task
    */
   private async updatePlanningSystem(task: Task): Promise<void> {
     try {
+      const NON_GOAL_TYPES = new Set([
+        'general',
+        'social',
+        'reflection',
+        'status',
+        'advisory_action',
+        'inventory',
+        'survival',
+      ]);
+      const typeKey = (task.type || '').toLowerCase();
+      const needsRequirement = !NON_GOAL_TYPES.has(typeKey);
+
+      let parameters: Record<string, unknown> =
+        (task.metadata as any)?.parameters ?? {};
+      if (needsRequirement && !parameters.requirementCandidate) {
+        const action = task.metadata?.action as Action | undefined;
+        const candidate = action
+          ? this.inferRequirementFromAction(action)
+          : null;
+        if (candidate) {
+          parameters = { ...parameters, requirementCandidate: candidate };
+        }
+      }
+
       const requestId = makeRequestId();
       const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
@@ -1320,6 +1379,8 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
           source: task.source,
           steps: task.steps,
           metadata: task.metadata,
+          parameters:
+            Object.keys(parameters).length > 0 ? parameters : undefined,
         }),
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });

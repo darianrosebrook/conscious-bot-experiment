@@ -38,11 +38,13 @@ const RECOVERY_SHORT_BACKOFF_MS = 5_000;
 const RECOVERY_LONG_BACKOFF_MS = 60_000;
 
 /**
- * Phase 1 frozen policy: threat levels that trigger retreat recovery mode.
- * Changing threat semantics in Phase 3 must not silently alter recovery behavior.
- * If threat thresholds are recalibrated, update this set explicitly.
+ * Threat levels that trigger retreat recovery mode instead of exploration.
+ * Runtime capture (2026-02-15) showed "medium" persists from ambient mobs at distance,
+ * causing every recovery to be retreat (0ms no-op) and blocking explore_for_resources.
+ * Changed: retreat only on high/critical. Medium allows exploration under ambient risk.
+ * Phase 3 may re-add medium with a proximity gate (retreat only if threat < N blocks).
  */
-const THREAT_RECOVERY_LEVELS = Object.freeze(new Set(['medium', 'high', 'critical'])) as ReadonlySet<string>;
+const THREAT_RECOVERY_LEVELS = Object.freeze(new Set(['high', 'critical'])) as ReadonlySet<string>;
 
 // ============================================================================
 // Block Reason Registry — single source of truth for executor block reasons.
@@ -388,7 +390,7 @@ async function executeRecoveryStep(
   task: { id: string },
   plan: RecoveryPlan,
   runId: string | undefined,
-): Promise<{ success: boolean; durationMs: number }> {
+): Promise<{ success: boolean; durationMs: number; outcome: 'success' | 'no_effect' | 'failed' }> {
   const start = Date.now();
 
   if (runId) {
@@ -416,21 +418,33 @@ async function executeRecoveryStep(
       ctx.getAbortSignal(),
     );
     const durationMs = Date.now() - start;
-    const success = result.ok === true;
+    const toolOk = result.ok === true;
+
+    // Check for effect evidence: a recovery that returns "success" but didn't
+    // actually change world state (e.g. retreat_from_threat with no nearby threats)
+    // should be treated as no_effect, not success. This prevents burning recovery
+    // budget on no-op actions that leave the bot stationary.
+    const resultData = (result.data ?? {}) as Record<string, unknown>;
+    const hasExplicitNoEffect = resultData.retreated === false || resultData.moved_blocks === 0;
+    const hasExplicitEffect = resultData.retreated === true || (typeof resultData.moved_blocks === 'number' && resultData.moved_blocks > 0);
+    // If the leaf reports explicit effect evidence, trust it. Otherwise fall back
+    // to timing heuristic: 0ms "success" is almost certainly a no-op stub.
+    const hadEffect = toolOk && !hasExplicitNoEffect && (hasExplicitEffect || durationMs > 50);
+    const outcome = toolOk ? (hadEffect ? 'success' : 'no_effect') : 'failed';
 
     if (runId) {
       ctx.getGoldenRunRecorder().recordDispatch(runId, {
         step_id: plan.stepId,
         leaf: plan.leaf,
-        recovery_outcome: success ? 'success' : 'failed',
+        recovery_outcome: outcome,
         duration_ms: durationMs,
         dispatched_at: Date.now(),
       });
     }
 
-    return { success, durationMs };
+    return { success: hadEffect, durationMs, outcome };
   } catch {
-    return { success: false, durationMs: Date.now() - start };
+    return { success: false, durationMs: Date.now() - start, outcome: 'failed' };
   }
 }
 
@@ -1035,12 +1049,17 @@ export async function executeSterlingStep(
       const staleRetryState =
         task.metadata?.verifyFailCount ||
         task.metadata?.repositionRetryCount ||
-        task.metadata?.lastRetryHint;
+        task.metadata?.lastRetryHint ||
+        task.metadata?.recoveryActionCount;
       if (staleRetryState) {
         ctx.updateTaskMetadata(task.id, {
           verifyFailCount: 0,
           repositionRetryCount: undefined,
           lastRetryHint: undefined,
+          recoveryActionCount: undefined,
+          lastRecoveryOutcome: undefined,
+          lastRecoveryLeaf: undefined,
+          lastRecoveryMode: undefined,
         });
       }
       // Replan after explore_for_resources so tool progression solver runs again
@@ -1248,12 +1267,13 @@ export async function executeSterlingStep(
         repositionRetries,
       );
       const outcome = await executeRecoveryStep(ctx, task, plan, runId);
+      const recoveryState = outcome.outcome;
       const backoffMs = outcome.success ? RECOVERY_SHORT_BACKOFF_MS : RECOVERY_LONG_BACKOFF_MS;
 
       console.log(
         `[StepExecutor] retry_hint=reposition_or_rescan for ${leafExec.leafName} ` +
           `(attempt ${repositionRetries}/${maxRepositionRetries}) ` +
-          `recovery=${outcome.success ? 'success' : 'failed'} ` +
+          `recovery=${recoveryState} ` +
           `leaf=${plan.leaf} mode=${plan.mode} backoff=${backoffMs}ms`
       );
 
@@ -1261,8 +1281,11 @@ export async function executeSterlingStep(
         repositionRetryCount: repositionRetries,
         lastRetryHint: retryHint,
         nextEligibleAt: Date.now() + backoffMs,
-        recoveryActionCount: recoveryActions + 1,
-        lastRecoveryOutcome: outcome.success ? 'success' : 'failed',
+        // Only count actions that had real effect toward the recovery budget.
+        // No-effect recoveries (0ms retreat, no movement) use long backoff
+        // but don't consume budget, so the next attempt can try a different strategy.
+        recoveryActionCount: outcome.success ? recoveryActions + 1 : recoveryActions,
+        lastRecoveryOutcome: recoveryState,
         lastRecoveryLeaf: plan.leaf,
         lastRecoveryMode: plan.mode,
       });

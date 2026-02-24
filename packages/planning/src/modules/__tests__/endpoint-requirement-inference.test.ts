@@ -16,7 +16,11 @@ describe('inferRequirementFromEndpointParams', () => {
       type: 'crafting',
       parameters: { item: 'oak_planks', quantity: 4 },
     });
-    expect(result).toEqual({ kind: 'craft', outputPattern: 'oak_planks', quantity: 4 });
+    expect(result).toEqual({
+      kind: 'craft',
+      outputPattern: 'oak_planks',
+      quantity: 4,
+    });
   });
 
   it('type:gathering + item → kind:collect', () => {
@@ -24,7 +28,11 @@ describe('inferRequirementFromEndpointParams', () => {
       type: 'gathering',
       parameters: { item: 'oak_log' },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: 'oak_log', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'collect',
+      outputPattern: 'oak_log',
+      quantity: 1,
+    });
   });
 
   it('type:mining + blockType → kind:mine', () => {
@@ -32,42 +40,66 @@ describe('inferRequirementFromEndpointParams', () => {
       type: 'mining',
       parameters: { blockType: 'iron_ore' },
     });
-    expect(result).toEqual({ kind: 'mine', outputPattern: 'iron_ore', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'mine',
+      outputPattern: 'iron_ore',
+      quantity: 1,
+    });
   });
 
   it('recipe parameter → kind:craft', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { recipe: 'crafting_table' },
     });
-    expect(result).toEqual({ kind: 'craft', outputPattern: 'crafting_table', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'craft',
+      outputPattern: 'crafting_table',
+      quantity: 1,
+    });
   });
 
   it('recipe parameter with qty', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { recipe: 'stick', qty: 4 },
     });
-    expect(result).toEqual({ kind: 'craft', outputPattern: 'stick', quantity: 4 });
+    expect(result).toEqual({
+      kind: 'craft',
+      outputPattern: 'stick',
+      quantity: 4,
+    });
   });
 
   it('resourceType:wood → kind:collect, outputPattern:_log (any wood)', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { resourceType: 'wood' },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: '_log', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'collect',
+      outputPattern: '_log',
+      quantity: 1,
+    });
   });
 
   it('resourceType:stone → kind:collect, outputPattern:stone', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { resourceType: 'stone' },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: 'stone', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'collect',
+      outputPattern: 'stone',
+      quantity: 1,
+    });
   });
 
   it('resourceType with targetQuantity', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { resourceType: 'wood', targetQuantity: 8 },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: '_log', quantity: 8 });
+    expect(result).toEqual({
+      kind: 'collect',
+      outputPattern: '_log',
+      quantity: 8,
+    });
   });
 
   it('type:crafting + empty parameters → null (400 path)', () => {
@@ -94,7 +126,11 @@ describe('inferRequirementFromEndpointParams', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { blockType: 'oak_log' },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: 'oak_log', quantity: 1 });
+    expect(result).toEqual({
+      kind: 'collect',
+      outputPattern: 'oak_log',
+      quantity: 1,
+    });
   });
 
   it('item without known type → null (no type mapping)', () => {
@@ -114,5 +150,35 @@ describe('inferRequirementFromEndpointParams', () => {
     // recipe checked first
     expect(result?.kind).toBe('craft');
     expect(result?.outputPattern).toBe('stick');
+  });
+
+  it('metadata.action (intrusive-thought) → infers from target + category', () => {
+    const result = inferRequirementFromEndpointParams({
+      type: 'building',
+      parameters: {},
+      metadata: {
+        action: {
+          target: 'a chest to store my inventory',
+          category: 'building',
+        },
+      },
+    });
+    expect(result).toEqual({
+      kind: 'craft',
+      outputPattern: 'chest',
+      quantity: 1,
+    });
+  });
+
+  it('type:building + item → kind:craft', () => {
+    const result = inferRequirementFromEndpointParams({
+      type: 'building',
+      parameters: { item: 'chest' },
+    });
+    expect(result).toEqual({
+      kind: 'craft',
+      outputPattern: 'chest',
+      quantity: 1,
+    });
   });
 });

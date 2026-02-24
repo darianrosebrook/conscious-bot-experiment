@@ -29,7 +29,7 @@ export function createSocialRoutes(deps: SocialRouteDeps): Router {
         });
       }
 
-      console.log(`🤔 Processing social consideration for ${entity.type}:`, {
+      console.log(`Processing social consideration for ${entity.type}:`, {
         entityId: entity.id,
         distance: entity.distance,
         hostile: entity.hostile,
@@ -37,10 +37,11 @@ export function createSocialRoutes(deps: SocialRouteDeps): Router {
       });
 
       // Use enhanced thought generator for social consideration
-      const thought = await deps.enhancedThoughtGenerator.generateSocialConsideration(
-        entity,
-        context
-      );
+      const thought =
+        await deps.enhancedThoughtGenerator.generateSocialConsideration(
+          entity,
+          context
+        );
 
       const thoughts = thought ? [thought] : [];
 
@@ -51,7 +52,10 @@ export function createSocialRoutes(deps: SocialRouteDeps): Router {
 
       // Keep only the last 100 thoughts to prevent memory leaks
       if (deps.state.cognitiveThoughts.length > 100) {
-        deps.state.cognitiveThoughts.splice(0, deps.state.cognitiveThoughts.length - 100);
+        deps.state.cognitiveThoughts.splice(
+          0,
+          deps.state.cognitiveThoughts.length - 100
+        );
       }
 
       const result = {
@@ -148,7 +152,7 @@ export function createSocialRoutes(deps: SocialRouteDeps): Router {
         });
       }
 
-      console.log(`💬 Processing chat consideration for ${message.sender}:`, {
+      console.log(`Processing chat consideration for ${message.sender}:`, {
         message: message.content.substring(0, 50) + '...',
         senderType: message.senderType,
         isDirect: message.isDirect,
@@ -216,18 +220,19 @@ export function createSocialRoutes(deps: SocialRouteDeps): Router {
         });
       }
 
-      console.log(`🚪 Considering departure communication:`, {
+      console.log(`Considering departure communication:`, {
         area: currentArea.name,
         newTask: newTask.title,
         entitiesNearby: currentArea.entities.length,
       });
 
       // Use social awareness manager for departure communication
-      const result = await deps.socialAwarenessManager.generateDepartureCommunication(
-        currentArea,
-        newTask,
-        context
-      );
+      const result =
+        await deps.socialAwarenessManager.generateDepartureCommunication(
+          currentArea,
+          newTask,
+          context
+        );
 
       // Send departure consideration to cognitive stream
       if (result.shouldAnnounce) {

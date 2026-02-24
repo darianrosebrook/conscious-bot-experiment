@@ -8,8 +8,8 @@
     "execution_decisions_v1"
   ],
   "run_id": "hunger-reflex-success",
-  "created_at": 1771027623294,
-  "updated_at": 1771027623295,
+  "created_at": 1771133172495,
+  "updated_at": 1771133172495,
   "execution": {
     "dispatched_steps": [],
     "decisions": [],
@@ -54,11 +54,11 @@
         }
       },
       "evidence": {
-        "proof_id": "cfb26c6a-5e0f-4797-a203-8fcf692b2e74",
+        "proof_id": "9bea5444-889c-4933-b6fd-19c6cda96d56",
         "goal_id": "8650ed17beb9036c",
         "task_id": "task-smoke-1",
-        "homeostasis_sample_digest": "f0d8a88f84d6e5e1",
-        "candidates_digest": "d63b86a8f340e239",
+        "homeostasis_sample_digest": "a05696a334a46fec",
+        "candidates_digest": "1ec5804f797d8a3c",
         "execution_receipt": {
           "itemsConsumed": 1,
           "foodConsumed": "bread"
@@ -66,12 +66,12 @@
         "candidate_food_item": "bread",
         "candidate_food_count": 5,
         "timing": {
-          "trigger_to_goal_ms": 1,
+          "trigger_to_goal_ms": 40,
           "goal_to_task_ms": 0,
           "task_to_execution_ms": 1,
-          "total_ms": 2
+          "total_ms": 41
         },
-        "triggered_at": 1771027623292
+        "triggered_at": 1771133172454
       }
     }
   }
