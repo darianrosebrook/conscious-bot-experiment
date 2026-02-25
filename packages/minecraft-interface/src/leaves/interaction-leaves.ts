@@ -1445,6 +1445,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
           bot.removeListener('playerCollect' as any, onCollect);
           (bot as any).setControlState?.('forward', false);
           (bot as any).setControlState?.('back', false);
+          (bot as any).setControlState?.('jump', false);
           try { (bot as any).pathfinder?.setGoal(null); } catch { /* best-effort */ }
         };
 
@@ -1474,10 +1475,10 @@ export class AcquireMaterialLeaf implements LeafImpl {
             let gotoTimedOut = false;
             await Promise.race([
               botWithPf.pathfinder?.goto(
-                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 0)
+                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 2)
               ) ?? Promise.resolve(),
               new Promise<void>((r) =>
-                setTimeout(() => { gotoTimedOut = true; r(); }, 5000)
+                setTimeout(() => { gotoTimedOut = true; r(); }, 8000)
               ),
             ]).catch(() => { /* pathfinder failure is non-fatal here */ });
             if (gotoTimedOut) {
@@ -1486,16 +1487,22 @@ export class AcquireMaterialLeaf implements LeafImpl {
 
             // If still far from drop, look at it and walk directly toward it
             // as a fallback when pathfinder times out or stops short.
+            // Jump for the first 1s to clear 1-block terrain obstacles (common around trees).
             const distAfterPf = bot.entity.position.distanceTo(dropPos);
             if (!pickupDetected && distAfterPf > 1.5) {
               await bot.lookAt(dropPos);
               (bot as any).setControlState('forward', true);
+              (bot as any).setControlState('jump', true);
               const walkStart = Date.now();
-              while (Date.now() - walkStart < 2000 && !pickupDetected) {
-                if (bot.entity.position.distanceTo(dropPos) < 0.8) break;
+              while (Date.now() - walkStart < 3000 && !pickupDetected) {
+                if (bot.entity.position.distanceTo(dropPos) < 1.5) break;
+                if (Date.now() - walkStart > 1000) {
+                  (bot as any).setControlState('jump', false);
+                }
                 await new Promise((r) => setTimeout(r, 100));
               }
               (bot as any).setControlState('forward', false);
+              (bot as any).setControlState('jump', false);
             }
 
             // Short settle window for playerCollect/inventory to reflect pickup.
@@ -1887,6 +1894,8 @@ export class PlaceBlockLeaf implements LeafImpl {
         // Use floored block coordinates (not floating-point entity pos)
         // so offsets reliably target distinct adjacent block cells.
         const bf = bot.entity.position.floored();
+        // Blocks that can be overwritten by placement. Do NOT add fluids
+        // (water, lava) — they cause placement physics to fail silently.
         const REPLACEABLE = new Set([
           'air', 'cave_air', 'void_air', 'tall_grass', 'short_grass',
           'grass', 'fern', 'dead_bush', 'snow', 'snow_layer',
@@ -1988,6 +1997,21 @@ export class PlaceBlockLeaf implements LeafImpl {
         };
       }
 
+      // Ensure bot is within reach of the placement position.
+      // Candidates are ≤2 blocks from floored pos, but movement between
+      // candidate selection and placement can push us out of range.
+      const distToPlacement = bot.entity.position.distanceTo(placementPos);
+      if (distToPlacement > 3.5) {
+        await bot.lookAt(placementPos.offset(0.5, 0.5, 0.5));
+        (bot as any).setControlState('forward', true);
+        const walkStart = Date.now();
+        while (Date.now() - walkStart < 2000) {
+          if (bot.entity.position.distanceTo(placementPos) <= 2.5) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        (bot as any).setControlState('forward', false);
+      }
+
       // Equip the item in hand before placing
       await bot.equip(itemToPlace, 'hand');
 
@@ -2013,13 +2037,14 @@ export class PlaceBlockLeaf implements LeafImpl {
         placeError = err instanceof Error ? err : new Error(String(err));
       }
 
-      // Verify placement — poll briefly to let the local world view settle even
-      // when we don't receive the expected blockUpdate signal.
+      // Verify placement — poll up to 2s to let the local world view settle even
+      // when we don't receive the expected blockUpdate signal. Server lag can
+      // delay the confirmation well beyond 500ms.
       let placedBlock = bot.blockAt(placementPos);
       let blockPlaced = !!placedBlock && placedBlock.name === item;
       let verifyPolls = 0;
       const verifyStart = Date.now();
-      while (!blockPlaced && Date.now() - verifyStart < 500) {
+      while (!blockPlaced && Date.now() - verifyStart < 2000) {
         verifyPolls++;
         await new Promise((r) => setTimeout(r, 50));
         placedBlock = bot.blockAt(placementPos);
@@ -2034,9 +2059,34 @@ export class PlaceBlockLeaf implements LeafImpl {
         );
       }
 
+      // Inline retry: if the first attempt failed silently (server rejected the
+      // packet without an error), re-equip and re-place once before giving up.
       if (!blockPlaced) {
-        // True failure. Log rich diagnostics so we can distinguish reach issues,
-        // held-item mismatches, and non-replaceable targets.
+        console.log(
+          `[place_block] first attempt failed, retrying once (verifyPolls=${verifyPolls} error=${placeError?.message ?? 'none'})`
+        );
+        await bot.equip(itemToPlace, 'hand');
+        await bot.lookAt(faceCenter);
+        try {
+          await bot.placeBlock(refBlock, faceVec);
+        } catch (err) {
+          placeError = err instanceof Error ? err : new Error(String(err));
+        }
+        const retryStart = Date.now();
+        while (!blockPlaced && Date.now() - retryStart < 2000) {
+          verifyPolls++;
+          placedBlock = bot.blockAt(placementPos);
+          blockPlaced = !!placedBlock && placedBlock.name === item;
+          if (!blockPlaced) await new Promise((r) => setTimeout(r, 50));
+        }
+        if (blockPlaced) {
+          console.log(`[place_block] retry succeeded after ${verifyPolls} total polls`);
+        }
+      }
+
+      if (!blockPlaced) {
+        // True failure after retry. Log rich diagnostics so we can distinguish
+        // reach issues, held-item mismatches, and non-replaceable targets.
         const distToRef = bot.entity.position.distanceTo(refBlock.position);
         const distToTarget = bot.entity.position.distanceTo(placementPos);
         console.warn(
@@ -2060,7 +2110,7 @@ export class PlaceBlockLeaf implements LeafImpl {
           },
           metrics: {
             durationMs: ctx.now() - startTime,
-            retries: 0,
+            retries: 1,
             timeouts: 0,
           },
         };
