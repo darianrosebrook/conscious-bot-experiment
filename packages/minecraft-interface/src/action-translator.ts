@@ -3736,15 +3736,15 @@ export class ActionTranslator {
             if (!gotoResult.success) {
               return { success: false, error: 'Navigation busy — cannot reach block' };
             }
-            const digResult = await this.executeDigBlock(
+            const acquireResult = await this.executeAcquireMaterial(
               {
-                type: 'dig_block',
-                parameters: { pos: { x: blockPos.x, y: blockPos.y, z: blockPos.z } },
-                timeout: 5000,
+                type: 'acquire_material',
+                parameters: { item: closest.name ?? itemsArr[0], count: 1 },
+                timeout: 10000,
               },
-              5000
+              10000
             );
-            if (digResult.success) {
+            if (acquireResult.success) {
               return {
                 success: true,
                 data: { blockType: closest.name ?? itemsArr[0], mined: true },
@@ -4016,16 +4016,16 @@ export class ActionTranslator {
                   { success: false, error: 'NAV_PREEMPTED' },
                 );
                 if (gotoResult.success) {
-                  const digResult = await this.executeDigBlock(
+                  const matchedBlockType = blockResults[0]?.blockType ?? itemsArr[0];
+                  const acquireResult = await this.executeAcquireMaterial(
                     {
-                      type: 'dig_block',
-                      parameters: { pos: { x: nearest.x, y: nearest.y, z: nearest.z } },
-                      timeout: 5000,
+                      type: 'acquire_material',
+                      parameters: { item: matchedBlockType, count: 1 },
+                      timeout: 10000,
                     },
-                    5000
+                    10000
                   );
-                  if (digResult.success) {
-                    const matchedBlockType = blockResults[0]?.blockType ?? itemsArr[0];
+                  if (acquireResult.success) {
                     return {
                       success: true,
                       data: { blockType: matchedBlockType, mined: true },
@@ -4479,17 +4479,17 @@ export class ActionTranslator {
           // Wait a moment for the bot to move closer
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          // Use dig_block action to break the block
-          const digResult = await this.executeDigBlock(
+          // Use acquire_material to dig + collect the drop
+          const acquireResult = await this.executeAcquireMaterial(
             {
-              type: 'dig_block',
-              parameters: { pos: blockPos },
-              timeout: 5000,
+              type: 'acquire_material',
+              parameters: { item: resource, count: 1 },
+              timeout: 10000,
             },
-            5000
+            10000
           );
 
-          if (digResult.success) {
+          if (acquireResult.success) {
             gatheredCount++;
             gatheredItems.push({
               position: blockPos,
@@ -4497,11 +4497,11 @@ export class ActionTranslator {
               success: true,
             });
             console.log(
-              `✅ Successfully gathered ${resource} from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}`
+              `Successfully gathered ${resource} from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}`
             );
           } else {
             console.log(
-              `❌ Failed to gather from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}: ${digResult.error}`
+              `Failed to gather from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}: ${acquireResult.error}`
             );
           }
         } catch (error) {
