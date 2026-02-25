@@ -2288,7 +2288,7 @@ export class ConsumeFoodLeaf implements LeafImpl {
    */
   private isFoodItem(itemName: string): boolean {
     const foodItems = [
-      'bread',
+      // Cooked meats
       'cooked_beef',
       'cooked_chicken',
       'cooked_porkchop',
@@ -2296,6 +2296,23 @@ export class ConsumeFoodLeaf implements LeafImpl {
       'cooked_mutton',
       'cooked_cod',
       'cooked_salmon',
+      // Raw meats (from hunting — edible but less efficient than cooked)
+      'raw_beef',
+      'beef',
+      'raw_porkchop',
+      'porkchop',
+      'raw_chicken',
+      'chicken',
+      'raw_mutton',
+      'mutton',
+      'raw_rabbit',
+      'rabbit',
+      'raw_cod',
+      'cod',
+      'raw_salmon',
+      'salmon',
+      // Plant-based
+      'bread',
       'baked_potato',
       'carrot',
       'apple',
@@ -2308,6 +2325,7 @@ export class ConsumeFoodLeaf implements LeafImpl {
       'dried_kelp',
       'beetroot',
       'potato',
+      // Prepared dishes
       'pumpkin_pie',
       'cookie',
       'cake',
@@ -2317,6 +2335,8 @@ export class ConsumeFoodLeaf implements LeafImpl {
       'suspicious_stew',
       'honey_bottle',
       'milk_bucket',
+      // Emergency food (negative effects but prevents starvation)
+      'rotten_flesh',
     ];
 
     return foodItems.some((food) => itemName.includes(food));

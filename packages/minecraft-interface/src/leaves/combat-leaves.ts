@@ -688,27 +688,69 @@ export class HuntAnimalLeaf implements LeafImpl {
       }
 
       // --- Phase 4: Collect drops ---
-      // Wait for auto-pickup (items within ~2 blocks)
-      for (let w = 0; w < 8 && !pickupDetected; w++) {
-        await new Promise((r) => setTimeout(r, 250));
-      }
+      // Brief settle — items need a tick to spawn after mob death
+      await new Promise((r) => setTimeout(r, 500));
 
-      // Walk to death position if drops not auto-collected
-      if (!pickupDetected && target.position) {
-        const deathPos = target.position.clone();
-        await bot.lookAt(deathPos);
-        (bot as any).setControlState('forward', true);
-        const walkStart = Date.now();
-        while (Date.now() - walkStart < 3000 && !pickupDetected) {
-          if (bot.entity.position.distanceTo(deathPos) < 1.0) break;
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        (bot as any).setControlState('forward', false);
+      // Scan for dropped item entities near the death area.
+      // target.position is the mob's last-known position (updated in real-time
+      // by mineflayer as the mob fled), which is close to but not exactly the
+      // death location. Items scatter ~2-3 blocks from death point.
+      const LOOT_SCAN_RADIUS = 12;
+      const deathArea = target.position ?? bot.entity.position;
+      const itemEntities = Object.values(bot.entities)
+        .filter((e: any) => {
+          if (e.type !== 'item' && e.name !== 'item') return false;
+          if (!e.position) return false;
+          return e.position.distanceTo(deathArea) <= LOOT_SCAN_RADIUS;
+        })
+        .sort(
+          (a: any, b: any) =>
+            a.position.distanceTo(bot.entity.position) -
+            b.position.distanceTo(bot.entity.position),
+        );
 
-        // Settle wait for inventory update
-        for (let w = 0; w < 4 && !pickupDetected; w++) {
+      // Walk to each item entity for pickup
+      for (const itemEntity of itemEntities) {
+        const ent = bot.entities[(itemEntity as any).id];
+        if (!ent?.position) continue; // Already picked up or despawned
+
+        const itemPos = ent.position;
+        if (bot.entity.position.distanceTo(itemPos) < 1.5) {
+          // Already close enough for auto-pickup
           await new Promise((r) => setTimeout(r, 200));
+          continue;
         }
+
+        try {
+          if (botPf.pathfinder) {
+            await Promise.race([
+              botPf.pathfinder.goto(
+                new pathfinderGoals.GoalNear(
+                  itemPos.x,
+                  itemPos.y,
+                  itemPos.z,
+                  0,
+                ),
+              ),
+              new Promise<void>((r) => setTimeout(r, 5000)),
+            ]);
+          } else {
+            // Fallback: direct walk toward item
+            await bot.lookAt(itemPos);
+            (bot as any).setControlState('forward', true);
+            const walkStart = Date.now();
+            while (Date.now() - walkStart < 3000) {
+              if (bot.entity.position.distanceTo(itemPos) < 1.5) break;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            (bot as any).setControlState('forward', false);
+          }
+        } catch {
+          // Navigation failed — try next item
+        }
+
+        // Settle for pickup registration
+        await new Promise((r) => setTimeout(r, 300));
       }
 
       bot.removeListener('playerCollect' as any, onCollect);

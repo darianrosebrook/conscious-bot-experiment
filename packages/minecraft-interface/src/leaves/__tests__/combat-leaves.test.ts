@@ -496,6 +496,62 @@ describe('Combat Leaves', () => {
         expect.any(Number),
       );
     });
+
+    it('should scan for dropped item entities after kill', async () => {
+      const leaf = new HuntAnimalLeaf();
+
+      // Pig at 2 blocks — close enough to skip pathfinder approach
+      const entities: Record<string, any> = {
+        50: {
+          id: 50, name: 'pig', type: 'pig',
+          position: new Vec3(2, 64, 0), health: 8, isValid: true,
+        },
+      };
+      const bot = createHuntBot(entities);
+
+      // Give bot a mock pathfinder so Phase 4 loot collection resolves instantly
+      // instead of falling back to the direct-walk loop (which blocks on real timers)
+      (bot as any).pathfinder = {
+        goto: vi.fn().mockResolvedValue(undefined),
+        setGoal: vi.fn(),
+        setMovements: vi.fn(),
+        isMoving: vi.fn().mockReturnValue(false),
+        stop: vi.fn(),
+      };
+
+      // Kill pig on first attack, then spawn item entities (simulating drops)
+      (bot.attack as any).mockImplementation(async () => {
+        entities[50].health = 0;
+        entities[50].isValid = false;
+        // Dropped items appear near pig's death position (5 blocks from bot)
+        entities[100] = {
+          id: 100, type: 'item', name: 'item',
+          position: new Vec3(5, 64, 1), isValid: true,
+          getDroppedItem: () => ({ name: 'raw_porkchop', count: 1 }),
+        };
+        entities[101] = {
+          id: 101, type: 'item', name: 'item',
+          position: new Vec3(5, 64, -1), isValid: true,
+          getDroppedItem: () => ({ name: 'bone', count: 1 }),
+        };
+      });
+
+      let invCall = 0;
+      bot.inventory.items.mockImplementation(() => {
+        invCall++;
+        if (invCall <= 1) return [];
+        return [
+          { name: 'raw_porkchop', count: 1, slot: 0 },
+          { name: 'bone', count: 1, slot: 1 },
+        ];
+      });
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, {});
+
+      expect(result.status).toBe('success');
+      expect((result.result as any).itemsCollected.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe('UseItemLeaf', () => {
