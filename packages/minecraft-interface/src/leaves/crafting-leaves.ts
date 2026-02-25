@@ -520,6 +520,45 @@ export class CraftRecipeLeaf implements LeafImpl {
       };
     }
 
+    // Navigate to crafting table if the recipe requires one and bot is too far
+    if (useTable && tablePos) {
+      const distToTable = bot.entity.position.distanceTo(tablePos);
+      if (distToTable > 3.5) {
+        try {
+          const pathfinderGoals = await import('mineflayer-pathfinder').then(m => m.goals);
+          const goal = new pathfinderGoals.GoalNear(tablePos.x, tablePos.y, tablePos.z, 2);
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('nav_timeout')), 8000);
+            (bot.pathfinder as any).goto(goal)
+              .then(() => { clearTimeout(timeout); resolve(); })
+              .catch((err: any) => { clearTimeout(timeout); reject(err); });
+          });
+        } catch {
+          return {
+            status: 'failure',
+            error: {
+              code: 'craft.missingInput' as any,
+              retryable: true,
+              detail: `Crafting table found at ${tablePos} but unreachable (dist=${distToTable.toFixed(1)})`,
+            },
+            result: {
+              success: false,
+              crafted: 0,
+              recipe,
+              toolDiagnostics: {
+                _diag_version: 1,
+                reason_code: 'table_unreachable',
+                table_pos: { x: tablePos.x, y: tablePos.y, z: tablePos.z },
+                bot_pos: { x: Math.floor(bot.entity.position.x), y: Math.floor(bot.entity.position.y), z: Math.floor(bot.entity.position.z) },
+                distance: distToTable,
+              },
+            },
+            metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+          };
+        }
+      }
+    }
+
     // Snapshot inventory before
     const beforeInv = await ctx.inventory();
     const beforeCounts = countByName(beforeInv);
