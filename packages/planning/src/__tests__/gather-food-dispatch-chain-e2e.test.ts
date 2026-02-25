@@ -8,7 +8,7 @@
  *
  * Pipeline under test:
  *   Idle episode (low food/health) → _select_idle_goal → ("gather", "food")
- *     → _lower_gather → [acquire_material, consume_food]
+ *     → _lower_gather → [hunt_animal, consume_food]
  *       → mapBTActionToMinecraft (each step)
  *         → executeSterlingStep (mock executeTool)
  *
@@ -148,6 +148,7 @@ function createMockExecutorContext(
       'minecraft.craft_recipe',
       'minecraft.move_to',
       'minecraft.move_forward',
+      'minecraft.hunt_animal',
     ]),
     mode: 'live',
     updateTaskMetadata: vi.fn(),
@@ -226,16 +227,16 @@ describe('Gather-Food Dispatch Chain E2E', () => {
     });
 
     it('fixture step count matches expected gather-food chain length', () => {
-      // 2 steps: acquire_material (find+dig+collect) → consume_food
+      // 2 steps: hunt_animal (find+kill passive animal) → consume_food
       expect(GATHER_FOOD_STEPS).toHaveLength(2);
-      expect(GATHER_FOOD_STEPS[0].leaf).toBe('acquire_material');
+      expect(GATHER_FOOD_STEPS[0].leaf).toBe('hunt_animal');
       expect(GATHER_FOOD_STEPS[1].leaf).toBe('consume_food');
     });
 
-    it('acquire_material step has valid item arg for AcquireMaterialLeaf', () => {
-      const acquireStep = GATHER_FOOD_STEPS[0];
-      expect(acquireStep.args.item).toBe('sweet_berry_bush');
-      expect(acquireStep.args.count).toBe(1);
+    it('hunt_animal step has valid args for HuntAnimalLeaf', () => {
+      const huntStep = GATHER_FOOD_STEPS[0];
+      expect(huntStep.args.animal_type).toBe('any');
+      expect(huntStep.args.radius).toBe(32);
     });
   });
 
@@ -313,10 +314,10 @@ describe('Gather-Food Dispatch Chain E2E', () => {
       // ── Stage 5: Verify dispatch details ──
       const executeCalls = (ctx.executeTool as ReturnType<typeof vi.fn>).mock.calls;
 
-      // Step 0: acquire_material dispatched with item=sweet_berry_bush
-      expect(executeCalls[0][0]).toBe('minecraft.acquire_material');
+      // Step 0: hunt_animal dispatched with animal_type=any
+      expect(executeCalls[0][0]).toBe('minecraft.hunt_animal');
       expect(executeCalls[0][1]).toEqual(
-        expect.objectContaining({ item: 'sweet_berry_bush' }),
+        expect.objectContaining({ animal_type: 'any', radius: 32 }),
       );
 
       // Step 1: consume_food dispatched

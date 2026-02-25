@@ -159,13 +159,23 @@ describe('cross-boundary bootstrap autonomy contract', () => {
       }
     });
 
-    it('acquire_material maps with correct item name', () => {
+    it('hunt_animal maps with correct args', () => {
       const action = mapBTActionToMinecraft(
         STERLING_GATHER_FOOD_STEPS[0].leaf,
         STERLING_GATHER_FOOD_STEPS[0].args,
       );
-      expect(action!.type).toBe('acquire_material');
-      expect(action!.parameters.item).toBe('sweet_berry_bush');
+      expect(action!.type).toBe('hunt_animal');
+      expect(action!.parameters.animal_type).toBe('any');
+      expect(action!.parameters.radius).toBe(32);
+    });
+
+    it('consume_food step maps correctly', () => {
+      const action = mapBTActionToMinecraft(
+        STERLING_GATHER_FOOD_STEPS[1].leaf,
+        STERLING_GATHER_FOOD_STEPS[1].args,
+      );
+      expect(action!.type).toBe('consume_food');
+      expect(action!.parameters.food_type).toBe('any');
     });
   });
 
@@ -183,6 +193,7 @@ describe('cross-boundary bootstrap autonomy contract', () => {
     const BOOTSTRAP_LEAVES = [
       'move_to',
       'step_forward_safely',
+      'hunt_animal',
       'acquire_material',
       'consume_food',
     ];

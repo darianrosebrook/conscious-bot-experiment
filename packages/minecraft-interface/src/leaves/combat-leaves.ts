@@ -462,6 +462,315 @@ export class AttackEntityLeaf implements LeafImpl {
 }
 
 // ============================================================================
+// Hunt Animal Leaf — food acquisition from passive mobs
+// ============================================================================
+
+/**
+ * Data-driven food animal table.
+ * Keys: entity names that drop food items when killed.
+ * Values: possible drop item names (for inventory delta verification).
+ */
+const FOOD_ANIMALS: Record<string, string[]> = {
+  cow: ['raw_beef', 'leather'],
+  mooshroom: ['raw_beef', 'leather'],
+  pig: ['raw_porkchop'],
+  chicken: ['raw_chicken', 'feather'],
+  sheep: ['raw_mutton'],
+  rabbit: ['raw_rabbit', 'rabbit_hide', 'rabbit_foot'],
+};
+
+const FOOD_ANIMAL_NAMES = new Set(Object.keys(FOOD_ANIMALS));
+
+/**
+ * Find the nearest food-dropping passive mob within radius.
+ */
+function findNearestFoodAnimal(
+  bot: Bot,
+  radius: number,
+  animalType?: string,
+): any {
+  if (!bot.entity?.position) return null;
+
+  const pos = bot.entity.position;
+  let nearest: any = null;
+  let nearestDistance = Infinity;
+
+  Object.values(bot.entities).forEach((entity: any) => {
+    if (entity === bot.entity) return;
+    if (!entity.position) return;
+    if (entity.isValid === false) return;
+
+    const name = entity.name || entity.type || '';
+    if (!FOOD_ANIMAL_NAMES.has(name)) return;
+    if (animalType && animalType !== 'any' && name !== animalType) return;
+
+    const distance = entity.position.distanceTo(pos);
+    if (distance <= radius && distance < nearestDistance) {
+      nearest = entity;
+      nearestDistance = distance;
+    }
+  });
+
+  return nearest;
+}
+
+/**
+ * Hunt a nearby passive animal for food drops.
+ *
+ * Unlike AttackEntityLeaf (which targets hostiles and includes retreat logic),
+ * this leaf specifically targets food-producing passive mobs with a simpler
+ * combat loop (passives don't fight back) and explicit loot collection.
+ */
+export class HuntAnimalLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'hunt_animal',
+    version: '1.0.0',
+    description: 'Hunt a nearby passive animal for food drops',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        animal_type: {
+          type: 'string',
+          default: 'any',
+          description:
+            'Target animal type (cow, pig, chicken, sheep, rabbit) or "any"',
+        },
+        radius: {
+          type: 'number',
+          minimum: 1,
+          maximum: 64,
+          default: 32,
+          description: 'Search radius for animals',
+        },
+      },
+      required: [],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        animalType: { type: 'string' },
+        itemsCollected: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              count: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+    timeoutMs: 30000,
+    retries: 2,
+    permissions: ['movement', 'dig'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const startTime = ctx.now();
+    const { animal_type = 'any', radius = 32 } = args;
+
+    try {
+      const bot = ctx.bot;
+
+      // --- Phase 1: Find target ---
+      const target = findNearestFoodAnimal(bot, radius, animal_type);
+      if (!target) {
+        const typeLabel =
+          animal_type === 'any' ? 'food animals' : animal_type;
+        return {
+          status: 'failure',
+          error: {
+            code: 'world.invalidPosition',
+            retryable: true,
+            detail: `No ${typeLabel} found within ${radius} blocks`,
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
+        };
+      }
+
+      const animalName = target.name || target.type;
+
+      // Snapshot inventory before combat for delta calculation
+      const invBefore = new Map<string, number>();
+      for (const item of bot.inventory.items()) {
+        invBefore.set(item.name, (invBefore.get(item.name) ?? 0) + item.count);
+      }
+
+      // --- Phase 2: Equip weapon + approach ---
+      const weapon = findBestWeapon(bot);
+      if (weapon) {
+        try {
+          await bot.equip(weapon, 'hand');
+        } catch {
+          // Non-fatal — fists work on passives
+        }
+      }
+
+      // Lazy-load pathfinder for approach
+      const pathfinderGoals = await import('mineflayer-pathfinder').then(
+        (m) => m.goals,
+      );
+      const botPf = bot as any;
+
+      if (
+        target.position &&
+        target.position.distanceTo(bot.entity.position) > 3
+      ) {
+        try {
+          await Promise.race([
+            botPf.pathfinder?.goto(
+              new pathfinderGoals.GoalNear(
+                target.position.x,
+                target.position.y,
+                target.position.z,
+                2,
+              ),
+            ) ?? Promise.resolve(),
+            new Promise<void>((r) => setTimeout(r, 8000)),
+          ]);
+        } catch {
+          // Path failure — try direct walk
+          await bot.lookAt(target.position);
+          (bot as any).setControlState('forward', true);
+          await new Promise((r) => setTimeout(r, 1500));
+          (bot as any).setControlState('forward', false);
+        }
+      }
+
+      // --- Phase 3: Attack until dead ---
+      // Passive mobs don't fight back, so no retreat logic needed.
+      const maxCombatMs = 15000;
+      const combatDeadline = ctx.now() + maxCombatMs;
+
+      // Listen for drops
+      let pickupDetected = false;
+      const onCollect = (collector: any) => {
+        if (collector === bot.entity) pickupDetected = true;
+      };
+      bot.on('playerCollect' as any, onCollect);
+
+      try {
+        while (ctx.now() < combatDeadline) {
+          // Target dead or despawned?
+          if (
+            target.isValid === false ||
+            (target.health != null && target.health <= 0) ||
+            !bot.entities[target.id]
+          ) {
+            break;
+          }
+
+          // Re-approach if target fled (passive mobs run when hit)
+          const dist = target.position?.distanceTo(bot.entity.position) ?? 99;
+          if (dist > 4) {
+            await bot.lookAt(target.position);
+            (bot as any).setControlState('forward', true);
+            await new Promise((r) => setTimeout(r, 300));
+            (bot as any).setControlState('forward', false);
+          }
+
+          try {
+            await bot.attack(target);
+          } catch {
+            // Entity may have despawned mid-attack
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      } finally {
+        (bot as any).setControlState?.('forward', false);
+      }
+
+      // --- Phase 4: Collect drops ---
+      // Wait for auto-pickup (items within ~2 blocks)
+      for (let w = 0; w < 8 && !pickupDetected; w++) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
+
+      // Walk to death position if drops not auto-collected
+      if (!pickupDetected && target.position) {
+        const deathPos = target.position.clone();
+        await bot.lookAt(deathPos);
+        (bot as any).setControlState('forward', true);
+        const walkStart = Date.now();
+        while (Date.now() - walkStart < 3000 && !pickupDetected) {
+          if (bot.entity.position.distanceTo(deathPos) < 1.0) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        (bot as any).setControlState('forward', false);
+
+        // Settle wait for inventory update
+        for (let w = 0; w < 4 && !pickupDetected; w++) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+
+      bot.removeListener('playerCollect' as any, onCollect);
+
+      // --- Phase 5: Calculate inventory delta ---
+      const itemsCollected: Array<{ name: string; count: number }> = [];
+      for (const item of bot.inventory.items()) {
+        const before = invBefore.get(item.name) ?? 0;
+        const after = item.count;
+        // Aggregate: same item may appear in multiple slots
+        const existing = itemsCollected.find((ic) => ic.name === item.name);
+        if (existing) {
+          // Already counted from another slot
+          continue;
+        }
+        // Sum all slots for this item
+        const totalNow = bot.inventory
+          .items()
+          .filter((i: any) => i.name === item.name)
+          .reduce((sum: number, i: any) => sum + i.count, 0);
+        const delta = totalNow - before;
+        if (delta > 0) {
+          itemsCollected.push({ name: item.name, count: delta });
+        }
+      }
+
+      const duration = ctx.now() - startTime;
+      ctx.emitMetric('hunt_animal_duration', duration);
+      ctx.emitMetric('hunt_animal_items', itemsCollected.length);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          animalType: animalName,
+          itemsCollected,
+        },
+        metrics: {
+          durationMs: duration,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    } catch (error) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'movement.timeout',
+          retryable: true,
+          detail: `Hunt failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+        metrics: {
+          durationMs: ctx.now() - startTime,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    }
+  }
+}
+
+// ============================================================================
 // Equip Weapon Leaf
 // ============================================================================
 

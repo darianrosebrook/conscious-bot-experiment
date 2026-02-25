@@ -7,12 +7,23 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
+
+// Mock mineflayer-pathfinder before importing leaves (dynamic import in HuntAnimalLeaf)
+vi.mock('mineflayer-pathfinder', () => ({
+  goals: {
+    GoalNear: class GoalNear {
+      constructor(public x: number, public y: number, public z: number, public range: number) {}
+    },
+  },
+}));
+
 import {
   AttackEntityLeaf,
   EquipWeaponLeaf,
+  HuntAnimalLeaf,
   RetreatFromThreatLeaf,
   UseItemLeaf,
 } from '../combat-leaves';
@@ -320,6 +331,170 @@ describe('Combat Leaves', () => {
       expect((result.result as any)?.retreatDistance).toBe(10);
       expect(mockBot.setControlState).toHaveBeenCalledWith('forward', true);
       expect(mockBot.setControlState).toHaveBeenCalledWith('sprint', true);
+    });
+  });
+
+  describe('HuntAnimalLeaf', () => {
+
+    const createHuntCtx = (bot: Bot) => {
+      let tick = 1000;
+      return {
+        bot,
+        abortSignal: new AbortController().signal,
+        now: vi.fn(() => (tick += 50)),
+        snapshot: vi.fn(),
+        inventory: vi.fn(),
+        emitMetric: vi.fn(),
+        emitError: vi.fn(),
+      } as any;
+    };
+
+    /** Create a bot mock with food animals. Positions within 3 blocks skip pathfinder.
+     *  Immediately triggers playerCollect callback to short-circuit loot wait loops. */
+    const createHuntBot = (entities: Record<string, any>) => {
+      const bot = {
+        ...createMockBot(),
+        entities,
+        on: vi.fn().mockImplementation((event: string, cb: Function) => {
+          // Trigger playerCollect immediately after registration
+          if (event === 'playerCollect') {
+            setTimeout(() => cb(bot.entity), 10);
+          }
+        }),
+        removeListener: vi.fn(),
+        pathfinder: null,
+      } as any;
+      return bot;
+    };
+
+    it('should have correct spec', () => {
+      const leaf = new HuntAnimalLeaf();
+      expect(leaf.spec.name).toBe('hunt_animal');
+      expect(leaf.spec.version).toBe('1.0.0');
+      expect(leaf.spec.permissions).toContain('movement');
+      expect(leaf.spec.timeoutMs).toBe(30000);
+      expect(leaf.spec.retries).toBe(2);
+    });
+
+    it('should hunt nearest food animal (cow)', async () => {
+      const leaf = new HuntAnimalLeaf();
+      const bot = createHuntBot({
+        10: {
+          id: 10, name: 'cow', type: 'cow',
+          position: new Vec3(2, 64, 0), health: 10, isValid: true,
+        },
+      });
+
+      (bot.attack as any).mockImplementation(async () => {
+        bot.entities[10].health = 0;
+        bot.entities[10].isValid = false;
+      });
+
+      let invCall = 0;
+      bot.inventory.items.mockImplementation(() => {
+        invCall++;
+        if (invCall <= 1) return [];
+        return [{ name: 'raw_beef', count: 1, slot: 0 }];
+      });
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, { animal_type: 'any', radius: 32 });
+
+      expect(result.status).toBe('success');
+      expect((result.result as any).success).toBe(true);
+      expect((result.result as any).animalType).toBe('cow');
+      expect(bot.attack).toHaveBeenCalled();
+    });
+
+    it('should reject non-food passive animals (horse)', async () => {
+      const leaf = new HuntAnimalLeaf();
+      const bot = createHuntBot({
+        20: {
+          id: 20, name: 'horse', type: 'horse',
+          position: new Vec3(2, 64, 0), health: 20, isValid: true,
+        },
+      });
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, {});
+
+      expect(result.status).toBe('failure');
+      expect(result.error?.detail).toContain('No food animals found');
+    });
+
+    it('should fail when no animals nearby', async () => {
+      const leaf = new HuntAnimalLeaf();
+      const bot = createHuntBot({});
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, { radius: 10 });
+
+      expect(result.status).toBe('failure');
+      expect(result.error?.code).toBe('world.invalidPosition');
+      expect(result.error?.retryable).toBe(true);
+    });
+
+    it('should filter by specific animal type', async () => {
+      const leaf = new HuntAnimalLeaf();
+      const bot = createHuntBot({
+        30: {
+          id: 30, name: 'cow', type: 'cow',
+          position: new Vec3(2, 64, 0), health: 10, isValid: true,
+        },
+        31: {
+          id: 31, name: 'chicken', type: 'chicken',
+          position: new Vec3(1, 64, 0), health: 4, isValid: true,
+        },
+      });
+
+      (bot.attack as any).mockImplementation(async () => {
+        bot.entities[31].health = 0;
+        bot.entities[31].isValid = false;
+      });
+
+      bot.inventory.items.mockReturnValue([]);
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, { animal_type: 'chicken', radius: 32 });
+
+      expect(result.status).toBe('success');
+      expect((result.result as any).animalType).toBe('chicken');
+    });
+
+    it('should collect drops and report inventory delta', async () => {
+      const leaf = new HuntAnimalLeaf();
+      const bot = createHuntBot({
+        40: {
+          id: 40, name: 'pig', type: 'pig',
+          position: new Vec3(1, 64, 0), health: 10, isValid: true,
+        },
+      });
+
+      (bot.attack as any).mockImplementation(async () => {
+        bot.entities[40].health = 0;
+        bot.entities[40].isValid = false;
+      });
+
+      let invCall = 0;
+      bot.inventory.items.mockImplementation(() => {
+        invCall++;
+        if (invCall <= 1) return [];
+        return [{ name: 'raw_porkchop', count: 2, slot: 0 }];
+      });
+
+      const ctx = createHuntCtx(bot);
+      const result = await leaf.run(ctx, {});
+
+      expect(result.status).toBe('success');
+      expect((result.result as any).itemsCollected).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'raw_porkchop', count: 2 }),
+        ]),
+      );
+      expect(ctx.emitMetric).toHaveBeenCalledWith(
+        'hunt_animal_duration',
+        expect.any(Number),
+      );
     });
   });
 

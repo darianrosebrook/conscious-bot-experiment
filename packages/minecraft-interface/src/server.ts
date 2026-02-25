@@ -96,6 +96,7 @@ import {
 } from './leaves/container-leaves';
 import {
   AttackEntityLeaf,
+  HuntAnimalLeaf,
   EquipWeaponLeaf,
   RetreatFromThreatLeaf,
   UseItemLeaf,
@@ -1132,6 +1133,7 @@ async function registerCoreLeaves() {
     // Register combat leaves
     const combatLeaves = [
       new AttackEntityLeaf(),
+      new HuntAnimalLeaf(),
       new EquipWeaponLeaf(),
       new RetreatFromThreatLeaf(),
       new UseItemLeaf(),

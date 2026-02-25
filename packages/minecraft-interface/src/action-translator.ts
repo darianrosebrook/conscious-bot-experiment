@@ -877,6 +877,16 @@ export class ActionTranslator {
           timeout: 10000,
         };
 
+      case 'hunt_animal':
+        return {
+          type: 'hunt_animal',
+          parameters: {
+            animal_type: params.animal_type || 'any',
+            radius: params.radius || 32,
+          },
+          timeout: 30000,
+        };
+
       case 'harvest_crops':
         // Creating harvest action
         return {

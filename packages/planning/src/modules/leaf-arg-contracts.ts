@@ -276,6 +276,11 @@ const CONTRACTS: Record<string, LeafArgContract> = {
     fields: ['?entityId:string', '?radius:number', '?duration:number', '?retreatHealth:number'],
     validate: () => null,
   },
+  hunt_animal: {
+    leafName: 'hunt_animal',
+    fields: ['?animal_type:string', '?radius:number'],
+    validate: () => null,
+  },
   equip_weapon: {
     leafName: 'equip_weapon',
     fields: ['?preferredType:string', '?fallbackToHand:any'],

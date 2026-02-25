@@ -38,10 +38,10 @@
       "theme": "food",
       "steps": [
         {
-          "leaf": "acquire_material",
+          "leaf": "hunt_animal",
           "args": {
-            "item": "sweet_berry_bush",
-            "count": 1,
+            "animal_type": "any",
+            "radius": 32,
             "lowered_from": "gather",
             "theme": "food"
           }
@@ -49,6 +49,7 @@
         {
           "leaf": "consume_food",
           "args": {
+            "food_type": "any",
             "lowered_from": "gather",
             "theme": "food"
           }

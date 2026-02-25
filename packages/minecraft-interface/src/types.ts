@@ -216,6 +216,7 @@ export type MinecraftActionType =
   | 'drop_item'
   | 'use_item'
   | 'attack_entity'
+  | 'hunt_animal'
   | 'chat'
   | 'wait'
   | 'consume_food'

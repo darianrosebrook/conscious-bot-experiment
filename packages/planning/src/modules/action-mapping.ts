@@ -582,6 +582,7 @@ export function mapBTActionToMinecraft(
       return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
 
     case 'attack_entity':
+    case 'hunt_animal':
       return { type: normalizedTool, parameters: { ...args }, timeout: 60000 };
 
     case 'equip_weapon':

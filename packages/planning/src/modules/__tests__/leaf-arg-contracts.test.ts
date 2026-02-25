@@ -383,6 +383,7 @@ describe('KNOWN_LEAVES', () => {
       'place_torch',
       // Combat
       'attack_entity',
+      'hunt_animal',
       'equip_weapon',
       'retreat_from_threat',
       'retreat_and_block',

@@ -153,6 +153,11 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     aliases: {},
     defaults: { radius: 16, duration: 30000 },
   },
+  hunt_animal: {
+    leafName: 'hunt_animal',
+    aliases: {},
+    defaults: { animal_type: 'any', radius: 32 },
+  },
   equip_weapon: {
     leafName: 'equip_weapon',
     aliases: {},
