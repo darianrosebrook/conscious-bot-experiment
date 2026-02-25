@@ -924,10 +924,13 @@ export class DigBlockLeaf implements LeafImpl {
             ) => boolean)
           | undefined;
         // Expanding cube search with radius up to 32 blocks.
-        // All candidates require line-of-sight when the checker is available.
-        // This prevents selecting blocks behind opaque obstructions (e.g. stone
-        // behind a dirt wall) — the bot would pathfind there but can't dig through.
+        // Blocks within dig reach (≤4) require line-of-sight — prevents selecting
+        // occluded blocks the bot would try to mine through (e.g. stone behind dirt).
+        // Blocks beyond dig reach skip LOS: the bot will pathfind there first, and
+        // underground resources (ores behind stone) are inherently occluded until
+        // the bot digs to an exposed face.
         const MAX_SEARCH_RADIUS = 32;
+        const DIG_REACH_LOS = 4;
         outer: for (let r = 1; r <= MAX_SEARCH_RADIUS; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = -r; dy <= r; dy++) {
@@ -937,7 +940,8 @@ export class DigBlockLeaf implements LeafImpl {
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(namePattern)) {
-                  if (hasLineOfSight) {
+                  // Within dig reach: require LOS to prevent mining through obstructions
+                  if (r <= DIG_REACH_LOS && hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,
@@ -1303,9 +1307,11 @@ export class AcquireMaterialLeaf implements LeafImpl {
         let resolvedPos: Vec3 | null = null;
         // Expanding cube search for nearest matching block.
         // Prefer blocks at or above bot Y; skip deep pits.
-        // All candidates require line-of-sight when the checker is available,
-        // preventing selection of blocks behind opaque obstructions.
+        // Blocks within dig reach (≤4) require LOS — prevents mining through
+        // obstructions. Blocks beyond dig reach skip LOS so underground
+        // resources (ores behind stone) can still be targeted for pathfinding.
         const MIN_DY = -2;
+        const DIG_REACH_LOS = 4;
         outer: for (let r = 1; r <= maxSearchRadius; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
@@ -1315,7 +1321,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(itemPattern)) {
-                  if (hasLineOfSight) {
+                  if (r <= DIG_REACH_LOS && hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,
