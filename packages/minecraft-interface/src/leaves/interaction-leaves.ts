@@ -924,10 +924,10 @@ export class DigBlockLeaf implements LeafImpl {
             ) => boolean)
           | undefined;
         // Expanding cube search with radius up to 32 blocks.
-        // Inner 10: prefer blocks with line-of-sight (diggable without moving).
-        // Outer 11–32: find blocks the bot will pathfind to before digging.
+        // All candidates require line-of-sight when the checker is available.
+        // This prevents selecting blocks behind opaque obstructions (e.g. stone
+        // behind a dirt wall) — the bot would pathfind there but can't dig through.
         const MAX_SEARCH_RADIUS = 32;
-        const LOS_RADIUS = 10;
         outer: for (let r = 1; r <= MAX_SEARCH_RADIUS; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = -r; dy <= r; dy++) {
@@ -937,8 +937,7 @@ export class DigBlockLeaf implements LeafImpl {
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(namePattern)) {
-                  // Within LOS radius: require line-of-sight if checker available
-                  if (r <= LOS_RADIUS && hasLineOfSight) {
+                  if (hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,
@@ -1304,8 +1303,9 @@ export class AcquireMaterialLeaf implements LeafImpl {
         let resolvedPos: Vec3 | null = null;
         // Expanding cube search for nearest matching block.
         // Prefer blocks at or above bot Y; skip deep pits.
+        // All candidates require line-of-sight when the checker is available,
+        // preventing selection of blocks behind opaque obstructions.
         const MIN_DY = -2;
-        const LOS_RADIUS = 10;
         outer: for (let r = 1; r <= maxSearchRadius; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
@@ -1315,8 +1315,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(itemPattern)) {
-                  // Within LOS radius: require line-of-sight for immediate dig
-                  if (r <= LOS_RADIUS && hasLineOfSight) {
+                  if (hasLineOfSight) {
                     const blockCenter = {
                       x: p.x + 0.5,
                       y: p.y + 0.5,

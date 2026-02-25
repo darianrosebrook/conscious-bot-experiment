@@ -107,6 +107,7 @@ function setupMockLeafFactory(
     'sterling_navigate',
     // combat
     'attack_entity',
+    'hunt_animal',
     'equip_weapon',
     'retreat_from_threat',
     'use_item',
@@ -1117,6 +1118,7 @@ describe('action dispatch contract', () => {
         wait: { duration: 100 },
         step_forward_safely: { distance: 1 },
         attack_entity: {},
+        hunt_animal: { animal_type: 'any', radius: 32 },
         equip_weapon: {},
         retreat_from_threat: {},
         retreat_and_block: {},
