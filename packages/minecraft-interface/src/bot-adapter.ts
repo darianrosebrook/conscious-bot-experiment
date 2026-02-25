@@ -529,7 +529,7 @@ export class BotAdapter extends EventEmitter {
         try {
           void this.processIncomingChat(username, message);
         } catch (error) {
-          console.error('❌ Failed to process incoming chat:', error);
+          console.error('[Chat] Failed to process incoming chat:', error);
         }
       }
     });
@@ -830,7 +830,7 @@ export class BotAdapter extends EventEmitter {
     if (!this.bot) return;
 
     try {
-      console.log(`💬 Processing chat from ${sender}: "${message}"`);
+      console.log(`[Chat] Processing from ${sender}: "${message}"`);
 
       // Send to cognition system for processing
       const cognitionUrl =
@@ -880,15 +880,9 @@ export class BotAdapter extends EventEmitter {
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
-            console.log(
-              `✅ Bot responded: "${result.response}" (${responseTime}ms)`
-            );
             this.lastSocialChatResponse = now;
             this.lastChatResponse = now; // Also bump general cooldown to avoid double-talking
           } else {
-            console.log(
-              `💬 Social chat response throttled (cooldown: ${(this.socialChatCooldown - (now - this.lastSocialChatResponse)) / 1000}s)`
-            );
           }
         }
 
@@ -903,12 +897,12 @@ export class BotAdapter extends EventEmitter {
         }
       } else if (response) {
         console.log(
-          `⚠️ Cognition system chat processing failed: ${response.status}`
+          `Cognition system chat processing failed: ${response.status}`
         );
       }
     } catch (error) {
       console.error(
-        '❌ Failed to process chat through cognition system:',
+        'Failed to process chat through cognition system:',
         error
       );
     }
@@ -934,7 +928,7 @@ export class BotAdapter extends EventEmitter {
           this.lastEntityScan = now;
           this.performanceMetrics.entityScans++;
         } catch (error) {
-          console.error('❌ Entity detection error:', error);
+          console.error('Entity detection error:', error);
         }
       }, 2000)
     ); // Check every 2 seconds but only process every 10 seconds
@@ -948,13 +942,13 @@ export class BotAdapter extends EventEmitter {
    */
   private tryStartBeliefBus(): void {
     if (this.beliefBusStarted) {
-      console.log('[BeliefBus] Already started, skipping');
+      // Already started
       return;
     }
 
     if (!isSystemReady()) {
       this.beliefBusPending = true;
-      console.log('[BeliefBus] Waiting for system readiness before starting');
+      // Waiting for system readiness
       return;
     }
 
@@ -967,7 +961,7 @@ export class BotAdapter extends EventEmitter {
   private startBeliefBus(): void {
     if (this.beliefBusStarted) return;
     if (!this.bot) {
-      console.log('[BeliefBus] No bot available, cannot start');
+      console.warn('[BeliefBus] No bot available, cannot start');
       return;
     }
 
@@ -977,7 +971,7 @@ export class BotAdapter extends EventEmitter {
     this.setupBeliefIngestion();
     this.setupCognitionEmission();
 
-    console.log('[BeliefBus] Started (system ready)');
+    // BeliefBus started
   }
 
   /**
@@ -986,7 +980,7 @@ export class BotAdapter extends EventEmitter {
    */
   public onSystemReady(): void {
     if (this.beliefBusPending && !this.beliefBusStarted) {
-      console.log('[BeliefBus] System ready signal received, starting BeliefBus');
+      // System ready — start pending BeliefBus
       this.startBeliefBus();
     }
   }
@@ -1033,7 +1027,7 @@ export class BotAdapter extends EventEmitter {
       }, TICK_INTERVAL_MS)
     );
 
-    console.log('[BeliefBus] Entity belief ingestion activated (5Hz)');
+    // Entity belief ingestion activated (5Hz)
   }
 
   /**
@@ -1090,7 +1084,7 @@ export class BotAdapter extends EventEmitter {
       }, EMIT_INTERVAL_MS)
     );
 
-    console.log('[BeliefBus] Cognition emission activated (1Hz)');
+    // Cognition emission activated (1Hz)
   }
 
   private lastEntityScan = 0;
@@ -1139,14 +1133,12 @@ export class BotAdapter extends EventEmitter {
 
       if (nearbyEntities.length === 0) return;
 
-      console.log(`👀 Detected ${nearbyEntities.length} nearby entities`);
-
       // Process each entity for potential reactions
       for (const entity of nearbyEntities) {
         await this.processEntity(entity);
       }
     } catch (error) {
-      console.error('❌ Error in entity detection:', error);
+      console.error('[BotAdapter] Error in entity detection:', error);
     }
   }
 
@@ -1212,10 +1204,7 @@ export class BotAdapter extends EventEmitter {
           shouldCreateTask?: boolean;
           taskSuggestion?: string;
         };
-        console.warn(
-          `[DEBUG] ✅ Entity processed by cognition system:`,
-          result
-        );
+        // Entity processed by cognition
 
         // If cognition suggests a response, execute it (with throttling)
         if (result.shouldRespond && result.response) {
@@ -1232,14 +1221,8 @@ export class BotAdapter extends EventEmitter {
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
-            console.warn(
-              `💬 Bot responded to entity: "${result.response}" (${responseTime}ms)`
-            );
             this.lastChatResponse = now;
           } else {
-            console.warn(
-              `💬 Entity response throttled (cooldown: ${(this.chatCooldown - (now - this.lastChatResponse)) / 1000}s)`
-            );
           }
         }
 
@@ -1250,7 +1233,7 @@ export class BotAdapter extends EventEmitter {
         }
       }
     } catch (error) {
-      console.error('❌ Error processing entity:', error);
+      console.error('Error processing entity:', error);
     }
   }
 
@@ -1323,12 +1306,12 @@ export class BotAdapter extends EventEmitter {
 
       if (response?.ok) {
         const result = await response.json();
-        console.warn(`[DEBUG] ✅ Created task from entity encounter:`, result);
+        // Task created from entity encounter
       } else if (response) {
-        console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
+        console.warn(`[BotAdapter] Failed to create task from entity: ${response.status}`);
       }
     } catch (error) {
-      console.error('❌ Error creating task from entity:', error);
+      console.error('[BotAdapter] Error creating task from entity:', error);
     }
   }
 
@@ -1367,14 +1350,12 @@ export class BotAdapter extends EventEmitter {
 
       if (response?.ok) {
         const result = await response.json();
-        console.log(`✅ Created task from social chat:`, result);
+        // Task created from social chat
       } else if (response) {
-        console.log(
-          `⚠️ Failed to create task from social chat: ${response.status}`
-        );
+        console.warn(`[BotAdapter] Failed to create task from social chat: ${response.status}`);
       }
     } catch (error) {
-      console.error('❌ Error creating task from social chat:', error);
+      console.error('Error creating task from social chat:', error);
     }
   }
 
@@ -1400,7 +1381,7 @@ export class BotAdapter extends EventEmitter {
             });
           }
         } catch (error) {
-          console.error('❌ Error processing block break event:', error);
+          console.error('Error processing block break event:', error);
         }
       }
     });
@@ -1423,7 +1404,7 @@ export class BotAdapter extends EventEmitter {
               });
             }
           } catch (error) {
-            console.error('❌ Error processing item pickup event:', error);
+            console.error('Error processing item pickup event:', error);
           }
         }
       }
@@ -1458,7 +1439,7 @@ export class BotAdapter extends EventEmitter {
             lastHealth = currentHealth;
           }
         } catch (error) {
-          console.error('❌ Error processing health event:', error);
+          console.error('Error processing health event:', error);
         }
       }, 5000)
     ); // Check every 5 seconds, only for significant changes
@@ -1547,14 +1528,8 @@ export class BotAdapter extends EventEmitter {
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
-            console.log(
-              `💬 Bot responded to environmental event: "${result.response}" (${responseTime}ms)`
-            );
             this.lastEnvironmentalResponse = now;
           } else {
-            console.log(
-              `💬 Environmental response throttled (cooldown: ${(this.environmentalCooldown - (now - this.lastEnvironmentalResponse)) / 1000}s)`
-            );
           }
         }
 
@@ -1570,7 +1545,7 @@ export class BotAdapter extends EventEmitter {
         this.performanceMetrics.environmentalEvents++;
       }
     } catch (error) {
-      console.error('❌ Error processing environmental event:', error);
+      console.error('Error processing environmental event:', error);
     }
   }
 
@@ -1637,15 +1612,12 @@ export class BotAdapter extends EventEmitter {
 
       if (response?.ok) {
         const result = await response.json();
-        console.warn(
-          `[DEBUG] ✅ Created task from environmental event:`,
-          result
-        );
+        // Task created from environmental event
       } else if (response) {
-        console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
+        console.warn(`[BotAdapter] Failed to create task from env event: ${response.status}`);
       }
     } catch (error) {
-      console.error('❌ Error creating task from environmental event:', error);
+      console.error('Error creating task from environmental event:', error);
     }
   }
 
@@ -1691,22 +1663,7 @@ export class BotAdapter extends EventEmitter {
    */
   logPerformanceMetrics() {
     const metrics = this.getPerformanceMetrics();
-    console.warn(`
-[DEBUG] 🤖 Reactive Consciousness Performance Report:
-══════════════════════════════════════════════════════
-⏱️  Uptime: ${metrics.uptime}s
-👁️  Entity Scans: ${metrics.entityScans} (${metrics.scansPerMinute}/min)
-💬  Chat Responses: ${metrics.chatResponses} (${metrics.responsesPerMinute}/min)
-🌍  Environmental Events: ${metrics.environmentalEvents} (${metrics.eventsPerMinute}/min)
-📋  Tasks Created: ${metrics.tasksCreated} (${metrics.tasksPerMinute}/min)
-⚡  Avg Response Time: ${metrics.averageResponseTime}ms
-
-🚦 Throttling:
-   • Chat Cooldown: ${metrics.throttling.chatCooldown}s
-   • Environmental Cooldown: ${metrics.throttling.environmentalCooldown}s
-
-[DEBUG] ══════════════════════════════════════════════════════
-    `);
+    console.log(`[BotAdapter] Performance: uptime=${metrics.uptime}s scans=${metrics.entityScans} chats=${metrics.chatResponses} env=${metrics.environmentalEvents} tasks=${metrics.tasksCreated} avgResponseMs=${metrics.averageResponseTime}`);
   }
 
   /**

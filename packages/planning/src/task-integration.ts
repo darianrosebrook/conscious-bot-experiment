@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { createServiceClients } from '@conscious-bot/core';
+import { createServiceClients, isVerbose } from '@conscious-bot/core';
 import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import { resolveRequirement } from './modules/requirements';
@@ -491,15 +491,14 @@ function isDebugJoinKeysMigrationEnabled(): boolean {
 // This logs even if no tasks exercise the fallback, which is intentional:
 // it makes the compat path visible in logs so you know it's active.
 if (isDeprecatedJoinKeysCompatEnabled()) {
-  console.log('[JoinKeys] Deprecated solveJoinKeys fallback is ENABLED (JOIN_KEYS_DEPRECATED_COMPAT=1). Remove after 2026-02-15.');
+  // Migration compat active — visibility handled by event store
 }
 
 /** Log once per process when fallback is actually exercised */
 let _migrationFallbackExercised = false;
-function logMigrationFallbackOnce(taskId: string, planId: string | undefined): void {
+function logMigrationFallbackOnce(_taskId: string, _planId: string | undefined): void {
   if (_migrationFallbackExercised) return;
   _migrationFallbackExercised = true;
-  console.log(`[JoinKeys] Migration fallback exercised: task=${taskId}, planId=${planId}`);
 }
 
 /**
@@ -724,8 +723,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         console.error('Error processing actionable thoughts:', error);
       }
     }, 30000); // 30 seconds
-
-    console.log('[Thought-to-task] Started conversion polling');
   }
 
   private trimSeenThoughtIds(): void {
@@ -788,21 +785,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             this.emit('thoughtConvertedToTask', { thought, task: result.task });
           }
           if (result.managementResult) {
-            console.log(
-              `[Thought-to-task] management ${result.managementResult.action}: ${result.managementResult.decision}` +
-                (result.managementResult.affectedTaskId
-                  ? ` → task ${result.managementResult.affectedTaskId}`
-                  : '') +
-                (result.managementResult.reason
-                  ? ` (${result.managementResult.reason})`
-                  : '')
-            );
+            if (isVerbose()) {
+              console.log(
+                `[Thought-to-task] management ${result.managementResult.action}: ${result.managementResult.decision}` +
+                  (result.managementResult.affectedTaskId
+                    ? ` -> task ${result.managementResult.affectedTaskId}`
+                    : '') +
+                  (result.managementResult.reason
+                    ? ` (${result.managementResult.reason})`
+                    : '')
+              );
+            }
             this.emit('managementAction', {
               thought,
               result: result.managementResult,
             });
           }
           if (
+            isVerbose() &&
             result.decision !== 'created' &&
             result.decision !== 'dropped_seen' &&
             result.decision !== 'blocked_guard' &&
@@ -847,7 +847,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // Batch ack all evaluated thoughts
       if (thoughtsToAck.length > 0) {
         await this.cognitiveStreamClient.ackThoughts(thoughtsToAck);
-        console.log(`[Thought-to-task] Census: fetched=${actionableThoughts.length} converted=${convertedCount} skipped=${skippedCount} acked=${thoughtsToAck.length}`);
       }
     } catch (error) {
       console.error('Error processing actionable thoughts:', error);
@@ -909,7 +908,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
 
       task.status = status as any;
-      console.log(`Updated task ${taskId} status to ${status}`);
 
       // Persist status change (with any self-targeted hold effects already applied)
       this.taskStore.setTask(task);
@@ -967,9 +965,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return false;
     }
 
-    // Transition pending → active
+    // Transition pending -> active
     await this.updateTaskStatus(taskId, 'active');
-    console.log(`[TaskIntegration] ensureActivated: ${taskId} transitioned pending → active`);
     return true;
   }
 
@@ -987,9 +984,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         return; // No event to emit
       }
 
-      // Log the task lifecycle event
-      console.log(`Task lifecycle event: ${eventType} for task: ${task.title}`);
-
       // Fire-and-forget persistence (gated by PLANNING_EVENT_STORE=1)
       global.planningEventStore?.recordEvent('task_lifecycle', task.id, {
         task,
@@ -997,7 +991,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         previousStatus,
       });
     } catch (error) {
-      console.warn('⚠️ Failed to emit lifecycle event:', error);
+      console.warn('[TaskIntegration] Failed to emit lifecycle event:', error);
     }
   }
 
@@ -1433,9 +1427,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     feedbackStore?: any;
   }): void {
     if (this.isHierarchicalPlannerConfigured) {
-      console.log(
-        '[TaskIntegration] Hierarchical planner already configured; no-op'
-      );
       return;
     }
     const macroPlanner =
@@ -1443,7 +1434,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const feedbackStore = overrides?.feedbackStore ?? new FeedbackStore();
     this.sterlingPlanner.setMacroPlanner(macroPlanner);
     this.sterlingPlanner.setFeedbackStore(feedbackStore);
-    console.log('[TaskIntegration] Rig E hierarchical planner configured');
+    if (isVerbose()) {
+      console.log('[TaskIntegration] Rig E hierarchical planner configured');
+    }
   }
 
   /**
@@ -1721,7 +1714,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     // ── Dev log ──
-    if (process.env.NODE_ENV === 'development') {
+    if (isVerbose()) {
       console.log(
         `[Planning] Task added: id=${task.id} title="${task.title.slice(0, 50)}" source=${task.source} priority=${task.priority}`
       );
@@ -1791,7 +1784,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    */
   enableGoalResolver(resolver?: GoalResolver): void {
     this.goalResolver = resolver ?? new GoalResolver();
-    console.log('[TaskIntegration] Goal resolver enabled');
+    if (isVerbose()) {
+      console.log('[TaskIntegration] Goal resolver enabled');
+    }
   }
 
   /**
@@ -2183,9 +2178,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         };
       }
       recorder.recordServerBanner(runId, bannerLine!);
-      console.log(
-        `[GoldenRun] Expansion request run_id=${runId} request_id=${requestId} digest=${digest.slice(0, 12)}`
-      );
+      if (isVerbose()) {
+        console.log(
+          `[GoldenRun] Expansion request run_id=${runId} request_id=${requestId} digest=${digest.slice(0, 12)}`
+        );
+      }
     }
 
     const expandTimeoutMsRaw =
@@ -2435,9 +2432,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // ── Fail-closed gate: resolution disabled by config ──
       if (process.env.STERLING_INTENT_RESOLVE === '0') {
-        console.log(
-          `[Sterling] Intent resolution disabled (STERLING_INTENT_RESOLVE=0) — blocking ${intentSteps.length} intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] Intent resolution disabled (STERLING_INTENT_RESOLVE=0) -- blocking ${intentSteps.length} intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2453,9 +2452,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // ── Fail-closed gate: no executor service ──
       if (!this.sterlingExecutorService) {
-        console.log(
-          `[Sterling] No executor service — blocking ${intentSteps.length} intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] No executor service -- blocking ${intentSteps.length} intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2503,9 +2504,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Crafting intents require requirement.item + mcData for buildCraftingRules
       if (craftingIntents.length > 0 && !mcData) {
-        console.log(
-          `[Sterling] Cannot resolve crafting intents: no mcData — blocking ${craftingIntents.length} crafting intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] Cannot resolve crafting intents: no mcData -- blocking ${craftingIntents.length} crafting intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2519,9 +2522,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         };
       }
       if (craftingIntents.length > 0 && !goalItem) {
-        console.log(
-          `[Sterling] Cannot resolve crafting intents: no requirement.item — blocking ${craftingIntents.length} crafting intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] Cannot resolve crafting intents: no requirement.item -- blocking ${craftingIntents.length} crafting intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2537,9 +2542,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Navigation intents require mcData (for bot position context)
       if (navigationIntents.length > 0 && !mcData) {
-        console.log(
-          `[Sterling] Cannot resolve navigation intents: no mcData — blocking ${navigationIntents.length} navigation intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] Cannot resolve navigation intents: no mcData -- blocking ${navigationIntents.length} navigation intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2555,9 +2562,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Resource intents require mcData (for inventory/nearby block context)
       if (resourceIntents.length > 0 && !mcData) {
-        console.log(
-          `[Sterling] Cannot resolve resource intents: no mcData — blocking ${resourceIntents.length} resource intent step(s)`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Sterling] Cannot resolve resource intents: no mcData -- blocking ${resourceIntents.length} resource intent step(s)`
+          );
+        }
         recordExpansion({
           request_id: requestId,
           status: 'blocked',
@@ -2674,14 +2683,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
                 }))
                 .digest('hex'),
             };
-            console.log(
-              `[Sterling] Resolved ${replacementMap.size}/${intentSteps.length} intent step(s) → ${totalResolved} executable step(s)`
-            );
+            if (isVerbose()) {
+              console.log(
+                `[Sterling] Resolved ${replacementMap.size}/${intentSteps.length} intent step(s) -> ${totalResolved} executable step(s)`
+              );
+            }
           } else {
-            // Resolution ok but 0 resolved → fail-closed
-            console.log(
-              `[Sterling] Intent resolution returned ok but no steps resolved — blocking`
-            );
+            // Resolution ok but 0 resolved -> fail-closed
+            if (isVerbose()) {
+              console.log(
+                `[Sterling] Intent resolution returned ok but no steps resolved -- blocking`
+              );
+            }
             recordExpansion({
               request_id: requestId,
               status: 'blocked',
@@ -2701,9 +2714,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             : resolveResponse.status === 'error'
               ? resolveResponse.error
               : 'unknown';
-          console.log(
-            `[Sterling] Intent resolution ${resolveResponse.status}: ${detail} — blocking ${intentSteps.length} intent step(s)`
-          );
+          if (isVerbose()) {
+            console.log(
+              `[Sterling] Intent resolution ${resolveResponse.status}: ${detail} -- blocking ${intentSteps.length} intent step(s)`
+            );
+          }
           const validation_errors_resfail = buildValidationErrors([{
             path: 'intent_resolution',
             code: 'resolution_failed',
@@ -3572,9 +3587,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Don't update progress for failed tasks unless explicitly changing status
     if (task.status === 'failed' && !status) {
-      console.log(
-        `[TaskIntegration] Suppressing progress update for failed task: ${taskId}`
-      );
+      if (isVerbose()) {
+        console.log(
+          `[TaskIntegration] Suppressing progress update for failed task: ${taskId}`
+        );
+      }
       return false;
     }
 
@@ -3771,7 +3788,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
       if (verification.status === 'failed') {
         console.warn(
-          `⚠️ Step verification failed [${verification.status}]: ${step.label}`,
+          `[Verification] Step verification failed [${verification.status}]: ${step.label}`,
           verification.actualResult
         );
         return false;
@@ -3795,9 +3812,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     let finalStatus: Task['status'] | undefined;
 
     if (task.status === 'failed') {
-      console.log(
-        `[TaskIntegration] Skipping progress update for failed task: ${taskId}`
-      );
+      if (isVerbose()) {
+        console.log(
+          `[TaskIntegration] Skipping progress update for failed task: ${taskId}`
+        );
+      }
       return true;
     }
 
@@ -3826,10 +3845,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             );
 
             if (totalQty < expectedQty) {
-              console.log(
-                `⚠️ Task steps completed but inventory check failed: need ${expectedQty}x ${expectedItem}, found ${totalQty}`
-              );
-              // Don't mark as completed — let the autonomous executor handle it
+              // Don't mark as completed -- let the autonomous executor handle it
               return true;
             }
           }
@@ -3988,11 +4004,13 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         const snap = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as
           | StepSnapshot
           | undefined;
-        console.log(
-          `[Verify:acquire_material] START item=${item} accepted=[${acceptedNames}] ` +
-            `timeout=${acquireTimeout}ms hasSnapshot=${!!snap} ` +
-            `snapshotCounts=${snap ? acceptedNames.map((n) => `${n}:${snap.inventoryByName?.[n] ?? 0}`).join(',') : 'none'}`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Verify:acquire_material] START item=${item} accepted=[${acceptedNames}] ` +
+              `timeout=${acquireTimeout}ms hasSnapshot=${!!snap} ` +
+              `snapshotCounts=${snap ? acceptedNames.map((n) => `${n}:${snap.inventoryByName?.[n] ?? 0}`).join(',') : 'none'}`
+          );
+        }
         const passed = await this.retryUntil(
           () =>
             this.verifyInventoryDelta(
@@ -4582,7 +4600,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             `hasSnapshot=${!!start} settlePolls=${settlePolls} settleMs=${settleMs} ` +
             `breakdown=[${perName}] inventoryKeys=[${invKeys}]`
         );
-      } else if (settlePolls > 1 || process.env.LOG_VERIFY_PASSES === '1') {
+      } else if (isVerbose() && (settlePolls > 1 || process.env.LOG_VERIFY_PASSES === '1')) {
         // Log when settle barrier was needed, or always when LOG_VERIFY_PASSES=1
         const perName = acceptedNames
           .map(
@@ -4769,10 +4787,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       if (dryRun) {
         // Shadow: evaluate + log, no mutations
-        console.log(
-          `[Shadow:RigG] Task ${taskId}: proceed=${advice.shouldProceed}, ` +
-            `replan=${advice.shouldReplan}, reason=${advice.blockReason || 'none'}`
-        );
+        if (isVerbose()) {
+          console.log(
+            `[Shadow:RigG] Task ${taskId}: proceed=${advice.shouldProceed}, ` +
+              `replan=${advice.shouldReplan}, reason=${advice.blockReason || 'none'}`
+          );
+        }
         this.emit('taskLifecycleEvent', {
           type: 'shadow_rig_g_evaluation',
           taskId,
@@ -5100,7 +5120,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         joinKeys = deprecated;
         logMigrationFallbackOnce(task.id, planId);
         if (isDebugJoinKeysMigrationEnabled()) {
-          console.log(`[JoinKeys] Task ${task.id} using deprecated keys slot for planId=${planId}`);
+          // Migration noise removed — gated behind debug flag only
         }
       }
     }
@@ -5290,10 +5310,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       this.taskStore.setTask(task);
     }
 
-    console.log(
-      `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}, ` +
-        `bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8) ?? 'none'}, outcomeClass=${linkage.outcomeClass}`
-    );
+    if (isVerbose()) {
+      console.log(
+        `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}, ` +
+          `bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8) ?? 'none'}, outcomeClass=${linkage.outcomeClass}`
+      );
+    }
   }
 
   /**
@@ -5307,7 +5329,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   ): void {
     // Idempotency: if a replan is already scheduled for this task, skip
     if (this._rigGReplanTimers.has(taskId)) {
-      console.log(`[RigG] Replan already scheduled for ${taskId}; skipping`);
       return;
     }
 
@@ -5355,9 +5376,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
         // Pre-check: is task still unplannable? Something else may have fixed it.
         if (freshTask.status !== 'unplannable') {
-          console.log(
-            `[RigG] Task ${taskId} no longer unplannable; skipping replan`
-          );
+          if (isVerbose()) {
+            console.log(
+              `[RigG] Task ${taskId} no longer unplannable; skipping replan`
+            );
+          }
           freshTask.metadata.solver ??= {};
           freshTask.metadata.solver.rigGReplan = undefined;
           this.taskStore.setTask(freshTask);

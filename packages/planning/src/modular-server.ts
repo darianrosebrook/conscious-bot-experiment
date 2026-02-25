@@ -91,10 +91,9 @@ async function getEventDrivenThoughtGenerator(): Promise<any> {
       const { eventDrivenThoughtGenerator: generator } =
         await import('@conscious-bot/cognition');
       eventDrivenThoughtGenerator = generator;
-      console.log('✅ Event-driven thought generator initialized');
     } catch (error) {
       console.warn(
-        '⚠️ Failed to initialize event-driven thought generator:',
+        'Failed to initialize event-driven thought generator:',
         error
       );
     }
@@ -262,7 +261,7 @@ declare global {
 import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
-import { createServiceClients, SterlingClient, workstationRegistry } from '@conscious-bot/core';
+import { createServiceClients, SterlingClient, workstationRegistry, isVerbose } from '@conscious-bot/core';
 import type {
   SterlingReasoningService,
   MinecraftCraftingSolver,
@@ -351,7 +350,6 @@ if (isSystemReady()) {
   startWorldStatePolling();
 } else {
   waitForSystemReady().then(() => {
-    console.log('System readiness received; starting world state polling');
     startWorldStatePolling();
   });
 }
@@ -574,11 +572,6 @@ const toolExecutor = {
       ? tool
       : `minecraft.${tool}`;
 
-    console.log(
-      `[toolExecutor] Executing tool: ${tool} (normalized: ${normalizedTool}) with args:`,
-      args
-    );
-
     const startTime = Date.now();
     try {
       // Map BT actions to Minecraft actions (strict: unmapped tools return null for fail-closed executor)
@@ -626,7 +619,7 @@ const toolExecutor = {
       // Prefer MCP path when available; fall back to direct action only if MCP_ONLY is false
       if (MCP_ONLY) {
         console.warn(
-          '⚠️ [toolExecutor] MCP_ONLY=true; toolExecutor will not use direct /action fallback. Set MCP_ONLY=false to enable direct execution.'
+          '[toolExecutor] MCP_ONLY=true; toolExecutor will not use direct /action fallback. Set MCP_ONLY=false to enable direct execution.'
         );
         return {
           ok: false,
@@ -685,8 +678,6 @@ const toolExecutor = {
           diagDetail +
           ` outcome=${(result as any).outcome}`
         );
-      } else {
-        console.log(`[toolExecutor] ← ${mappedAction.type} ok (${duration}ms)`);
       }
 
       // Enhance result with metrics
@@ -1002,9 +993,6 @@ async function injectNextAcquisitionStep(
       t.status !== 'failed'
   );
   if (existing) {
-    console.log(
-      `⏭️ [Prereq] Skipping duplicate: subtaskKey "${key}" already active for parent ${parentTask.id}`
-    );
     return false;
   }
 
@@ -1037,9 +1025,6 @@ async function injectDynamicPrereqForCraft(
   // Enforce cap at this layer — all call sites go through here
   const prereqAttempts = (task.metadata as any)?.prereqInjectionCount || 0;
   if (prereqAttempts >= 3) {
-    console.log(
-      `⛔ [Prereq] Cap reached (${prereqAttempts}/3) for task ${task.id}, refusing injection`
-    );
     return false;
   }
 
@@ -1072,9 +1057,6 @@ async function injectDynamicPrereqForCraft(
     taskIntegration.updateTaskMetadata(task.id, {
       prereqInjectionCount: prereqAttempts + 1,
     });
-    console.log(
-      `💉 [Prereq] injected_prereq=true goal=${recipe} count=${qty} prereqInjectionCount=${prereqAttempts + 1}/3 task=${task.id}`
-    );
   }
   return injected;
 }
@@ -1125,11 +1107,6 @@ async function injectWorkstationPrereq(
             blockedReason: 'waiting_on_prereq',
             prereqInjectionCount: prereqAttempts + 1,
           });
-          console.log(
-            `🧭 [Prereq] workstation_nav=true type=${workstationType} ` +
-            `target=(${known.position.x},${known.position.y},${known.position.z}) ` +
-            `distance=${Math.round(dist)} task=${task.id}`,
-          );
           return true;
         }
       }
@@ -1159,9 +1136,6 @@ async function injectWorkstationPrereq(
           blockedReason: 'waiting_on_prereq',
           prereqInjectionCount: prereqAttempts + 1,
         });
-        console.log(
-          `🔨 [Prereq] workstation_place=true type=${workstationType} task=${task.id}`,
-        );
         return true;
       }
     }
@@ -1391,8 +1365,6 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
       return true; // No crafting table needed
     }
 
-    console.log(`🔍 Intelligent crafting table analysis for: ${task.title}`);
-
     // Get inventory and perform comprehensive analysis
     const inventory = await fetchInventorySnapshot();
 
@@ -1402,7 +1374,6 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
     );
 
     if (hasCraftingTable) {
-      console.log('✅ Crafting table found in inventory');
       return true;
     }
 
@@ -1420,22 +1391,16 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
     );
 
     if (decision.action === 'use_existing') {
-      console.log(
-        `✅ Using existing crafting table at distance ${decision.details.distance}`
-      );
       return true;
     } else if (decision.action === 'craft_new') {
-      console.log(`🔨 Crafting new table: ${decision.reasoning}`);
       await addCraftingTableTask(task, decision.details);
       return false; // Wait for crafting table task
     } else if (decision.action === 'gather_resources') {
-      console.log(`🌳 Need to gather resources first: ${decision.reasoning}`);
       await addResourceGatheringTask(task, decision.details);
       return false; // Wait for resource gathering
     }
 
     // Fallback case
-    console.log('⚠️ No viable crafting table strategy found');
     return false;
   } catch (error) {
     console.error('Error checking crafting table prerequisite:', error);
@@ -1661,7 +1626,6 @@ async function addCraftingTableTask(
       t.status !== 'failed'
   );
   if (existing) {
-    console.log('Task already exists: Craft Crafting Table');
     return;
   }
 
@@ -1673,7 +1637,6 @@ async function addCraftingTableTask(
   const result = await taskIntegration.addTask(taskData);
   logTaskIngestion({ _diag_version: 1, source: 'crafting_table_subtask', task_id: result?.id, parent_task_id: originalTask.id, decision: result?.id ? 'created' : 'rejected', task_type: taskData.type });
   if (result && result.id) {
-    console.log(`✅ Added intelligent crafting table task: ${result.id}`);
     // Block parent
     taskIntegration.updateTaskMetadata(originalTask.id, {
       blockedReason: 'waiting_on_prereq',
@@ -1705,7 +1668,6 @@ async function addResourceGatheringTask(
       t.status !== 'failed'
   );
   if (existing) {
-    console.log('Task already exists: Gather Wood for Crafting Table');
     return;
   }
 
@@ -1721,7 +1683,6 @@ async function addResourceGatheringTask(
   const result = await taskIntegration.addTask(taskData);
   logTaskIngestion({ _diag_version: 1, source: 'resource_gathering_subtask', task_id: result?.id, parent_task_id: originalTask.id, decision: result?.id ? 'created' : 'rejected', task_type: taskData.type });
   if (result && result.id) {
-    console.log(`✅ Added intelligent wood gathering task: ${result.id}`);
     // Block parent
     taskIntegration.updateTaskMetadata(originalTask.id, {
       blockedReason: 'waiting_on_prereq',
@@ -1742,8 +1703,6 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
       taskTitle.includes('axe') ||
       taskTitle.includes('sword')
     ) {
-      console.log(`🔧 Generating complex crafting subtasks for: ${task.title}`);
-
       // Check current inventory for required materials
       const inventory = await fetchInventorySnapshot();
       const subtaskDatas: Partial<any>[] = [];
@@ -1810,14 +1769,12 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
               t.status !== 'failed'
           );
           if (existing) {
-            console.log(`Task already exists: ${subtaskData.title}`);
             continue;
           }
         }
         const result = await taskIntegration.addTask(subtaskData);
         logTaskIngestion({ _diag_version: 1, source: 'complex_crafting_subtask', task_id: result?.id, parent_task_id: task.id, decision: result?.id ? 'created' : 'rejected', task_type: subtaskData.type });
         if (result && result.id) {
-          console.log(`✅ Added crafting subtask: ${subtaskData.title}`);
           addedCount++;
         }
       }
@@ -1829,7 +1786,6 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
         });
       }
 
-      console.log(`🔧 Generated ${addedCount} subtasks for complex crafting`);
     }
   } catch (error) {
     console.error('Error generating complex crafting subtasks:', error);
@@ -1853,7 +1809,6 @@ async function autonomousTaskExecutor() {
   try {
     // singleton guard
     if (!global.__planningExecutorState) {
-      console.log('[AUTONOMOUS EXECUTOR] Initializing executor state...');
       global.__planningExecutorState = {
         running: false,
         failures: 0,
@@ -1867,7 +1822,7 @@ async function autonomousTaskExecutor() {
     const cbNowMs = Date.now();
     if (isCircuitBreakerOpen(cbNowMs)) {
       const cbState = getCircuitBreakerState();
-      console.log(
+      console.warn(
         `[AUTONOMOUS EXECUTOR] Circuit breaker open (trips=${cbState.tripCount}), ` +
           `skipping cycle. Resume at ${new Date(cbState.resumeAt!).toISOString()}`
       );
@@ -1923,9 +1878,11 @@ async function autonomousTaskExecutor() {
     const now = Date.now();
     const lastTaskCountLog = global.lastTaskCountLog || 0;
     if (
-      !global.lastTaskCount ||
-      global.lastTaskCount !== activeTasks.length ||
-      now - lastTaskCountLog > 300000
+      isVerbose() && (
+        !global.lastTaskCount ||
+        global.lastTaskCount !== activeTasks.length ||
+        now - lastTaskCountLog > 300000
+      )
     ) {
       console.log(
         `[AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
@@ -1935,14 +1892,6 @@ async function autonomousTaskExecutor() {
       }
       global.lastTaskCount = activeTasks.length;
       global.lastTaskCountLog = now;
-    }
-    if (activeTasks.length > 0) {
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title} (${activeTasks[0].type})`
-      );
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Task status: ${activeTasks[0].status}, priority: ${activeTasks[0].priority}`
-      );
     }
 
     // Auto-unblock shadow-blocked tasks when mode switches to live.
@@ -1956,9 +1905,6 @@ async function autonomousTaskExecutor() {
           blockedAt: undefined,
           // Keep shadowObservationCount for audit trail
         });
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Auto-unblocked shadow task ${t.id}: mode is now live`
-        );
       }
     }
 
@@ -1975,7 +1921,7 @@ async function autonomousTaskExecutor() {
         taskIntegration.updateTaskMetadata(t.id, {
           failReason: blockState.failReason,
         });
-        console.log(
+        console.warn(
           `[AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: ${blockState.failReason}`
         );
       }
@@ -1999,12 +1945,7 @@ async function autonomousTaskExecutor() {
 
       expansionRetriesThisTick++;
       try {
-        const result = await taskIntegration.retryExpansion(ppt.id);
-        if (result.outcome === 'ok') {
-          console.log(`[AUTONOMOUS EXECUTOR] Re-expansion succeeded for task ${ppt.id}`);
-        } else if (result.outcome !== 'skipped') {
-          console.log(`[AUTONOMOUS EXECUTOR] Re-expansion ${result.outcome} for task ${ppt.id}: ${'reason' in result ? result.reason : 'error' in result ? result.error : ''}`);
-        }
+        await taskIntegration.retryExpansion(ppt.id);
       } catch (err) {
         console.warn(`[AUTONOMOUS EXECUTOR] Re-expansion error for task ${ppt.id}:`, err);
       }
@@ -2052,15 +1993,6 @@ async function autonomousTaskExecutor() {
           },
           { dryRun: isDryRun },
         );
-        if (tickResult.fired && tickResult.taskId) {
-          console.log(
-            `[Reflex] ${tickResult.reflexName} injected task: ${tickResult.taskId}`
-          );
-        } else if (tickResult.fired) {
-          console.log(
-            `[Reflex:shadow] ${tickResult.reflexName} would fire (dryRun=${isDryRun})`
-          );
-        }
       } catch (error) {
         // Fail-closed: registry failure must never break the executor cycle
         console.warn('[Reflex] Registry evaluateTick failed:', error);
@@ -2069,20 +2001,19 @@ async function autonomousTaskExecutor() {
 
     if (idleReason !== null) {
       // Only log once per minute to avoid spam
-      if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
+      if (isVerbose() && (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000)) {
         console.log(
           `[AUTONOMOUS EXECUTOR] Idle detected: ${idleReason} (active=${activeTasks.length}, eligible=${eligibleTasks.length})`
         );
-        logOptimizer.log(`Idle: ${idleReason}`, `idle-${idleReason}`);
+        global.lastNoTasksLog = now;
+      } else if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
         global.lastNoTasksLog = now;
       }
+      logOptimizer.log(`Idle: ${idleReason}`, `idle-${idleReason}`);
 
       // Post idle event to cognition service for thought generation
       // Include idle_reason so cognition can respond appropriately (IDLE-1)
       if (!global.lastIdleEvent || now - global.lastIdleEvent > 300000) {
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Bot is idle (${idleReason}) — posting lifecycle event to cognition`
-        );
         const prevIdleAt = global.lastIdleEvent || 0;
         global.lastIdleEvent = now;
         taskIntegration.outbox.enqueue(
@@ -2139,12 +2070,6 @@ async function autonomousTaskExecutor() {
             botState
           );
 
-          if (result?.ticked) {
-            console.log(
-              `[AUTONOMOUS EXECUTOR] Keep-alive tick: thought=${result.thought?.id?.slice(0, 8)}, ` +
-                `eligible=${result.thought?.eligibility.convertEligible}`
-            );
-          }
         } catch (error) {
           console.error('[AUTONOMOUS EXECUTOR] Keep-alive tick failed:', error);
         }
@@ -2158,23 +2083,14 @@ async function autonomousTaskExecutor() {
       return;
     }
 
-    console.log(
-      `[AUTONOMOUS EXECUTOR] Found ${eligibleTasks.length} eligible tasks (of ${activeTasks.length} active), executing...`
-    );
-
     // Execute the highest priority eligible task, prioritizing prerequisite tasks
     const currentTask = eligibleTasks[0]; // Tasks are already sorted by priority
 
-    console.log(
-      `[AUTONOMOUS EXECUTOR] Executing task: ${currentTask.title} (${currentTask.type})`
-    );
-    console.log('[AUTONOMOUS EXECUTOR] Task details:', {
-      id: currentTask.id,
-      type: currentTask.type,
-      priority: currentTask.priority,
-      urgency: currentTask.urgency,
-      status: currentTask.status,
-    });
+    if (isVerbose()) {
+      console.log(
+        `[AUTONOMOUS EXECUTOR] Executing task: ${currentTask.title} (${currentTask.type}) id=${currentTask.id}`
+      );
+    }
 
     // Check if this task is a prerequisite task (has prerequisite tag)
     const isPrerequisiteTask =
@@ -2190,38 +2106,15 @@ async function autonomousTaskExecutor() {
 
     // Special handling for cognitive reflection tasks
     if (currentTask.type === 'cognitive_reflection') {
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
-      );
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Thought content: ${currentTask.parameters?.thoughtContent?.substring(0, 100)}...`
-      );
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Signals received: ${currentTask.parameters?.signals?.length || 0}`
-      );
-
       // Check if this cognitive reflection contains actionable steps
       const thoughtContent = currentTask.parameters?.thoughtContent || '';
       const hasActionableSteps = detectActionableSteps(thoughtContent);
 
       if (hasActionableSteps) {
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Cognitive reflection contains actionable steps - converting to executable tasks`
-        );
-
         // Convert cognitive reflection to actionable tasks
         await convertCognitiveReflectionToTasks(currentTask, taskIntegration);
-      } else {
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
-        );
-
-        // Pure cognitive reflection - should remain active until actionable tasks complete
-        // Don't mark as completed just because we processed the thought
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Pure cognitive reflection task - keeping active for potential actionable conversion`
-        );
       }
+      // Pure cognitive reflection stays active for potential actionable conversion
       return;
     }
 
@@ -2239,9 +2132,7 @@ async function autonomousTaskExecutor() {
       executorConfig.mode === 'shadow' &&
       process.env.EXECUTOR_SKIP_READINESS === '1';
     if (!skipBotChecks) {
-      console.log('[AUTONOMOUS EXECUTOR] Checking bot connection...');
       const botConnection = await checkBotConnectionDetailed();
-      console.log(`[AUTONOMOUS EXECUTOR] Bot connected: ${botConnection.ok}`);
 
       if (!botConnection.ok) {
         const st = global.__planningExecutorState;
@@ -2268,10 +2159,6 @@ async function autonomousTaskExecutor() {
       }
       const st = global.__planningExecutorState;
       if (st.breaker !== 'closed') {
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Circuit breaker was ${st.breaker}, closing it`
-        );
-        console.log('Bot reachable — closing circuit');
         st.breaker = 'closed';
         st.failures = 0;
       }
@@ -2287,9 +2174,6 @@ async function autonomousTaskExecutor() {
             connectionState?: string;
           };
           if (healthData.connectionState !== 'spawned') {
-            console.log(
-              '[Executor] Bot reachable but not spawned — skipping cycle'
-            );
             const runIdSpawned = (currentTask.metadata as any)?.goldenRun
               ?.runId as string | undefined;
             if (runIdSpawned) {
@@ -2305,7 +2189,6 @@ async function autonomousTaskExecutor() {
           }
         }
       } catch {
-        console.log('[Executor] Health re-check failed — skipping cycle');
         const runIdHealth = (currentTask.metadata as any)?.goldenRun?.runId as
           | string
           | undefined;
@@ -2327,9 +2210,6 @@ async function autonomousTaskExecutor() {
       const craftingTableReady =
         await checkCraftingTablePrerequisite(currentTask);
       if (!craftingTableReady) {
-        console.log(
-          '⏳ Waiting for crafting table prerequisite to be satisfied...'
-        );
         const runIdCraft = (currentTask.metadata as any)?.goldenRun?.runId as
           | string
           | undefined;
@@ -2433,17 +2313,11 @@ async function autonomousTaskExecutor() {
             );
             if (!hasOutput) {
               // Don't mark as completed if we don't have the actual crafted item
-              console.log(
-                '⚠️ Crafting task has materials but not the crafted item - continuing execution'
-              );
               return;
             }
           }
 
           // If already satisfied, mark completed and skip execution
-          console.log(
-            '✅ Requirement already satisfied from inventory; completing task.'
-          );
           taskIntegration.updateTaskProgress(currentTask.id, 1, 'completed');
           return;
         }
@@ -2473,7 +2347,7 @@ async function autonomousTaskExecutor() {
           blockedReason: 'no-executable-plan',
         });
         console.warn(
-          `⚠️ [Executor] Task ${currentTask.id} has no remaining executable steps — marking blocked`
+          `[Executor] Task ${currentTask.id} has no remaining executable steps — marking blocked`
         );
         {
           const runId = (currentTask.metadata as any)?.goldenRun?.runId as string | undefined;
@@ -2536,11 +2410,7 @@ async function autonomousTaskExecutor() {
     let executionResult = false;
 
     // Execute MCP option if found
-    if (suitableOption) {
-      console.log(
-        `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - delegating to MCP execution pipeline`
-      );
-    } else {
+    if (!suitableOption) {
       // No MCP option found — fall through to leaf mapping below.
       // (Legacy: this path previously called executeTask() → POST /execute-scenario,
       //  but that endpoint is retired. Leaf mapping is the canonical direct-execution path.)
@@ -2750,24 +2620,18 @@ async function autonomousTaskExecutor() {
           reason: 'Mapped by task type (not verified)',
         } as any;
       if (selectedLeaf) {
-        console.log(
-          `✅ Selected leaf for task: ${selectedLeaf.leafName} — ${
-            (selectedLeaf as any).reason || 'heuristic'
-          }`
-        );
-
         // Check retry count to prevent infinite loops
         const retryCount = currentTask.metadata?.retryCount || 0;
         const maxRetries = currentTask.metadata?.maxRetries || 3;
 
         if (retryCount >= maxRetries) {
-          console.log(
-            `[Executor] Task failed after ${retryCount} retries, marking as failed: ${currentTask.title}`
-          );
           taskIntegration.updateTaskProgress(
             currentTask.id,
             currentTask.progress || 0,
             'failed'
+          );
+          console.warn(
+            `[Executor] Task failed after ${retryCount} retries: ${currentTask.title}`
           );
           return;
         }
@@ -2783,9 +2647,6 @@ async function autonomousTaskExecutor() {
         ) {
           const preInv = await fetchInventorySnapshot();
           if (!hasEnoughLogs(preInv)) {
-            console.log(
-              '🪵 Missing wood logs for crafting (leaf path). Injecting prerequisite gathering steps.'
-            );
             taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
               { label: 'Move to resource location' },
@@ -2831,9 +2692,11 @@ async function autonomousTaskExecutor() {
 
         // 2. Shadow mode: always observe, never throttle
         if (executorConfig.mode === 'shadow') {
-          console.log(
-            `[Executor:shadow] Would execute: ${mcpToolName} ${JSON.stringify(selectedLeaf.args)}`
-          );
+          if (isVerbose()) {
+            console.log(
+              `[Executor:shadow] Would execute: ${mcpToolName} ${JSON.stringify(selectedLeaf.args)}`
+            );
+          }
           if (mcpCurrentStep) {
             await taskIntegration.startTaskStep(
               currentTask.id,
@@ -2873,10 +2736,6 @@ async function autonomousTaskExecutor() {
         );
 
         if (actionResult?.ok) {
-          console.log(
-            `✅ Leaf executed successfully: ${selectedLeaf.leafName}`
-          );
-
           // Post-check: if crafting pickaxe reported success but no pickaxe, inject acquisition step
           if (
             selectedLeaf.leafName === 'craft_recipe' &&
@@ -2885,7 +2744,7 @@ async function autonomousTaskExecutor() {
             const postInv = await fetchInventorySnapshot();
             if (!hasPickaxe(postInv)) {
               console.warn(
-                '⚠️ Craft reported success but pickaxe not found; planning next acquisition step.'
+                '[Executor] Craft reported success but pickaxe not found; planning next acquisition step.'
               );
               const injected = await injectDynamicPrereqForCraft(currentTask);
               if (injected) return;
@@ -2897,7 +2756,6 @@ async function autonomousTaskExecutor() {
         }
         // Navigation-busy: retry next cycle, not a failure
         if (isNavigatingError(actionResult?.error)) {
-          console.log(`🚶 Bot is navigating, will retry next cycle`);
           return;
         }
 
@@ -2959,8 +2817,8 @@ async function autonomousTaskExecutor() {
             currentTask.progress || 0,
             'failed'
           );
-          console.log(
-            `[Executor] Task marked as failed after ${newRetryCount} retries: ${currentTask.title}`
+          console.warn(
+            `[Executor] Task failed after ${newRetryCount} retries: ${currentTask.title}`
           );
         } else {
           taskIntegration.updateTaskMetadata(currentTask.id, {
@@ -2976,23 +2834,18 @@ async function autonomousTaskExecutor() {
               { label: 'Search nearby chest for wood' },
             ]);
           }
-          console.log(
-            `🔄 Task will be retried (${newRetryCount}/${maxRetries}): ${currentTask.title}`
-          );
         }
       }
     }
 
     if (suitableOption) {
-      console.log(`✅ Found MCP option for task: ${suitableOption.name}`);
-
       // Check retry count to prevent infinite loops
       const retryCount = currentTask.metadata?.retryCount || 0;
       const maxRetries = currentTask.metadata?.maxRetries || 3;
 
       if (retryCount >= maxRetries) {
-        console.log(
-          `[Executor] Task failed after ${retryCount} retries, marking as failed: ${currentTask.title}`
+        console.warn(
+          `[Executor] Task failed after ${retryCount} retries: ${currentTask.title}`
         );
         taskIntegration.updateTaskProgress(
           currentTask.id,
@@ -3009,15 +2862,12 @@ async function autonomousTaskExecutor() {
       ) {
         const preInv = await fetchInventorySnapshot();
         if (!hasEnoughLogs(preInv)) {
-          console.log(
-            '🪵 Missing wood logs for crafting. Performing quick gather attempt.'
-          );
           const gather = await serverConfig
             .getMCPIntegration()
             ?.executeTool('minecraft.dig_block', { blockType: '_log' });
           if (!gather?.success) {
             console.warn(
-              '⚠️ Quick gather attempt failed. Injecting prerequisite steps.'
+              '[Executor] Quick gather attempt failed. Injecting prerequisite steps.'
             );
             taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
@@ -3029,7 +2879,7 @@ async function autonomousTaskExecutor() {
           const postGather = await fetchInventorySnapshot();
           if (!hasEnoughLogs(postGather)) {
             console.warn(
-              '⚠️ Wood still insufficient after gather attempt. Injecting prerequisite steps.'
+              '[Executor] Wood still insufficient after gather attempt. Injecting prerequisite steps.'
             );
             taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
@@ -3084,10 +2934,6 @@ async function autonomousTaskExecutor() {
         });
 
       if (mcpResult?.success) {
-        console.log(
-          `✅ MCP option executed successfully: ${suitableOption.name}`
-        );
-
         if (
           currentTask.type === 'crafting' &&
           /pickaxe/i.test(currentTask.title || '')
@@ -3095,7 +2941,7 @@ async function autonomousTaskExecutor() {
           const postInv = await fetchInventorySnapshot();
           if (!hasPickaxe(postInv)) {
             console.warn(
-              '⚠️ Craft reported success but pickaxe not found; planning next acquisition step.'
+              '[Executor] Craft reported success but pickaxe not found; planning next acquisition step.'
             );
             const injected = await injectDynamicPrereqForCraft(currentTask);
             if (injected) return;
@@ -3152,8 +2998,8 @@ async function autonomousTaskExecutor() {
             currentTask.progress || 0,
             'failed'
           );
-          console.log(
-            `[Executor] Task marked as failed after ${newRetryCount} retries: ${currentTask.title}`
+          console.warn(
+            `[Executor] Task failed after ${newRetryCount} retries: ${currentTask.title}`
           );
         } else {
           // Update retry count using the enhanced task integration
@@ -3170,9 +3016,6 @@ async function autonomousTaskExecutor() {
               { label: 'Search nearby chest for wood' },
             ]);
           }
-          console.log(
-            `🔄 Task will be retried (${newRetryCount}/${maxRetries}): ${currentTask.title}`
-          );
         }
       }
     } else {
@@ -3182,15 +3025,12 @@ async function autonomousTaskExecutor() {
       );
       // If no MCP option, execute the task through the planning system
       try {
-        console.log(`🚀 Starting execution of task: ${currentTask.title}`);
-
         // Map task type to real Minecraft action
         const minecraftAction = mapTaskTypeToMinecraftAction(currentTask);
 
         // Thread task scope for nav lease isolation
         const scopedAction = withNavLeaseScope(minecraftAction, currentTask.id);
         if (scopedAction) {
-          console.log(`🔄 Executing task: ${currentTask.title}`);
 
           // Execute real Minecraft action (pass taskId explicitly for typed wrapper)
           const actionResult = await executeActionWithBotCheck(
@@ -3201,9 +3041,6 @@ async function autonomousTaskExecutor() {
           if (actionResult.outcome === 'shadow') {
             // Shadow mode: observation recorded. Task is blocked until mode changes.
             // NOT a failure — do not consume retries.
-            console.log(
-              `[Shadow] Observed: ${currentTask.title} (${scopedAction.type})`
-            );
             taskIntegration.updateTaskMetadata(currentTask.id, {
               blockedReason: 'shadow_mode',
               blockedAt: Date.now(),
@@ -3220,7 +3057,6 @@ async function autonomousTaskExecutor() {
             tripCircuitBreaker(actionResult.error || 'Unknown infra error');
             // Task stays as-is; executor will pause until breaker resets
           } else if (actionResult.ok) {
-            console.log(`✅ Task executed successfully: ${currentTask.title}`);
             // Record success for circuit breaker reset
             recordSuccess();
             await recomputeProgressAndMaybeComplete(currentTask);
@@ -3242,22 +3078,19 @@ async function autonomousTaskExecutor() {
                 currentTask.progress || 0,
                 'failed'
               );
-              console.log(
-                `[Executor] Task marked as failed after ${retryCount} retries: ${currentTask.title}`
+              console.warn(
+                `[Executor] Task failed after ${retryCount} retries: ${currentTask.title}`
               );
             } else {
               taskIntegration.updateTaskMetadata(currentTask.id, {
                 retryCount,
                 lastRetry: Date.now(),
               });
-              console.log(
-                `🔄 Task will be retried (${retryCount}/${maxRetries}): ${currentTask.title}`
-              );
             }
           }
         } else {
           console.warn(
-            `⚠️ No Minecraft action mapping for task type: ${currentTask.type}`
+            `[Executor] No Minecraft action mapping for task type: ${currentTask.type}`
           );
         }
       } catch (error) {
@@ -3438,8 +3271,6 @@ const planningSystem: PlanningSystem = {
   execution: {
     executeGoal: async (goal: any) => {
       try {
-        console.log(`🎯 Executing goal: ${goal.title || goal.id}`);
-
         // Ensure task is activated before dispatch (P0-2: activation at dispatch boundary)
         // Goals often have task IDs when converted from tasks
         if (goal.id) {
@@ -3450,9 +3281,6 @@ const planningSystem: PlanningSystem = {
         const result = await reactiveExecutor.executeTask(goal);
 
         if (result.success) {
-          console.log(
-            `✅ Goal executed successfully: ${goal.title || goal.id}`
-          );
           return {
             success: true,
             message: 'Goal executed successfully',
@@ -3481,8 +3309,6 @@ const planningSystem: PlanningSystem = {
     },
     executeTask: async (task: any) => {
       try {
-        console.log(`🔄 Executing task: ${task.title || task.id}`);
-
         // Ensure task is activated before dispatch (P0-2: activation at dispatch boundary)
         // This guarantees tasks cannot remain 'pending' after execution
         if (task.id) {
@@ -3493,9 +3319,6 @@ const planningSystem: PlanningSystem = {
         const result = await reactiveExecutor.executeTask(task);
 
         if (result.success) {
-          console.log(
-            `✅ Task executed successfully: ${task.title || task.id}`
-          );
           return {
             success: true,
             message: 'Task executed successfully',
@@ -3539,15 +3362,19 @@ const serverConfig = new ServerConfiguration({
 
 // Setup event listeners
 taskIntegration.on('taskAdded', (task) => {
-  console.log('Task added to enhanced integration:', task.title);
+  if (isVerbose()) {
+    console.log(`[TaskIntegration] Task added: ${task.title} (${task.id})`);
+  }
 });
 
 taskIntegration.on(
   'taskProgressUpdated',
   ({ task, oldProgress, oldStatus }) => {
-    console.log(
-      `Task progress updated: ${task.title} - ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
-    );
+    if (isVerbose()) {
+      console.log(
+        `[TaskIntegration] Progress: ${task.title} ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
+      );
+    }
   }
 );
 
@@ -3559,7 +3386,6 @@ taskIntegration.on(
   'taskLifecycleEvent',
   (event: { type: string; taskId: string; task?: any; reason?: string }) => {
     const reason = `${event.type}: task ${event.taskId}${event.reason ? ` (${event.reason})` : ''}`;
-    console.log(`[Lifecycle→Review] ${reason}`);
 
     // Register failed task categories so the thought-to-task converter
     // can suppress creation of identical tasks during the cooldown window.
@@ -3630,7 +3456,6 @@ taskIntegration.on(
             const goldenRunId = (event.task.metadata as any)?.goldenRun?.runId as string | undefined;
             if (goldenRunId) {
               // The proof bundle is built inside onTaskTerminal; we log here for observability
-              console.log(`[Reflex] Proof bundle assembled for reflexId=${reflexInstanceId.slice(0, 8)}`);
             }
           }
         }
@@ -4181,10 +4006,9 @@ async function startServer() {
       const { eventDrivenThoughtGenerator: generator } =
         await import('@conscious-bot/cognition');
       eventDrivenThoughtGenerator = generator;
-      console.log('[Planning] Event-driven thought generator initialized');
     } catch (error) {
       console.warn(
-        '⚠️ Failed to initialize event-driven thought generator:',
+        'Failed to initialize event-driven thought generator:',
         error
       );
     }
@@ -4212,7 +4036,7 @@ async function startServer() {
       });
       console.log('[Planning] Keep-alive integration initialized');
     } catch (error) {
-      console.warn('⚠️ Failed to initialize keep-alive integration:', error);
+      console.warn('[Planning] Failed to initialize keep-alive integration:', error);
     }
 
     // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
@@ -4266,11 +4090,6 @@ async function startServer() {
               food_after: afterState.food,
               inventory_after: afterState.inventory ?? [],
             } : null);
-            console.log(
-              `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
-                `result=${bundle.identity.execution.result}, ` +
-                `verified=${(bundle.identity.verification.delta ?? 0) > 0}`
-            );
             // Record to golden run if active
             const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
             if (goldenRunId) {
@@ -4309,19 +4128,12 @@ async function startServer() {
               food_after: afterState.food,
               inventory_after: afterState.inventory ?? [],
             } : null);
-            console.log(
-              `[Reflex] Proof bundle assembled: hash=${bundle.bundle_hash.slice(0, 8)}, ` +
-                `result=${bundle.identity.execution.result}, ` +
-                `verified=${(bundle.identity.verification.delta ?? 0) > 0}`
-            );
             const goldenRunId = (task.metadata as any)?.goldenRun?.runId as string | undefined;
             if (goldenRunId) {
               getGoldenRunRecorder().recordReflexProof(goldenRunId, bundle);
             }
           },
         });
-
-        console.log('[Planning] Hunger driveshaft controller initialized');
 
         // Exploration driveshaft controller
         global.explorationDriveshaft = new ExplorationDriveshaftController({
@@ -4346,8 +4158,7 @@ async function startServer() {
             global.explorationDriveshaft!.onTaskTerminal(task, afterState),
         });
 
-        console.log('[Planning] Exploration driveshaft controller initialized');
-        console.log(`[Planning] ReflexRegistry: ${global.reflexRegistry.getRegistered().length} reflexes registered`);
+        console.log(`[Planning] Reflex system initialized: ${global.reflexRegistry.getRegistered().length} reflexes registered`);
       } catch (error) {
         console.warn('[Planning] Failed to initialize reflex system:', error);
       }
@@ -4373,7 +4184,7 @@ async function startServer() {
       console.log('[Planning] MCP integration initialized');
     } catch (error) {
       console.warn(
-        '⚠️ MCP integration failed to initialize, continuing without it:',
+        '[Planning] MCP integration failed to initialize, continuing without it:',
         error
       );
     }
@@ -4387,11 +4198,10 @@ async function startServer() {
         // Add the behavior tree runner to the MCP integration so it can execute options
         (mcpIntegration as any).btRunner = btRunner;
 
-        console.log('MCP integration connected to behavior tree runner');
       }
     } catch (error) {
       console.warn(
-        '⚠️ Failed to connect MCP integration to behavior tree runner:',
+        '[Planning] Failed to connect MCP integration to behavior tree runner:',
         error
       );
     }
@@ -4414,7 +4224,7 @@ async function startServer() {
         console.log('[Planning] Event store initialized');
       } catch (error) {
         console.warn(
-          '⚠️ Planning event store failed to initialize, continuing without persistence:',
+          '[Planning] Event store failed to initialize, continuing without persistence:',
           error
         );
       }
@@ -4513,9 +4323,9 @@ async function startServer() {
             if (ok) registered++;
           } catch (err) {
             console.warn(
-              `⚠️ Failed to register leaf ${
+              `[Planning] Failed to register leaf ${
                 (leaf as any)?.spec?.name || 'unknown'
-              } in planning:`,
+              }:`,
               err
             );
           }
@@ -4524,7 +4334,7 @@ async function startServer() {
         console.log(`Registered ${registered} core leaves in planning`);
       }
     } catch (e) {
-      console.warn('⚠️ Core leaf registration in planning failed:', e);
+      console.warn('[Planning] Core leaf registration failed:', e);
     }
 
     // Mount planning endpoints (getServerBanner wires golden-run banner capture via WS server_info_v1)
@@ -4950,16 +4760,10 @@ async function startServer() {
         }
         if (!sysReady) {
           executorStartState = 'waiting_for_ready';
-          console.log(
-            `[Planning] tryStartExecutor: waiting — systemReady=${sysReady}, depsReady=${depsReady}`
-          );
           return;
         }
         if (!depsReady) {
           executorStartState = 'waiting_for_deps';
-          console.log(
-            `[Planning] tryStartExecutor: waiting — systemReady=${sysReady}, depsReady=${depsReady}`
-          );
           return;
         }
         executorStarted = true;
@@ -4972,8 +4776,7 @@ async function startServer() {
         // The session stays open for the executor's lifetime.
         import('@conscious-bot/cognition')
           .then(({ auditLogger }) => {
-            const sid = auditLogger.startSession('executor-' + Date.now());
-            console.log(`[Planning] Audit session started: ${sid}`);
+            auditLogger.startSession('executor-' + Date.now());
           })
           .catch(() => {
             // Audit logging is optional — executor runs without it.
@@ -5016,7 +4819,6 @@ async function startServer() {
           tryStartExecutor();
           if (executorStarted) {
             clearInterval(fastRetryTimer);
-            console.log('[Planning] Self-healing: executor started via fast retry probe');
           }
         }, FAST_RETRY_MS);
       }
@@ -5036,10 +4838,6 @@ async function startServer() {
     //     error
     //   );
     // }
-    console.log(
-      '[Planning] Using event-driven thought generation (cognition) instead of legacy cognitive processor.'
-    );
-
     console.log('[Planning] Modular planning server started successfully');
   } catch (error) {
     console.error('[Planning] Failed to start modular planning server:', error);

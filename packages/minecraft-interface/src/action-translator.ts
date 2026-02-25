@@ -16,7 +16,7 @@ import {
   SensingConfig,
   Orientation,
 } from '@conscious-bot/world';
-import { resilientFetch } from '@conscious-bot/core';
+import { resilientFetch, isVerbose } from '@conscious-bot/core';
 import { NavigationLeaseManager } from './navigation-lease-manager';
 import { createHash } from 'crypto';
 
@@ -432,15 +432,17 @@ export class ActionTranslator {
         usePathfinding: true,
       });
     } else {
-      console.log(
-        '⚠️ ActionTranslator initialized without NavigationBridge - bot not fully spawned yet',
-        {
-          hasBot: !!bot,
-          botSpawned: !!bot.entity?.position,
-          hasStateMachine: !!stateMachineWrapper,
-          timestamp: Date.now(),
-        }
-      );
+      if (isVerbose()) {
+        console.log(
+          'ActionTranslator initialized without NavigationBridge - bot not fully spawned yet',
+          {
+            hasBot: !!bot,
+            botSpawned: !!bot.entity?.position,
+            hasStateMachine: !!stateMachineWrapper,
+            timestamp: Date.now(),
+          }
+        );
+      }
     }
   }
 
@@ -1469,13 +1471,8 @@ export class ActionTranslator {
     const qty = normalizedParams.qty ?? 1;
 
     try {
-      console.log(
-        `🔧 Attempting to craft ${qty}x ${recipe} using leaf system`
-      );
-
       // Get the global leaf factory
       const leafFactory = (global as any).minecraftLeafFactory;
-      console.log('🔧 Leaf factory available:', !!leafFactory);
       if (!leafFactory) {
         console.warn(
           'Leaf factory not available, falling back to basic crafting'
@@ -1499,9 +1496,6 @@ export class ActionTranslator {
           });
 
           if (result.status === 'success') {
-            console.log(
-              `✅ Crafting successful: ${result.result.crafted}x ${result.result.recipe}`
-            );
             return {
               success: true,
               data: {
@@ -1513,24 +1507,20 @@ export class ActionTranslator {
               },
             };
           } else {
-            console.log(`❌ Crafting failed: ${result.error?.detail}`);
             return {
               success: false,
               error: result.error?.detail || 'Crafting failed',
             };
           }
         } catch (error) {
-          console.log(
-            '❌ Leaf crafting failed, falling back to basic crafting:',
-            error
-          );
+          console.warn('[craft-handler] Leaf crafting failed, falling back to basic crafting:', error);
         }
       }
 
       // Fallback: Basic crafting without mcData
       return await this.executeBasicCraftItem(action, timeout);
     } catch (error) {
-      console.log('❌ Leaf crafting error:', error);
+      console.warn('[craft-handler] Leaf crafting error:', error);
       return await this.executeBasicCraftItem(action, timeout);
     }
   }
@@ -1544,14 +1534,8 @@ export class ActionTranslator {
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const { item, quantity = 1 } = action.parameters;
 
-    console.log(`🔧 Attempting basic crafting for ${quantity}x ${item}`);
-
     // Check if we have the required materials
     const inventory = this.bot.inventory.items();
-    console.log(
-      'Current inventory:',
-      inventory.map((item: any) => `${item.name} x${item.count}`)
-    );
 
     // Detect which wood variant the bot actually has in inventory
     const invLog = inventory.find((i: any) => i.name.includes('_log'));
@@ -1604,9 +1588,6 @@ export class ActionTranslator {
     }
 
     // Simulate successful crafting (since we can't actually craft without mcData)
-    console.log(
-      `✅ Basic crafting simulation successful: ${quantity}x ${item}`
-    );
     return {
       success: true,
       data: {
@@ -1655,7 +1636,7 @@ export class ActionTranslator {
         value: number,
         tags?: Record<string, string>
       ) => {
-        console.log(`Metric: ${name} = ${value}`, tags);
+        if (isVerbose()) console.log(`Metric: ${name} = ${value}`, tags);
       },
       emitError: (error: any) => {
         console.error('Leaf error:', error);
@@ -1886,11 +1867,7 @@ export class ActionTranslator {
     try {
       // Get the global leaf factory
       const leafFactory = (global as any).minecraftLeafFactory;
-      console.log('🔧 Leaf factory available:', !!leafFactory);
       if (!leafFactory) {
-        console.warn(
-          'Leaf factory not available, falling back to basic digging'
-        );
         return await this.executeBasicDigBlock(action, timeout);
       }
 
@@ -2002,10 +1979,7 @@ export class ActionTranslator {
         error: result.error?.detail,
       };
     } catch (error) {
-      console.log(
-        '❌ Leaf digging failed, falling back to basic digging:',
-        error
-      );
+      console.warn('[dig_block] Leaf digging failed, falling back to basic digging:', error);
       return await this.executeBasicDigBlock(action, timeout);
     }
   }
@@ -2050,7 +2024,7 @@ export class ActionTranslator {
       const dist = botPos.distanceTo(blockPos);
       if (dist > DIG_REACH) {
         console.log(
-          `[AcquireMaterial] Block ${targetBlock} at ${blockPos} is ${dist.toFixed(1)} blocks away — pathfinding to reach`
+          `[AcquireMaterial] Block ${targetBlock} at ${blockPos} is ${dist.toFixed(1)} blocks away -- pathfinding to reach`
         );
         const navResult = await this.executeNavigate(
           {
@@ -2342,7 +2316,7 @@ export class ActionTranslator {
     action: PlaceBlockAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    console.log('🔧 executePlaceBlock called with:', action);
+    if (isVerbose()) console.log('[place_block] executePlaceBlock called with:', action);
     try {
       const {
         block_type = 'torch',
@@ -2385,10 +2359,6 @@ export class ActionTranslator {
           (11 * Math.PI) / 6,
         ];
 
-        console.log(
-          `🔍 Searching for placement locations around bot at ${botPosition.x}, ${botPosition.y}, ${botPosition.z}`
-        );
-
         for (let i = 0; i < count && i < angles.length; i++) {
           const angle = angles[i];
           const x = Math.round(botPosition.x + Math.cos(angle) * radius);
@@ -2400,37 +2370,17 @@ export class ActionTranslator {
             const targetBlock = this.bot.blockAt(targetPosition);
             const blockBelow = this.bot.blockAt(new Vec3(x, y - 1, z));
 
-            console.log(
-              `🔍 Checking position ${x}, ${y}, ${z}: target=${targetBlock?.name}, below=${blockBelow?.name}`
-            );
-
             // Check if the target position is air (can place block there)
             if (targetBlock && targetBlock.name === 'air') {
               // Check if the block below is solid (can support the block)
               if (blockBelow && blockBelow.name !== 'air') {
-                console.log(
-                  `🔧 Attempting to place ${block_type} at ${x}, ${y}, ${z}`
-                );
                 await this.bot.placeBlock(targetBlock, blockItem as any);
                 blocksPlaced++;
-                console.log(
-                  `✅ Successfully placed ${block_type} at ${x}, ${y}, ${z}`
-                );
                 break; // Successfully placed one block
-              } else {
-                console.log(
-                  `⚠️ Block below at ${x}, ${y - 1}, ${z} is not solid: ${blockBelow?.name}`
-                );
               }
-            } else {
-              console.log(
-                `⚠️ Target position ${x}, ${y}, ${z} is not air: ${targetBlock?.name}`
-              );
             }
           } catch (error) {
-            console.log(
-              `❌ Failed to place block at ${x}, ${y}, ${z}: ${error}`
-            );
+            console.warn(`[place_block] Failed to place block at ${x}, ${y}, ${z}: ${error}`);
             // Continue trying other positions
             continue;
           }
@@ -2501,10 +2451,9 @@ export class ActionTranslator {
       if (shelterFound && shelterPosition) {
         // Move to the shelter (under nav lease)
         const Goals = await getGoals();
-        console.log('🔍 Using Goals module:', !!Goals, typeof Goals);
 
         if (!Goals || !Goals.GoalBlock) {
-          console.error('❌ Goals module missing GoalBlock:', Goals);
+          console.error('Goals module missing GoalBlock:', Goals);
           throw new Error('Goals module not properly initialized');
         }
 
@@ -2733,10 +2682,8 @@ export class ActionTranslator {
     try {
       const now = Date.now();
       if (this.navigationBridge?.isNavigationActive()) {
-        if (this.shouldLog('nav-gated', this.navLogThrottleMs)) {
-          console.log(
-            `[ActionTranslator] 🧭 navigate gated: already navigating`
-          );
+        if (isVerbose() && this.shouldLog('nav-gated', this.navLogThrottleMs)) {
+          console.log('[ActionTranslator] navigate gated: already navigating');
         }
         return {
           success: false,
@@ -2815,13 +2762,15 @@ export class ActionTranslator {
             target: String(params.target ?? ''),
           };
 
-          console.log(
-            `[ActionTranslator] Exploration fallback: target=${params.target}, distance=${dist}, seed=${seed.toFixed(4)}, retries=${retryCount} → pos=(${targetVec.x}, ${targetVec.y}, ${targetVec.z})`
-          );
+          if (isVerbose()) {
+            console.log(
+              `[ActionTranslator] Exploration fallback: target=${params.target}, distance=${dist}, seed=${seed.toFixed(4)}, retries=${retryCount} -> pos=(${targetVec.x}, ${targetVec.y}, ${targetVec.z})`
+            );
+          }
         } else {
           if (this.shouldLog('nav-invalid-target', 1000)) {
             console.error(
-              `[ActionTranslator] ❌ Invalid navigation target (missing/NaN coordinates)`
+              '[ActionTranslator] Invalid navigation target (missing/NaN coordinates)'
             );
           }
           return {
@@ -2840,9 +2789,9 @@ export class ActionTranslator {
         this.lastNavTargetKey === targetKey &&
         now - this.lastNavAttemptAt < this.navDebounceMs
       ) {
-        if (this.shouldLog('nav-debounce', this.navLogThrottleMs)) {
+        if (isVerbose() && this.shouldLog('nav-debounce', this.navLogThrottleMs)) {
           console.log(
-            `[ActionTranslator] 🧭 navigate debounced: ${targetKey} (${
+            `[ActionTranslator] navigate debounced: ${targetKey} (${
               now - this.lastNavAttemptAt
             }ms)`
           );
@@ -2856,13 +2805,13 @@ export class ActionTranslator {
       this.lastNavTargetKey = targetKey;
       this.lastNavAttemptAt = now;
 
-      if (this.shouldLog('nav-execute', this.navLogThrottleMs)) {
+      if (isVerbose() && this.shouldLog('nav-execute', this.navLogThrottleMs)) {
         console.log(
-          `[ActionTranslator] 🧭 executeNavigate called with target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
+          `[ActionTranslator] executeNavigate called with target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
         );
       }
-      if (this.shouldLog('nav-state', this.navLogThrottleMs)) {
-        console.log('[ActionTranslator] 🔍 state:', {
+      if (isVerbose() && this.shouldLog('nav-state', this.navLogThrottleMs)) {
+        console.log('[ActionTranslator] state:', {
           hasNavigationBridge: !!this.navigationBridge,
           hasBot: !!this.bot,
           botSpawned: !!this.bot.entity?.position,
@@ -2873,7 +2822,7 @@ export class ActionTranslator {
 
       if (!this.navigationBridge) {
         console.error(
-          '❌ NavigationBridge not initialized in ActionTranslator'
+          'NavigationBridge not initialized in ActionTranslator'
         );
         return {
           success: false,
@@ -2891,9 +2840,9 @@ export class ActionTranslator {
         };
       }
 
-      if (this.shouldLog('nav-dstar', this.navLogThrottleMs)) {
+      if (isVerbose() && this.shouldLog('nav-dstar', this.navLogThrottleMs)) {
         console.log(
-          `[ActionTranslator] 🧭 Using D* Lite navigation to target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
+          `[ActionTranslator] Using D* Lite navigation to target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
         );
       }
 
@@ -2912,10 +2861,6 @@ export class ActionTranslator {
       }
 
       if (navigationResult.success) {
-        console.log(
-          `[ActionTranslator] ✅ D* Lite navigation successful: ${navigationResult.pathLength} steps, ${navigationResult.replans} replans`
-        );
-
         if (sprint) {
           this.bot.setControlState('sprint', false);
         }
@@ -2934,9 +2879,9 @@ export class ActionTranslator {
           },
         };
       } else {
-        if (this.shouldLog('nav-fail', this.navLogThrottleMs)) {
+        if (isVerbose() && this.shouldLog('nav-fail', this.navLogThrottleMs)) {
           console.log(
-            `[ActionTranslator] ❌ D* Lite navigation failed: ${navigationResult.error}`
+            `[ActionTranslator] D* Lite navigation failed: ${navigationResult.error}`
           );
         }
 
@@ -2961,7 +2906,7 @@ export class ActionTranslator {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (this.shouldLog('nav-error', 1000)) {
-        console.error(`[ActionTranslator] ❌ D* Lite navigation error: ${msg}`);
+        console.error(`[ActionTranslator] D* Lite navigation error: ${msg}`);
         if (process.env.NAV_DEBUG_STACK === '1' && error instanceof Error) {
           console.error(error.stack);
         }
@@ -3209,11 +3154,9 @@ export class ActionTranslator {
             itemId: itemEntity.id,
             position: itemEntity.position.clone(),
           });
-        } else {
-          console.log(`[CollectItems] Item ${itemEntity.id} still exists after approach (dist=${itemEntity.position.distanceTo(this.bot.entity.position).toFixed(1)})`);
         }
       } catch (error) {
-        console.log(`Failed to collect item ${itemEntity.id}: ${error}`);
+        // Item collection failure — continue to next item
         continue;
       }
     }
@@ -3255,10 +3198,6 @@ export class ActionTranslator {
     } = action.parameters;
     const startTime = Date.now();
 
-    console.log(
-      `🔍 Starting enhanced item collection for ${item || 'any items'} within ${radius} blocks`
-    );
-
     // First, try the normal pickup method
     const initialPickup = await this.executePickup(
       {
@@ -3270,16 +3209,11 @@ export class ActionTranslator {
     );
 
     if (initialPickup.success) {
-      console.log('✅ Items found and collected immediately');
       return initialPickup;
     }
 
     // If no items found and exploreOnFail is enabled, try exploration
     if (exploreOnFail && Date.now() - startTime < maxSearchTime) {
-      console.log(
-        `🔍 No items found immediately, starting exploration within ${radius} blocks`
-      );
-
       // Try to explore the area by moving in a spiral pattern
       const explorationResult = await this.exploreForItems(
         item,
@@ -3287,9 +3221,6 @@ export class ActionTranslator {
         maxSearchTime - (Date.now() - startTime)
       );
 
-      if (explorationResult.success) {
-        console.log('✅ Items found during exploration');
-      }
       // Propagate diagnostics from exploration (both success and failure)
       return explorationResult;
     }
@@ -3337,10 +3268,6 @@ export class ActionTranslator {
       action: scanAction = 'find_nearest_block',
     } = action.parameters;
 
-    console.log(
-      `🔍 Scanning environment for ${targetBlock} within ${radius} blocks`
-    );
-
     try {
       const scanResult = this.scanVisibleForTargetBlock(
         targetBlock,
@@ -3352,10 +3279,6 @@ export class ActionTranslator {
         const closestBlock = scanResult.foundBlocks.reduce(
           (closest, current) =>
             current.distance < closest.distance ? current : closest
-        );
-
-        console.log(
-          `✅ Found ${scanResult.foundBlocks.length} ${targetBlock} blocks in FoV, closest at ${closestBlock.distance.toFixed(1)} blocks`
         );
 
         return {
@@ -3371,13 +3294,12 @@ export class ActionTranslator {
         };
       }
 
-      console.log(`❌ No ${targetBlock} blocks found within ${radius} blocks`);
       return {
         success: false,
         error: `No ${targetBlock} blocks found within ${radius} blocks`,
       };
     } catch (error) {
-      console.error('❌ Error during environment scan:', error);
+      console.error('Error during environment scan:', error);
       return {
         success: false,
         error: `Scan failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -3399,14 +3321,6 @@ export class ActionTranslator {
       Array.isArray(resource_tags) && resource_tags.length > 0
         ? resource_tags.map((t) => String(t))
         : undefined;
-
-    console.log('[explore:block] executeExplore input', {
-      resource_tags,
-      targetItems,
-      searchRadius,
-      goal_item: action.parameters?.goal_item,
-      reason: action.parameters?.reason,
-    });
 
     try {
       const result = await this.exploreForItems(
@@ -3504,8 +3418,6 @@ export class ActionTranslator {
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const { btId } = action.parameters;
 
-    console.log(`🎯 Executing behavior tree: ${btId}`);
-
     try {
       // For now, implement basic behavior tree execution
       // This is a placeholder that should be enhanced with proper BT execution
@@ -3514,12 +3426,10 @@ export class ActionTranslator {
       }
 
       // Default behavior tree execution
-      console.log(
-        `⚠️ Behavior tree ${btId} not implemented, executing as wait`
-      );
+      console.warn(`Behavior tree ${btId} not implemented, executing as wait`);
       return await this.executeWait(action, timeout);
     } catch (error) {
-      console.error(`❌ Error executing behavior tree ${btId}:`, error);
+      console.error(`Error executing behavior tree ${btId}:`, error);
       return {
         success: false,
         error: `Behavior tree execution failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -3534,8 +3444,6 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    console.log('🔨 Crafting wooden axe...');
-
     try {
       // Check if we have the required materials
       const inventory = this.bot.inventory.items();
@@ -3558,16 +3466,11 @@ export class ActionTranslator {
 
       // For now, simulate crafting an axe since mineflayer API is complex
       // In a real implementation, this would use proper crafting mechanics
-      console.log(
-        '🔨 Simulating axe crafting (mineflayer API compatibility issue)'
-      );
-
       // Check if we can simulate having an axe by checking inventory
       const currentInventory = this.bot.inventory.items();
       const hasAxe = currentInventory.some((item) => item.name.includes('axe'));
 
       if (hasAxe) {
-        console.log('✅ Bot already has an axe');
         return {
           success: true,
           data: {
@@ -3576,16 +3479,13 @@ export class ActionTranslator {
           },
         };
       } else {
-        console.log(
-          '⚠️ Bot needs an axe but crafting is not fully implemented'
-        );
         return {
           success: false,
           error: 'Axe crafting not available - bot needs manual tool provision',
         };
       }
     } catch (error) {
-      console.error('❌ Error crafting wooden axe:', error);
+      console.error('Error crafting wooden axe:', error);
       return {
         success: false,
         error: `Crafting failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -3611,10 +3511,6 @@ export class ActionTranslator {
     const center = this.bot.entity.position.clone();
     const spiralRadius = Math.min(radius, 10); // Limit spiral to reasonable size
 
-    console.log(
-      `🔄 Starting enhanced exploration using perception system within ${radius} blocks`
-    );
-
     try {
       // Use the world package's perception system for better item detection
       const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
@@ -3626,11 +3522,6 @@ export class ActionTranslator {
         observerPosition: { x: center.x, y: center.y, z: center.z },
         level: 'enhanced',
       };
-      console.log('[explore:block] perception request', {
-        url: `${worldUrl}/api/perception/visual-field`,
-        targetItems: itemsArr,
-        ...perceptionRequest,
-      });
 
       // Cap perception API timeout to 3s so the fallback spiral still has
       // most of the time budget if the world service is slow or unreachable.
@@ -3647,11 +3538,6 @@ export class ActionTranslator {
       );
 
       if (!response?.ok) {
-        console.log('[explore:block] perception API failed, falling back to spiral', {
-          ok: response?.ok,
-          status: response?.status,
-          targetItems: itemsArr,
-        });
         return this.fallbackSpiralExploration(
           itemsArr,
           radius,
@@ -3669,31 +3555,8 @@ export class ActionTranslator {
         }>;
       };
 
-      const obs = perceptionResult.observations ?? [];
-      const typeCounts = obs.reduce((acc: Record<string, number>, o) => {
-        acc[o.type] = (acc[o.type] ?? 0) + 1;
-        return acc;
-      }, {});
-      const sampleObs = obs.slice(0, 3).map((o) => ({
-        type: o.type,
-        name: o.name,
-        itemId: o.itemId,
-        pos: o.pos,
-        distance: o.distance,
-      }));
-      console.log('[explore:block] perception response', {
-        totalObservations: obs.length,
-        typeCounts,
-        sampleObs,
-      });
-
       const targetIsBlock =
         itemsArr.length > 0 && itemsArr.some((i) => isBlockTarget(this.bot, i));
-      console.log('[explore:block] target classification', {
-        items: itemsArr,
-        targetIsBlock,
-        mcDataBlocksByName: !!(this.bot as any).mcData?.blocksByName,
-      });
 
       // Block target: look for blocks in the world (stone, iron_ore, oak_log, etc.)
       if (targetIsBlock && itemsArr.length > 0) {
@@ -3703,12 +3566,6 @@ export class ActionTranslator {
               o.type === 'block' &&
               itemsArr.some((t) => blockNameMatches(t, o.name))
           ) || [];
-
-        console.log('[explore:block] perception block filter', {
-          targets: itemsArr,
-          blocksFoundCount: blocksFound.length,
-          sampleBlocks: blocksFound.slice(0, 2).map((b) => ({ name: b.name, pos: b.pos, distance: b.distance })),
-        });
 
         if (blocksFound.length > 0) {
           const closest = blocksFound.reduce((a, b) =>
@@ -3751,7 +3608,7 @@ export class ActionTranslator {
               };
             }
           } catch (err) {
-            console.log(`Failed to reach or dig block at ${blockPos}:`, err);
+            // Failed to reach or dig block — fall through to item scan
           }
         }
       }
@@ -3765,17 +3622,7 @@ export class ActionTranslator {
             (perceptionItemIds === null || perceptionItemIds.has(Number(o.itemId)))
         ) || [];
 
-      console.log('[explore:block] perception item filter', {
-        targets: itemsArr,
-        perceptionItemIds: perceptionItemIds ? Array.from(perceptionItemIds) : null,
-        itemsFoundCount: itemsFound.length,
-      });
-
       if (itemsFound.length > 0) {
-        console.log(
-          `🎯 Found ${itemsFound.length} items via perception system`
-        );
-
         // Try to collect the closest item
         const closestItem = itemsFound.reduce((closest: any, current: any) =>
           current.distance < closest.distance ? current : closest
@@ -3813,7 +3660,7 @@ export class ActionTranslator {
             5000
           );
         } catch (error) {
-          console.log(`Failed to reach item at ${closestItem.pos}:`, error);
+          // Failed to reach item — fall through to spiral exploration
         }
       }
 
@@ -3824,10 +3671,6 @@ export class ActionTranslator {
         maxTime - (Date.now() - startTime)
       );
     } catch (error) {
-      console.log(
-        `Perception exploration failed, falling back to spiral:`,
-        error
-      );
       return this.fallbackSpiralExploration(
         itemsArr,
         radius,
@@ -3860,18 +3703,6 @@ export class ActionTranslator {
     const spiralRadius = Math.min(radius, 16); // Wider spiral for better coverage
     // Ensure at least 5 seconds for the spiral even if the caller's budget is low
     const effectiveMaxTime = Math.max(maxTime, 5000);
-
-    console.log(
-      `🔄 Starting fallback spiral exploration within ${spiralRadius} blocks (budget: ${Math.round(effectiveMaxTime / 1000)}s)`
-    );
-    console.log('[explore:block] fallbackSpiralExploration input', {
-      items: itemsArr,
-      radius,
-      maxTime,
-      targetIsBlock:
-        itemsArr.length > 0 && itemsArr.some((i) => isBlockTarget(this.bot, i)),
-      botPos: { x: center.x, y: center.y, z: center.z },
-    });
 
     let waypointsAttempted = 0;
     let waypointsReached = 0;
@@ -3988,16 +3819,6 @@ export class ActionTranslator {
                 if (blockResults.length >= 5) break;
               }
             }
-            if (blockAtCalls > 0 || blockResults.length > 0) {
-              console.log('[explore:block] spiral block scan', {
-                waypoint: waypointsReached,
-                targets: itemsArr,
-                blockAtCalls,
-                blockAtNonAir,
-                blockResultsCount: blockResults.length,
-                sampleBlocks: blockResults.slice(0, 2).map((br) => ({ pos: { x: br.pos.x, y: br.pos.y, z: br.pos.z }, distance: br.distance })),
-              });
-            }
             if (blockResults.length > 0) {
               blockResults.sort((a, b) => a.distance - b.distance);
               const nearest = blockResults[0].pos;
@@ -4072,9 +3893,6 @@ export class ActionTranslator {
           );
 
           if (itemsFound.length > 0) {
-            console.log(
-              `🎯 Found ${itemsFound.length} items at exploration position (after ${waypointsReached} waypoints)`
-            );
             const pickupResult = await this.executePickup(
               {
                 type: 'pickup_item',
@@ -4124,10 +3942,6 @@ export class ActionTranslator {
         }
       }
     }
-
-    console.log(
-      `🔍 Spiral exploration complete: ${waypointsReached}/${waypointsAttempted} waypoints reached, no items found`
-    );
 
     const diagnostics: CollectDiagnostics = {
       _diag_version: 1,
@@ -4409,13 +4223,8 @@ export class ActionTranslator {
     } = action.parameters;
 
     try {
-      console.log(
-        `🔧 Executing gather action for ${amount}x ${resource} from ${target}`
-      );
-
       // Get current position
       const position = this.bot.entity.position;
-      console.log(`Bot position: ${position.x}, ${position.y}, ${position.z}`);
 
       // Look for nearby blocks of the target type
       const nearbyBlocks = this.bot.findBlocks({
@@ -4445,8 +4254,6 @@ export class ActionTranslator {
         count: amount,
       });
 
-      console.log(`Found ${nearbyBlocks.length} nearby ${resource} blocks`);
-
       if (nearbyBlocks.length === 0) {
         return {
           success: false,
@@ -4462,10 +4269,6 @@ export class ActionTranslator {
         if (gatheredCount >= amount) break;
 
         try {
-          console.log(
-            `Breaking block at ${blockPos.x}, ${blockPos.y}, ${blockPos.z}`
-          );
-
           // First, move closer to the block to ensure we can pick up items
           const Goals = await getGoals();
           const goal = new Goals.GoalNear(
@@ -4496,18 +4299,11 @@ export class ActionTranslator {
               resource: resource,
               success: true,
             });
-            console.log(
-              `Successfully gathered ${resource} from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}`
-            );
           } else {
-            console.log(
-              `Failed to gather from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}: ${acquireResult.error}`
-            );
+            // gather attempt failed — continue to next block
           }
         } catch (error) {
-          console.log(
-            `❌ Error gathering from ${blockPos.x}, ${blockPos.y}, ${blockPos.z}: ${error}`
-          );
+          // Gather error — continue to next block
         }
       }
 
@@ -4519,9 +4315,8 @@ export class ActionTranslator {
 
       // Try to pick up any dropped items
       if (gatheredCount > 0) {
-        console.log('🔧 Attempting to pick up dropped items...');
         try {
-          const pickupResult = await this.executePickup(
+          await this.executePickup(
             {
               type: 'pickup_item',
               parameters: { radius: 3 },
@@ -4529,14 +4324,8 @@ export class ActionTranslator {
             },
             5000
           );
-
-          if (pickupResult.success) {
-            console.log('✅ Successfully picked up items');
-          } else {
-            console.log('⚠️ Failed to pick up items:', pickupResult.error);
-          }
         } catch (error) {
-          console.log('⚠️ Error during pickup:', error);
+          // Pickup error — continue with inventory check
         }
       }
 
@@ -4545,10 +4334,6 @@ export class ActionTranslator {
 
       const inventoryAfter = this.bot.inventory.items().length;
       const itemsPickedUp = inventoryAfter - inventoryBefore;
-
-      console.log(
-        `Inventory change: ${inventoryBefore} → ${inventoryAfter} (+${itemsPickedUp} items)`
-      );
 
       return {
         success: gatheredCount > 0,

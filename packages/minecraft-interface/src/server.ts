@@ -23,7 +23,7 @@ import {
 import type { Bot } from 'mineflayer';
 import { mineflayer as startMineflayerViewer } from './viewer/index.js';
 import { getVersionStatus } from './viewer/utils/version.js';
-import { resilientFetch } from '@conscious-bot/core';
+import { resilientFetch, isVerbose } from '@conscious-bot/core';
 import { Vec3 } from 'vec3';
 
 // ── Process-level error guards ──────────────────────────────────────────────
@@ -146,12 +146,6 @@ class WebSocketStateTracker {
       previousState !== isConnected ||
       now - lastLogTime > this.LOG_INTERVAL
     ) {
-      if (isConnected) {
-        console.log(`WebSocket client connected (${clientId})`);
-      } else {
-        console.log(`WebSocket client disconnected (${clientId})`);
-      }
-
       this.connectionStates.set(clientId, isConnected);
       this.lastLogTimes.set(clientId, now);
     }
@@ -210,11 +204,7 @@ app.use('/mc-assets', createAssetServer({
 // Warn if WORLD_SEED is not set — Mineflayer cannot extract the seed
 // from the server protocol. The seed can be provided later via POST /seed or POST /connect.
 if (!process.env.WORLD_SEED || process.env.WORLD_SEED === '0') {
-  console.warn(
-    'WARNING: WORLD_SEED environment variable is not set or is 0.\n' +
-      'Per-seed database isolation requires the Minecraft world seed.\n' +
-      'You can set it later via POST /seed or by including worldSeed in POST /connect.'
-  );
+  console.warn('[minecraft-interface] WORLD_SEED not set; provide via POST /seed or POST /connect');
 }
 
 // Bot configuration
@@ -222,9 +212,9 @@ if (!process.env.WORLD_SEED || process.env.WORLD_SEED === '0') {
 const authMode = (process.env.MINECRAFT_AUTH || 'microsoft') as
   | 'microsoft'
   | 'offline';
-console.log(
-  `Minecraft auth mode: ${authMode}${authMode === 'microsoft' ? ' (will prompt for Microsoft login on first connect)' : ''}`
-);
+if (isVerbose()) {
+  console.log(`[minecraft-interface] Auth mode: ${authMode}`);
+}
 const botConfig: BotConfig = {
   host: process.env.MINECRAFT_HOST || 'localhost',
   port: process.env.MINECRAFT_PORT
@@ -271,7 +261,6 @@ let pendingThoughtGeneration = false;
 function startObservationBroadcast() {
   if (!isSystemReady()) {
     pendingThoughtGeneration = true;
-    console.log('Waiting for system readiness; observation broadcast paused');
     return;
   }
 
@@ -300,27 +289,20 @@ function startObservationBroadcast() {
         timeoutMs: 5000,
       });
       if (healthRes?.ok && cognitionState === 'down') {
-        console.log('[Observation] Cognition service reachable');
         cognitionState = 'up';
       }
     } catch {
       if (cognitionState !== 'down') {
-        console.warn('[Observation] Cognition service unreachable');
         cognitionState = 'down';
       }
       // Silent on repeated failures — state-change logging only
     }
   }, 30_000); // 30s interval (status updates, not planning)
-
-  console.log('Observation broadcast started (30s intervals)');
 }
 
 function tryStartObservationBroadcast(reason: string) {
   if (!isSystemReady()) {
     pendingThoughtGeneration = true;
-    console.log(
-      `Deferring observation broadcast until system readiness (${reason})`
-    );
     return;
   }
   pendingThoughtGeneration = false;
@@ -334,7 +316,6 @@ function stopObservationBroadcast() {
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
     thoughtGenerationInterval = null;
-    console.log('Observation broadcast stopped');
   }
 }
 
@@ -350,14 +331,13 @@ function broadcastBotStateUpdate(eventType: string, data: any) {
 
   // Broadcast to WebSocket clients
   if (connectedClients.size > 0) {
-    console.log(`Broadcasting ${eventType} to ${connectedClients.size} WS clients`);
     connectedClients.forEach((client) => {
       if (client.readyState === 1) {
         // WebSocket.OPEN
         try {
           client.send(message);
         } catch (error) {
-          console.error('Failed to send message to WebSocket client:', error);
+          // Silent; client may have disconnected
         }
       }
     });
@@ -427,7 +407,7 @@ function setupBotStateWebSocket() {
     (global as any)._cachedActionTranslatorBot = undefined;
 
     // Stop thought generation when bot disconnects
-    console.log('Bot disconnected, stopping thought generation...');
+    console.log('[minecraft-interface] Bot disconnected');
     stopObservationBroadcast();
   });
 
@@ -439,9 +419,7 @@ function setupBotStateWebSocket() {
     (global as any)._cachedActionTranslatorBot = undefined;
 
     // Start thought generation when bot spawns
-    console.log(
-      '[Minecraft Interface] Bot spawned, starting thought generation...'
-    );
+    console.log('[minecraft-interface] Bot spawned');
     tryStartObservationBroadcast('bot spawned');
   });
 
@@ -461,7 +439,7 @@ function setupBotStateWebSocket() {
       });
 
       // Stop thought generation when bot dies
-      console.log('💀 Bot died, stopping thought generation...');
+      console.log('[minecraft-interface] Bot died');
       stopObservationBroadcast();
     }
     broadcastBotStateUpdate('error', data);
@@ -484,9 +462,7 @@ function setupBotStateWebSocket() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ spawnPosition: data.position }),
       label: 'cognition/stress-reset',
-    }).catch((err) => {
-      console.warn('Failed to call cognition stress reset:', err);
-    });
+    }).catch(() => {});
 
     // S8: Death/respawn signals — minecraft-interface emits signals only; memory service owns policy
     const memoryUrl = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
@@ -583,7 +559,7 @@ function setupBotStateWebSocket() {
           };
         }
       } catch (err) {
-        console.log(
+        console.warn(
           '[death-handler] Cognition reflection failed, using static fallback:',
           err instanceof Error ? err.message : String(err)
         );
@@ -614,7 +590,7 @@ function setupBotStateWebSocket() {
     })().catch(() => {});
 
     // Restart thought generation when bot respawns
-    console.log('Bot respawned, restarting thought generation...');
+    console.log('[minecraft-interface] Bot respawned');
     startObservationBroadcast();
   });
 
@@ -681,16 +657,13 @@ function setupBotStateWebSocket() {
             intero,
           };
 
-          console.log('Sending periodic HUD update:', hudData);
           broadcastBotStateUpdate('hud_update', hudData);
         } else if (process.env.DEBUG_HUD === 'true') {
           console.debug('No world state available for HUD update');
         }
-      } catch (error) {
-        console.error('Failed to send periodic HUD update:', error);
+      } catch {
+        // Silent; HUD update failure is non-critical
       }
-    } else {
-      console.log('No minecraft interface available for HUD update');
     }
   }, 5000);
 
@@ -765,8 +738,8 @@ wss.on('connection', (ws) => {
       };
 
       ws.send(JSON.stringify(initialState));
-    } catch (error) {
-      console.error('Failed to send initial state:', error);
+    } catch {
+      // Silent; client may have disconnected before initial state could be sent
     }
   }
 
@@ -775,8 +748,7 @@ wss.on('connection', (ws) => {
     wsStateTracker.logConnectionState(ws.url || 'unknown', false);
   });
 
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+  ws.on('error', () => {
     connectedClients.delete(ws);
     wsStateTracker.logConnectionState(ws.url || 'unknown', false);
   });
@@ -854,8 +826,6 @@ app.get('/state-stream', (req, res) => {
     sseClients.delete(res);
   });
 
-  console.log(`[SSE] Bot state client connected (${sseClients.size} total)`);
-
   // Send initial state immediately
   const botStatus = minecraftInterface?.botAdapter.getStatus();
   if (botStatus) {
@@ -888,7 +858,6 @@ app.get('/state-stream', (req, res) => {
   req.on('close', () => {
     clearInterval(keepaliveInterval);
     sseClients.delete(res);
-    console.log(`[SSE] Bot state client disconnected (${sseClients.size} remaining)`);
   });
 });
 
@@ -964,10 +933,6 @@ app.post('/seed', async (req, res) => {
         label: 'memory/seed',
       }
     );
-    if (memoryResponse?.ok) {
-      console.log('Seed propagated to memory service');
-    }
-
     res.json({
       success: true,
       message: `World seed updated to ${seedStr}`,
@@ -1000,7 +965,6 @@ app.post('/connect', async (req, res) => {
       const seedStr = String(worldSeed);
       botConfig.worldSeed = seedStr;
       process.env.WORLD_SEED = seedStr;
-      console.log(`🌱 World seed set to ${seedStr} via POST /connect`);
       // Propagate to memory service (resilient: retries until memory is up)
       const memoryResponse = await resilientFetch(
         `${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`,
@@ -1011,12 +975,7 @@ app.post('/connect', async (req, res) => {
           label: 'memory/seed',
         }
       );
-      if (memoryResponse?.ok) {
-        console.log('Seed propagated to memory service');
-      }
     }
-
-    console.log('Connecting to Minecraft server...');
 
     // Initialize memory integration service
     memoryIntegration = new MemoryIntegrationService(botConfig, {
@@ -1025,11 +984,9 @@ app.post('/connect', async (req, res) => {
 
     // Activate memory namespace for this world
     const memoryActivated = await memoryIntegration.activateWorldMemory();
-    if (memoryActivated) {
-      console.log('Memory namespace activated for world');
-    } else {
+    if (!memoryActivated) {
       console.warn(
-        '⚠️ Failed to activate memory namespace, continuing without memory integration'
+        'Failed to activate memory namespace, continuing without memory integration'
       );
     }
 
@@ -1040,8 +997,7 @@ app.post('/connect', async (req, res) => {
     setupBotStateWebSocket();
 
     // Leaves already registered on server startup; skip duplicate
-    console.log('Connected to Minecraft server');
-    console.log('Memory integration initialized');
+    console.log('[minecraft-interface] Connected to Minecraft server');
 
     res.json({
       success: true,
@@ -1187,9 +1143,11 @@ async function registerCoreLeaves() {
     }
 
     // Summary log instead of per-leaf logging
-    console.log(`[Minecraft Interface] Registered ${registered.length}/${allLeaves.length} core leaves`);
+    if (isVerbose()) {
+      console.log(`[minecraft-interface] Registered ${registered.length}/${allLeaves.length} core leaves`);
+    }
     if (failed.length > 0) {
-      console.warn(`[Minecraft Interface] Failed to register leaves: ${failed.join(', ')}`);
+      console.warn(`[minecraft-interface] Failed to register leaves: ${failed.join(', ')}`);
     }
 
     // Store the leaf factory globally so it can be used by the action executor
@@ -1210,10 +1168,6 @@ async function attemptAutoConnect() {
   }
 
   try {
-    // Only log auto-connect attempts in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log(' Auto-connecting to Minecraft server...');
-    }
     isConnecting = true;
 
     // Create minecraft interface (no local planning coordinator — execution flows through planning server)
@@ -1246,8 +1200,8 @@ async function attemptAutoConnect() {
             // Retry after 2 seconds if not ready
             setTimeout(() => startViewerWithRetry(retryCount + 1), 2000);
           } else {
-            console.log(
-              'Viewer auto-start failed after retries:',
+            console.warn(
+              '[Prismarine] Viewer auto-start failed after retries:',
               viewerCheck.reason
             );
           }
@@ -1265,10 +1219,6 @@ async function attemptAutoConnect() {
     startViewerWithRetry();
 
     minecraftInterface.planExecutor.on('shutdown', () => {
-      // Only log disconnections in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.log(' Bot disconnected');
-      }
       minecraftInterface = null;
       viewerActive = false;
       // Attempt to reconnect after a delay
@@ -1285,15 +1235,12 @@ async function attemptAutoConnect() {
     isConnecting = false;
   } catch (error) {
     isConnecting = false;
-    console.error(' Auto-connection failed:', error);
+    console.error('[minecraft-interface] Auto-connection failed:', error);
 
     // Don't retry on protocol version errors - this is a compatibility issue
     if (error instanceof Error && error.message.includes('protocol version')) {
-      console.log(
-        ' Protocol version incompatibility detected. Skipping auto-reconnect.'
-      );
-      console.log(
-        ' To resolve: Ensure Minecraft server version matches mineflayer support (1.8–1.21.9), or wait for protocol library update.'
+      console.warn(
+        '[minecraft-interface] Protocol version incompatibility detected. Skipping auto-reconnect. Ensure Minecraft server version matches mineflayer support (1.8-1.21.9).'
       );
       return;
     }
@@ -1336,7 +1283,7 @@ app.post('/disconnect', async (req, res) => {
       status: 'disconnected',
     });
   } catch (error) {
-    console.error(' Disconnect failed:', error);
+    console.error('[minecraft-interface] Disconnect failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to disconnect from Minecraft server',
@@ -1358,7 +1305,7 @@ app.post('/stop-auto-connect', async (req, res) => {
       message: 'Auto-connection stopped',
     });
   } catch (error) {
-    console.error(' Failed to stop auto-connection:', error);
+    console.error('[minecraft-interface] Failed to stop auto-connection:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to stop auto-connection',
@@ -1382,7 +1329,7 @@ app.post('/start-auto-connect', async (req, res) => {
       message: 'Auto-connection started',
     });
   } catch (error) {
-    console.error(' Failed to start auto-connection:', error);
+    console.error('[minecraft-interface] Failed to start auto-connection:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to start auto-connection',
@@ -1410,7 +1357,6 @@ app.get('/chat', (req, res) => {
       data: chatHistory,
     });
   } catch (error) {
-    console.error(' Failed to get chat history:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get chat history',
@@ -1467,8 +1413,6 @@ app.post('/chat', async (req, res) => {
     // Send the chat message
     await bot.chat(formattedMessage);
 
-    console.log(`Bot sent chat message: "${formattedMessage}"`);
-
     res.json({
       success: true,
       message: 'Chat message sent successfully',
@@ -1479,7 +1423,6 @@ app.post('/chat', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Failed to send chat message:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to send chat message',
@@ -1507,7 +1450,6 @@ app.get('/player-interactions', (req, res) => {
       data: playerInteractions,
     });
   } catch (error) {
-    console.error(' Failed to get player interactions:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get player interactions',
@@ -1536,7 +1478,6 @@ app.get('/processed-messages', (req, res) => {
       data: processedMessages,
     });
   } catch (error) {
-    console.error(' Failed to get processed messages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get processed messages',
@@ -1555,7 +1496,6 @@ app.get('/safety', async (req, res) => {
       timestamp: Date.now(),
     });
   } catch (error) {
-    console.error('Failed to get safety status:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get safety status',
@@ -1636,12 +1576,6 @@ app.get('/state', async (req, res) => {
     const isAlive = botStatus?.health && botStatus.health > 0;
 
     if (!isConnected) {
-      // Only log once per minute to avoid spam
-      const now = Date.now();
-      if (!global.lastStateLog || now - global.lastStateLog > 60000) {
-        console.log('[MINECRAFT INTERFACE] Bot not connected, returning 503');
-        global.lastStateLog = now;
-      }
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -1751,23 +1685,12 @@ app.get('/state', async (req, res) => {
     // mapBotStateToPlanningContext before the bot is fully spawned. Callers
     // (dashboard, planning) should treat 503 as "wait and retry".
     if (!bot.entity || !bot.entity.position) {
-      const now = Date.now();
-      if (!global.lastStateLog || now - global.lastStateLog > 60000) {
-        console.log(
-          '[Minecraft Interface] Bot not fully spawned, /state returning 503'
-        );
-        global.lastStateLog = now;
-      }
       return res.status(503).json({
         success: false,
         message: 'Bot not fully spawned',
         status: 'spawning',
       });
     }
-
-    // Verbose logging removed - this endpoint is polled frequently
-    // Enable for debugging specific state issues:
-    // console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
 
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
@@ -1866,20 +1789,6 @@ app.get('/state', async (req, res) => {
       isAlive: ws.health > 0,
     };
 
-    // Only log converted state when connection status changes
-    const now = Date.now();
-    if (
-      !global.lastConvertedStateLog ||
-      now - global.lastConvertedStateLog > 30000
-    ) {
-      console.log('[MINECRAFT INTERFACE] Bot state updated:', {
-        position: convertedState.data.position,
-        health: convertedState.data.health,
-        inventoryItems: convertedState.data.inventory?.items?.length || 0,
-      });
-      global.lastConvertedStateLog = now;
-    }
-
     res.json({
       success: true,
       status: isAlive ? 'connected' : 'dead',
@@ -1887,7 +1796,7 @@ app.get('/state', async (req, res) => {
       isAlive,
     });
   } catch (error) {
-    console.error(' Failed to get bot state:', error);
+    console.error('[minecraft-interface] Failed to get bot state:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get bot state',
@@ -1899,8 +1808,6 @@ app.get('/state', async (req, res) => {
 // Get inventory
 app.get('/inventory', async (req, res) => {
   try {
-    console.log('[MINECRAFT INTERFACE] /inventory endpoint called');
-
     const botStatus = minecraftInterface?.botAdapter.getStatus();
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
@@ -1913,9 +1820,6 @@ app.get('/inventory', async (req, res) => {
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
     if (!isConnected) {
-      console.log(
-        '[MINECRAFT INTERFACE] Inventory - Bot not connected, returning 503'
-      );
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -1950,7 +1854,7 @@ app.get('/inventory', async (req, res) => {
       data: inventory,
     });
   } catch (error) {
-    console.error(' Failed to get inventory:', error);
+    console.error('[minecraft-interface] Failed to get inventory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get inventory',
@@ -2092,20 +1996,22 @@ app.post('/action', async (req, res) => {
     const abortController = new AbortController();
     res.on('close', () => abortController.abort());
 
-    // P0-B: Ingress log — trace action dispatch from planning
     const actionStartTime = Date.now();
-    const paramPreview = JSON.stringify(parameters ?? {}).slice(0, 200);
-    console.log(`[MC/action] → type=${type} params=${paramPreview}`);
+    if (isVerbose()) {
+      const paramPreview = JSON.stringify(parameters ?? {}).slice(0, 200);
+      console.log(`[MC/action] type=${type} params=${paramPreview}`);
+    }
 
     const result = await actionTranslator.executeAction(
       action,
       abortController.signal
     );
 
-    // P0-B: Egress log — trace action result back to planning
-    const actionDuration = Date.now() - actionStartTime;
-    const actionStatus = result?.success ? 'ok' : 'fail';
-    console.log(`[MC/action] ← type=${type} status=${actionStatus} duration=${actionDuration}ms`);
+    if (isVerbose()) {
+      const actionDuration = Date.now() - actionStartTime;
+      const actionStatus = result?.success ? 'ok' : 'fail';
+      console.log(`[MC/action] type=${type} status=${actionStatus} duration=${actionDuration}ms`);
+    }
 
     // S8: Post-sleep signals — minecraft-interface emits signals only; memory service owns policy
     if (type === 'sleep' && result?.success) {
@@ -2191,7 +2097,7 @@ app.post('/action', async (req, res) => {
           };
         }
       } catch (err) {
-        console.log(
+        console.warn(
           '[sleep-handler] Cognition reflection failed, using static fallback:',
           err instanceof Error ? err.message : String(err)
         );
@@ -2235,7 +2141,7 @@ app.post('/action', async (req, res) => {
       result,
     });
   } catch (error) {
-    console.error(' Action failed:', error);
+    console.error('[minecraft-interface] Action failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to execute action',
@@ -2422,7 +2328,6 @@ app.post('/dev/packet-probe-placement', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('Packet probe error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2460,7 +2365,6 @@ app.get('/telemetry', (req, res) => {
 
     res.json(telemetry);
   } catch (error) {
-    console.error('Error getting minecraft telemetry:', error);
     res.status(500).json({ error: 'Failed to get telemetry' });
   }
 });
@@ -2546,7 +2450,6 @@ app.post('/test-simulation', async (req, res) => {
       finalState,
     });
   } catch (error) {
-    console.error(' Simulation test failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to run simulation test',
@@ -2580,7 +2483,6 @@ app.get('/viewer-status', (req, res) => {
       connectionState: minecraftInterface.botAdapter.getConnectionState(),
     });
   } catch (error) {
-    console.error('Error checking viewer status:', error);
     res.status(500).json({
       canStart: false,
       reason: 'Error checking viewer status',
@@ -2675,7 +2577,6 @@ app.post('/start-viewer', async (req, res) => {
       url: `http://localhost:${viewerPort}`,
     });
   } catch (error) {
-    console.error('Failed to start viewer:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to start viewer',
@@ -2795,13 +2696,11 @@ function createEntityFilter() {
 
     // Check if entity type is known
     if (!knownEntityTypes.has(entity.type)) {
-      console.log(`Filtering out unknown entity type: ${entity.type}`);
       return false;
     }
 
     // Additional filtering for problematic entities
     if (entity.type === 'item' && (!entity.item || !entity.item.name)) {
-      console.log('Filtering out item entity without item data');
       return false;
     }
 
@@ -2812,7 +2711,6 @@ function createEntityFilter() {
 // Robust viewer startup function with error handling
 function startViewerSafely(bot: any, port: number) {
   if (viewerActive) {
-    console.log('Viewer already active, skipping startup');
     return;
   }
 
@@ -2898,22 +2796,18 @@ function startViewerSafely(bot: any, port: number) {
       });
 
       // Log enhanced viewer status
-      enhancedViewer.on('started', () => {
-        console.log('Enhanced viewer features activated');
-      });
-
       enhancedViewer.on('error', (error) => {
         // Only log non-critical errors
         if (error.type !== 'entityUpdate') {
           console.warn(
-            '⚠️ Enhanced viewer error:',
+            '[Prismarine] Enhanced viewer error:',
             error.type,
             error.error?.message
           );
         }
       });
     } catch (err) {
-      console.warn('⚠️ Failed to apply viewer enhancements:', err);
+      console.warn('[Prismarine] Failed to apply viewer enhancements:', err);
     }
 
     // Restore console methods
@@ -2929,25 +2823,15 @@ function startViewerSafely(bot: any, port: number) {
       const status = getVersionStatus(mcVersion);
 
       if (!status.supported && !status.dynamic) {
-        console.warn(`[Prismarine] ⚠️  MC ${mcVersion} not in viewer version list`);
+        console.warn(`[Prismarine] MC ${mcVersion} not in viewer version list`);
         if (status.fallback) {
           console.warn(`[Prismarine] Using fallback: ${status.fallback}`);
         } else {
-          console.warn(`[Prismarine] No fallback available - terrain may not render correctly`);
-          console.warn(`[Prismarine] Run: pnpm mc:assets extract ${mcVersion}`);
+          console.warn(`[Prismarine] No fallback available - terrain may not render correctly. Run: pnpm mc:assets extract ${mcVersion}`);
         }
-      } else {
-        console.log(`[Prismarine] MC ${mcVersion} supported (${status.static ? 'static' : 'dynamic'})`);
       }
     } catch {
       // Version check not available (patched version.js not loaded)
-      console.log(`[Prismarine] Version check unavailable - using MC ${bot.version}`);
-    }
-
-    if (errorMessages.length > 0 || warningMessages.length > 0) {
-      console.log(
-        `⚠️ Suppressed ${errorMessages.length} unknown entity errors and ${warningMessages.length} warnings during viewer startup`
-      );
     }
 
     // Set up periodic cleanup of suppressed messages
@@ -2974,14 +2858,11 @@ app.post('/stop-viewer', async (req, res) => {
     // Note: the viewer doesn't provide a direct stop method
     // We can only mark it as inactive and let it be cleaned up
     viewerActive = false;
-    console.log('[Prismarine] Viewer stopped');
-
     res.json({
       success: true,
       message: 'Viewer stopped successfully',
     });
   } catch (error) {
-    console.error('Failed to stop viewer:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to stop viewer',
@@ -2992,12 +2873,7 @@ app.post('/stop-viewer', async (req, res) => {
 
 // Start server
 server.listen(port, async () => {
-  console.log(`Minecraft bot server running on port ${port}`);
-  console.log(
-    `Bot config: ${botConfig.username}@${botConfig.host}:${botConfig.port}`
-  );
-  console.log(`Use POST /connect to start the bot`);
-  console.log(`Prismarine viewer port reserved at ${viewerPort}`);
+  console.log(`[minecraft-interface] Server listening on port ${port} (viewer: ${viewerPort}, bot: ${botConfig.username}@${botConfig.host}:${botConfig.port})`);
 
   // Register leaves on startup
   try {
@@ -3114,7 +2990,6 @@ app.get('/memory/status', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Failed to get memory status:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get memory status',
@@ -3146,7 +3021,6 @@ app.get('/memory/namespace', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Failed to get memory namespace:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get memory namespace',
@@ -3175,7 +3049,6 @@ app.post('/memory/store', async (req, res) => {
         : 'Failed to store memory',
     });
   } catch (error) {
-    console.error('Failed to store memory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to store memory',
@@ -3202,7 +3075,6 @@ app.post('/memory/retrieve', async (req, res) => {
       data: memories,
     });
   } catch (error) {
-    console.error('Failed to retrieve memories:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve memories',
@@ -3239,7 +3111,6 @@ app.get('/leaves', (req, res) => {
       count: leafInfo.length,
     });
   } catch (error) {
-    console.error('Failed to get leaves:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get leaves',
@@ -3418,17 +3289,9 @@ async function updateBotInstanceInPlanningServer() {
         }
       );
 
-      if (response?.ok) {
-        console.log('Bot instance updated in planning server');
-      } else if (response) {
-        console.warn(
-          '⚠️ Failed to update bot instance in planning server:',
-          response.status
-        );
-      }
     }
-  } catch (error) {
-    console.warn('⚠️ Could not update bot instance in planning server:', error);
+  } catch {
+    // Silent; planning server may be down
   }
 }
 

@@ -118,3 +118,17 @@ export function logMiniMapUpdate(position: any): void {
 export function logApiRequest(endpoint: string, statusCode: number, duration: number): void {
   debugLog('debugApi', `POST ${endpoint} ${statusCode} in ${duration}ms`);
 }
+
+/**
+ * Verbose logging gate. Returns true when DEBUG_VERBOSE=1 or DEBUG_VERBOSE=true.
+ * Use this to guard diagnostic dumps and high-frequency telemetry that is
+ * useful for deep debugging but noisy during normal operation.
+ *
+ * Usage:
+ *   import { isVerbose } from '@conscious-bot/core/logging/config';
+ *   if (isVerbose()) console.log('[explore:block] perception dump', bigObject);
+ */
+const _verbose = process.env.DEBUG_VERBOSE === '1' || process.env.DEBUG_VERBOSE === 'true';
+export function isVerbose(): boolean {
+  return _verbose;
+}

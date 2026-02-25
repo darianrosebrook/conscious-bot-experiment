@@ -59,14 +59,11 @@ export class ActionExecutor {
 
     try {
       for (const action of actionPlan) {
-        console.log(`🔄 Executing action: ${action.type} (${action.priority})`);
-
         const result = await this.executeAction(action, bot);
         if (result.success) {
           actionsExecuted.push(action.type);
-          console.log(`✅ Action completed: ${action.type}`);
         } else {
-          console.warn(`⚠️ Action failed: ${action.type} - ${result.error}`);
+          console.warn(`[ActionExecutor] Action failed: ${action.type} - ${result.error}`);
           // Continue with next action unless it's high priority
           if (action.priority === 'high') {
             return {
