@@ -1396,11 +1396,21 @@ export class AcquireMaterialLeaf implements LeafImpl {
             );
             await botWithPf.pathfinder.goto(goal);
           } catch (navErr: any) {
-            // If pathfinding fails, still try to dig — might be close enough
+            // Pathfinding failed — only proceed to dig if we're actually
+            // within reach. Without this guard, Mineflayer tunnels through
+            // intervening blocks (dirt, stone) to reach the target.
+            const distAfterNav = bot.entity.position.distanceTo(resolvedPos);
+            if (distAfterNav > DIG_REACH + 0.5) {
+              console.warn(
+                `[AcquireMaterial] Pathfind failed (${navErr?.message}), ` +
+                  `still ${distAfterNav.toFixed(1)} blocks away — skipping to next candidate`
+              );
+              continue; // try the next block in the expanding search
+            }
             console.warn(
-              `[AcquireMaterial] Pathfind failed (${navErr?.message}), attempting dig anyway`
+              `[AcquireMaterial] Pathfind failed (${navErr?.message}), ` +
+                `but within reach (${distAfterNav.toFixed(1)} blocks) — attempting dig`
             );
-            // Diagnostics for pathfind failure are captured in the result if dig also fails
           }
         }
 
