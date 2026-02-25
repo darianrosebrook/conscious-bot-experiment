@@ -8,6 +8,7 @@
  */
 
 import { Bot } from 'mineflayer';
+import { isVerbose } from '@conscious-bot/core';
 import { Vec3 } from 'vec3';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
 import {
@@ -404,13 +405,15 @@ export class ThreatPerceptionManager {
       suppressedTotal += count;
     }
     if (suppressedTotal > 0) {
-      const byType = Array.from(this.losSuppressedByType.entries())
-        .map(([type, count]) => `${type}:${count}`)
-        .join(', ');
-      console.log(
-        `[ThreatPerception] ${suppressedTotal} entities failed LOS check in last ${this.losSummaryIntervalMs}ms` +
-          (byType ? ` (${byType})` : '')
-      );
+      if (isVerbose()) {
+        const byType = Array.from(this.losSuppressedByType.entries())
+          .map(([type, count]) => `${type}:${count}`)
+          .join(', ');
+        console.log(
+          `[ThreatPerception] ${suppressedTotal} entities failed LOS check in last ${this.losSummaryIntervalMs}ms` +
+            (byType ? ` (${byType})` : '')
+        );
+      }
       this.losSuppressedCount.clear();
       this.losSuppressedByType.clear();
     }

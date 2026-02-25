@@ -1050,34 +1050,96 @@ export class PlaceWorkstationLeaf implements LeafImpl {
     }
 
     // 4. Find placement position — prefer distance 2-3, fallback to 1
-    const origin = bot.entity.position.clone();
-    const dist2Offsets: [number, number, number][] = [
-      [2, 0, 0], [-2, 0, 0], [0, 0, 2], [0, 0, -2],
-      [2, 0, 1], [2, 0, -1], [-2, 0, 1], [-2, 0, -1],
-      [1, 0, 2], [-1, 0, 2], [1, 0, -2], [-1, 0, -2],
+    //    Scan Y offsets [-1, 0, +1] to handle sloped terrain (forests, hills).
+    const origin = bot.entity.position.floored();
+    const dist2XZ: [number, number][] = [
+      [2, 0], [-2, 0], [0, 2], [0, -2],
+      [2, 1], [2, -1], [-2, 1], [-2, -1],
+      [1, 2], [-1, 2], [1, -2], [-1, -2],
     ];
-    const dist1Offsets: [number, number, number][] = [
-      [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+    const dist1XZ: [number, number][] = [
+      [1, 0], [-1, 0], [0, 1], [0, -1],
     ];
+    const yOffsets = [-1, 0, 1];
 
     let placementPos: Vec3 | null = null;
 
-    // Try preferred distance first, then fallback
-    for (const offsets of [dist2Offsets, dist1Offsets]) {
-      for (const [dx, dy, dz] of offsets) {
-        const candidate = origin.offset(dx, dy, dz);
-        const block = bot.blockAt(candidate);
-        const below = bot.blockAt(candidate.offset(0, -1, 0));
-        if (
-          block?.name === 'air' &&
-          below?.boundingBox === 'block' &&
-          isStandableAdjacent(bot, candidate)
-        ) {
-          placementPos = candidate;
-          break;
+    const tryCandidate = (candidate: Vec3): boolean => {
+      const block = bot.blockAt(candidate);
+      const below = bot.blockAt(candidate.offset(0, -1, 0));
+      return (
+        block?.name === 'air' &&
+        below?.boundingBox === 'block' &&
+        isStandableAdjacent(bot, candidate)
+      );
+    };
+
+    // Try preferred distance first, then fallback, with Y variation
+    for (const xzOffsets of [dist2XZ, dist1XZ]) {
+      for (const [dx, dz] of xzOffsets) {
+        for (const dy of yOffsets) {
+          const candidate = origin.offset(dx, dy, dz);
+          if (tryCandidate(candidate)) {
+            placementPos = candidate;
+            break;
+          }
         }
+        if (placementPos) break;
       }
       if (placementPos) break;
+    }
+
+    // 4b. Walk-to-flat fallback: scan wider radius, pathfind to flat area, re-scan
+    if (!placementPos) {
+      const scanRadius = 8;
+      let bestFlat: Vec3 | null = null;
+      let bestDist = Infinity;
+      for (let dx = -scanRadius; dx <= scanRadius; dx++) {
+        for (let dz = -scanRadius; dz <= scanRadius; dz++) {
+          for (const dy of [-2, -1, 0, 1, 2]) {
+            const candidate = origin.offset(dx, dy, dz);
+            if (tryCandidate(candidate)) {
+              const dist = origin.distanceTo(candidate);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestFlat = candidate;
+              }
+              break; // Found a valid Y at this XZ, no need to check more
+            }
+          }
+        }
+      }
+
+      if (bestFlat) {
+        // Navigate close to the flat area
+        try {
+          const pathfinderGoals = await import('mineflayer-pathfinder').then(m => m.goals);
+          const goal = new pathfinderGoals.GoalNear(bestFlat.x, bestFlat.y, bestFlat.z, 2);
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('nav_timeout')), 8000);
+            (bot.pathfinder as any).goto(goal)
+              .then(() => { clearTimeout(timeout); resolve(); })
+              .catch((err: any) => { clearTimeout(timeout); reject(err); });
+          });
+          // Re-scan from new position with the tight offsets
+          const newOrigin = bot.entity.position.floored();
+          for (const xzOffsets of [dist2XZ, dist1XZ]) {
+            for (const [dx, dz] of xzOffsets) {
+              for (const dy of yOffsets) {
+                const candidate = newOrigin.offset(dx, dy, dz);
+                if (tryCandidate(candidate)) {
+                  placementPos = candidate;
+                  break;
+                }
+              }
+              if (placementPos) break;
+            }
+            if (placementPos) break;
+          }
+        } catch {
+          // Navigation failed — fall through to failure
+        }
+      }
     }
 
     if (!placementPos) {
