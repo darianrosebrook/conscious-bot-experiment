@@ -1469,14 +1469,28 @@ export class AcquireMaterialLeaf implements LeafImpl {
             let gotoTimedOut = false;
             await Promise.race([
               botWithPf.pathfinder?.goto(
-                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 1)
+                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 0)
               ) ?? Promise.resolve(),
               new Promise<void>((r) =>
-                setTimeout(() => { gotoTimedOut = true; r(); }, 2500)
+                setTimeout(() => { gotoTimedOut = true; r(); }, 5000)
               ),
             ]).catch(() => { /* pathfinder failure is non-fatal here */ });
             if (gotoTimedOut) {
               try { botWithPf.pathfinder?.setGoal(null); } catch { /* best-effort */ }
+            }
+
+            // If still far from drop, look at it and walk directly toward it
+            // as a fallback when pathfinder times out or stops short.
+            const distAfterPf = bot.entity.position.distanceTo(dropPos);
+            if (!pickupDetected && distAfterPf > 1.5) {
+              await bot.lookAt(dropPos);
+              (bot as any).setControlState('forward', true);
+              const walkStart = Date.now();
+              while (Date.now() - walkStart < 2000 && !pickupDetected) {
+                if (bot.entity.position.distanceTo(dropPos) < 0.8) break;
+                await new Promise((r) => setTimeout(r, 100));
+              }
+              (bot as any).setControlState('forward', false);
             }
 
             // Short settle window for playerCollect/inventory to reflect pickup.
