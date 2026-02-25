@@ -262,7 +262,7 @@ declare global {
 import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
-import { createServiceClients, SterlingClient } from '@conscious-bot/core';
+import { createServiceClients, SterlingClient, workstationRegistry } from '@conscious-bot/core';
 import type {
   SterlingReasoningService,
   MinecraftCraftingSolver,
@@ -1043,6 +1043,16 @@ async function injectDynamicPrereqForCraft(
     return false;
   }
 
+  // --- Workstation proximity fix (doom-loop breaker) ---
+  // When craft fails because bot isn't near a required workstation,
+  // inject navigate-to or place-workstation prereq instead of mining materials.
+  const diag = opts?.toolDiagnostics;
+  if (diag?.requires_workstation === true && diag?.crafting_table_nearby === false) {
+    const injected = await injectWorkstationPrereq(task, diag, prereqAttempts);
+    if (injected) return true;
+    // Fall through to normal acquisition if workstation injection fails
+  }
+
   // Priority: explicit step args > task parameters > title inference > hardcoded fallback
   const title = (task.title || '').toLowerCase();
   const recipe =
@@ -1067,6 +1077,98 @@ async function injectDynamicPrereqForCraft(
     );
   }
   return injected;
+}
+
+/** Inject a navigate-to or place-workstation prereq when craft fails due to missing nearby table. */
+async function injectWorkstationPrereq(
+  task: any,
+  diag: Record<string, unknown>,
+  prereqAttempts: number,
+): Promise<boolean> {
+  const workstationType = 'crafting_table';
+  const WALK_THRESHOLD = 64;
+
+  // 1. Check registry for a known workstation within walking distance
+  const snapshot = worldStateManager.getSnapshot();
+  const botPos = snapshot.agentPosition;
+  if (botPos) {
+    const known = workstationRegistry.findNearest(workstationType, botPos, WALK_THRESHOLD);
+    if (known) {
+      const dist = Math.sqrt(
+        (botPos.x - known.position.x) ** 2 +
+        (botPos.y - known.position.y) ** 2 +
+        (botPos.z - known.position.z) ** 2,
+      );
+      const requirement = { kind: 'navigate', outputPattern: workstationType, quantity: 1 };
+      const key = computeSubtaskKey(requirement, task.id);
+      // Dedupe: skip if an identical navigate task already exists
+      const existing = taskIntegration.getActiveTasks().find(
+        (t: any) =>
+          (t.metadata as any)?.subtaskKey === key &&
+          t.status !== 'completed' &&
+          t.status !== 'failed',
+      );
+      if (!existing) {
+        const taskData = buildTaskFromRequirement(requirement, {
+          parentTask: task,
+          tags: ['dynamic', 'workstation-navigation'],
+          type: 'navigation',
+          title: `Navigate to ${workstationType}`,
+          extraParameters: {
+            targetPosition: { ...known.position },
+            registrySource: true,
+          },
+        });
+        const t = await taskIntegration.addTask(taskData);
+        if (t && task.id) {
+          taskIntegration.updateTaskMetadata(task.id, {
+            blockedReason: 'waiting_on_prereq',
+            prereqInjectionCount: prereqAttempts + 1,
+          });
+          console.log(
+            `🧭 [Prereq] workstation_nav=true type=${workstationType} ` +
+            `target=(${known.position.x},${known.position.y},${known.position.z}) ` +
+            `distance=${Math.round(dist)} task=${task.id}`,
+          );
+          return true;
+        }
+      }
+    }
+  }
+
+  // 2. No known workstation nearby — place one if bot has it in inventory
+  if (diag.has_workstation_in_inventory === true) {
+    const requirement = { kind: 'build', outputPattern: workstationType, quantity: 1 };
+    const key = computeSubtaskKey(requirement, task.id);
+    const existing = taskIntegration.getActiveTasks().find(
+      (t: any) =>
+        (t.metadata as any)?.subtaskKey === key &&
+        t.status !== 'completed' &&
+        t.status !== 'failed',
+    );
+    if (!existing) {
+      const taskData = buildTaskFromRequirement(requirement, {
+        parentTask: task,
+        tags: ['dynamic', 'workstation-placement'],
+        type: 'placement',
+        title: `Place ${workstationType}`,
+      });
+      const t = await taskIntegration.addTask(taskData);
+      if (t && task.id) {
+        taskIntegration.updateTaskMetadata(task.id, {
+          blockedReason: 'waiting_on_prereq',
+          prereqInjectionCount: prereqAttempts + 1,
+        });
+        console.log(
+          `🔨 [Prereq] workstation_place=true type=${workstationType} task=${task.id}`,
+        );
+        return true;
+      }
+    }
+  }
+
+  // 3. Neither navigation nor placement possible — fall through
+  return false;
 }
 
 async function injectDynamicPrereqForMine(task: any): Promise<boolean> {

@@ -263,5 +263,12 @@ export type {
   SterlingResolveIntentStepsResultMessage,
 } from './sterling';
 
+// Workstation position registry
+export {
+  workstationRegistry,
+  WorkstationRegistry,
+  type WorkstationEntry,
+} from './workstation-registry';
+
 // Version info
 export const VERSION = '0.1.0';

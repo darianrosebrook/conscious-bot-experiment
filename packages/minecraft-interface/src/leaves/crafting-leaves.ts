@@ -14,6 +14,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
+  workstationRegistry,
 } from '@conscious-bot/core';
 
 // ============================================================================
@@ -994,6 +995,7 @@ export class PlaceWorkstationLeaf implements LeafImpl {
     // 2. Check for existing reusable workstation within 6 blocks
     const existing = await findNearestBlock(bot, [workstation], WORKSTATION_SEARCH_RADIUS);
     if (existing && isWorkstationUsable(bot, existing, hasLineOfSight)) {
+      workstationRegistry.register(workstation, { x: existing.x, y: existing.y, z: existing.z });
       ctx.emitMetric('place_workstation_duration', ctx.now() - t0, {
         workstation,
         reused: 'true',
@@ -1114,6 +1116,7 @@ export class PlaceWorkstationLeaf implements LeafImpl {
     }
 
     // 6. Emit metrics and return
+    workstationRegistry.register(workstation, { x: placementPos.x, y: placementPos.y, z: placementPos.z });
     ctx.emitMetric('place_workstation_duration', ctx.now() - t0, {
       workstation,
       reused: 'false',
