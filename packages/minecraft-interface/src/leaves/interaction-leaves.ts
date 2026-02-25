@@ -1290,11 +1290,17 @@ export class AcquireMaterialLeaf implements LeafImpl {
     let lastToolUsed = 'hand';
     let searchRadiusUsed = 0;
 
+    // Positions to skip: blocks that pathfinding couldn't reach.
+    // Persists across acquisition iterations so the same unreachable
+    // block isn't retried on every `count` loop.
+    const skipPositions = new Set<string>();
+    const posKey = (p: Vec3) => `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
+
     try {
       for (let i = 0; i < count; i++) {
-        // --- Phase 1: Find nearest matching block (expanding cube search) ---
-        // Tiered search: inner ring (≤10) requires LOS for immediate dig;
-        // outer rings (11-24, 25-maxRadius) will pathfind before digging.
+        // --- Phase 1: Find nearest reachable block (expanding cube search) ---
+        // Tiered search: inner ring (≤4) requires LOS for immediate dig;
+        // outer rings pathfind before digging. Skips previously failed positions.
         const origin = bot.entity.position.clone();
         const eyePos = origin.offset(0, bot.entity.height ?? 1.62, 0);
         const hasLineOfSight = (ctx as any).hasLineOfSight as
@@ -1312,30 +1318,87 @@ export class AcquireMaterialLeaf implements LeafImpl {
         // resources (ores behind stone) can still be targeted for pathfinding.
         const MIN_DY = -2;
         const DIG_REACH_LOS = 4;
-        outer: for (let r = 1; r <= maxSearchRadius; r++) {
-          for (let dx = -r; dx <= r; dx++) {
-            for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
-              for (let dz = -r; dz <= r; dz++) {
-                // Only check the shell at distance r (skip interior, already checked)
-                if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
-                const p = origin.offset(dx, dy, dz);
-                const b = bot.blockAt(p);
-                if (b && b.name && b.name.includes(itemPattern)) {
-                  if (r <= DIG_REACH_LOS && hasLineOfSight) {
-                    const blockCenter = {
-                      x: p.x + 0.5,
-                      y: p.y + 0.5,
-                      z: p.z + 0.5,
-                    };
-                    if (!hasLineOfSight(eyePos, blockCenter)) continue;
+        const MAX_NAV_FAILURES = 3; // max pathfind attempts per acquisition iteration
+        let navFailures = 0;
+
+        findBlock: for (;;) {
+          resolvedPos = null;
+          outer: for (let r = 1; r <= maxSearchRadius; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+              for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
+                for (let dz = -r; dz <= r; dz++) {
+                  if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
+                  const p = origin.offset(dx, dy, dz);
+                  if (skipPositions.has(posKey(p))) continue;
+                  const b = bot.blockAt(p);
+                  if (b && b.name && b.name.includes(itemPattern)) {
+                    if (r <= DIG_REACH_LOS && hasLineOfSight) {
+                      const blockCenter = {
+                        x: p.x + 0.5,
+                        y: p.y + 0.5,
+                        z: p.z + 0.5,
+                      };
+                      if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                    }
+                    resolvedPos = p;
+                    searchRadiusUsed = r;
+                    break outer;
                   }
-                  resolvedPos = p;
-                  searchRadiusUsed = r;
-                  break outer;
                 }
               }
             }
           }
+
+          if (!resolvedPos) break; // no more candidates — exit findBlock
+
+          const block = bot.blockAt(resolvedPos);
+          if (!block || block.name === 'air') {
+            skipPositions.add(posKey(resolvedPos));
+            continue findBlock;
+          }
+
+          // --- Phase 1b: Pathfind to within reach if too far ---
+          const DIG_REACH = 4.0;
+          const distToBlock = origin.distanceTo(resolvedPos);
+          if (distToBlock > DIG_REACH) {
+            try {
+              const botWithPf = bot as BotWithPathfinder;
+              if (!botWithPf.pathfinder) {
+                botWithPf.loadPlugin(pathfinder);
+              }
+              const moves = new Movements(bot);
+              moves.scafoldingBlocks = [];
+              moves.canDig = false;
+              botWithPf.pathfinder.setMovements(moves);
+
+              const goal = new pathfinderGoals.GoalNear(
+                resolvedPos.x,
+                resolvedPos.y,
+                resolvedPos.z,
+                3
+              );
+              await botWithPf.pathfinder.goto(goal);
+            } catch (navErr: any) {
+              // Pathfinding failed — skip this candidate and try the next one.
+              // Without this, the bot would dig through terrain it can't walk to.
+              skipPositions.add(posKey(resolvedPos));
+              navFailures++;
+              const distAfterNav = bot.entity.position.distanceTo(resolvedPos);
+              console.warn(
+                `[AcquireMaterial] Pathfind failed (${navErr?.message}), ` +
+                  `${distAfterNav.toFixed(1)} blocks away — skipping (${navFailures}/${MAX_NAV_FAILURES})`
+              );
+              if (navFailures >= MAX_NAV_FAILURES) {
+                console.warn(
+                  `[AcquireMaterial] ${MAX_NAV_FAILURES} pathfind failures — giving up on this acquisition`
+                );
+                break findBlock;
+              }
+              continue findBlock; // try next candidate in the search
+            }
+          }
+
+          break findBlock; // found a reachable block — proceed to dig
         }
 
         if (!resolvedPos) {
@@ -1346,7 +1409,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
             error: {
               code: 'world.invalidPosition',
               retryable: true,
-              detail: `No ${itemPattern} found within ${maxSearchRadius} blocks — reposition needed`,
+              detail: `No reachable ${itemPattern} found within ${maxSearchRadius} blocks — reposition needed`,
             },
             result: {
               success: false,
@@ -1359,7 +1422,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                   search_radius: maxSearchRadius,
                   target_pattern: itemPattern,
                 },
-                reason_code: 'no_blocks_found',
+                reason_code: navFailures > 0 ? 'no_reachable_blocks' : 'no_blocks_found',
                 retry_hint: 'reposition_or_rescan',
               },
             },
@@ -1373,46 +1436,6 @@ export class AcquireMaterialLeaf implements LeafImpl {
 
         const block = bot.blockAt(resolvedPos);
         if (!block || block.name === 'air') continue;
-
-        // --- Phase 1b: Pathfind to within reach if too far ---
-        const DIG_REACH = 4.0;
-        const distToBlock = origin.distanceTo(resolvedPos);
-        if (distToBlock > DIG_REACH) {
-          try {
-            const botWithPf = bot as BotWithPathfinder;
-            if (!botWithPf.pathfinder) {
-              botWithPf.loadPlugin(pathfinder);
-            }
-            const moves = new Movements(bot);
-            moves.scafoldingBlocks = [];
-            moves.canDig = false;
-            botWithPf.pathfinder.setMovements(moves);
-
-            const goal = new pathfinderGoals.GoalNear(
-              resolvedPos.x,
-              resolvedPos.y,
-              resolvedPos.z,
-              3
-            );
-            await botWithPf.pathfinder.goto(goal);
-          } catch (navErr: any) {
-            // Pathfinding failed — only proceed to dig if we're actually
-            // within reach. Without this guard, Mineflayer tunnels through
-            // intervening blocks (dirt, stone) to reach the target.
-            const distAfterNav = bot.entity.position.distanceTo(resolvedPos);
-            if (distAfterNav > DIG_REACH + 0.5) {
-              console.warn(
-                `[AcquireMaterial] Pathfind failed (${navErr?.message}), ` +
-                  `still ${distAfterNav.toFixed(1)} blocks away — skipping to next candidate`
-              );
-              continue; // try the next block in the expanding search
-            }
-            console.warn(
-              `[AcquireMaterial] Pathfind failed (${navErr?.message}), ` +
-                `but within reach (${distAfterNav.toFixed(1)} blocks) — attempting dig`
-            );
-          }
-        }
 
         // --- Phase 2: Equip tool and dig ---
         // Auto-equip: if no explicit tool arg, pick the best available tool
