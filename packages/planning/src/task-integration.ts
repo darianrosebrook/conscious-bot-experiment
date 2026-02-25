@@ -3625,6 +3625,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         this.emit('taskLifecycleEvent', { type: 'failed', taskId, task });
         // Unblock parent even on failure (prereq no longer active)
         this.tryUnblockParent(task);
+        // Record task_terminal signature for LoopBreaker. The targetParam
+        // is the IR digest prefix so it matches the check in convertThoughtToTask.
+        const irDigest = (task.metadata?.sterling as any)?.exec?.stepsDigest?.slice(0, 12)
+          ?? task.id.split('-').pop();
+        const terminalSig = buildFailureSignature({
+          category: 'task_terminal',
+          targetParam: irDigest,
+        });
+        getLoopBreaker().recordFailure(terminalSig, { taskId: task.id });
       }
     }
 

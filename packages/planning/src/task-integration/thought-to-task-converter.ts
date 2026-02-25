@@ -24,6 +24,7 @@ export type TaskDecision =
   | 'blocked_not_eligible'
   | 'dropped_seen'
   | 'suppressed_dedup'
+  | 'suppressed_loop_breaker'
   | 'dropped_no_reduction'
   | 'dropped_sterling_unavailable'
   | 'dropped_not_executable'
@@ -616,6 +617,22 @@ export async function convertThoughtToTask(
       const cooldownSig = buildFailureSignature({ category: 'dedup_repeat', blockedReason: 'failed_category_cooldown' });
       getLoopBreaker().recordFailure(cooldownSig, { taskId: `dedup_phantom_${thought.id}` });
       const r: ConvertThoughtResult = { task: null, decision: 'suppressed_dedup', reason: `task category recently failed (up to ${MAX_COOLDOWN_TTL_MS / 1000}s cooldown)` };
+      logConversionDecision(thought, r);
+      return r;
+    }
+
+    // LoopBreaker enforcement: suppress tasks whose failure signature is
+    // actively suppressed. In shadow mode this is a no-op (always returns false).
+    const loopBreakerSig = buildFailureSignature({
+      category: 'task_terminal',
+      targetParam: result.committed_ir_digest?.slice(0, 12),
+    });
+    if (getLoopBreaker().isSuppressed(loopBreakerSig.signatureId)) {
+      const r: ConvertThoughtResult = {
+        task: null,
+        decision: 'suppressed_loop_breaker',
+        reason: `LoopBreaker suppressed signature ${loopBreakerSig.signatureId}`,
+      };
       logConversionDecision(thought, r);
       return r;
     }
