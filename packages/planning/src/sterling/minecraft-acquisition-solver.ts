@@ -48,6 +48,7 @@ import {
   buildDefaultRationaleContext,
   parseSterlingIdentity,
   attachSterlingIdentity,
+  attachOrchestrationProvenance,
 } from './solve-bundle';
 import type { SolveBundle, ObjectiveWeights, ObjectiveWeightsSource } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
@@ -295,6 +296,15 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     });
 
     const parentBundle = createSolveBundle(parentBundleInput, parentBundleOutput, compatReport);
+
+    // Attach orchestration provenance: links parent strategy decision to
+    // child solve identities, making the orchestration layer auditable (G1).
+    attachOrchestrationProvenance(
+      parentBundle,
+      dispatchResult.childBundles,
+      selected.strategy,
+      candidateSetDigest,
+    );
 
     // Aggregate bundles: parent first, then child bundles
     const allBundles: SolveBundle[] = [parentBundle, ...dispatchResult.childBundles];

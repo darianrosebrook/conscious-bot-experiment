@@ -86,6 +86,42 @@ export interface SolveBundleOutput {
    * identical traceHash across runs.
    */
   traceHash?: ContentHash;
+  /**
+   * Present on orchestration bundles (e.g. Rig D acquisition parent) that
+   * coordinate child solves rather than executing a direct Sterling solve.
+   *
+   * Names this bundle as an orchestration artifact over child solve identities.
+   * The orchestrationHash is derived from child trace identities + strategy
+   * decision metadata, making the orchestration decision itself auditable.
+   *
+   * NOT included in bundleHash (excluded like sterlingIdentity — provenance
+   * metadata, not solve content).
+   */
+  orchestrationProvenance?: OrchestrationProvenance;
+}
+
+/**
+ * Provenance for an orchestration bundle that coordinates child solves.
+ *
+ * This is a CB-side identity scope — it does NOT represent a Sterling solve.
+ * It links the strategy decision to the child solve identities that resulted
+ * from that decision, making the orchestration layer auditable.
+ */
+export interface OrchestrationProvenance {
+  /** 'orchestration' — distinguishes from Sterling-sourced identity */
+  scope: 'orchestration';
+  /** Content hash of strategy decision + child trace identities */
+  orchestrationHash: ContentHash;
+  /** Child solve trace identities (from Sterling), ordered by dispatch sequence */
+  childTraceRefs: Array<{
+    solverId: string;
+    bundleHash: ContentHash;
+    traceBundleHash?: string;
+  }>;
+  /** Strategy that was selected (for blame isolation) */
+  selectedStrategy: string;
+  /** Candidate set digest at selection time */
+  candidateSetDigest: ContentHash;
 }
 
 /** Content-addressed audit trail for a single solve round-trip */

@@ -29,6 +29,7 @@ import type {
   ObjectiveWeightsSource,
   SolveRationale,
   SterlingIdentity,
+  OrchestrationProvenance,
 } from './solve-bundle-types';
 import { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 
@@ -599,4 +600,47 @@ export function attachSterlingIdentity(
   }
 
   bundle.output.sterlingIdentity = identity;
+}
+
+/**
+ * Attach orchestration provenance to a parent bundle that coordinates
+ * child solves (e.g. Rig D acquisition).
+ *
+ * The orchestrationHash is a content-addressed hash over the strategy
+ * decision and child trace identities, making the orchestration layer
+ * itself auditable. This is a CB-side identity scope — it does NOT
+ * represent a Sterling solve.
+ *
+ * @param parentBundle - The orchestration bundle to annotate
+ * @param childBundles - Child solve bundles (with sterlingIdentity attached)
+ * @param selectedStrategy - The strategy that was selected
+ * @param candidateSetDigest - Hash of the candidate set at selection time
+ */
+export function attachOrchestrationProvenance(
+  parentBundle: SolveBundle,
+  childBundles: SolveBundle[],
+  selectedStrategy: string,
+  candidateSetDigest: ContentHash,
+): void {
+  const childRefs = childBundles.map((cb) => ({
+    solverId: cb.input.solverId,
+    bundleHash: cb.bundleHash,
+    traceBundleHash: cb.output.sterlingIdentity?.traceBundleHash,
+  }));
+
+  // Deterministic preimage: strategy + candidate set + child trace chain
+  const preimage = [
+    'orchestration:v1',
+    selectedStrategy,
+    candidateSetDigest,
+    ...childRefs.map((r) => `${r.solverId}:${r.bundleHash}:${r.traceBundleHash ?? 'absent'}`),
+  ].join(':');
+
+  parentBundle.output.orchestrationProvenance = {
+    scope: 'orchestration',
+    orchestrationHash: contentHash(preimage),
+    childTraceRefs: childRefs,
+    selectedStrategy,
+    candidateSetDigest,
+  };
 }
