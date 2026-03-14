@@ -1365,13 +1365,21 @@ export class AcquireMaterialLeaf implements LeafImpl {
                   if (skipPositions.has(posKey(p))) continue;
                   const b = bot.blockAt(p);
                   if (b && b.name && b.name.includes(itemPattern)) {
-                    if (r <= DIG_REACH_LOS && hasLineOfSight) {
-                      const blockCenter = {
-                        x: p.x + 0.5,
-                        y: p.y + 0.5,
-                        z: p.z + 0.5,
-                      };
-                      if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                    // Require either LOS (close) or air-exposure (far) to prevent
+                    // tunneling through terrain to reach buried blocks.
+                    if (r <= DIG_REACH_LOS) {
+                      if (hasLineOfSight) {
+                        const blockCenter = {
+                          x: p.x + 0.5,
+                          y: p.y + 0.5,
+                          z: p.z + 0.5,
+                        };
+                        if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                      }
+                    } else {
+                      // Beyond dig reach: require air above (exposed/accessible)
+                      const above = bot.blockAt(p.offset(0, 1, 0));
+                      if (!above || (above.name !== 'air' && above.name !== 'cave_air')) continue;
                     }
                     resolvedPos = p;
                     searchRadiusUsed = r;

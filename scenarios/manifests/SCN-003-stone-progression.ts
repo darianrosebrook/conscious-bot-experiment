@@ -36,17 +36,30 @@ export const SCN_003: ScenarioManifest = {
       { block: 'minecraft:stone', from: { x: -8, y: 59, z: -8 }, to: { x: 8, y: 61, z: 8 } },
     ],
     blocks: [
-      // Expose some stone on the surface so the bot can see and reach it
-      // without needing to dig through dirt first
-      { block: 'minecraft:stone', pos: { x: 3, y: 63, z: 0 } },
-      { block: 'minecraft:stone', pos: { x: 3, y: 63, z: 1 } },
-      { block: 'minecraft:stone', pos: { x: 4, y: 63, z: 0 } },
-      { block: 'minecraft:stone', pos: { x: 4, y: 63, z: 1 } },
-      // Clear air above exposed stone
-      { block: 'minecraft:air', pos: { x: 3, y: 64, z: 0 } },
-      { block: 'minecraft:air', pos: { x: 3, y: 64, z: 1 } },
-      { block: 'minecraft:air', pos: { x: 4, y: 64, z: 0 } },
-      { block: 'minecraft:air', pos: { x: 4, y: 64, z: 1 } },
+      // Exposed stone ring around spawn — impossible to miss from any direction.
+      // Each stone has air above it so the exposed-first scan will find it.
+      // Placed at Y=63 (ground level) directly adjacent to spawn (0, 64, 0).
+      { block: 'minecraft:stone', pos: { x: 1, y: 63, z: 0 } },
+      { block: 'minecraft:stone', pos: { x: -1, y: 63, z: 0 } },
+      { block: 'minecraft:stone', pos: { x: 0, y: 63, z: 1 } },
+      { block: 'minecraft:stone', pos: { x: 0, y: 63, z: -1 } },
+      { block: 'minecraft:stone', pos: { x: 1, y: 63, z: 1 } },
+      { block: 'minecraft:stone', pos: { x: -1, y: 63, z: -1 } },
+      { block: 'minecraft:stone', pos: { x: 2, y: 63, z: 0 } },
+      { block: 'minecraft:stone', pos: { x: -2, y: 63, z: 0 } },
+      { block: 'minecraft:stone', pos: { x: 0, y: 63, z: 2 } },
+      { block: 'minecraft:stone', pos: { x: 0, y: 63, z: -2 } },
+      // Clear air above all exposed stone (should already be air from clear region, but explicit)
+      { block: 'minecraft:air', pos: { x: 1, y: 64, z: 0 } },
+      { block: 'minecraft:air', pos: { x: -1, y: 64, z: 0 } },
+      { block: 'minecraft:air', pos: { x: 0, y: 64, z: 1 } },
+      { block: 'minecraft:air', pos: { x: 0, y: 64, z: -1 } },
+      { block: 'minecraft:air', pos: { x: 1, y: 64, z: 1 } },
+      { block: 'minecraft:air', pos: { x: -1, y: 64, z: -1 } },
+      { block: 'minecraft:air', pos: { x: 2, y: 64, z: 0 } },
+      { block: 'minecraft:air', pos: { x: -2, y: 64, z: 0 } },
+      { block: 'minecraft:air', pos: { x: 0, y: 64, z: 2 } },
+      { block: 'minecraft:air', pos: { x: 0, y: 64, z: -2 } },
     ],
     commands: [],
   },
@@ -75,8 +88,8 @@ export const SCN_003: ScenarioManifest = {
   preRunInvariants: [
     {
       type: 'block_present',
-      description: 'Exposed stone at (3, 63, 0)',
-      params: { pos: { x: 3, y: 63, z: 0 }, block: 'stone' },
+      description: 'Exposed stone at (1, 63, 0) — adjacent to spawn',
+      params: { pos: { x: 1, y: 63, z: 0 }, block: 'stone' },
     },
     {
       type: 'inventory_contains',
