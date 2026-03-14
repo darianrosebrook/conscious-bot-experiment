@@ -105,9 +105,14 @@ export class BotAdapter extends EventEmitter {
     this.isShuttingDown = false;
 
     return new Promise((resolve, reject) => {
+      // Microsoft auth device code flow requires user to open a browser and
+      // sign in, which can take 2+ minutes. Use a longer timeout for 'microsoft'
+      // auth to avoid killing the auth flow mid-sign-in and entering a retry
+      // loop with stale device codes.
+      const timeoutMs = this.config.auth === 'microsoft' ? 180000 : 30000;
       const timeoutId = setTimeout(() => {
         reject(new Error('Connection timeout'));
-      }, 30000); // 30 second timeout
+      }, timeoutMs);
 
       // Skin: with auth 'microsoft', the account's selected skin is sent via session;
       // with 'offline' the server typically shows a default. Third-party servers often
