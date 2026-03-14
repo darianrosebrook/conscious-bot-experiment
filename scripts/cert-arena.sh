@@ -61,11 +61,8 @@ freeze_env() {
 
 hard_clear_arena() {
   info "Hard-clearing arena at (${ARENA_CX},${BOT_Y},${ARENA_CZ})"
-  local min_chunk_x=$(((MIN_X) / 16))
-  local min_chunk_z=$(((MIN_Z) / 16))
-  local max_chunk_x=$(((MAX_X) / 16))
-  local max_chunk_z=$(((MAX_Z) / 16))
-  rcon "forceload add ${min_chunk_x} ${min_chunk_z} ${max_chunk_x} ${max_chunk_z}"
+  # forceload takes block coordinates, not chunk coordinates
+  rcon "forceload add ${MIN_X} ${MIN_Z} ${MAX_X} ${MAX_Z}"
   rcon "kill @e[type=!player,x=${ARENA_CX},y=${BOT_Y},z=${ARENA_CZ},distance=..96]"
   rcon "fill ${MIN_X} $((FLOOR_Y + 1)) ${MIN_Z} ${MAX_X} ${CLEAR_TOP_Y} ${MAX_Z} air"
   rcon "fill ${MIN_X} ${FLOOR_Y} ${MIN_Z} ${MAX_X} ${FLOOR_Y} ${MAX_Z} stone"
