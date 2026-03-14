@@ -1290,6 +1290,59 @@ export class SterlingPlanner {
       };
     }
 
+    // M3b: If this is a replan (replanCount > 0) and the solve succeeded,
+    // check for a stored deficit declaration and create the craft_for_build bridge.
+    if (replanCount > 0 && result.solved && bundle) {
+      const storedDeficit = solverMeta.buildingDeficitDeclaration as {
+        originatingBundleHash?: string;
+        templateId?: string;
+        deficit?: Record<string, number>;
+      } | undefined;
+
+      if (storedDeficit?.originatingBundleHash && storedDeficit?.templateId === templateId) {
+        // Coherent replan: same template, deficit source matches
+        // The "upstream" is whatever acquisition happened between deficit and replan.
+        // We don't have the acquisition bundle directly here, but we have the
+        // replan building bundle which proves the deficit was resolved.
+        const { buildCraftForBuildBridge } = await import('../sterling/bridge-artifact');
+        const { computeBundleInput: _cbi, computeBundleOutput: _cbo, createSolveBundle: _csb } = await import('../sterling/solve-bundle');
+
+        // Build a synthetic upstream ref from the deficit metadata
+        // (the real acquisition bundles live in the acquisition solver's output,
+        // not directly accessible here — use the deficit hash as provenance anchor)
+        const bridge = buildCraftForBuildBridge(
+          bundle, // Use replan bundle as upstream (it consumed the acquisition result)
+          bundle, // Downstream is also this bundle (it's the replan target)
+          inventory, // Produced items = current inventory at replan time
+          storedDeficit.deficit ?? {},
+        );
+
+        solverMeta.craftForBuildBridge = {
+          bridgeHash: bridge.bridgeHash,
+          kind: bridge.kind,
+          deficit: storedDeficit.deficit,
+          originatingBundleHash: storedDeficit.originatingBundleHash,
+          replanBundleHash: bundle.bundleHash,
+          coherent: true,
+        };
+        console.log(
+          `[Sterling] craft_for_build bridge created: hash=${bridge.bridgeHash.slice(0, 8)} ` +
+          `deficit=${JSON.stringify(storedDeficit.deficit)} template=${templateId}`
+        );
+      } else if (storedDeficit) {
+        // Incoherent: template mismatch or missing originating bundle
+        solverMeta.craftForBuildBridge = {
+          coherent: false,
+          reason: storedDeficit.templateId !== templateId
+            ? `template_mismatch: stored=${storedDeficit.templateId} current=${templateId}`
+            : 'missing_originating_bundle',
+        };
+        console.warn(
+          `[Sterling] craft_for_build bridge SKIPPED: coherence failure — ${(solverMeta.craftForBuildBridge as any).reason}`
+        );
+      }
+    }
+
     if (result.needsMaterials && replanCount >= MAX_REPLANS) {
       const deficit = result.needsMaterials.deficit;
       const deficitStr = Object.entries(deficit)
@@ -1313,7 +1366,25 @@ export class SterlingPlanner {
     }
 
     if (result.needsMaterials) {
-      ensureSolverMeta(taskData).buildingReplanCount = replanCount + 1;
+      const sm = ensureSolverMeta(taskData);
+      sm.buildingReplanCount = replanCount + 1;
+
+      // M3b: Persist typed deficit declaration for bridge creation on replan.
+      // This is the "precondition witness" side of craft_for_build.
+      sm.buildingDeficitDeclaration = {
+        originatingBundleHash: bundle?.bundleHash ?? null,
+        originatingPlanId: result.planId ?? null,
+        templateId,
+        deficit: result.needsMaterials.deficit,
+        blockedModules: result.needsMaterials.blockedModules,
+        currentProgress: result.needsMaterials.currentProgress,
+        declaredAt: Date.now(),
+      };
+      console.log(
+        `[Sterling] Building deficit declared: template=${templateId} ` +
+        `deficit=${JSON.stringify(result.needsMaterials.deficit)} ` +
+        `bundle=${bundle?.bundleHash?.slice(0, 8) ?? 'absent'}`
+      );
     }
 
     const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);
