@@ -17,6 +17,7 @@
     "dev:memory": "pnpm --filter @conscious-bot/memory run dev:server",
     "dev:world": "pnpm --filter @conscious-bot/world run dev:server",
     "dev:planning": "pnpm --filter @conscious-bot/planning run dev:server",
+    "auth": "node scripts/auth.js",
     "kill": "node scripts/kill-servers.js",
     "status": "node scripts/status.js",
     "health": "node scripts/health-check-diagnostic.js",
