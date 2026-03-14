@@ -1323,6 +1323,39 @@ export class AcquireMaterialLeaf implements LeafImpl {
 
         findBlock: for (;;) {
           resolvedPos = null;
+
+          // Exposed-first pass: scan nearby blocks (≤8) that have air above.
+          // This prevents the bot from targeting deep underground stone when
+          // there's exposed stone on the surface nearby. Critical for governed
+          // scenarios where resources are placed at specific surface locations.
+          const EXPOSED_SCAN_RADIUS = 8;
+          exposedScan: for (let r = 1; r <= EXPOSED_SCAN_RADIUS; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+              for (let dy = Math.max(-r, MIN_DY); dy <= Math.min(r, 3); dy++) {
+                for (let dz = -r; dz <= r; dz++) {
+                  if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
+                  const p = origin.offset(dx, dy, dz);
+                  if (skipPositions.has(posKey(p))) continue;
+                  const b = bot.blockAt(p);
+                  if (!b || !b.name || !b.name.includes(itemPattern)) continue;
+                  // Check exposed: block above must be air (surface-accessible)
+                  const above = bot.blockAt(p.offset(0, 1, 0));
+                  if (!above || (above.name !== 'air' && above.name !== 'cave_air')) continue;
+                  // LOS check for close blocks
+                  if (r <= DIG_REACH_LOS && hasLineOfSight) {
+                    const blockCenter = { x: p.x + 0.5, y: p.y + 0.5, z: p.z + 0.5 };
+                    if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                  }
+                  resolvedPos = p;
+                  searchRadiusUsed = r;
+                  break exposedScan;
+                }
+              }
+            }
+          }
+
+          // Full expanding search if no exposed block found
+          if (!resolvedPos) {
           outer: for (let r = 1; r <= maxSearchRadius; r++) {
             for (let dx = -r; dx <= r; dx++) {
               for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
@@ -1348,6 +1381,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
               }
             }
           }
+          } // close if (!resolvedPos) from exposed-first pass
 
           if (!resolvedPos) break; // no more candidates — exit findBlock
 
