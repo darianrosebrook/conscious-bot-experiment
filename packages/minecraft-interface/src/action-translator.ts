@@ -3717,6 +3717,67 @@ export class ActionTranslator {
     let closestItemDist: number | null = null;
     let timedOut = false;
 
+    // Phase 0: Scan from CURRENT position first using mineflayer's findBlock.
+    // This catches resources that are already visible (loaded chunks, ~80 block radius)
+    // without requiring pathfinding. Many exploration failures occurred because
+    // the bot was surrounded by trees but never checked its immediate vicinity.
+    if (itemsArr.length > 0 && itemsArr.some((i) => isBlockTarget(this.bot, i))) {
+      try {
+        const mcDataInstance = (this.bot as any).mcData;
+        if (mcDataInstance) {
+          for (const tag of itemsArr) {
+            const blockType = mcDataInstance.blocksByName[tag];
+            if (!blockType) continue;
+            const found = this.bot.findBlock({
+              matching: blockType.id,
+              maxDistance: 32,
+              count: 1,
+            });
+            if (found) {
+              // Found a matching block — navigate and acquire
+              const Goals = await getGoals();
+              const gotoResult = await this.withNavLease(
+                'action:explore_immediate_block',
+                'normal',
+                async () => {
+                  await this.bot.pathfinder.goto(
+                    new Goals.GoalNear(found.position.x, found.position.y, found.position.z, 2)
+                  );
+                  return { success: true };
+                },
+                { success: false, error: 'NAV_BUSY' },
+                { success: false, error: 'NAV_PREEMPTED' },
+              );
+              if (gotoResult.success) {
+                const acquireResult = await this.executeAcquireMaterial(
+                  {
+                    type: 'acquire_material',
+                    parameters: { item: tag, count: 1 },
+                    timeout: 10000,
+                  },
+                  10000
+                );
+                if (acquireResult.success) {
+                  return {
+                    success: true,
+                    data: { blockType: tag, mined: true },
+                    diagnostics: {
+                      _diag_version: 1,
+                      scan: { scan_scope: 'findBlock' as any, items_seen_count: 1, item_types_seen_count: 1, entities_seen_total: 0, closest_item_distance: null, item_types_seen: [tag], target_type_seen: true },
+                      explore: { enabled: true, waypoint_candidates: 0, waypoints_planned: 0, waypoints_reached: 0, path_requests: 1, path_successes: 1, path_failures: 0, net_position_delta: quantize1(this.bot.entity.position.distanceTo(startPos)), duration_ms: Date.now() - startTime },
+                      reason_code: 'collected_ok' as const,
+                    },
+                  };
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // findBlock not available or failed — fall through to spiral
+      }
+    }
+
     // Spiral outward with 8 directions (intercardinal too) for better coverage
     for (let r = 2; r <= spiralRadius; r += 3) {
       if (Date.now() - startTime > effectiveMaxTime) {
