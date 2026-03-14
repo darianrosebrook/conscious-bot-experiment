@@ -373,6 +373,11 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       bundleOutput.traceHash = computeTraceHash(bundleInput, bundleOutput);
       const tierBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
       attachSterlingIdentity(tierBundle, sterlingIdentity);
+      this.logIdentityFieldStatus(
+        !!sterlingIdentity?.traceBundleHash,
+        !!sterlingIdentity?.engineCommitment,
+        !!sterlingIdentity?.operatorRegistryHash,
+      );
       tierBundles.push(tierBundle);
 
       // Build explanation for the last tier (carried to final return)

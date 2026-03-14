@@ -22,12 +22,15 @@ import { computeRegistrationDigest, validateDeclaration } from './domain-declara
 
 /**
  * When enabled, report_episode includes engineCommitment and operatorRegistryHash.
- * Default OFF until Sterling confirms it accepts these fields without error.
  *
- * Set via environment: STERLING_REPORT_IDENTITY_FIELDS=1
+ * Default ON (G3 closure): Sterling server now accepts these fields on all
+ * three domain solvers (minecraft, building, navigation). The downgrade-on-
+ * rejection latch remains as the only compatibility guard for older servers.
+ *
+ * Set STERLING_REPORT_IDENTITY_FIELDS=0 to explicitly disable.
  */
 function isReportIdentityFieldsEnabled(): boolean {
-  return process.env.STERLING_REPORT_IDENTITY_FIELDS === '1';
+  return process.env.STERLING_REPORT_IDENTITY_FIELDS !== '0';
 }
 
 /**
