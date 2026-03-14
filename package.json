@@ -74,6 +74,9 @@
     "pnpm": "10.15.0"
   },
   "pnpm": {
+    "patchedDependencies": {
+      "prismarine-auth@2.7.0": "patches/prismarine-auth@2.7.0.patch"
+    },
     "overrides": {
       "axios": "^1.12.0",
       "esbuild": "^0.25.0",

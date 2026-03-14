@@ -1,0 +1,15 @@
+diff --git a/src/TokenManagers/LiveTokenManager.js b/src/TokenManagers/LiveTokenManager.js
+index 1234567..abcdefg 100644
+--- a/src/TokenManagers/LiveTokenManager.js
++++ b/src/TokenManagers/LiveTokenManager.js
+@@ -145,6 +145,11 @@
+         return { accessToken: token.access_token }
+       } catch (e) {
++        // invalid_grant means the device code is dead — stop polling
++        if (e.message && e.message.includes('invalid_grant')) {
++          this.polling = false
++          throw e
++        }
+         console.debug(e)
+       }
+     }
