@@ -26,7 +26,7 @@ describeIf(IS_E2E)('declaration-drift-e2e', () => {
 
   beforeAll(async () => {
     service = new SterlingReasoningService({
-      url: process.env.STERLING_WS_URL || 'ws://localhost:8765',
+      url: process.env.STERLING_WS_URL || 'ws://localhost:8766',
     });
     await service.initialize();
   });

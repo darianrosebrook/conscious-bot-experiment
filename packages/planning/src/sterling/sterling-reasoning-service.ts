@@ -18,7 +18,7 @@ import {
   type SterlingLanguageReducerResult,
   type SterlingIntentReplacement,
 } from '@conscious-bot/core';
-import { computeDeclarationDigest, type DomainDeclarationV1 } from './domain-declaration';
+import { computeRegistrationDigest, type DomainDeclarationV1 } from './domain-declaration';
 
 // ============================================================================
 // Types
@@ -478,7 +478,7 @@ export class SterlingReasoningService {
     // receives a digest and can verify canonicalization parity.
     // TODO: Validate declaration shape at this boundary instead of trusting the cast.
     // The caller passes Record<string, unknown>; we trust it conforms to DomainDeclarationV1.
-    const effectiveDigest = digest ?? computeDeclarationDigest(
+    const effectiveDigest = digest ?? computeRegistrationDigest(
       declaration as unknown as DomainDeclarationV1,
     );
     return this.client.registerDomainDeclaration(declaration, effectiveDigest);

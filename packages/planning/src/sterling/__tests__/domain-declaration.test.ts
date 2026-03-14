@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDeclarationDigest,
+  computeRegistrationDigest,
   validateDeclaration,
   buildRegisterMessage,
   buildGetMessage,
@@ -150,7 +151,7 @@ describe('buildRegisterMessage', () => {
     expect(msg.command).toBe('register_domain_declaration_v1');
     expect(msg.declaration).toEqual(VALID_DECLARATION);
     expect(msg.digest).toMatch(/^[0-9a-f]{16}$/);
-    expect(msg.digest).toBe(computeDeclarationDigest(VALID_DECLARATION));
+    expect(msg.digest).toBe(computeRegistrationDigest(VALID_DECLARATION));
   });
 
   it('throws for invalid declaration', () => {

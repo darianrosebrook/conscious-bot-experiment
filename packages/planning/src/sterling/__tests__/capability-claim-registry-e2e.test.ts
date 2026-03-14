@@ -16,7 +16,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
 import {
-  computeDeclarationDigest,
+  computeRegistrationDigest,
   buildRegisterMessage,
   type DomainDeclarationV1,
 } from '../domain-declaration';
@@ -98,7 +98,7 @@ describeIf(shouldRun)('Capability-Claim Registry — E2E', () => {
     }
 
     const msg = buildRegisterMessage(CRAFTING_DECLARATION);
-    const expectedDigest = computeDeclarationDigest(CRAFTING_DECLARATION);
+    const expectedDigest = computeRegistrationDigest(CRAFTING_DECLARATION);
 
     // Register
     const regResult = await service.registerDomainDeclaration(
@@ -258,7 +258,7 @@ describeIf(shouldRun)('Capability-Claim Registry — E2E', () => {
     );
 
     expect(regResult.success).toBe(true);
-    const expectedDigest = computeDeclarationDigest(CRAFTING_DECLARATION);
+    const expectedDigest = computeRegistrationDigest(CRAFTING_DECLARATION);
     expect(regResult.digest).toBe(expectedDigest);
 
     // Verify we can retrieve it
@@ -284,7 +284,7 @@ describeIf(shouldRun)('Capability-Claim Registry — E2E', () => {
       notes: 'Edge case: "quotes" & <brackets> — newline\ntab\there',
     };
 
-    const tsDigest = computeDeclarationDigest(edgeDecl);
+    const tsDigest = computeRegistrationDigest(edgeDecl);
 
     // Register — server computes its own digest
     const regResult = await service.registerDomainDeclaration(

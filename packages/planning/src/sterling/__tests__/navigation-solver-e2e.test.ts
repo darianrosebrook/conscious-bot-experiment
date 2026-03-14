@@ -31,7 +31,7 @@ import {
   type NavigationSolveResult,
 } from '../minecraft-navigation-types';
 import {
-  computeDeclarationDigest,
+  computeRegistrationDigest,
   type DomainDeclarationV1,
 } from '../domain-declaration';
 
@@ -391,7 +391,7 @@ describeIf(shouldRun)('NavigationSolver — solver-class E2E', () => {
       notes: 'Grid-based A* navigation solver. Phase 1: 4-cardinal walk/jump/descend.',
     };
 
-    const expectedDigest = computeDeclarationDigest(navDeclaration);
+    const expectedDigest = computeRegistrationDigest(navDeclaration);
 
     // 2. Register declaration — proves TS and Python agree on digest
     // Access the service from the solver's internal reference

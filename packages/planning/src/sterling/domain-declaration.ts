@@ -168,7 +168,7 @@ export function buildRegisterMessage(decl: DomainDeclarationV1): {
   return {
     command: 'register_domain_declaration_v1',
     declaration: decl,
-    digest: computeDeclarationDigest(decl),
+    digest: computeRegistrationDigest(decl),
   };
 }
 
