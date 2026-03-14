@@ -244,6 +244,15 @@ export abstract class BaseDomainSolver<
   // --------------------------------------------------------------------------
 
   /**
+   * M2: Get the registration digest if this solver has successfully
+   * registered its declaration with Sterling. Returns null if not registered
+   * or if the solver has no declaration.
+   */
+  get registeredDigest(): string | null {
+    return this._registeredDigest;
+  }
+
+  /**
    * Override to provide a domain declaration for this solver.
    * Default: null (no declaration to register — backward compatible).
    */

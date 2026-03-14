@@ -15,8 +15,20 @@ import { SOLVER_IDS } from '../sterling/solver-ids';
 import { resolveRequirement } from '../modules/requirements';
 import type { TaskRequirement } from '../modules/requirements';
 import { routeActionPlan } from '../modules/action-plan-backend';
+import type { DeclarationLookup } from '../modules/action-plan-backend';
 import { requirementToFallbackPlan } from '../modules/leaf-arg-contracts';
 import { buildCraftingRules, inventoryToRecord } from '../sterling/minecraft-crafting-rules';
+import type { DomainDeclarationV1 } from '../sterling/domain-declaration';
+
+/** Mapping from rig letter to solver ID constant. */
+const RIG_TO_SOLVER_ID: Record<string, string> = {
+  A: SOLVER_IDS.CRAFTING,
+  B: SOLVER_IDS.TOOL_PROGRESSION,
+  C: SOLVER_IDS.FURNACE,
+  D: SOLVER_IDS.ACQUISITION,
+  E: SOLVER_IDS.NAVIGATION,
+  G: SOLVER_IDS.BUILDING,
+};
 import type { Task } from '../types/task';
 import type { TaskStep } from '../types/task-step';
 import type { PlanningDecision } from '../constraints/planning-decisions';
@@ -213,6 +225,30 @@ export class SterlingPlanner {
    */
   setResolveIntentSteps(fn: ResolveIntentStepsFn | undefined): void {
     this._resolveIntentSteps = fn;
+  }
+
+  /**
+   * M2: Build a DeclarationLookup from the solver registry.
+   * Maps rig IDs to solver declarations and checks registration status
+   * via each solver's registeredDigest getter.
+   */
+  private buildDeclarationLookup(): DeclarationLookup {
+    return {
+      getDeclarationForRig: (rigId: string): DomainDeclarationV1 | null => {
+        const solverId = RIG_TO_SOLVER_ID[rigId];
+        if (!solverId) return null;
+        const solver = this.solverRegistry.get(solverId);
+        if (!solver) return null;
+        return (solver as any).getDomainDeclaration?.() ?? null;
+      },
+      isRegistered: (digest: string): boolean => {
+        // Check all registered solvers — if any has this digest confirmed, it's registered
+        for (const solver of this.solverRegistry.values()) {
+          if (solver.registeredDigest === digest) return true;
+        }
+        return false;
+      },
+    };
   }
 
   /**
@@ -494,12 +530,27 @@ export class SterlingPlanner {
 
   async generateDynamicSteps(taskData: Partial<Task>): Promise<StepGenerationResult> {
     const requirement = resolveRequirement(taskData);
-    const route = routeActionPlan(requirement);
+    const route = routeActionPlan(requirement, {
+      declarations: this.buildDeclarationLookup(),
+    });
     const routeInfo = { backend: route.backend, requiredRig: route.requiredRig, reason: route.reason };
     console.log('[PlanRoute]', {
       ...routeInfo,
       taskTitle: taskData.title,
+      ...(route.decision ? {
+        proofStatus: route.decision.proofStatus,
+        solverId: route.decision.solverId,
+        declarationDigest: route.decision.declarationDigest?.slice(0, 8),
+        primitives: route.decision.requiredPrimitives,
+      } : {}),
     });
+
+    // M2: Emit warnings from capability decision (warning mode, not rejection)
+    if (route.decision?.warnings.length) {
+      for (const warning of route.decision.warnings) {
+        console.warn(`[CapabilityDecision] ${warning}`);
+      }
+    }
 
     if (route.backend === 'unplannable') {
       const reason = route.reason === 'no-requirement' ? 'no-requirement' as const : 'unplannable' as const;

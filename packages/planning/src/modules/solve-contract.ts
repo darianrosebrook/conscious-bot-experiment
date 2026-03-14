@@ -134,9 +134,51 @@ export interface CapabilityRoute {
   availableCapabilities: string[];
   /** Human-readable routing reason. */
   reason: string;
+  /**
+   * M2: Capability decision record with declaration identity and proof status.
+   * Present when the router has access to the solver declaration registry.
+   * Absent for legacy callers that don't provide registry context.
+   */
+  decision?: CapabilityDecisionRecord;
 }
 
 export type PlanBackend = 'sterling' | 'compiler' | 'unplannable';
+
+// ---------------------------------------------------------------------------
+// M2: Capability Decision Record
+// ---------------------------------------------------------------------------
+
+/**
+ * Proof status lattice for declaration-backed routing.
+ *
+ * Each level implies all lower levels:
+ * - undeclared: solver exists but has no DomainDeclarationV1
+ * - declared: declaration exists in code but not yet registered with Sterling
+ * - structural: declaration registered (digest confirmed by server)
+ * - verified: registered AND primitives have proof evidence (future)
+ */
+export type ProofStatus = 'undeclared' | 'declared' | 'structural' | 'verified';
+
+/**
+ * Capability decision record produced by declaration-backed routing.
+ *
+ * Extends CapabilityRoute with identity and proof provenance. Every route
+ * decision produces one of these so downstream code can distinguish
+ * "I know which solver to call" from "I know which verified capability
+ * I am allowed to invoke."
+ */
+export interface CapabilityDecisionRecord {
+  /** Registration digest of the solver's declaration (null if undeclared) */
+  declarationDigest: string | null;
+  /** Solver ID from the declaration (null if undeclared) */
+  solverId: string | null;
+  /** Position in the proof status lattice */
+  proofStatus: ProofStatus;
+  /** Qualified primitive IDs from the declaration's implementsPrimitives */
+  requiredPrimitives: readonly string[];
+  /** Non-fatal issues: missing declaration, unverified claim, etc. */
+  warnings: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Repair Input

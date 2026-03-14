@@ -6,14 +6,34 @@
  * - Deterministic compiler for template-based lowering (collect, mine)
  * - Unplannable for unknown/underspecified tasks (fail-closed)
  *
+ * M2: Declaration-backed routing. When a DeclarationLookup is provided,
+ * every route decision produces a CapabilityDecisionRecord with declaration
+ * digest, proof status, and required primitives. Warning mode by default.
+ *
  * @pivot 3 — Routing is fail-closed and capability-aware
  * @pivot 8 — Strict mode is the production default
  */
 
 import type { TaskRequirement } from './requirements';
-import type { CapabilityRoute, PlanBackend } from './solve-contract';
+import type { CapabilityRoute, PlanBackend, CapabilityDecisionRecord, ProofStatus } from './solve-contract';
+import type { DomainDeclarationV1 } from '../sterling/domain-declaration';
+import { computeRegistrationDigest } from '../sterling/domain-declaration';
 
-export type { CapabilityRoute, PlanBackend } from './solve-contract';
+export type { CapabilityRoute, PlanBackend, CapabilityDecisionRecord, ProofStatus } from './solve-contract';
+
+/**
+ * M2: Lookup interface for solver declarations.
+ *
+ * The router needs to know: for a given rig, what declaration exists and
+ * whether it has been registered with Sterling. This decouples the router
+ * from the solver registry and base-domain-solver internals.
+ */
+export interface DeclarationLookup {
+  /** Get the declaration for a rig ID. Returns null if solver has no declaration. */
+  getDeclarationForRig(rigId: string): DomainDeclarationV1 | null;
+  /** Check if a declaration digest has been registered with Sterling. */
+  isRegistered(digest: string): boolean;
+}
 
 export interface RouteOptions {
   /**
@@ -23,6 +43,57 @@ export interface RouteOptions {
    * @pivot 8 — Strict mode is the production default.
    */
   strict?: boolean;
+  /**
+   * M2: Declaration lookup for proof-backed routing.
+   * When provided, routes include a CapabilityDecisionRecord with
+   * declaration digest, proof status, and warnings.
+   */
+  declarations?: DeclarationLookup;
+}
+
+/**
+ * Build a CapabilityDecisionRecord for a route that targets a rig.
+ * Returns undefined if no declaration lookup is available.
+ */
+function buildDecisionRecord(
+  rigId: string | null,
+  declarations: DeclarationLookup | undefined,
+): CapabilityDecisionRecord | undefined {
+  if (!declarations || !rigId) return undefined;
+
+  const decl = declarations.getDeclarationForRig(rigId);
+  if (!decl) {
+    return {
+      declarationDigest: null,
+      solverId: null,
+      proofStatus: 'undeclared',
+      requiredPrimitives: [],
+      warnings: [`Rig ${rigId}: solver has no DomainDeclarationV1 — capability is not declaration-backed`],
+    };
+  }
+
+  const digest = computeRegistrationDigest(decl);
+  const registered = declarations.isRegistered(digest);
+
+  const proofStatus: ProofStatus = registered ? 'structural' : 'declared';
+  const warnings: string[] = [];
+
+  if (!registered) {
+    warnings.push(
+      `Rig ${rigId}: declaration ${digest.slice(0, 8)}… (${decl.solverId}) exists but is not registered with Sterling`
+    );
+  }
+
+  // Future: check if primitives have proof evidence → 'verified'
+  // For now, highest reachable status is 'structural'
+
+  return {
+    declarationDigest: digest,
+    solverId: decl.solverId,
+    proofStatus,
+    requiredPrimitives: decl.implementsPrimitives,
+    warnings,
+  };
 }
 
 /**
@@ -35,6 +106,11 @@ export interface RouteOptions {
  * - collect, mine    -> compiler (deterministic lowering, no search)
  * - null/unknown     -> unplannable (strict) or compiler (permissive)
  *
+ * M2: When options.declarations is provided, every sterling-backed route
+ * includes a CapabilityDecisionRecord with declaration digest, proof status,
+ * and required primitives. Warning mode: decision.warnings may be non-empty
+ * but routing proceeds. Future strict mode will reject undeclared routes.
+ *
  * @pivot 3 — If available capabilities do not cover required, status is unplannable.
  */
 export function routeActionPlan(
@@ -42,6 +118,7 @@ export function routeActionPlan(
   options?: RouteOptions
 ): CapabilityRoute {
   const strict = options?.strict ?? (process.env.STRICT_REQUIREMENTS !== 'false');
+  const declarations = options?.declarations;
 
   if (!requirement) {
     if (strict) {
@@ -70,6 +147,7 @@ export function routeActionPlan(
         requiredCapabilities: ['craft'],
         availableCapabilities: ['craft'],
         reason: 'craft-requirement',
+        decision: buildDecisionRecord('A', declarations),
       };
 
     case 'tool_progression':
@@ -79,6 +157,7 @@ export function routeActionPlan(
         requiredCapabilities: ['tool_progression'],
         availableCapabilities: ['tool_progression'],
         reason: 'tool-progression-requirement',
+        decision: buildDecisionRecord('B', declarations),
       };
 
     case 'build':
@@ -88,6 +167,7 @@ export function routeActionPlan(
         requiredCapabilities: ['build'],
         availableCapabilities: ['build'],
         reason: 'build-requirement',
+        decision: buildDecisionRecord('G', declarations),
       };
 
     case 'collect':
@@ -115,6 +195,7 @@ export function routeActionPlan(
         requiredCapabilities: ['navigate'],
         availableCapabilities: ['navigate'],
         reason: 'navigate-requirement',
+        decision: buildDecisionRecord('E', declarations),
       };
 
     case 'explore':
@@ -124,6 +205,7 @@ export function routeActionPlan(
         requiredCapabilities: ['explore'],
         availableCapabilities: ['explore'],
         reason: 'explore-requirement',
+        decision: buildDecisionRecord('E', declarations),
       };
 
     case 'find':
@@ -133,11 +215,10 @@ export function routeActionPlan(
         requiredCapabilities: ['find'],
         availableCapabilities: ['find'],
         reason: 'find-requirement',
+        decision: buildDecisionRecord('E', declarations),
       };
 
     default: {
-      // Exhaustive check: if a new requirement kind is added, TypeScript
-      // will flag this as an error (assuming TaskRequirement is a closed union).
       const _exhaustive: never = requirement;
       return {
         backend: 'unplannable',
