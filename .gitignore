@@ -159,3 +159,4 @@ packages/minecraft-interface/.asset-cache/
 
 # Generated entities.json (produced by bedrock-entity-extractor from Mojang/bedrock-samples)
 packages/minecraft-interface/src/viewer/entities/entities.json
+scenarios/runs/
