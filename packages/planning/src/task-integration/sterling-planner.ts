@@ -14,7 +14,7 @@ import type { MinecraftAcquisitionSolver } from '../sterling/minecraft-acquisiti
 import { SOLVER_IDS } from '../sterling/solver-ids';
 import { resolveRequirement } from '../modules/requirements';
 import type { TaskRequirement } from '../modules/requirements';
-import { routeActionPlan } from '../modules/action-plan-backend';
+import { routeActionPlan, buildDecisionRecordForRig } from '../modules/action-plan-backend';
 import type { DeclarationLookup } from '../modules/action-plan-backend';
 import { requirementToFallbackPlan } from '../modules/leaf-arg-contracts';
 import { buildCraftingRules, inventoryToRecord } from '../sterling/minecraft-crafting-rules';
@@ -46,6 +46,8 @@ export interface StepGenerationResult {
     | 'context-unavailable' | 'compiler-empty' | 'blocked-sentinel' | 'advisory-skip';
   route?: { backend: string; requiredRig: string | null; reason: string };
   planId?: string;
+  /** M2b: Capability decision record for the route that produced these steps. */
+  capabilityDecision?: import('../modules/solve-contract').CapabilityDecisionRecord;
 }
 
 /** Callback type for resolve_intent_steps — matches SterlingReasoningService.resolveIntentSteps signature. */
@@ -552,9 +554,16 @@ export class SterlingPlanner {
       }
     }
 
+    // M2b: Persist capability decision into task metadata for downstream replay/audit
+    const decision = route.decision;
+    if (decision) {
+      const solverMeta = ensureSolverMeta(taskData);
+      solverMeta.capabilityDecision = decision;
+    }
+
     if (route.backend === 'unplannable') {
       const reason = route.reason === 'no-requirement' ? 'no-requirement' as const : 'unplannable' as const;
-      return { steps: [], noStepsReason: reason, route: routeInfo };
+      return { steps: [], noStepsReason: reason, route: routeInfo, capabilityDecision: decision };
     }
 
     // Rig D upgrade: when acquisition solver is registered, collect/mine
@@ -565,8 +574,14 @@ export class SterlingPlanner {
       try {
         const steps = await this.generateAcquisitionStepsFromSterling(taskData);
         if (steps && steps.length > 0) {
+          // M2b: Rig D upgrade produces its own decision record for the promoted route
+          const rigDDecision = buildDecisionRecordForRig('D', this.buildDeclarationLookup());
           const rigDRoute = { ...routeInfo, requiredRig: 'D', reason: `${routeInfo.reason}→rig-d-upgrade` };
-          return { steps, route: rigDRoute };
+          if (rigDDecision) {
+            const solverMeta = ensureSolverMeta(taskData);
+            solverMeta.capabilityDecision = rigDDecision;
+          }
+          return { steps, route: rigDRoute, capabilityDecision: rigDDecision };
         }
       } catch (error) {
         console.warn(
@@ -580,36 +595,36 @@ export class SterlingPlanner {
     if (route.backend === 'compiler') {
       const steps = this.generateLeafMappedSteps(taskData);
       if (steps.length === 0) {
-        return { steps: [], noStepsReason: 'compiler-empty', route: routeInfo };
+        return { steps: [], noStepsReason: 'compiler-empty', route: routeInfo, capabilityDecision: decision };
       }
-      return { steps, route: routeInfo };
+      return { steps, route: routeInfo, capabilityDecision: decision };
     }
 
     if (this.toolProgressionSolver && route.requiredRig === 'B') {
       try {
         const steps =
           await this.generateToolProgressionStepsFromSterling(taskData);
-        if (steps && steps.length > 0) return { steps, route: routeInfo };
+        if (steps && steps.length > 0) return { steps, route: routeInfo, capabilityDecision: decision };
       } catch (error) {
         console.warn(
           'Sterling tool progression solver failed, falling through:',
           error
         );
-        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo, capabilityDecision: decision };
       }
     }
 
     if (this.craftingSolver && route.requiredRig === 'A') {
       try {
         const steps = await this.generateStepsFromSterling(taskData);
-        if (steps && steps.length > 0) return { steps, route: routeInfo };
-        return { steps: [], noStepsReason: 'solver-unsolved', route: routeInfo };
+        if (steps && steps.length > 0) return { steps, route: routeInfo, capabilityDecision: decision };
+        return { steps: [], noStepsReason: 'solver-unsolved', route: routeInfo, capabilityDecision: decision };
       } catch (error) {
         console.warn(
           'Sterling crafting solver failed, falling through:',
           error
         );
-        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo, capabilityDecision: decision };
       }
     }
 

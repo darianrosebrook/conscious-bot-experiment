@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SterlingPlanner } from '../sterling-planner';
 import type { ResolveIntentStepsFn } from '../sterling-planner';
 import { SOLVER_IDS } from '../../sterling/solver-ids';
+import { CRAFTING_DECLARATION } from '../../sterling/minecraft-crafting-solver';
 
 // ── Mock minecraft-data ──
 const mockMcData = {
@@ -56,7 +57,8 @@ function createMockCraftingSolver() {
     toTaskSteps: vi.fn().mockReturnValue([
       { id: 'step-1', label: 'craft oak_planks', done: false, order: 1, estimatedDuration: 5000, meta: { leaf: 'craft_recipe', args: { recipe: 'oak_planks', qty: 1 } } },
     ]),
-    getDomainDeclaration: vi.fn().mockReturnValue(null),
+    getDomainDeclaration: vi.fn().mockReturnValue(CRAFTING_DECLARATION),
+    registeredDigest: null, // Not yet registered with Sterling in this test
     isAvailable: vi.fn().mockReturnValue(true),
     ensureDeclarationRegistered: vi.fn().mockResolvedValue(true),
     strictMapping: false,
@@ -132,6 +134,48 @@ describe('AC-2.1: Rig A authority dispatch', () => {
     expect(solver.solveCraftingGoal).toHaveBeenCalledTimes(1);
     // Steps should come from toTaskSteps (legacy mapping)
     expect(result.steps.length).toBe(1);
+  });
+
+  it('persists capabilityDecision into task metadata and result', async () => {
+    const solver = createMockCraftingSolver();
+    planner.registerSolver(solver as any);
+
+    const resolveIntentSteps: ResolveIntentStepsFn = vi.fn().mockResolvedValue({
+      status: 'ok',
+      replacements: [{
+        intent_step_index: 0,
+        resolved: true,
+        steps: [{ leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe', qty: 1 } }],
+      }],
+      plan_bundle_digest: 'abc123',
+      schema_version: '1.1.0',
+    });
+
+    planner.setResolveIntentSteps(resolveIntentSteps);
+
+    const taskData: any = {
+      id: 'test-task',
+      title: 'Craft wooden pickaxe',
+      type: 'craft',
+      parameters: {
+        requirementCandidate: { kind: 'craft', outputPattern: 'wooden_pickaxe' },
+      },
+      metadata: {},
+    };
+
+    const result = await planner.generateDynamicSteps(taskData);
+
+    // M2b: capabilityDecision MUST be persisted into task metadata
+    const decision = taskData.metadata?.solver?.capabilityDecision;
+    expect(decision).toBeDefined();
+    expect(decision.solverId).toBe('minecraft.crafting');
+    expect(decision.proofStatus).toBe('declared'); // Not registered in this test
+    expect(decision.requiredPrimitives).toContain('CB-P01');
+    expect(decision.declarationDigest).toBeTruthy();
+
+    // M2b: capabilityDecision MUST also be on the result
+    expect(result.capabilityDecision).toBeDefined();
+    expect(result.capabilityDecision!.solverId).toBe('minecraft.crafting');
   });
 
   it('persists blocked_info into solver metadata on unresolved CRAFT', async () => {

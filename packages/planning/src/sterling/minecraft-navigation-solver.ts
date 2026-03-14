@@ -15,6 +15,7 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
 import { SOLVER_IDS } from './solver-ids';
 import type { SterlingDomain } from '@conscious-bot/core';
 import type {
@@ -54,9 +55,23 @@ import { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 // Solver
 // ============================================================================
 
+export const NAVIGATION_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.NAVIGATION,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P05'],
+  consumesFields: ['start', 'goal', 'occupancyGrid', 'toleranceXZ', 'toleranceY', 'hazardPolicy', 'maxNodes'],
+  producesFields: ['steps', 'primitives', 'pathPositions', 'planId', 'solveMeta'],
+  notes: 'Rig E: hierarchical spatial planning. Not yet on structural registration path.',
+};
+
 export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveResult> {
   readonly sterlingDomain = 'navigation' as SterlingDomain;
   readonly solverId = SOLVER_IDS.NAVIGATION;
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return NAVIGATION_DECLARATION;
+  }
 
   protected makeUnavailableResult(): NavigationSolveResult {
     return {

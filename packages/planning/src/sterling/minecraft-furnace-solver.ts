@@ -11,6 +11,7 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
 import { SOLVER_IDS } from './solver-ids';
 import type {
   FurnaceSchedulingSolveResult,
@@ -47,9 +48,23 @@ const MAX_NODES = 5000;
 // Solver
 // ============================================================================
 
+export const FURNACE_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.FURNACE,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P03'],
+  consumesFields: ['items', 'inventory', 'furnaceSlots', 'nowTicks', 'maxNodes'],
+  producesFields: ['steps', 'planId', 'solveMeta'],
+  notes: 'Rig C: temporal scheduling with duration constraints. Not yet on structural registration path.',
+};
+
 export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSolveResult> {
   readonly sterlingDomain = 'minecraft' as const;
   readonly solverId = SOLVER_IDS.FURNACE;
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return FURNACE_DECLARATION;
+  }
 
   /** Shared temporal adapter. */
   private readonly temporalAdapter = new P03ReferenceAdapter(MAX_WAIT_BUCKETS, 8);

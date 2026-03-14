@@ -54,8 +54,11 @@ export interface RouteOptions {
 /**
  * Build a CapabilityDecisionRecord for a route that targets a rig.
  * Returns undefined if no declaration lookup is available.
+ *
+ * Exported for use by the planner's Rig D upgrade path, which needs
+ * to produce a decision record outside the normal routeActionPlan flow.
  */
-function buildDecisionRecord(
+export function buildDecisionRecordForRig(
   rigId: string | null,
   declarations: DeclarationLookup | undefined,
 ): CapabilityDecisionRecord | undefined {
@@ -147,7 +150,7 @@ export function routeActionPlan(
         requiredCapabilities: ['craft'],
         availableCapabilities: ['craft'],
         reason: 'craft-requirement',
-        decision: buildDecisionRecord('A', declarations),
+        decision: buildDecisionRecordForRig('A', declarations),
       };
 
     case 'tool_progression':
@@ -157,7 +160,7 @@ export function routeActionPlan(
         requiredCapabilities: ['tool_progression'],
         availableCapabilities: ['tool_progression'],
         reason: 'tool-progression-requirement',
-        decision: buildDecisionRecord('B', declarations),
+        decision: buildDecisionRecordForRig('B', declarations),
       };
 
     case 'build':
@@ -167,7 +170,7 @@ export function routeActionPlan(
         requiredCapabilities: ['build'],
         availableCapabilities: ['build'],
         reason: 'build-requirement',
-        decision: buildDecisionRecord('G', declarations),
+        decision: buildDecisionRecordForRig('G', declarations),
       };
 
     case 'collect':
@@ -195,7 +198,7 @@ export function routeActionPlan(
         requiredCapabilities: ['navigate'],
         availableCapabilities: ['navigate'],
         reason: 'navigate-requirement',
-        decision: buildDecisionRecord('E', declarations),
+        decision: buildDecisionRecordForRig('E', declarations),
       };
 
     case 'explore':
@@ -205,7 +208,7 @@ export function routeActionPlan(
         requiredCapabilities: ['explore'],
         availableCapabilities: ['explore'],
         reason: 'explore-requirement',
-        decision: buildDecisionRecord('E', declarations),
+        decision: buildDecisionRecordForRig('E', declarations),
       };
 
     case 'find':
@@ -215,7 +218,7 @@ export function routeActionPlan(
         requiredCapabilities: ['find'],
         availableCapabilities: ['find'],
         reason: 'find-requirement',
-        decision: buildDecisionRecord('E', declarations),
+        decision: buildDecisionRecordForRig('E', declarations),
       };
 
     default: {
