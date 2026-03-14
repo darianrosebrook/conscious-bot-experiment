@@ -1602,12 +1602,44 @@ export class AcquireMaterialLeaf implements LeafImpl {
           cleanupPickup();
         }
 
-        // Bounded confirm-pickup loop: poll inventory for up to 500ms
-        // to close the race between pickup occurring and inventory reflecting it.
+        // Bounded confirm-pickup loop: poll inventory for up to 500ms.
+        // Check BOTH total count (catches any pickup) and specific item
+        // (catches the expected drop including block→item aliases).
+        const BLOCK_DROP_ALIASES: Record<string, string> = {
+          stone: 'cobblestone',
+          coal_ore: 'coal',
+          iron_ore: 'raw_iron',
+          gold_ore: 'raw_gold',
+          copper_ore: 'raw_copper',
+          diamond_ore: 'diamond',
+          emerald_ore: 'emerald',
+          redstone_ore: 'redstone',
+          lapis_ore: 'lapis_lazuli',
+          nether_quartz_ore: 'quartz',
+        };
+        const expectedDropNames = [
+          blockName,
+          BLOCK_DROP_ALIASES[blockName],
+        ].filter(Boolean) as string[];
+
         let confirmed = false;
         let confirmPolls = 0;
         const confirmStart = Date.now();
         while (Date.now() - confirmStart < 500) {
+          // Check per-item: did any expected drop increase?
+          for (const dropName of expectedDropNames) {
+            const beforeCount = inventoryBeforeMap.get(dropName) ?? 0;
+            const afterCount = bot.inventory.items()
+              .filter((it: any) => it.name === dropName)
+              .reduce((sum: number, it: any) => sum + (it.count || 1), 0);
+            if (afterCount > beforeCount) {
+              confirmed = true;
+              break;
+            }
+          }
+          if (confirmed) break;
+
+          // Fallback: total count increased (catches unexpected drops)
           const inventoryTotalAfter = bot.inventory.items().reduce(
             (sum: number, it: any) => sum + (it.count || 1),
             0
