@@ -41,8 +41,8 @@ services:
       ENABLE_COMMAND_BLOCK: "false"
       ALLOW_CHEATS: "true"
       EXISTING_OPS_FILE: SYNCHRONIZE
-      # SEED: (random — let Minecraft generate one)
-      LEVEL_TYPE: DEFAULT
+      SEED: "smoke-flat-2026"
+      LEVEL_TYPE: FLAT
     ports:
       - "25565:25565"
     volumes:

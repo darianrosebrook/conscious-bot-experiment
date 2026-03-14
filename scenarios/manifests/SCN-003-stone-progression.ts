@@ -17,9 +17,9 @@ export const SCN_003: ScenarioManifest = {
   id: 'SCN-003',
   name: 'Stone Progression — Stone Pickaxe',
   description:
-    'Bot starts with wooden_pickaxe and crafting_table. Must place table, ' +
-    'mine stone (exposed on surface), and craft stone_pickaxe.',
-  capabilities: ['acquire_material', 'stone_drop_alias', 'craft_recipe', 'place_workstation', 'tool_progression'],
+    'Bot starts with wooden_pickaxe. Must mine exposed stone (getting ' +
+    'cobblestone). Isolates the stone mining + pickup chain.',
+  capabilities: ['acquire_material', 'stone_drop_alias', 'pickup_after_dig'],
 
   baseline: 'flat',
 
@@ -80,8 +80,6 @@ export const SCN_003: ScenarioManifest = {
     food: 20,
     inventory: [
       { item: 'wooden_pickaxe', count: 1 },
-      { item: 'crafting_table', count: 1 },
-      { item: 'stick', count: 2 },     // needed for stone_pickaxe recipe
     ],
   },
 
