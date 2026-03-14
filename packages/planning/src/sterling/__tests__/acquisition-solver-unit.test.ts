@@ -65,8 +65,8 @@ function makeMockCraftingSolver(): MinecraftCraftingSolver {
           bundleId: 'minecraft.crafting:abc123',
           bundleHash: 'abc123',
           timestamp: Date.now(),
-          input: {} as any,
-          output: {} as any,
+          input: { solverId: 'minecraft.crafting' } as any,
+          output: { solved: true, planId: 'craft-plan-1' } as any,
           compatReport: { valid: true, issues: [], checkedAt: Date.now(), definitionCount: 1 },
         }],
       },
@@ -326,6 +326,34 @@ describe('MinecraftAcquisitionSolver', () => {
     const childBundle = result.solveMeta!.bundles[1];
     expect(parentBundle.bundleId).toContain('minecraft.acquisition');
     expect(childBundle.bundleId).toContain('minecraft.crafting');
+  });
+
+  it('mine/craft delegation: bridgeEdges produced for acquire_for_craft', async () => {
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      undefined,
+      mockMcData,
+    );
+    expect(result.solved).toBe(true);
+    expect(result.bridgeEdges).toBeDefined();
+    expect(result.bridgeEdges!.length).toBeGreaterThanOrEqual(1);
+
+    const bridge = result.bridgeEdges![0];
+    expect(bridge.kind).toBe('acquire_for_craft');
+    expect(bridge.bridgeHash).toBeTruthy();
+    // Upstream = acquisition parent
+    expect(bridge.upstreamRef.solverId).toBe('minecraft.acquisition');
+    // Downstream = crafting child
+    expect(bridge.downstreamRef.solverId).toBe('minecraft.crafting');
+    // Postcondition: items produced by the mine/craft solve
+    expect(bridge.postcondition.kind).toBe('items_produced');
+    expect(bridge.postcondition.solved).toBe(true);
+    // Precondition: goal items required
+    expect(bridge.precondition.kind).toBe('items_available');
+    expect(bridge.precondition.requiredItems).toEqual({ cobblestone: 1 });
   });
 
   // ── mcData dependency gate ────────────────────────────────────────────
