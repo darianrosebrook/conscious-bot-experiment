@@ -145,6 +145,25 @@ async function writeLogBuffer() {
   }
 }
 
+// Periodic flush: write logs every 30s while capture is active so hard
+// kills don't lose the entire buffer. Each flush overwrites with the
+// full buffer (append-style would complicate the final write).
+if (CAPTURE_LOGS && CAPTURE_DURATION_SEC > 0) {
+  const flushInterval = setInterval(async () => {
+    if (!logCaptureActive) {
+      clearInterval(flushInterval);
+      return;
+    }
+    if (logBuffer.length > 0) {
+      const logPath = path.join(projectRoot, 'run.log');
+      try {
+        await fs.promises.writeFile(logPath, logBuffer.join('\n') + '\n');
+      } catch { /* best-effort */ }
+    }
+  }, 30_000);
+  flushInterval.unref(); // don't prevent process exit
+}
+
 // Dynamically import listr2 only if needed
 let Listr = null;
 if (OUTPUT_MODE === 'progress') {
@@ -163,9 +182,14 @@ const sterlingDir = path.resolve(
   projectRoot,
   process.env.STERLING_DIR || path.join('..', 'sterling')
 );
-const sterlingPython = path.join(sterlingDir, '.venv', 'bin', 'python');
+// Sterling monorepo: Python code lives under sterling/python/ since the restructure.
+// Try python/ subdirectory first, fall back to root for pre-restructure layouts.
+const sterlingPythonDir = fs.existsSync(path.join(sterlingDir, 'python', '.venv'))
+  ? path.join(sterlingDir, 'python')
+  : sterlingDir;
+const sterlingPython = path.join(sterlingPythonDir, '.venv', 'bin', 'python');
 const sterlingScript = path.join(
-  sterlingDir,
+  sterlingPythonDir,
   'scripts',
   'utils',
   'sterling_unified_server.py'
@@ -330,7 +354,7 @@ if (sterlingAvailable) {
       'Sterling symbolic reasoning server (crafting, building, tool progression)',
     priority: 2,
     dependencies: [],
-    cwd: sterlingDir,
+    cwd: sterlingPythonDir,
   });
 }
 
