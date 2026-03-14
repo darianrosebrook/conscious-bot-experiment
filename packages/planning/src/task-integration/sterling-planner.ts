@@ -726,19 +726,42 @@ export class SterlingPlanner {
   }
 
   /**
-   * Authoritative crafting resolution via resolve_intent_steps.
-   * Uses the same fetchBotContext → world_state assembly as task-integration.ts
-   * (single source of truth — no duplicate payload assembly).
+   * Build the canonical resolve_intent_steps request from bot context.
+   *
+   * This is the SINGLE source of truth for world_state + rules assembly.
+   * Both the planner's Rig A path and task-integration's expand path
+   * should use this builder to avoid duplicate request shaping.
+   *
+   * Returns null if bot context is unavailable.
    */
-  private async _generateStepsViaResolveIntent(
-    taskData: Partial<Task>,
+  async buildResolveIntentRequest(
     goalItem: string,
     mcData: any,
-  ): Promise<TaskStep[]> {
+    intentSteps: Array<{ leaf: string; args: Record<string, unknown> }>,
+    options?: {
+      requestIdPrefix?: string;
+      schemaVersion?: string;
+      /** Pre-built inventory index (canonicalized). When provided, skips inventoryToRecord. */
+      inventoryOverride?: Record<string, number>;
+    },
+  ): Promise<{
+    intent_steps: Array<{ leaf: string; args: Record<string, unknown> }>;
+    world_state: {
+      inventory: Record<string, number>;
+      nearby_blocks: string[];
+      nearby_blocks_known: boolean;
+      nearby_block_counts: Record<string, number>;
+      preferred_base_items: string[];
+      scan_meta: { radius: number; scanned_at: number; biome: string };
+    };
+    rules: Array<Record<string, unknown>>;
+    schema_version: string;
+    request_id: string;
+  } | null> {
     const botCtx = await this.fetchBotContext();
-    if (botCtx._unavailable) return [];
+    if (botCtx._unavailable) return null;
 
-    const inventory = inventoryToRecord(botCtx.inventory);
+    const inventory = options?.inventoryOverride ?? inventoryToRecord(botCtx.inventory);
     const blockCounts = botCtx.nearbyBlockCounts ?? {};
     const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
       ? Object.keys(blockCounts)
@@ -752,36 +775,53 @@ export class SterlingPlanner {
 
     const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
 
+    const prefix = options?.requestIdPrefix ?? 'resolve';
+    const requestId = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    return {
+      intent_steps: intentSteps,
+      world_state: {
+        inventory,
+        nearby_blocks: nearbyBlocks,
+        nearby_blocks_known: botCtx.nearbyBlocksKnown,
+        nearby_block_counts: botCtx.nearbyBlockCounts ?? {},
+        preferred_base_items: preferredBaseItems,
+        scan_meta: {
+          radius: 8,
+          scanned_at: Date.now(),
+          biome: botCtx.biome ?? 'unknown',
+        },
+      },
+      rules,
+      schema_version: options?.schemaVersion ?? '1.1.0',
+      request_id: requestId,
+    };
+  }
+
+  /**
+   * Authoritative crafting resolution via resolve_intent_steps.
+   * Uses buildResolveIntentRequest for request assembly (single source of truth).
+   */
+  private async _generateStepsViaResolveIntent(
+    taskData: Partial<Task>,
+    goalItem: string,
+    mcData: any,
+  ): Promise<TaskStep[]> {
     const intentStep = {
       leaf: 'task_type_craft',
       args: {
-        task_type: 'CRAFT',
+        task_type: 'CRAFT' as const,
         goal_item: goalItem,
       },
     };
 
-    const requestId = `rig-a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    const response = await this._resolveIntentSteps!(
-      {
-        intent_steps: [intentStep],
-        world_state: {
-          inventory,
-          nearby_blocks: nearbyBlocks,
-          nearby_blocks_known: botCtx.nearbyBlocksKnown,
-          nearby_block_counts: botCtx.nearbyBlockCounts,
-          preferred_base_items: preferredBaseItems,
-          scan_meta: {
-            radius: 8,
-            scanned_at: Date.now(),
-            biome: botCtx.biome ?? 'unknown',
-          },
-        },
-        rules,
-        schema_version: '1.1.0',
-        request_id: requestId,
-      },
+    const request = await this.buildResolveIntentRequest(
+      goalItem, mcData, [intentStep],
+      { requestIdPrefix: 'rig-a' },
     );
+    if (!request) return [];
+
+    const response = await this._resolveIntentSteps!(request);
 
     if (response.status === 'error') {
       console.warn(
@@ -803,25 +843,32 @@ export class SterlingPlanner {
 
     const r = replacements[0];
     if (!r.resolved || !r.steps || r.steps.length === 0) {
-      // Log blocked_info for diagnostic purposes
-      if ((r as any).blocked_info) {
-        const bi = (r as any).blocked_info;
+      // Persist blocked_info into solver metadata so downstream code
+      // (task-integration, planner outcomes) can surface it without
+      // reintroducing a separate preflight solver call.
+      const solverMeta = ensureSolverMeta(taskData);
+      solverMeta.resolvedVia = 'resolve_intent_steps';
+      solverMeta.unresolvedReason = r.unresolved_reason;
+      if (r.blocked_info) {
+        solverMeta.blockedInfo = {
+          frontier_items: r.blocked_info.frontier_items ?? null,
+          nearby_blocks_gap: r.blocked_info.nearby_blocks_gap ?? null,
+          total_nodes_explored: r.blocked_info.total_nodes_explored ?? null,
+        };
         console.log(
           `[Sterling] CRAFT ${goalItem} unresolved: ${r.unresolved_reason}`,
-          `frontier=${JSON.stringify(bi.frontier_items)}`,
-          `gap=${JSON.stringify(bi.nearby_blocks_gap)}`,
-          `nodes=${bi.total_nodes_explored}`,
+          `frontier=${JSON.stringify(r.blocked_info.frontier_items)}`,
+          `gap=${JSON.stringify(r.blocked_info.nearby_blocks_gap)}`,
+          `nodes=${r.blocked_info.total_nodes_explored}`,
         );
       }
       return [];
     }
 
-    // Store plan_bundle_digest in solver metadata
-    if (response.status === 'ok') {
-      const solverMeta = ensureSolverMeta(taskData);
-      solverMeta.planBundleDigest = (response as any).plan_bundle_digest;
-      solverMeta.resolvedVia = 'resolve_intent_steps';
-    }
+    // Store plan_bundle_digest and authority provenance in solver metadata
+    const solverMeta = ensureSolverMeta(taskData);
+    solverMeta.planBundleDigest = (response as any).plan_bundle_digest;
+    solverMeta.resolvedVia = 'resolve_intent_steps';
 
     // Convert resolve_intent_steps steps to TaskStep[]
     const taskId = taskData.id || 'unknown';

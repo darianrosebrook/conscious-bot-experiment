@@ -57,11 +57,16 @@ export interface LanguageIOTransport {
    *
    * @param envelope - The envelope to send (as plain object for serialization)
    * @param timeoutMs - Optional timeout in milliseconds
+   * @param worldSnapshot - Optional world snapshot for grounding (AC-2.3).
+   *   When present, Sterling uses reduce_and_ground instead of plain reduce.
+   *   The snapshot is an explicit artifact boundary — grounding is an
+   *   explicit step, not a silent enrichment of the reducer path.
    * @returns The reducer result or throws an error
    */
   sendReduce(
     envelope: Record<string, unknown>,
     timeoutMs?: number,
+    worldSnapshot?: Record<string, unknown>,
   ): Promise<LanguageIOReduceResponse>;
 
   /**
@@ -82,6 +87,7 @@ export interface SterlingClientLike {
   sendLanguageIOReduce(
     envelope: Record<string, unknown>,
     timeoutMs?: number,
+    worldSnapshot?: Record<string, unknown>,
   ): Promise<{ success: true; result: LanguageIOReduceResponse } | { success: false; error: string }>;
   isAvailable(): boolean;
   connect(): Promise<void>;
@@ -99,8 +105,9 @@ export class SterlingTransportAdapter implements LanguageIOTransport {
   async sendReduce(
     envelope: Record<string, unknown>,
     timeoutMs?: number,
+    worldSnapshot?: Record<string, unknown>,
   ): Promise<LanguageIOReduceResponse> {
-    const result = await this.client.sendLanguageIOReduce(envelope, timeoutMs);
+    const result = await this.client.sendLanguageIOReduce(envelope, timeoutMs, worldSnapshot);
 
     if (!result.success) {
       throw new Error(`Sterling reduce failed: ${result.error}`);
@@ -157,6 +164,7 @@ export class MockLanguageIOTransport implements LanguageIOTransport {
   async sendReduce(
     envelope: Record<string, unknown>,
     _timeoutMs?: number,
+    _worldSnapshot?: Record<string, unknown>,
   ): Promise<LanguageIOReduceResponse> {
     if (!this._isAvailable) {
       throw new Error('Mock transport unavailable');

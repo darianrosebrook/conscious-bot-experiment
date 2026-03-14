@@ -2592,43 +2592,40 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // ── Single resolution attempt (no retry loop in request path) ──
       try {
+        // Use shared request builder for world_state + rules assembly
+        // (single source of truth — see AC-2.1 request assembly centralization).
+        // Pass pre-canonicalized inventory via inventoryOverride to preserve
+        // minecraft: prefix stripping and variant suffix normalization.
         const botCtx = await this.fetchBotContext();
-        const inventory = this.buildInventoryIndex(botCtx.inventory);
-        const blockCounts = botCtx.nearbyBlockCounts ?? {};
-        const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
-          ? Object.keys(blockCounts)
-          : [];
+        const canonicalInventory = this.buildInventoryIndex(botCtx.inventory);
 
-        // Derive preferred_base_items: most abundant log types first
-        const preferredBaseItems = Object.entries(blockCounts)
-          .filter(([name]) => name.endsWith('_log'))
-          .sort(([, a], [, b]) => (b as number) - (a as number))
-          .map(([name]) => name);
-
-        // Only build crafting rules when there are crafting intents AND mcData+goalItem
-        // are available (guaranteed by the preflight guards above).
-        const rules: Array<Record<string, unknown>> = craftingIntents.length > 0
-          ? buildCraftingRules(mcData, goalItem!) as unknown as Array<Record<string, unknown>>
-          : [];
-        const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
+        const resolveRequest = await this.sterlingPlanner.buildResolveIntentRequest(
+          goalItem ?? '_unknown',
+          craftingIntents.length > 0 ? mcData : null,
+          intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
           {
-            intent_steps: intentSteps.map((s) => ({ leaf: s.leaf, args: s.args })),
-            world_state: {
-              inventory,
-              nearby_blocks: nearbyBlocks,
-              nearby_blocks_known: botCtx.nearbyBlocksKnown,
-              nearby_block_counts: botCtx.nearbyBlockCounts,
-              preferred_base_items: preferredBaseItems,
-              scan_meta: {
-                radius: 8,
-                scanned_at: Date.now(),
-                biome: botCtx.biome ?? 'unknown',
-              },
-            },
-            rules,
-            schema_version: schemaVersion,
-            request_id: `${requestId}_resolve`,
+            requestIdPrefix: `${requestId}_resolve`,
+            schemaVersion,
+            inventoryOverride: canonicalInventory,
           },
+        );
+
+        if (!resolveRequest) {
+          recordExpansion({
+            request_id: requestId,
+            status: 'blocked',
+            blocked_reason: 'blocked_bot_context_unavailable',
+          });
+          return {
+            outcome: 'blocked',
+            reason: 'blocked_bot_context_unavailable',
+            requestId,
+            ingestRetry,
+          };
+        }
+
+        const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
+          resolveRequest,
           expandTimeoutMs,
         );
 
@@ -2686,9 +2683,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
               resolutionContextDigest: createHash('sha256')
                 .update(canonicalize({
                   inventory: Object.fromEntries(
-                    Object.entries(inventory).sort(([a], [b]) => a.localeCompare(b))
+                    Object.entries(resolveRequest.world_state.inventory).sort(([a], [b]) => a.localeCompare(b))
                   ),
-                  nearbyBlocks: [...nearbyBlocks].sort(),
+                  nearbyBlocks: [...resolveRequest.world_state.nearby_blocks].sort(),
                   goalItem,
                 }))
                 .digest('hex'),
@@ -3371,18 +3368,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     try {
-      const botCtx = await this.fetchBotContext();
-      const inventory = this.buildInventoryIndex(botCtx.inventory);
-      const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
-        ? Object.keys(botCtx.nearbyBlockCounts)
-        : [];
-
-      // Derive preferred_base_items: most abundant log types first
-      const preferredBaseItems = Object.entries(botCtx.nearbyBlockCounts)
-        .filter(([name]) => name.endsWith('_log'))
-        .sort(([, a], [, b]) => b - a)
-        .map(([name]) => name);
-
       // Find intent steps in current task steps
       const intentSteps = task.steps.filter((s) => s.meta?.leaf && isIntentLeaf(s.meta.leaf as string));
       if (intentSteps.length === 0) {
@@ -3397,27 +3382,30 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
 
       const schemaVersion = (task.metadata as any)?.sterling?.schemaVersion as string | undefined;
-      const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+      const botCtx = await this.fetchBotContext();
+      const canonicalInventory = this.buildInventoryIndex(botCtx.inventory);
+
+      const resolveRequest = await this.sterlingPlanner.buildResolveIntentRequest(
+        goalItem,
+        mcData,
+        intentSteps.map((s) => ({ leaf: s.meta!.leaf as string, args: s.meta!.args as any })),
+        {
+          requestIdPrefix: `retry_resolve_${task.id}`,
+          schemaVersion: schemaVersion ?? '1',
+          inventoryOverride: canonicalInventory,
+        },
+      );
+
+      if (!resolveRequest) {
+        const backoffMs = Math.min(30_000 * Math.pow(2, retryCount), 300_000);
+        (task.metadata as any).expansionRetryCount = retryCount + 1;
+        task.metadata.nextEligibleAt = Date.now() + backoffMs;
+        this.taskStore.setTask(task);
+        return { outcome: 'blocked', reason: 'blocked_bot_context_unavailable' };
+      }
 
       const resolveResponse = await this.sterlingExecutorService.resolveIntentSteps(
-        {
-          intent_steps: intentSteps.map((s) => ({ leaf: s.meta!.leaf as string, args: s.meta!.args as any })),
-          world_state: {
-            inventory,
-            nearby_blocks: nearbyBlocks,
-            nearby_blocks_known: botCtx.nearbyBlocksKnown,
-            nearby_block_counts: botCtx.nearbyBlockCounts,
-            preferred_base_items: preferredBaseItems,
-            scan_meta: {
-              radius: 8,
-              scanned_at: Date.now(),
-              biome: botCtx.biome ?? 'unknown',
-            },
-          },
-          rules,
-          schema_version: schemaVersion ?? '1',
-          request_id: `retry_resolve_${task.id}_${Date.now()}`,
-        },
+        resolveRequest,
         Number(process.env.STERLING_EXPAND_TIMEOUT_MS ?? '5000'),
       );
 
@@ -3487,9 +3475,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             const resolutionContextDigest = createHash('sha256')
               .update(canonicalize({
                 inventory: Object.fromEntries(
-                  Object.entries(inventory).sort(([a], [b]) => a.localeCompare(b))
+                  Object.entries(resolveRequest.world_state.inventory).sort(([a], [b]) => a.localeCompare(b))
                 ),
-                nearbyBlocks: [...nearbyBlocks].sort(),
+                nearbyBlocks: [...resolveRequest.world_state.nearby_blocks].sort(),
                 goalItem,
               }))
               .digest('hex');

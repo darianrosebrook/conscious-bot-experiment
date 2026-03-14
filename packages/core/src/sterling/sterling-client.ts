@@ -690,6 +690,7 @@ export class SterlingClient extends EventEmitter {
   async sendLanguageIOReduce(
     envelope: Record<string, unknown>,
     timeoutMs: number = 10000,
+    worldSnapshot?: Record<string, unknown>,
   ): Promise<{ success: true; result: SterlingLanguageReducerResult } | { success: false; error: string }> {
     if (!this.isAvailable()) {
       return { success: false, error: 'Client not available' };
@@ -729,6 +730,9 @@ export class SterlingClient extends EventEmitter {
           command: 'language_io.reduce',
           envelope,
           requestId,
+          // AC-2.3: world_snapshot triggers reduce_and_ground on Sterling server.
+          // When absent, Sterling uses plain reduce (backward compatible).
+          ...(worldSnapshot ? { world_snapshot: worldSnapshot } : {}),
         });
       } catch (err) {
         cleanup();

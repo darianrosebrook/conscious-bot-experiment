@@ -62,8 +62,15 @@ export interface ReduceOptions {
   modelId?: string;
   /** Prompt digest for provenance tracking */
   promptDigest?: string;
-  /** World snapshot reference for grounding */
+  /** World snapshot reference for grounding (embedded in envelope) */
   worldSnapshotRef?: WorldSnapshotRef;
+  /**
+   * Full world snapshot data for grounding validation (AC-2.3).
+   * When present, Sterling uses reduce_and_ground instead of plain reduce.
+   * This is an explicit artifact boundary — grounding is a separate step,
+   * not a silent enrichment of the reducer path.
+   */
+  worldSnapshot?: Record<string, unknown>;
 }
 
 export interface ReduceResult {
@@ -275,10 +282,13 @@ export class SterlingLanguageIOClient extends EventEmitter {
     }
 
     // 3. Send to Sterling via transport and await result
+    // AC-2.3: pass world_snapshot as a separate artifact alongside the envelope.
+    // Sterling's server handler uses its presence to trigger reduce_and_ground.
     try {
       const rawResponse = await this.transport.sendReduce(
         envelope as unknown as Record<string, unknown>,
         this.config.reduceTimeout,
+        options.worldSnapshot,
       );
       const durationMs = Date.now() - startTime;
 
