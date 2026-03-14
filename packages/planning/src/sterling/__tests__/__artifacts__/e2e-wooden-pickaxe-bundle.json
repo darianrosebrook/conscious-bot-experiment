@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:a60610281d47691e",
-  "bundleHash": "a60610281d47691e",
-  "timestamp": 1771044981441,
+  "bundleId": "minecraft.tool_progression:6b56f6689ccf3bdb",
+  "bundleHash": "6b56f6689ccf3bdb",
+  "timestamp": 1773469790192,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -19,31 +19,31 @@
       "riskWeight": 0
     },
     "objectiveWeightsSource": "default",
-    "leafRegistryDigest": "a3aa29420f52319f",
-    "leafContractRequiredDigest": "2f56371517ff6ce0",
-    "leafContractFullDigest": "a3aa29420f52319f"
+    "leafRegistryDigest": "c7a8d716fc15beeb",
+    "leafContractRequiredDigest": "b0c4bedd47bc13d2",
+    "leafContractFullDigest": "c7a8d716fc15beeb"
   },
   "output": {
-    "planId": "b1dcdc457547d1fb",
+    "planId": "d0b1d93a95872b63",
     "solved": true,
     "stepsDigest": "270c723b6b0c141e",
     "searchStats": {
-      "totalNodes": 98,
-      "durationMs": 16,
+      "totalNodes": 130,
+      "durationMs": 22,
       "solutionPathLength": 8
     },
     "searchHealth": {
-      "nodesExpanded": 50,
-      "frontierPeak": 48,
+      "nodesExpanded": 66,
+      "frontierPeak": 64,
       "hMin": 0,
       "hMax": 1,
-      "hMean": 0.98,
-      "hVariance": 0.0196,
+      "hMean": 0.9848484848484849,
+      "hVariance": 0.01492194674012856,
       "fMin": 1,
       "fMax": 13.5,
-      "pctSameH": 0.98,
+      "pctSameH": 0.9848484848484849,
       "terminationReason": "goal_found",
-      "branchingEstimate": 3,
+      "branchingEstimate": 2.8636363636363638,
       "searchHealthVersion": 1
     },
     "rationale": {
@@ -57,9 +57,9 @@
         "objectiveWeightsSource": "default"
       },
       "searchEffort": {
-        "nodesExpanded": 50,
-        "frontierPeak": 48,
-        "branchingEstimate": 3
+        "nodesExpanded": 66,
+        "frontierPeak": 64,
+        "branchingEstimate": 2.8636363636363638
       },
       "searchTermination": {
         "terminationReason": "goal_found",
@@ -76,8 +76,8 @@
     },
     "traceHash": "039b989d67ccc77a",
     "sterlingIdentity": {
-      "traceBundleHash": "dea4857ffb4dea7de76d510cb19a83c517a4a59f5965fa3d2652194749082ddc",
-      "engineCommitment": "e5b59fe48ab2b47f73daac70e2a95f2df0b2fa63f8fc622127f29622b4ca7ec4",
+      "traceBundleHash": "cc85ee967d7709c0bba645e4f9dbdde2fac5c5befe6210d3a215c3c354b2bc1f",
+      "engineCommitment": "d2b47cd076e378c50559d3516d4d7308c5a962b82be0605b3f56f7874f0f7e9b",
       "operatorRegistryHash": "d6590a986f022faf77acda6bdb0f89508e021abfecae03141d87d0abcb5398a1",
       "completenessDeclaration": {
         "completenessVersion": 1,
@@ -91,13 +91,13 @@
           "no_decision_witnesses"
         ]
       },
-      "bindingHash": "072575a2ac306301"
+      "bindingHash": "a6ec29f9c699639c"
     }
   },
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1771044981414,
+    "checkedAt": 1773469790157,
     "definitionCount": 6
   }
 }
