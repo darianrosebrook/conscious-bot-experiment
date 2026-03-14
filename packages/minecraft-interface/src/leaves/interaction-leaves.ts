@@ -1466,6 +1466,12 @@ export class AcquireMaterialLeaf implements LeafImpl {
         // Secondary: walk toward dig site to trigger proximity pickup.
         // Final: bounded confirm loop checks inventory delta per-item.
 
+        // Wait for item entity to spawn. Minecraft servers typically spawn the
+        // drop entity 1-3 ticks (~50-150ms) after the block break packet.
+        // Without this delay, the playerCollect listener and auto-pickup window
+        // start before the item exists in the world.
+        await new Promise((r) => setTimeout(r, 350));
+
         let pickupDetected = false;
         const onCollect = (collector: any, _entity: any) => {
           if (collector === bot.entity) pickupDetected = true;
@@ -1489,21 +1495,40 @@ export class AcquireMaterialLeaf implements LeafImpl {
           }
 
           if (!pickupDetected) {
-            // Use pathfinder to reach the likely drop zone instead of raw "walk forward".
-            // This handles height differences (tree logs dropping to ground),
-            // slopes, and obstacles that defeat straight-line movement.
+            // Use pathfinder to reach the drop zone.
+            // First check for a visible item entity near the dig site — if one exists,
+            // navigate to its actual position instead of the computed ground position.
             const botWithPf = bot as BotWithPathfinder;
-            const fx = Math.floor(digSitePos.x);
-            const fz = Math.floor(digSitePos.z);
-            let groundY = Math.floor(digSitePos.y);
-            for (let dy = 0; dy < 12; dy++) {
-              const b = bot.blockAt(new Vec3(fx, groundY - dy, fz));
-              if (b && b.boundingBox === 'block') {
-                groundY = (groundY - dy) + 1;
-                break;
+            let dropPos: Vec3;
+
+            const nearbyItemEntity = Object.values((bot as any).entities ?? {}).find(
+              (e: any) =>
+                (e.name === 'item' || e.type === 'item') &&
+                e.position &&
+                e.position.distanceTo(digSitePos) < 8
+            ) as any;
+
+            if (nearbyItemEntity?.position) {
+              // Navigate to the actual item entity position
+              dropPos = new Vec3(
+                nearbyItemEntity.position.x,
+                nearbyItemEntity.position.y,
+                nearbyItemEntity.position.z
+              );
+            } else {
+              // Fallback: compute ground position below the dig site
+              const fx = Math.floor(digSitePos.x);
+              const fz = Math.floor(digSitePos.z);
+              let groundY = Math.floor(digSitePos.y);
+              for (let dy = 0; dy < 12; dy++) {
+                const b = bot.blockAt(new Vec3(fx, groundY - dy, fz));
+                if (b && b.boundingBox === 'block') {
+                  groundY = (groundY - dy) + 1;
+                  break;
+                }
               }
+              dropPos = new Vec3(fx + 0.5, groundY, fz + 0.5);
             }
-            const dropPos = new Vec3(fx + 0.5, groundY, fz + 0.5);
 
             let gotoTimedOut = false;
             await Promise.race([
@@ -1589,9 +1614,9 @@ export class AcquireMaterialLeaf implements LeafImpl {
           // Count nearby item entities matching expected drops
           const nearbyItems = Object.values((bot as any).entities ?? {}).filter(
             (e: any) =>
-              e.entityType === 'item' &&
+              (e.name === 'item' || e.type === 'item') &&
               e.position &&
-              e.position.distanceTo(digSitePos) < 6
+              e.position.distanceTo(digSitePos) < 8
           );
           const distToBlock = bot.entity.position.distanceTo(digSitePos);
           console.warn(
