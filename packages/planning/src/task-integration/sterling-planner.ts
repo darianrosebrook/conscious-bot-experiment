@@ -16,6 +16,7 @@ import { resolveRequirement } from '../modules/requirements';
 import type { TaskRequirement } from '../modules/requirements';
 import { routeActionPlan } from '../modules/action-plan-backend';
 import { requirementToFallbackPlan } from '../modules/leaf-arg-contracts';
+import { buildCraftingRules, inventoryToRecord } from '../sterling/minecraft-crafting-rules';
 import type { Task } from '../types/task';
 import type { TaskStep } from '../types/task-step';
 import type { PlanningDecision } from '../constraints/planning-decisions';
@@ -34,6 +35,44 @@ export interface StepGenerationResult {
   route?: { backend: string; requiredRig: string | null; reason: string };
   planId?: string;
 }
+
+/** Callback type for resolve_intent_steps — matches SterlingReasoningService.resolveIntentSteps signature. */
+export type ResolveIntentStepsFn = (
+  request: {
+    intent_steps: Array<{ leaf: string; args: Record<string, unknown> }>;
+    world_state: {
+      inventory: Record<string, number>;
+      nearby_blocks: string[];
+      nearby_blocks_known?: boolean;
+      nearby_block_counts?: Record<string, number>;
+      preferred_base_items?: string[];
+      scan_meta?: { radius: number; scanned_at: number; biome: string };
+    };
+    rules?: Array<Record<string, unknown>>;
+    schema_version?: string;
+    request_id?: string;
+  },
+  timeoutMs?: number,
+) => Promise<
+  | {
+      status: 'ok';
+      replacements: Array<{
+        intent_step_index: number;
+        resolved: boolean;
+        steps?: Array<{ leaf: string; args: Record<string, unknown> }>;
+        unresolved_reason?: string;
+        blocked_info?: {
+          frontier_items?: string[] | null;
+          nearby_blocks_gap?: string[] | null;
+          total_nodes_explored?: number | null;
+        };
+      }>;
+      plan_bundle_digest: string;
+      schema_version?: string;
+    }
+  | { status: 'blocked'; blocked_reason: string }
+  | { status: 'error'; error: string }
+>;
 
 export interface SterlingPlannerOptions {
   /** HTTP get for Minecraft interface (path, opts) => Response */
@@ -146,6 +185,16 @@ export class SterlingPlanner {
   private readonly solverRegistry = new Map<string, BaseDomainSolver>();
   private _mcDataCache: any = null;
 
+  /**
+   * When set, Rig A crafting uses resolve_intent_steps (the authoritative
+   * planning-resolution path) instead of solveCraftingGoal → command:'solve'.
+   * This eliminates the parallel authority surface per MC-INT-01 AC-2.1.
+   *
+   * The direct solve command remains available for workbench/benchmark use
+   * via solveCraftingGoal, but production CB planning routes through here.
+   */
+  private _resolveIntentSteps?: ResolveIntentStepsFn;
+
   /** Optional macro planner for hierarchical planning (Rig E) */
   private _macroPlanner?: MacroPlanner;
   /** Optional feedback store for macro cost updates (Rig E) */
@@ -156,6 +205,14 @@ export class SterlingPlanner {
   constructor(options: SterlingPlannerOptions) {
     this.minecraftGet = options.minecraftGet;
     this.worldPost = options.worldPost;
+  }
+
+  /**
+   * Wire the authoritative resolve_intent_steps path for Rig A crafting.
+   * When set, generateStepsFromSterling uses this instead of solveCraftingGoal.
+   */
+  setResolveIntentSteps(fn: ResolveIntentStepsFn | undefined): void {
+    this._resolveIntentSteps = fn;
   }
 
   /**
@@ -645,6 +702,155 @@ export class SterlingPlanner {
     }
     if (!goalItem) return [];
 
+    const mcData = (taskData.metadata as any)?.mcData || this.getMcData();
+    if (!mcData) {
+      console.warn(
+        'Cannot invoke Sterling crafting solver — minecraft-data unavailable'
+      );
+      return [];
+    }
+
+    // ── Authoritative path: resolve_intent_steps (AC-2.1) ──
+    // When wired, crafting uses resolve_intent_steps which provides
+    // epistemic filtering (mine rule pruning, craft variant pruning,
+    // frontier analysis) that the direct solve path lacks.
+    if (this._resolveIntentSteps) {
+      return this._generateStepsViaResolveIntent(taskData, goalItem, mcData);
+    }
+
+    // ── Legacy path: direct solveCraftingGoal (workbench/benchmark only) ──
+    // This path is retained for backward compatibility with test harnesses
+    // and workbench use. It is NOT the authoritative planning path for
+    // production conscious-bot — see MC-INT-01 AC-2.1.
+    return this._generateStepsViaDirectSolve(taskData, goalItem, mcData);
+  }
+
+  /**
+   * Authoritative crafting resolution via resolve_intent_steps.
+   * Uses the same fetchBotContext → world_state assembly as task-integration.ts
+   * (single source of truth — no duplicate payload assembly).
+   */
+  private async _generateStepsViaResolveIntent(
+    taskData: Partial<Task>,
+    goalItem: string,
+    mcData: any,
+  ): Promise<TaskStep[]> {
+    const botCtx = await this.fetchBotContext();
+    if (botCtx._unavailable) return [];
+
+    const inventory = inventoryToRecord(botCtx.inventory);
+    const blockCounts = botCtx.nearbyBlockCounts ?? {};
+    const nearbyBlocks: string[] = botCtx.nearbyBlocksKnown
+      ? Object.keys(blockCounts)
+      : [];
+
+    // Derive preferred_base_items: most abundant log types first
+    const preferredBaseItems = Object.entries(blockCounts)
+      .filter(([name]) => name.endsWith('_log'))
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .map(([name]) => name);
+
+    const rules = buildCraftingRules(mcData, goalItem) as unknown as Array<Record<string, unknown>>;
+
+    const intentStep = {
+      leaf: 'task_type_craft',
+      args: {
+        task_type: 'CRAFT',
+        goal_item: goalItem,
+      },
+    };
+
+    const requestId = `rig-a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const response = await this._resolveIntentSteps!(
+      {
+        intent_steps: [intentStep],
+        world_state: {
+          inventory,
+          nearby_blocks: nearbyBlocks,
+          nearby_blocks_known: botCtx.nearbyBlocksKnown,
+          nearby_block_counts: botCtx.nearbyBlockCounts,
+          preferred_base_items: preferredBaseItems,
+          scan_meta: {
+            radius: 8,
+            scanned_at: Date.now(),
+            biome: botCtx.biome ?? 'unknown',
+          },
+        },
+        rules,
+        schema_version: '1.1.0',
+        request_id: requestId,
+      },
+    );
+
+    if (response.status === 'error') {
+      console.warn(
+        `[Sterling] resolve_intent_steps error for ${goalItem}: ${(response as any).error}`
+      );
+      return [];
+    }
+
+    if (response.status === 'blocked') {
+      console.log(
+        `[Sterling] resolve_intent_steps blocked for ${goalItem}: ${(response as any).blocked_reason}`
+      );
+      return [];
+    }
+
+    // status === 'ok' — extract resolved steps from replacements
+    const replacements = response.replacements;
+    if (!replacements || replacements.length === 0) return [];
+
+    const r = replacements[0];
+    if (!r.resolved || !r.steps || r.steps.length === 0) {
+      // Log blocked_info for diagnostic purposes
+      if ((r as any).blocked_info) {
+        const bi = (r as any).blocked_info;
+        console.log(
+          `[Sterling] CRAFT ${goalItem} unresolved: ${r.unresolved_reason}`,
+          `frontier=${JSON.stringify(bi.frontier_items)}`,
+          `gap=${JSON.stringify(bi.nearby_blocks_gap)}`,
+          `nodes=${bi.total_nodes_explored}`,
+        );
+      }
+      return [];
+    }
+
+    // Store plan_bundle_digest in solver metadata
+    if (response.status === 'ok') {
+      const solverMeta = ensureSolverMeta(taskData);
+      solverMeta.planBundleDigest = (response as any).plan_bundle_digest;
+      solverMeta.resolvedVia = 'resolve_intent_steps';
+    }
+
+    // Convert resolve_intent_steps steps to TaskStep[]
+    const taskId = taskData.id || 'unknown';
+    return r.steps.map((step, index) => ({
+      id: `step-resolve-${taskId}-${index + 1}`,
+      label: `${step.leaf}: ${JSON.stringify(step.args)}`,
+      done: false,
+      order: index + 1,
+      estimatedDuration: 10000,
+      meta: {
+        authority: 'sterling' as const,
+        source: 'resolve_intent_steps',
+        leaf: step.leaf,
+        executable: true,
+        args: step.args,
+      },
+    }));
+  }
+
+  /**
+   * Legacy crafting resolution via direct solveCraftingGoal → command:'solve'.
+   * Retained for workbench, benchmark, and test harness use.
+   * NOT the authoritative planning path for production CB (see AC-2.1).
+   */
+  private async _generateStepsViaDirectSolve(
+    taskData: Partial<Task>,
+    goalItem: string,
+    mcData: any,
+  ): Promise<TaskStep[]> {
     let inventoryItems = (taskData.metadata as any)?.currentState?.inventory;
     let nearbyBlocks = (taskData.metadata as any)?.currentState?.nearbyBlocks;
     if (!inventoryItems || !nearbyBlocks) {
@@ -654,15 +860,7 @@ export class SterlingPlanner {
       nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
     }
 
-    const mcData = (taskData.metadata as any)?.mcData || this.getMcData();
-    if (!mcData) {
-      console.warn(
-        'Cannot invoke Sterling crafting solver — minecraft-data unavailable'
-      );
-      return [];
-    }
-
-    const result = await this.craftingSolver.solveCraftingGoal(
+    const result = await this.craftingSolver!.solveCraftingGoal(
       goalItem,
       inventoryItems,
       mcData,
@@ -673,7 +871,6 @@ export class SterlingPlanner {
       ensureSolverMeta(taskData).craftingPlanId = result.planId;
     }
     if (result.solveJoinKeys) {
-      // Per-domain keys prevent cross-solver clobbering
       ensureSolverMeta(taskData).craftingSolveJoinKeys = result.solveJoinKeys;
     }
     if (result.mappingDegraded) {
@@ -686,7 +883,7 @@ export class SterlingPlanner {
 
     if (!result.solved) return [];
 
-    const steps = this.craftingSolver.toTaskSteps(result);
+    const steps = this.craftingSolver!.toTaskSteps(result);
     return steps.map((s) => {
       const enrichedMeta: Record<string, unknown> = {
         ...s.meta,

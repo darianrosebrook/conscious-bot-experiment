@@ -656,6 +656,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   setSterlingExecutorService(service: SterlingReasoningService | undefined): void {
     this.sterlingExecutorService = service;
+
+    // Wire resolve_intent_steps into the planner so Rig A crafting uses
+    // the authoritative path (AC-2.1) instead of direct solve.
+    if (service) {
+      this.sterlingPlanner.setResolveIntentSteps(
+        (request, timeoutMs) => service.resolveIntentSteps(request, timeoutMs)
+      );
+    } else {
+      this.sterlingPlanner.setResolveIntentSteps(undefined);
+    }
   }
 
   private getMcData(): any {
