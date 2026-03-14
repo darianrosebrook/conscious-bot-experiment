@@ -216,6 +216,14 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       );
     }
 
+    // Diagnostic: capture solve inputs for SCN-003 Track 2 investigation
+    const invItems = Object.entries(inventory).filter(([, v]) => v > 0);
+    console.log(
+      `[Sterling:solve] goal=${goalItem} inventory=[${invItems.map(([k, v]) => `${k}:${v}`).join(',')}] ` +
+      `nearbyBlocks=[${nearbyBlocks.slice(0, 10).join(',')}${nearbyBlocks.length > 10 ? '...' : ''}] ` +
+      `rules=${rules.length}`
+    );
+
     // 4. Build Sterling payload — temporal fields only in sterling_temporal mode
     const solvePayload: Record<string, unknown> = {
       contractVersion: this.contractVersion,

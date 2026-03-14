@@ -1508,15 +1508,17 @@ export class AcquireMaterialLeaf implements LeafImpl {
                 e.position.distanceTo(digSitePos) < 8
             ) as any;
 
+            // Diagnostic: capture navigation decision for artifact analysis
+            let navSource: 'entity' | 'ground_calc' = 'ground_calc';
+
             if (nearbyItemEntity?.position) {
-              // Navigate to the actual item entity position
+              navSource = 'entity';
               dropPos = new Vec3(
                 nearbyItemEntity.position.x,
                 nearbyItemEntity.position.y,
                 nearbyItemEntity.position.z
               );
             } else {
-              // Fallback: compute ground position below the dig site
               const fx = Math.floor(digSitePos.x);
               const fz = Math.floor(digSitePos.z);
               let groundY = Math.floor(digSitePos.y);
@@ -1530,10 +1532,21 @@ export class AcquireMaterialLeaf implements LeafImpl {
               dropPos = new Vec3(fx + 0.5, groundY, fz + 0.5);
             }
 
+            const botPosBeforeNav = bot.entity.position.clone();
+            console.log(
+              `[acquire_material] nav_decision: target=${blockName} navSource=${navSource} ` +
+              `dropPos=(${dropPos.x.toFixed(1)},${dropPos.y.toFixed(1)},${dropPos.z.toFixed(1)}) ` +
+              `botPos=(${botPosBeforeNav.x.toFixed(1)},${botPosBeforeNav.y.toFixed(1)},${botPosBeforeNav.z.toFixed(1)}) ` +
+              `distToDropPos=${botPosBeforeNav.distanceTo(dropPos).toFixed(1)} ` +
+              `entityFound=${!!nearbyItemEntity} ` +
+              (nearbyItemEntity ? `entityPos=(${nearbyItemEntity.position.x.toFixed(1)},${nearbyItemEntity.position.y.toFixed(1)},${nearbyItemEntity.position.z.toFixed(1)})` : '')
+            );
+
+            // Navigate to drop — use range 1 instead of 2 to get closer to the item
             let gotoTimedOut = false;
             await Promise.race([
               botWithPf.pathfinder?.goto(
-                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 2)
+                new pathfinderGoals.GoalNear(dropPos.x, dropPos.y, dropPos.z, 1)
               ) ?? Promise.resolve(),
               new Promise<void>((r) =>
                 setTimeout(() => { gotoTimedOut = true; r(); }, 8000)
@@ -1547,6 +1560,12 @@ export class AcquireMaterialLeaf implements LeafImpl {
             // as a fallback when pathfinder times out or stops short.
             // Jump for the first 1s to clear 1-block terrain obstacles (common around trees).
             const distAfterPf = bot.entity.position.distanceTo(dropPos);
+            const botPosAfterNav = bot.entity.position.clone();
+            console.log(
+              `[acquire_material] post_nav: distAfterPf=${distAfterPf.toFixed(1)} ` +
+              `botPos=(${botPosAfterNav.x.toFixed(1)},${botPosAfterNav.y.toFixed(1)},${botPosAfterNav.z.toFixed(1)}) ` +
+              `timedOut=${gotoTimedOut} pickupDetected=${pickupDetected}`
+            );
             if (!pickupDetected && distAfterPf > 1.5) {
               await bot.lookAt(dropPos);
               (bot as any).setControlState('forward', true);

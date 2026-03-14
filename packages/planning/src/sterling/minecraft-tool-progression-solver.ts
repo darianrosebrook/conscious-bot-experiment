@@ -152,6 +152,14 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     const { tier: targetTier, toolType } = parsed;
     const currentTier = detectCurrentTier(inventory);
 
+    // Diagnostic: capture what the solver sees
+    const invItems = Object.entries(inventory).filter(([, v]) => v > 0);
+    console.log(
+      `[Sterling:tool_progression] target=${targetTool} currentTier=${currentTier ?? 'none'} ` +
+      `inventory=[${invItems.map(([k, v]) => `${k}:${v}`).join(',')}] ` +
+      `nearbyBlocks=[${nearbyBlocks.slice(0, 8).join(',')}${nearbyBlocks.length > 8 ? '...' : ''}]`
+    );
+
     // Already have the target tier or better
     if (currentTier !== null) {
       const currentIdx = TOOL_TIERS.indexOf(currentTier);
