@@ -145,12 +145,12 @@ function hardReset(): void {
   rcon(`effect give ${BOT_USERNAME} minecraft:saturation 1 10`);
 
   // Clear a large area around spawn of any player-placed blocks.
-  // Fill with air above ground level, then restore ground to grass.
-  // This removes crafting tables, torches, placed blocks from prior runs.
-  rcon('fill -20 64 -20 20 80 20 minecraft:air');
-  rcon('fill -20 63 -20 20 63 20 minecraft:grass_block');
-  rcon('fill -20 60 -20 20 62 20 minecraft:dirt');
+  // Works for both flat worlds (Y=-60 ground) and normal worlds (Y=63 ground).
+  // Build the platform at Y=63 regardless, since scenarios expect that level.
   rcon('fill -20 59 -20 20 59 20 minecraft:bedrock');
+  rcon('fill -20 60 -20 20 62 20 minecraft:dirt');
+  rcon('fill -20 63 -20 20 63 20 minecraft:grass_block');
+  rcon('fill -20 64 -20 20 80 20 minecraft:air');
 
   // Kill any mobs that spawned
   rcon('kill @e[type=!minecraft:player]');

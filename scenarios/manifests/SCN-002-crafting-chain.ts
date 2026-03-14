@@ -1,39 +1,16 @@
-/**
- * SCN-002: Crafting Chain — Planks, Sticks, Table, Pickaxe
- *
- * Validates: craft_recipe, place_workstation, full tool progression tier 0
- *
- * Environment: flat terrain, bot starts with 4 oak_log in inventory,
- * no crafting table in the world. Must craft planks, sticks, place a
- * crafting table, and craft a wooden pickaxe.
- *
- * Success: bot has wooden_pickaxe in inventory.
- */
-
-import type { ScenarioManifest } from '../lib/types';
+import type { ScenarioManifest } from './types';
 
 export const SCN_002: ScenarioManifest = {
   id: 'SCN-002',
-  name: 'Crafting Chain — Wooden Pickaxe',
+  name: 'Crafting Chain — Certification Arena',
   description:
-    'Bot starts with 4 oak_log. Must craft planks, sticks, crafting table, ' +
-    'place the table on flat ground, and craft a wooden pickaxe.',
+    'Bot starts at arena center with 4 oak_log and no crafting table placed in the world. ' +
+    'Must craft planks, sticks, a crafting table, place it on the workstation pad, and craft a wooden_pickaxe.',
   capabilities: ['craft_recipe', 'place_workstation', 'tool_progression'],
-
-  baseline: 'flat',
-
+  baseline: 'custom',
   fixture: {
-    clearRegions: [
-      { block: 'minecraft:air', from: { x: -5, y: 64, z: -5 }, to: { x: 5, y: 74, z: 5 } },
-    ],
-    fillRegions: [
-      { block: 'minecraft:grass_block', from: { x: -5, y: 63, z: -5 }, to: { x: 5, y: 63, z: 5 } },
-      { block: 'minecraft:dirt', from: { x: -5, y: 60, z: -5 }, to: { x: 5, y: 62, z: 5 } },
-    ],
-    blocks: [],
-    commands: [],
+    commands: ['# Use ./scripts/cert-arena.sh reset scn-002 before run'],
   },
-
   rules: {
     difficulty: 'peaceful',
     doDaylightCycle: false,
@@ -42,28 +19,30 @@ export const SCN_002: ScenarioManifest = {
     time: 6000,
     weather: 'clear',
   },
-
   bot: {
-    position: { x: 0, y: 64, z: 0 },
+    position: { x: 1000, y: 64, z: 1000 },
     gameMode: 'survival',
     health: 20,
     food: 20,
     inventory: [{ item: 'oak_log', count: 4 }],
   },
-
   preRunInvariants: [
-    {
-      type: 'block_absent',
-      description: 'No crafting table near spawn (bot must place one)',
-      params: { pos: { x: 0, y: 64, z: 0 }, block: 'crafting_table', radius: 8 },
-    },
     {
       type: 'inventory_contains',
       description: 'Bot has 4 oak_log',
       params: { item: 'oak_log', count: 4 },
     },
+    {
+      type: 'block_absent',
+      description: 'No crafting table already placed on workstation pad center',
+      params: { pos: { x: 1012, y: 64, z: 1000 }, block: 'crafting_table', radius: 2 },
+    },
+    {
+      type: 'bot_at_position',
+      description: 'Bot starts on arena center pad',
+      params: { pos: { x: 1000, y: 64, z: 1000 }, maxDistance: 1.0 },
+    },
   ],
-
   acceptance: [
     {
       id: 'AC-1',
@@ -75,22 +54,21 @@ export const SCN_002: ScenarioManifest = {
       id: 'AC-2',
       description: 'place_workstation succeeded',
       type: 'log_contains',
-      params: { pattern: 'place_workstation.*status=success' },
+      params: { pattern: 'place_workstation status=success' },
     },
     {
       id: 'AC-3',
-      description: 'craft_recipe dispatched for wooden_pickaxe (proves the plan included it)',
+      description: 'Plan dispatched wooden_pickaxe craft step',
       type: 'log_contains',
-      params: { pattern: 'recipe.*wooden_pickaxe.*qty' },
+      params: { pattern: 'recipe":"wooden_pickaxe:v11' },
     },
     {
       id: 'AC-4',
-      description: 'No state carryover — bot did not start with wooden_pickaxe',
+      description: 'No reconnect storms occurred',
       type: 'log_absent',
-      params: { pattern: 'initial.*wooden_pickaxe|carryover' },
+      params: { pattern: 'duplicate_login|logged in from another location' },
     },
   ],
-
   maxDurationSeconds: 180,
-  tags: ['crafting', 'placement', 'tier-0', 'certification'],
+  tags: ['crafting', 'workstation', 'cert-arena', 'tier-0', 'certification'],
 };
