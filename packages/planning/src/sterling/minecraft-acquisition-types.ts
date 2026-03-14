@@ -110,6 +110,33 @@ export interface AcquisitionSolveResult {
   solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
   /** M3: Bridge artifacts linking upstream/downstream solver segments */
   bridgeEdges?: import('./bridge-artifact-types').BridgeEdgeV1[];
+  /** M4: Learning decision record explaining how priors affected ranking */
+  learningDecision?: LearningDecisionRecord;
+}
+
+/**
+ * M4: Per-solve learning decision record.
+ *
+ * Captures the full causal surface of how priors influenced strategy
+ * selection. Persisted in the solve result so any episode can be
+ * reconstructed: which strategies were considered, what prior state
+ * influenced the choice, and what the effective scores were.
+ */
+export interface LearningDecisionRecord {
+  /** Whether learning (prior influence) was enabled for this solve */
+  learningEnabled: boolean;
+  /** Context key used for prior lookup */
+  contextKey: string;
+  /** Candidate set digest (M1 boundary — unchanged by learning) */
+  candidateSetDigest: string;
+  /** Selected strategy */
+  selectedStrategy: AcquisitionStrategy | null;
+  /** Per-candidate scoring breakdown, in ranked order */
+  scoringEvidence: import('./minecraft-acquisition-rules').CandidateScoringEvidence[];
+  /** Bundle identity anchoring this decision */
+  parentBundleHash?: string;
+  /** Plan identity anchoring this decision */
+  planId?: string;
 }
 
 /** A single step in the acquisition solution */

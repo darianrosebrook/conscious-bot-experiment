@@ -480,6 +480,74 @@ export function rankStrategies(
 }
 
 /**
+ * M4: Scoring evidence for a single candidate.
+ * Exposes the internal causal surface of the ranking decision.
+ */
+export interface CandidateScoringEvidence {
+  strategy: AcquisitionStrategy;
+  estimatedCost: number;
+  priorSuccessRate: number;
+  effectiveScore: number;
+  scoreMillis: number;
+  priorSampleCount: number;
+  contextKey: string;
+}
+
+/**
+ * M4: Rank strategies with full scoring evidence.
+ *
+ * Returns both the ordered candidates AND the scoring breakdown for each,
+ * so the caller can persist a learning decision record that explains
+ * exactly why each strategy was ranked where it was.
+ */
+export function rankStrategiesWithEvidence(
+  candidates: AcquisitionCandidate[],
+  priors: StrategyPrior[],
+  _objectiveWeights?: { costWeight?: number; timeWeight?: number; riskWeight?: number },
+): { ranked: AcquisitionCandidate[]; evidence: CandidateScoringEvidence[] } {
+  const priorMap = new Map<string, StrategyPrior>();
+  for (const p of priors) {
+    priorMap.set(`${p.strategy}:${p.contextKey}`, p);
+  }
+
+  const scored = candidates.map(c => {
+    const contextKey = contextKeyFromAcquisitionContext(c.contextSnapshot);
+    const prior = priorMap.get(`${c.strategy}:${contextKey}`);
+    const successRate = prior?.successRate ?? 0.5;
+    const score = c.estimatedCost * (1 - successRate);
+    const scoreMillis = Number.isNaN(score) || !Number.isFinite(score)
+      ? Number.MAX_SAFE_INTEGER
+      : Math.round(score * 1000);
+    return {
+      candidate: c,
+      scoreMillis,
+      evidence: {
+        strategy: c.strategy,
+        estimatedCost: c.estimatedCost,
+        priorSuccessRate: successRate,
+        effectiveScore: score,
+        scoreMillis,
+        priorSampleCount: prior?.sampleCount ?? 0,
+        contextKey,
+      } satisfies CandidateScoringEvidence,
+    };
+  });
+
+  scored.sort((a, b) => {
+    const diff = a.scoreMillis - b.scoreMillis;
+    if (diff !== 0) return diff;
+    const nameA = a.candidate.strategy;
+    const nameB = b.candidate.strategy;
+    return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
+  });
+
+  return {
+    ranked: scored.map(s => s.candidate),
+    evidence: scored.map(s => s.evidence),
+  };
+}
+
+/**
  * Derive a stable context key from AcquisitionContextV1.
  * Subset of context fields that are strategy-relevant for prior indexing.
  */

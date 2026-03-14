@@ -29,6 +29,7 @@ import {
   buildAcquisitionStrategies,
   buildSalvageCandidatesWithInventory,
   rankStrategies,
+  rankStrategiesWithEvidence,
   contextKeyFromAcquisitionContext,
   MINECRAFT_TRADE_TABLE,
   MINECRAFT_SALVAGE_TABLE,
@@ -127,6 +128,12 @@ export function buildSalvageRules(
 export interface AcquisitionSolveOptions {
   objectiveWeights?: ObjectiveWeights;
   maxNodes?: number;
+  /**
+   * M4: Explicit learning toggle. When false, priors are not consulted
+   * during ranking (all strategies ranked by static cost only).
+   * Default: true (production behavior).
+   */
+  useLearning?: boolean;
 }
 
 // ============================================================================
@@ -238,8 +245,13 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     }
 
     // 5. Get priors and rank
-    const priors = this.priorStore.getPriorsForContext(item, contextKey);
-    const ranked = rankStrategies(candidates, priors, options?.objectiveWeights);
+    const useLearning = options?.useLearning ?? true;
+    const priors = useLearning
+      ? this.priorStore.getPriorsForContext(item, contextKey)
+      : []; // Empty priors → all strategies ranked by static cost only
+    const { ranked, evidence: scoringEvidence } = rankStrategiesWithEvidence(
+      candidates, priors, options?.objectiveWeights,
+    );
 
     // 6. Select top strategy
     const selected = ranked[0];
@@ -358,6 +370,16 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
         ? extractSolveJoinKeys(parentBundle, dispatchResult.planId)
         : undefined,
       bridgeEdges: bridgeEdges.length > 0 ? bridgeEdges : undefined,
+      // M4: Learning decision record — explains how priors affected ranking
+      learningDecision: {
+        learningEnabled: useLearning,
+        contextKey,
+        candidateSetDigest,
+        selectedStrategy: selected.strategy,
+        scoringEvidence,
+        parentBundleHash: parentBundle.bundleHash,
+        planId: dispatchResult.planId ?? undefined,
+      },
     };
   }
 
