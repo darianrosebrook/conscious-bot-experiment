@@ -24,6 +24,7 @@ import {
 } from './entity-belief';
 import { assessReflexThreats, ReflexArbitrator } from './reflex';
 import { isSystemReady, onSystemReady } from './startup-barrier';
+import { ConnectionManager } from './connection-manager';
 
 /** Module-level monotonic counter for ephemeral stream_id (deterministic, no Date.now()) */
 let botInstanceCounter = 0;
@@ -31,13 +32,15 @@ let botInstanceCounter = 0;
 export class BotAdapter extends EventEmitter {
   private bot: Bot | null = null;
   private config: BotConfig;
-  private reconnectAttempts = 0;
   private isShuttingDown = false;
   private connectionState:
     | 'disconnected'
     | 'connecting'
     | 'connected'
     | 'spawned' = 'disconnected';
+
+  /** External ConnectionManager — if set, all reconnect decisions delegate to it. */
+  private _connectionManager: ConnectionManager | null = null;
   private safetyMonitor: AutomaticSafetyMonitor | null = null;
   private actionTranslator: any = null;
 
@@ -94,6 +97,15 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
+   * Attach the ConnectionManager that owns reconnect decisions.
+   * When set, BotAdapter delegates all disconnect/error handling to it
+   * instead of running its own attemptReconnect().
+   */
+  setConnectionManager(cm: ConnectionManager): void {
+    this._connectionManager = cm;
+  }
+
+  /**
    * Connect to Minecraft server
    */
   async connect(): Promise<Bot> {
@@ -136,7 +148,6 @@ export class BotAdapter extends EventEmitter {
       this.bot.once('login', () => {
         clearTimeout(timeoutId);
         this.connectionState = 'connected';
-        this.reconnectAttempts = 0;
         this.emitBotEvent('connected', {
           username: this.config.username,
           server: `${this.config.host}:${this.config.port}`,
@@ -169,8 +180,9 @@ export class BotAdapter extends EventEmitter {
         this.connectionState = 'disconnected';
         this.emitBotEvent('error', { error: error.message });
 
-        if (!this.isShuttingDown && this.config.autoReconnect) {
-          this.attemptReconnect();
+        // Delegate reconnect decision to ConnectionManager if available
+        if (!this.isShuttingDown && this._connectionManager) {
+          this._connectionManager.handleUnexpectedDisconnect(error.message, false);
         }
 
         reject(error);
@@ -187,8 +199,15 @@ export class BotAdapter extends EventEmitter {
               : undefined,
         });
 
-        if (!this.isShuttingDown && this.config.autoReconnect) {
-          this.attemptReconnect();
+        // Delegate reconnect decision to ConnectionManager if available
+        if (!this.isShuttingDown && this._connectionManager) {
+          const wasKicked = !!(this as any)._lastKickReason;
+          const kickReason = (this as any)._lastKickReason;
+          (this as any)._lastKickReason = null;
+          this._connectionManager.handleUnexpectedDisconnect(
+            kickReason || reason,
+            wasKicked,
+          );
         }
       });
     });
@@ -612,40 +631,17 @@ export class BotAdapter extends EventEmitter {
       });
     });
 
-    // Kicked handling
+    // Kicked handling — delegate to ConnectionManager for reconnect decisions
     this.bot.on('kicked', (reason) => {
       this.emitBotEvent('error', {
-        error: `Kicked from server: ${reason}`,
+        error: `Kicked from server: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}`,
         reason,
       });
+      // The 'end' event will fire after 'kicked', so ConnectionManager will
+      // be notified there. But we mark the kick here so the 'end' handler
+      // can pass wasKicked=true. We use a short-lived flag.
+      (this as any)._lastKickReason = reason;
     });
-  }
-
-  /**
-   * Attempt to reconnect to server
-   */
-  private async attemptReconnect(): Promise<void> {
-    if (
-      this.isShuttingDown ||
-      this.reconnectAttempts >= this.config.maxReconnectAttempts
-    ) {
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff, max 30s
-
-    this.emitBotEvent('error', {
-      error: `Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${delay}ms`,
-    });
-
-    setTimeout(async () => {
-      try {
-        await this.connect();
-      } catch (error) {
-        // Error will be handled by connect() method
-      }
-    }, delay);
   }
 
   /**
@@ -681,11 +677,15 @@ export class BotAdapter extends EventEmitter {
    * Get bot status for monitoring
    */
   getStatus(): any {
+    const cmStatus = this._connectionManager?.getStatus();
+    const reconnects = cmStatus?.reconnectAttempts ?? 0;
+
     if (!this.bot) {
       return {
         connected: false,
-        connectionState: this.connectionState,
-        reconnectAttempts: this.reconnectAttempts,
+        connectionState: cmStatus?.state ?? this.connectionState,
+        reconnectAttempts: reconnects,
+        ...(cmStatus?.lastReason !== 'unknown' ? { lastDisconnectReason: cmStatus?.lastReason } : {}),
       };
     }
 
@@ -694,7 +694,7 @@ export class BotAdapter extends EventEmitter {
       return {
         connected: true,
         connectionState: this.connectionState,
-        reconnectAttempts: this.reconnectAttempts,
+        reconnectAttempts: reconnects,
         username: this.bot.username,
         health: this.bot.health,
         food: this.bot.food,
@@ -712,7 +712,7 @@ export class BotAdapter extends EventEmitter {
     const status: any = {
       connected: true,
       connectionState: this.connectionState,
-      reconnectAttempts: this.reconnectAttempts,
+      reconnectAttempts: reconnects,
       username: this.bot.username || 'unknown',
       health: this.bot.health || 0,
       food: this.bot.food || 0,

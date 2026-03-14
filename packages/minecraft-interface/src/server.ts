@@ -53,6 +53,9 @@ import {
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
 
+// Connection lifecycle authority (Phase 0 restructure)
+import { ConnectionManager } from './connection-manager';
+
 // Import asset pipeline for custom texture serving
 import { createAssetServer } from './asset-pipeline/index.js';
 
@@ -253,6 +256,14 @@ let isConnecting = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
 let pendingThoughtGeneration = false;
+
+// Single connection authority — all connect/disconnect/reconnect goes through here
+const connectionManager = new ConnectionManager({
+  maxReconnectAttempts: 5,
+  baseReconnectDelayMs: 3000,
+  maxReconnectDelayMs: 30000,
+  reconnectJitterMs: 1000,
+});
 
 /**
  * Start observation broadcast — sends periodic bot status to cognition service.
@@ -947,16 +958,21 @@ app.post('/seed', async (req, res) => {
   }
 });
 
-// Connect to Minecraft server
+// Connect to Minecraft server — routes through ConnectionManager
 app.post('/connect', async (req, res) => {
-  if (isConnecting) {
-    return res.status(400).json({
-      success: false,
-      message: 'Connection already in progress',
+  // If already connected, return success
+  if (connectionManager.isConnected) {
+    return res.json({
+      success: true,
+      message: 'Already connected',
+      status: connectionManager.getStatus(),
     });
   }
 
-  isConnecting = true;
+  // If blocked (fatal disconnect), unblock first so connect can proceed
+  if (connectionManager.state === 'blocked') {
+    connectionManager.unblock();
+  }
 
   try {
     // Accept optional worldSeed in request body
@@ -965,8 +981,7 @@ app.post('/connect', async (req, res) => {
       const seedStr = String(worldSeed);
       botConfig.worldSeed = seedStr;
       process.env.WORLD_SEED = seedStr;
-      // Propagate to memory service (resilient: retries until memory is up)
-      const memoryResponse = await resilientFetch(
+      await resilientFetch(
         `${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`,
         {
           method: 'POST',
@@ -977,32 +992,23 @@ app.post('/connect', async (req, res) => {
       );
     }
 
-    // Initialize memory integration service
+    // Initialize memory integration
     memoryIntegration = new MemoryIntegrationService(botConfig, {
       autoActivateNamespaces: true,
     });
-
-    // Activate memory namespace for this world
     const memoryActivated = await memoryIntegration.activateWorldMemory();
     if (!memoryActivated) {
-      console.warn(
-        'Failed to activate memory namespace, continuing without memory integration'
-      );
+      console.warn('Failed to activate memory namespace, continuing without memory integration');
     }
 
-    // Create minecraft interface (no local planning coordinator — execution flows through planning server)
-    minecraftInterface = await createMinecraftInterface(botConfig);
-
-    // Setup WebSocket event handlers for real-time updates
-    setupBotStateWebSocket();
-
-    // Leaves already registered on server startup; skip duplicate
-    console.log('[minecraft-interface] Connected to Minecraft server');
+    // Connect through the single authority
+    await connectionManager.connect();
 
     res.json({
       success: true,
       message: 'Connected to Minecraft server',
       memoryIntegration: memoryActivated,
+      status: connectionManager.getStatus(),
     });
   } catch (error) {
     console.error('Failed to connect:', error);
@@ -1010,9 +1016,8 @@ app.post('/connect', async (req, res) => {
       success: false,
       message: 'Failed to connect to Minecraft server',
       error: error instanceof Error ? error.message : 'Unknown error',
+      status: connectionManager.getStatus(),
     });
-  } finally {
-    isConnecting = false;
   }
 });
 
@@ -1161,126 +1166,106 @@ async function registerCoreLeaves() {
   }
 }
 
-// Auto-connect function
-async function attemptAutoConnect() {
-  if (minecraftInterface?.botAdapter.getStatus()?.connected || isConnecting) {
-    return;
-  }
+// ── ConnectionManager wiring ────────────────────────────────────────────────
+// The ConnectionManager is the SINGLE authority for connect/disconnect/reconnect.
+// It calls performConnect() to create and initialize the bot, and performDisconnect()
+// to tear it down. No other code should schedule reconnects.
+
+async function performConnect(): Promise<void> {
+  if (isConnecting) return;
+  isConnecting = true;
 
   try {
-    isConnecting = true;
-
-    // Create minecraft interface (no local planning coordinator — execution flows through planning server)
+    // Create minecraft interface
     minecraftInterface =
       await createMinecraftInterfaceWithoutConnect(botConfig);
 
-    // Manually initialize the plan executor to connect to Minecraft
+    // Attach ConnectionManager to BotAdapter so disconnect/kick events route through it
+    minecraftInterface.botAdapter.setConnectionManager(connectionManager);
+
+    // Initialize (connects mineflayer to the server)
     await minecraftInterface.planExecutor.initialize();
 
-    // Leaves already registered on server startup; skip duplicate
-    // Setup WebSocket event handlers and start autonomous planning
-    // (must be after initialize() completes, not in 'initialized' event which already fired)
+    // Setup WS/SSE push and observation broadcast
     setupBotStateWebSocket();
     startObservationBroadcast();
 
-    // Start Prismarine viewer now that bot is connected and spawned.
-    // Previously this was inside the 'initialized' event handler, but that event
-    // fires during initialize() — before the handler is registered — so it was never reached.
+    // Start Prismarine viewer
     const startViewerWithRetry = async (retryCount = 0) => {
       try {
-        if (!minecraftInterface) {
-          return;
-        }
+        if (!minecraftInterface) return;
         const bot = minecraftInterface.botAdapter.getBot();
         if (bot && !viewerActive) {
           const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
           if (viewerCheck.canStart) {
             startViewerSafely(bot, viewerPort);
           } else if (retryCount < 3) {
-            // Retry after 2 seconds if not ready
             setTimeout(() => startViewerWithRetry(retryCount + 1), 2000);
-          } else {
-            console.warn(
-              '[Prismarine] Viewer auto-start failed after retries:',
-              viewerCheck.reason
-            );
           }
         }
       } catch (err) {
         console.error('Failed to start Prismarine viewer:', err);
         viewerActive = false;
-        // Retry once more after error
         if (retryCount < 1) {
           setTimeout(() => startViewerWithRetry(retryCount + 1), 3000);
         }
       }
     };
-
     startViewerWithRetry();
 
+    // On shutdown, clean up but do NOT schedule reconnect — ConnectionManager does that
     minecraftInterface.planExecutor.on('shutdown', () => {
       minecraftInterface = null;
       viewerActive = false;
-      // Attempt to reconnect after a delay
-      setTimeout(() => {
-        if (
-          !minecraftInterface?.botAdapter.getStatus()?.connected &&
-          !isConnecting
-        ) {
-          attemptAutoConnect();
-        }
-      }, 10000); // Increased from 5 to 10 seconds to reduce reconnection spam
+      // ConnectionManager will be notified via BotAdapter's 'end' handler
     });
-
+  } finally {
     isConnecting = false;
-  } catch (error) {
-    isConnecting = false;
-    console.error('[minecraft-interface] Auto-connection failed:', error);
-
-    // Don't retry on protocol version errors - this is a compatibility issue
-    if (error instanceof Error && error.message.includes('protocol version')) {
-      console.warn(
-        '[minecraft-interface] Protocol version incompatibility detected. Skipping auto-reconnect. Ensure Minecraft server version matches mineflayer support (1.8-1.21.9).'
-      );
-      return;
-    }
-
-    // Retry after 60 seconds for other errors
-    setTimeout(() => {
-      if (
-        !minecraftInterface?.botAdapter.getStatus()?.connected &&
-        !isConnecting
-      ) {
-        attemptAutoConnect();
-      }
-    }, 60000); // Increased from 30 to 60 seconds to reduce reconnection spam
   }
 }
 
-// Start auto-connection when server starts
+async function performDisconnect(): Promise<void> {
+  if (minecraftInterface) {
+    try {
+      await minecraftInterface.botAdapter.disconnect();
+    } catch {
+      // best-effort
+    }
+    minecraftInterface = null;
+    viewerActive = false;
+  }
+}
+
+// Register handlers with the ConnectionManager
+connectionManager.registerHandlers(performConnect, performDisconnect);
+
+// Log all lifecycle transitions for diagnostics
+connectionManager.on('transition', (event: any) => {
+  if (event.state === 'blocked') {
+    console.warn(
+      `[ConnectionManager] BLOCKED: ${event.reason} — ${event.detail || 'no detail'}. ` +
+      `Will not auto-reconnect. Use POST /connect to retry manually.`
+    );
+  }
+});
+
+// Start initial connection when server starts
 setTimeout(() => {
-  attemptAutoConnect();
-}, 5000); // Wait 5 seconds after server starts to reduce initial spam
+  connectionManager.connect().catch((err: any) => {
+    console.warn(`[ConnectionManager] Initial connection failed: ${err.message}`);
+    // ConnectionManager handles retry/block decisions internally
+  });
+}, 5000);
 
 // Disconnect from server
 app.post('/disconnect', async (req, res) => {
   try {
-    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
-      return res.json({
-        success: true,
-        message: 'Not connected',
-        status: 'disconnected',
-      });
-    }
-
-    await minecraftInterface.planExecutor.shutdown();
-    minecraftInterface = null;
-    viewerActive = false;
+    await connectionManager.disconnect();
 
     res.json({
       success: true,
       message: 'Disconnected from Minecraft server',
-      status: 'disconnected',
+      status: connectionManager.getStatus(),
     });
   } catch (error) {
     console.error('[minecraft-interface] Disconnect failed:', error);
@@ -1292,50 +1277,19 @@ app.post('/disconnect', async (req, res) => {
   }
 });
 
-// Stop auto-connection
-app.post('/stop-auto-connect', async (req, res) => {
-  try {
-    if (autoConnectInterval) {
-      clearInterval(autoConnectInterval);
-      autoConnectInterval = null;
-    }
-
-    res.json({
-      success: true,
-      message: 'Auto-connection stopped',
-    });
-  } catch (error) {
-    console.error('[minecraft-interface] Failed to stop auto-connection:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to stop auto-connection',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+// Connection lifecycle status
+app.get('/connection', (_req, res) => {
+  res.json(connectionManager.getStatus());
 });
 
-// Start auto-connection
-app.post('/start-auto-connect', async (req, res) => {
-  try {
-    if (
-      !minecraftInterface?.botAdapter.getStatus()?.connected &&
-      !isConnecting
-    ) {
-      attemptAutoConnect();
-    }
-
-    res.json({
-      success: true,
-      message: 'Auto-connection started',
-    });
-  } catch (error) {
-    console.error('[minecraft-interface] Failed to start auto-connection:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to start auto-connection',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+// Unblock after fatal disconnect (e.g., after fixing server config)
+app.post('/unblock', async (_req, res) => {
+  connectionManager.unblock();
+  res.json({
+    success: true,
+    message: 'Connection unblocked',
+    status: connectionManager.getStatus(),
+  });
 });
 
 // Get chat history
