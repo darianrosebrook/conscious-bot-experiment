@@ -1032,6 +1032,7 @@ async function injectDynamicPrereqForCraft(
   // When craft fails because bot isn't near a required workstation,
   // inject navigate-to or place-workstation prereq instead of mining materials.
   const diag = opts?.toolDiagnostics;
+  console.log(`[PrereqInjection] craft prereq check: recipe=${opts?.recipe} requires_workstation=${diag?.requires_workstation} table_nearby=${diag?.crafting_table_nearby} has_inventory_table=${diag?.has_workstation_in_inventory} prereqAttempts=${prereqAttempts}`);
   if (diag?.requires_workstation === true && diag?.crafting_table_nearby === false) {
     const injected = await injectWorkstationPrereq(task, diag, prereqAttempts);
     if (injected) return true;

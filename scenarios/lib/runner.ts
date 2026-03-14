@@ -121,6 +121,41 @@ function writeArtifact(runDir: string, filename: string, data: unknown): void {
   }
 }
 
+// ─── Phase 0: Hard Reset ────────────────────────────────────────────────────
+// Destroy all carryover state from previous runs. This runs BEFORE any
+// fixture application. Without this, inventory, placed blocks, dropped items,
+// and entity state from prior scenarios contaminate the next run.
+
+function hardReset(): void {
+  // Kill all dropped item entities in the world
+  rcon('kill @e[type=minecraft:item]');
+
+  // Clear bot inventory completely
+  rcon(`clear ${BOT_USERNAME}`);
+
+  // Remove all XP
+  rcon(`experience set ${BOT_USERNAME} 0 points`);
+  rcon(`experience set ${BOT_USERNAME} 0 levels`);
+
+  // Clear all effects
+  rcon(`effect clear ${BOT_USERNAME}`);
+
+  // Reset health and hunger
+  rcon(`effect give ${BOT_USERNAME} minecraft:instant_health 1 10`);
+  rcon(`effect give ${BOT_USERNAME} minecraft:saturation 1 10`);
+
+  // Clear a large area around spawn of any player-placed blocks.
+  // Fill with air above ground level, then restore ground to grass.
+  // This removes crafting tables, torches, placed blocks from prior runs.
+  rcon('fill -20 64 -20 20 80 20 minecraft:air');
+  rcon('fill -20 63 -20 20 63 20 minecraft:grass_block');
+  rcon('fill -20 60 -20 20 62 20 minecraft:dirt');
+  rcon('fill -20 59 -20 20 59 20 minecraft:bedrock');
+
+  // Kill any mobs that spawned
+  rcon('kill @e[type=!minecraft:player]');
+}
+
 // ─── Phase 1: World Setup ───────────────────────────────────────────────────
 
 function applyWorldSetup(manifest: ScenarioManifest): void {
@@ -374,13 +409,8 @@ export async function setupScenario(
   console.log(`\n=== Scenario: ${manifest.id} — ${manifest.name} ===`);
   console.log(`Run directory: ${runDir}\n`);
 
-  // Phase 1: World setup
-  console.log('[Phase 1] Applying world fixture...');
-  applyWorldSetup(manifest);
-  writeArtifact(runDir, 'manifest.json', manifest);
-
-  // Phase 2: Wait for bot
-  console.log('[Phase 2] Waiting for bot connection...');
+  // Phase 0: Wait for bot to be online (required for reset commands)
+  console.log('[Phase 0] Waiting for bot connection...');
   const botReady = await waitForBot(60000);
   if (!botReady) {
     console.error('Bot not connected after 60s. Is the bot running?');
@@ -389,12 +419,21 @@ export async function setupScenario(
     return { runDir, invariantsPassed: false, results: [], initialState: null };
   }
 
-  // Phase 3: Apply bot state (bot must be online for teleport/inventory)
-  console.log('[Phase 3] Applying bot state...');
+  // Phase 0b: Hard reset — destroy all carryover from previous runs
+  console.log('[Phase 0b] Hard reset — clearing carryover state...');
+  hardReset();
+
+  // Phase 1: Apply world fixture on clean slate
+  console.log('[Phase 1] Applying world fixture...');
+  applyWorldSetup(manifest);
+  writeArtifact(runDir, 'manifest.json', manifest);
+
+  // Phase 2: Apply bot state (bot is already online from Phase 0)
+  console.log('[Phase 2] Applying bot state...');
   applyBotState(manifest);
 
-  // Phase 4: Verify ALL invariants (world + bot state)
-  console.log('[Phase 4] Verifying invariants...');
+  // Phase 3: Verify ALL invariants (world + bot state)
+  console.log('[Phase 3] Verifying invariants...');
   const { passed, results } = await verifyAllInvariants(manifest);
 
   // Capture initial state snapshot

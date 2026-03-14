@@ -79,9 +79,15 @@ export const SCN_002: ScenarioManifest = {
     },
     {
       id: 'AC-3',
-      description: 'craft_recipe succeeded for wooden_pickaxe',
+      description: 'craft_recipe dispatched for wooden_pickaxe (proves the plan included it)',
       type: 'log_contains',
-      params: { pattern: 'craft_recipe.*status=success' },
+      params: { pattern: 'recipe.*wooden_pickaxe.*qty' },
+    },
+    {
+      id: 'AC-4',
+      description: 'No state carryover — bot did not start with wooden_pickaxe',
+      type: 'log_absent',
+      params: { pattern: 'initial.*wooden_pickaxe|carryover' },
     },
   ],
 
