@@ -31,7 +31,8 @@ services:
       EULA: "TRUE"
       VERSION: "1.21.9"
       # ONLINE_MODE=FALSE for bot testing (custom skins require TRUE + Mojang auth)
-      ONLINE_MODE: "TRUE"
+      ONLINE_MODE: "FALSE"
+      ALLOW_FLIGHT: "TRUE"
       GAMEMODE: survival
       DIFFICULTY: normal
       SPAWN_PROTECTION: "0"
