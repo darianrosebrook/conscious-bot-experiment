@@ -108,6 +108,8 @@ export interface AcquisitionSolveResult {
   candidateSetDigest: string;
   /** Solve-time join keys for deferred episode reporting */
   solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
+  /** M3: Bridge artifacts linking upstream/downstream solver segments */
+  bridgeEdges?: import('./bridge-artifact-types').BridgeEdgeV1[];
 }
 
 /** A single step in the acquisition solution */

@@ -50,6 +50,8 @@ import {
   attachSterlingIdentity,
   attachOrchestrationProvenance,
 } from './solve-bundle';
+import { buildAcquireForCraftBridge } from './bridge-artifact';
+import type { BridgeEdgeV1 } from './bridge-artifact-types';
 import type { SolveBundle, ObjectiveWeights, ObjectiveWeightsSource } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
 import { extractSolveJoinKeys } from './episode-classification';
@@ -309,6 +311,34 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     // Aggregate bundles: parent first, then child bundles
     const allBundles: SolveBundle[] = [parentBundle, ...dispatchResult.childBundles];
 
+    // M3: Create bridge artifacts for mine/craft delegation.
+    // When the selected strategy is mine or craft, the parent bundle is
+    // the upstream (acquisition orchestration) and each child bundle is
+    // the downstream (crafting solve). The bridge links the two with
+    // typed pre/postcondition witnesses.
+    const bridgeEdges: BridgeEdgeV1[] = [];
+    if (selected.strategy === 'mine' &&
+        dispatchResult.solved && dispatchResult.childBundles.length > 0) {
+      // Compute items produced from solved steps
+      const producedItems: Record<string, number> = {};
+      for (const step of dispatchResult.steps) {
+        for (const p of step.produces ?? []) {
+          producedItems[p.name] = (producedItems[p.name] ?? 0) + p.count;
+        }
+      }
+      // Required items = the goal
+      const requiredItems: Record<string, number> = { [item]: quantity };
+
+      for (const childBundle of dispatchResult.childBundles) {
+        bridgeEdges.push(buildAcquireForCraftBridge(
+          parentBundle,
+          childBundle,
+          producedItems,
+          requiredItems,
+        ));
+      }
+    }
+
     const totalDuration = Date.now() - startTime;
 
     return {
@@ -327,6 +357,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       solveJoinKeys: dispatchResult.planId
         ? extractSolveJoinKeys(parentBundle, dispatchResult.planId)
         : undefined,
+      bridgeEdges: bridgeEdges.length > 0 ? bridgeEdges : undefined,
     };
   }
 
