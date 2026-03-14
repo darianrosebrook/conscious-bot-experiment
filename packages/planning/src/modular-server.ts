@@ -2807,6 +2807,28 @@ async function autonomousTaskExecutor() {
           }
         }
 
+        // M3.5: Prerequisite closure for craft_recipe failures.
+        // When craft fails with toolDiagnostics (requires_workstation, missing inputs, etc.),
+        // forward them to injectDynamicPrereqForCraft which handles workstation proximity,
+        // material acquisition, and other typed prerequisites.
+        if (selectedLeaf.leafName === 'craft_recipe') {
+          const diag = (actionResult as any)?.toolDiagnostics;
+          if (diag) {
+            const prereqInjected = await injectDynamicPrereqForCraft(currentTask, {
+              recipe: leafConfig.args?.recipe as string | undefined,
+              qty: leafConfig.args?.qty as number | undefined,
+              toolDiagnostics: diag,
+            });
+            if (prereqInjected) {
+              logTaskIngestion({ _diag_version: 1, source: 'executor_explore_subtask', parent_task_id: currentTask.id, decision: 'created', task_type: 'craft' });
+              taskIntegration.updateTaskMetadata(currentTask.id, {
+                blockedReason: 'waiting_on_prereq',
+              });
+              return; // Don't retry — prerequisite task will run first
+            }
+          }
+        }
+
         if (newRetryCount >= maxRetries) {
           taskIntegration.updateTaskMetadata(currentTask.id, {
             retryCount: newRetryCount,
@@ -2825,15 +2847,6 @@ async function autonomousTaskExecutor() {
             retryCount: newRetryCount,
             lastRetry: Date.now(),
           });
-          // Add chest search fallback on retry if crafting pickaxe
-          if (
-            leafConfig.leafName === 'craft_recipe' &&
-            /pickaxe/i.test(currentTask.title || '')
-          ) {
-            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
-              { label: 'Search nearby chest for wood' },
-            ]);
-          }
         }
       }
     }

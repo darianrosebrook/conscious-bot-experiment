@@ -212,10 +212,13 @@ describe('AC-2.1: Rig A authority dispatch', () => {
 
     const result = await planner.generateDynamicSteps(taskData);
 
-    // No steps (solver couldn't solve)
-    expect(result.steps).toHaveLength(0);
+    // M3.5: blocked_info with frontier_items + empty gap → acquire_material prereq
+    // (no longer returns empty steps — derives prerequisite instead)
+    expect(result.steps.length).toBeGreaterThan(0);
+    expect(result.steps[0].meta?.leaf).toBe('acquire_material');
+    expect(result.steps[0].meta?.args?.item).toBe('oak_log');
 
-    // blocked_info MUST be persisted into solver metadata
+    // blocked_info MUST still be persisted into solver metadata
     const solverMeta = taskData.metadata?.solver;
     expect(solverMeta).toBeDefined();
     expect(solverMeta.resolvedVia).toBe('resolve_intent_steps');
@@ -225,5 +228,93 @@ describe('AC-2.1: Rig A authority dispatch', () => {
       nearby_blocks_gap: [],
       total_nodes_explored: 5,
     });
+    expect(solverMeta.prerequisitesDerived).toBe(true);
+  });
+
+  it('derives explore_for_resources prereq when frontier has nearby_blocks_gap', async () => {
+    const solver = createMockCraftingSolver();
+    planner.registerSolver(solver as any);
+
+    const resolveIntentSteps: ResolveIntentStepsFn = vi.fn().mockResolvedValue({
+      status: 'ok',
+      replacements: [{
+        intent_step_index: 0,
+        resolved: false,
+        unresolved_reason: 'no_solution',
+        blocked_info: {
+          frontier_items: ['oak_log', 'birch_log'],
+          nearby_blocks_gap: ['oak_log', 'birch_log'],
+          total_nodes_explored: 3,
+        },
+      }],
+      plan_bundle_digest: '',
+      schema_version: '1.1.0',
+    });
+
+    planner.setResolveIntentSteps(resolveIntentSteps);
+
+    const taskData: any = {
+      id: 'test-explore-prereq',
+      title: 'Craft wooden pickaxe',
+      type: 'craft',
+      parameters: {
+        requirementCandidate: { kind: 'craft', outputPattern: 'wooden_pickaxe' },
+      },
+      metadata: {},
+    };
+
+    const result = await planner.generateDynamicSteps(taskData);
+
+    // M3.5: Should produce explore_for_resources steps, NOT empty
+    expect(result.steps.length).toBeGreaterThan(0);
+    expect(result.steps[0].meta?.leaf).toBe('explore_for_resources');
+    expect(result.steps[0].meta?.args?.resource_tags).toEqual(['oak_log', 'birch_log']);
+    expect(result.steps[0].meta?.args?.goal_item).toBe('wooden_pickaxe');
+    expect(result.steps[0].meta?.source).toBe('blocked_info_prereq');
+
+    // Metadata should record that prerequisites were derived
+    expect(taskData.metadata?.solver?.prerequisitesDerived).toBe(true);
+  });
+
+  it('derives acquire_material prereq when frontier is nearby but unsolved', async () => {
+    const solver = createMockCraftingSolver();
+    planner.registerSolver(solver as any);
+
+    const resolveIntentSteps: ResolveIntentStepsFn = vi.fn().mockResolvedValue({
+      status: 'ok',
+      replacements: [{
+        intent_step_index: 0,
+        resolved: false,
+        unresolved_reason: 'no_solution',
+        blocked_info: {
+          frontier_items: ['oak_log'],
+          nearby_blocks_gap: [],  // Resources ARE nearby
+          total_nodes_explored: 50,
+        },
+      }],
+      plan_bundle_digest: '',
+      schema_version: '1.1.0',
+    });
+
+    planner.setResolveIntentSteps(resolveIntentSteps);
+
+    const taskData: any = {
+      id: 'test-acquire-prereq',
+      title: 'Craft wooden pickaxe',
+      type: 'craft',
+      parameters: {
+        requirementCandidate: { kind: 'craft', outputPattern: 'wooden_pickaxe' },
+      },
+      metadata: {},
+    };
+
+    const result = await planner.generateDynamicSteps(taskData);
+
+    // M3.5: Should produce acquire_material step
+    expect(result.steps.length).toBeGreaterThan(0);
+    expect(result.steps[0].meta?.leaf).toBe('acquire_material');
+    expect(result.steps[0].meta?.args?.item).toBe('oak_log');
+    expect(result.steps[0].meta?.args?.goal_item).toBe('wooden_pickaxe');
+    expect(result.steps[0].meta?.source).toBe('blocked_info_prereq');
   });
 });

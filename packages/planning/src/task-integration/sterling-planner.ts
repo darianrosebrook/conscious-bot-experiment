@@ -909,9 +909,7 @@ export class SterlingPlanner {
 
     const r = replacements[0];
     if (!r.resolved || !r.steps || r.steps.length === 0) {
-      // Persist blocked_info into solver metadata so downstream code
-      // (task-integration, planner outcomes) can surface it without
-      // reintroducing a separate preflight solver call.
+      // Persist blocked_info into solver metadata for audit/replay
       const solverMeta = ensureSolverMeta(taskData);
       solverMeta.resolvedVia = 'resolve_intent_steps';
       solverMeta.unresolvedReason = r.unresolved_reason;
@@ -928,6 +926,16 @@ export class SterlingPlanner {
           `nodes=${r.blocked_info.total_nodes_explored}`,
         );
       }
+
+      // M3.5: Convert blocked_info into prerequisite subgoal steps.
+      // Instead of returning empty (which stalls the task in pending_planning),
+      // derive the next best action from the typed failure surface.
+      const prereqSteps = this._derivePrerequisiteSteps(goalItem, r.blocked_info, taskData);
+      if (prereqSteps.length > 0) {
+        solverMeta.prerequisitesDerived = true;
+        return prereqSteps;
+      }
+
       return [];
     }
 
@@ -952,6 +960,77 @@ export class SterlingPlanner {
         args: step.args,
       },
     }));
+  }
+
+  /**
+   * M3.5: Derive prerequisite subgoal steps from blocked_info.
+   *
+   * Three outcomes:
+   * - frontier_items present + nearby_blocks_gap non-empty → explore_for_resources
+   * - frontier_items present + nearby_blocks_gap empty → acquire_material
+   * - no frontier_items → empty (terminal block, can't determine next action)
+   */
+  private _derivePrerequisiteSteps(
+    goalItem: string,
+    blockedInfo: { frontier_items?: string[] | null; nearby_blocks_gap?: string[] | null; total_nodes_explored?: number | null } | undefined,
+    taskData: Partial<Task>,
+  ): TaskStep[] {
+    if (!blockedInfo?.frontier_items || blockedInfo.frontier_items.length === 0) {
+      return []; // Can't determine prerequisites without frontier
+    }
+
+    const taskId = taskData.id || 'unknown';
+    const gap = blockedInfo.nearby_blocks_gap ?? [];
+
+    if (gap.length > 0) {
+      // Resources NOT nearby — explore for them first
+      console.log(
+        `[Sterling] Deriving explore_for_resources prereq for ${goalItem}: gap=${JSON.stringify(gap)}`
+      );
+      return [{
+        id: `step-prereq-explore-${taskId}-1`,
+        label: `Explore for resources: ${gap.join(', ')} (prerequisite for ${goalItem})`,
+        done: false,
+        order: 1,
+        estimatedDuration: 15000,
+        meta: {
+          authority: 'sterling' as const,
+          source: 'blocked_info_prereq',
+          leaf: 'explore_for_resources',
+          executable: true,
+          args: {
+            resource_tags: gap,
+            goal_item: goalItem,
+            reason: 'nearby_blocks_gap',
+          },
+        },
+      }];
+    }
+
+    // Resources ARE nearby but solver still couldn't solve — acquire them
+    const frontierItem = blockedInfo.frontier_items[0];
+    console.log(
+      `[Sterling] Deriving acquire_material prereq for ${goalItem}: frontier=${frontierItem}`
+    );
+    return [{
+      id: `step-prereq-acquire-${taskId}-1`,
+      label: `Acquire ${frontierItem} (prerequisite for ${goalItem})`,
+      done: false,
+      order: 1,
+      estimatedDuration: 15000,
+      meta: {
+        authority: 'sterling' as const,
+        source: 'blocked_info_prereq',
+        leaf: 'acquire_material',
+        executable: true,
+        args: {
+          item: frontierItem,
+          count: 1,
+          goal_item: goalItem,
+          reason: 'frontier_hit_unsolved',
+        },
+      },
+    }];
   }
 
   /**
