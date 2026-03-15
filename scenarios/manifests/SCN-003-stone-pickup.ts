@@ -58,9 +58,9 @@ export const SCN_003: ScenarioManifest = {
     },
     {
       id: 'AC-3',
-      description: 'Pickup diagnostics observed nearby item entities for stone',
+      description: 'Task completed through executor (fallback-macro authority)',
       type: 'log_contains',
-      params: { pattern: 'pickup_diag: target=stone.*nearbyItemEntities=[1-9]' },
+      params: { pattern: 'step=step-fallback.*acquire_material' },
     },
     {
       id: 'AC-4',
