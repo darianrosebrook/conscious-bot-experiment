@@ -1,3 +1,12 @@
+---
+doc_id: PROTO-001
+authority: reference
+status: active
+title: "Structure Build Protocol v0"
+owner: darian
+updated: 2026-03-15
+---
+
 # Structure Build Protocol v0
 
 Anchor document for checkpointed long-horizon building. This defines the checkpoint schema, invariant set, macro/micro planning contract, resume algorithm, and acceptance tests so work can be picked up across sessions without re-litigating fundamentals.
@@ -21,7 +30,7 @@ What exists today:
 | Step meta tags (moduleId, moduleType, templateId) | Working; set by `toTaskStepsWithReplan` | `minecraft-building-solver.ts:396-402` |
 | Step-level inventory snapshots | Working; delta verification on complete | `task-integration.ts startTaskStep/completeTaskStep` |
 | Building leaves (prepare_site, build_module, place_feature) | **Placeholder stubs** — read-only, no world mutation | `construction-leaves.ts` |
-| `/action` dispatch for building types | **Broken** — `executeAction` has no cases for these types | Phase 0 prerequisite |
+| `/action` dispatch for building types | **Fixed (Phase 0, 2026-02-01)** — `executeLeafAction` via LeafFactory delegation, 75/75 tests | `action-translator.ts`, `planner-action-boundary.test.ts` |
 | Checkpoint/resume system | **Absent** | This spec defines it |
 | World-state block scanning | **Absent** | Needed for module postcondition verification |
 | Site signature persistence | **Absent** | Needed for resume |
@@ -29,16 +38,16 @@ What exists today:
 
 ## Staged implementation plan
 
-### Stage 0: Action boundary (prerequisite for all live execution)
+### Stage 0: Action boundary ✅ COMPLETE (2026-02-01)
 
-Fix `executeAction` in `action-translator.ts` so building step types reach their leaf implementations. Without this, the executor can only "fail correctly."
+Fixed `executeAction` so building step types reach their leaf implementations via LeafFactory delegation.
 
-**Commits (from existing plan):**
-- **0a**: Add `craft`/`smelt` aliases + building leaf delegation via `executeLeafAction`
+**Commits:**
+- **0a**: `executeLeafAction()` generic handler for building leaves
 - **0b**: LeafFactory-first dispatch with `ACTION_TYPE_TO_LEAF` normalization
-- **0c**: Boundary conformance test (every solver-emittable type accepted)
+- **0c**: `planner-action-boundary.test.ts` — 51 tests, 75/75 total passed
 
-**Done when**: `npx vitest run planner-action-boundary.test.ts` passes; POST `/action` with `type: 'prepare_site'` reaches `PrepareSiteLeaf.tick()`.
+**Evidence**: `sterling-capability-tracker.md` Phase 0 section. All solver-emittable action types accepted by `executeAction`.
 
 ### Stage 0.5: World-mutating building execution
 
