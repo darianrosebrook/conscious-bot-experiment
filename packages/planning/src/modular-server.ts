@@ -4602,6 +4602,13 @@ async function startServer() {
         const addedTask = await taskIntegration.addTask(taskData as any);
         const finalTaskId = addedTask?.id || `scenario-${runId}`;
 
+        // Promote to active so the executor dispatches it immediately.
+        // addTask leaves non-sterling_ir tasks in 'pending' status, but
+        // scenario tasks have pre-expanded steps and should be active.
+        if (addedTask && addedTask.status === 'pending' && addedTask.steps?.length > 0) {
+          taskIntegration.updateTaskProgress(addedTask.id, 0, 'active');
+        }
+
         console.log(
           `[Scenario] run_id=${runId} task_id=${finalTaskId} authority=${planner} ` +
           `requirement=${JSON.stringify(requirementCandidate).slice(0, 100)}`
