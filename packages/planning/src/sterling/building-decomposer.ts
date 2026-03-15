@@ -255,6 +255,12 @@ export function decomposeCheckpointableTemplate(
         dz: block.position.z,
         blockId: block.blockType,
       })),
+      // Include requiredEmpty from the module definition (door openings, corridors)
+      (moduleDef.requiredEmpty ?? []).map(pos => ({
+        dx: pos.x,
+        dy: pos.y,
+        dz: pos.z,
+      })),
     );
 
     // Insert verify_module checkpoint step with embedded witness.

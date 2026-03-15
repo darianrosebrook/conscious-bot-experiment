@@ -526,6 +526,7 @@ const BUILDING_LEAVES = new Set([
   'build_module',
   'place_feature',
   'building_step',
+  'verify_module',  // M5: checkpoint verification boundary
 ]);
 
 function shouldEmitExecutorEvent(key: string, throttleMs = 2000): boolean {

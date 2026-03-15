@@ -30,6 +30,8 @@ export interface CheckpointableModule {
   materialsNeeded: Array<{ name: string; count: number }>;
   /** The actual blocks this module places in the world (relative coordinates) */
   placements: PlacedBlock[];
+  /** Positions that must remain empty after module completion (doorways, corridors) */
+  requiredEmpty?: Array<{ x: number; y: number; z: number }>;
 }
 
 /**
@@ -93,7 +95,12 @@ export function getSimpleShelterTemplate(): CheckpointableTemplate {
 
   // Walls: 3 high (y=1..3), hollow, with door/window modifications
   const wallBlocks: PlacedBlock[] = [];
-  const doorPositions = new Set(['6,1,4', '6,2,4']);
+  /** Positions that must remain empty (door opening) — used in requiredEmpty witness */
+  const doorOpeningPositions = [
+    { x: 6, y: 1, z: 4 },
+    { x: 6, y: 2, z: 4 },
+  ];
+  const doorPositions = new Set(doorOpeningPositions.map(p => `${p.x},${p.y},${p.z}`));
   const windowPositions = new Set(['5,2,8', '7,2,8', '4,2,6', '8,2,6']);
 
   for (let y = 1; y <= 3; y++) {
@@ -140,6 +147,7 @@ export function getSimpleShelterTemplate(): CheckpointableTemplate {
           { name: 'glass', count: wallBlocks.filter(b => b.blockType === 'glass').length },
         ],
         placements: wallBlocks,
+        requiredEmpty: doorOpeningPositions,
       },
       {
         moduleId: 'roof_slab',

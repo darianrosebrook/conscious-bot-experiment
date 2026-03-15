@@ -117,7 +117,8 @@ export function stepToLeafExecution(step: {
     case 'prepare_site':
     case 'build_module':
     case 'place_feature':
-    case 'building_step': {
+    case 'building_step':
+    case 'verify_module': {
       return {
         leafName: leaf,
         args: {

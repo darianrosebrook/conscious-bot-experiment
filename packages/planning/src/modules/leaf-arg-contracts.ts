@@ -123,6 +123,17 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  verify_module: {
+    leafName: 'verify_module',
+    fields: ['moduleId:string', 'witness:object'],
+    validate: (args) => {
+      if (!args.moduleId || typeof args.moduleId !== 'string')
+        return 'verify_module requires moduleId (string)';
+      if (!args.witness || typeof args.witness !== 'object')
+        return 'verify_module requires witness (object with expectedPlacements)';
+      return null;
+    },
+  },
   building_step: {
     leafName: 'building_step',
     fields: ['moduleId:string'],
