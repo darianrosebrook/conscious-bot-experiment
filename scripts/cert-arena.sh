@@ -220,8 +220,9 @@ reset_scn_004() {
   # Place a crafting table near center so craft_recipe can find it
   rcon "setblock $((ARENA_CX + 2)) $((FLOOR_Y + 1)) ${ARENA_CZ} crafting_table"
   give_inv wooden_pickaxe 1
+  give_inv cobblestone 3
   give_inv stick 2
-  info "SCN-004 ready (table placed, must mine stone for cobblestone)"
+  info "SCN-004 ready (table placed, cobblestone given, must craft stone_pickaxe)"
 }
 
 verify_scn_001() {
