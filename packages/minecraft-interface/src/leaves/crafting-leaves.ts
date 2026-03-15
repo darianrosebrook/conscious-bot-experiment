@@ -487,6 +487,17 @@ export class CraftRecipeLeaf implements LeafImpl {
               missingInputs.push({ item: inputName, have, need });
             }
           }
+        } else {
+          // Recipe.find returned nothing — fall back to mcData recipe lookup.
+          // This ensures requires_workstation is set correctly even when the
+          // mineflayer Recipe class is unavailable or the item ID doesn't match.
+          const mcRecipes = mcData.recipes?.[item.id];
+          if (Array.isArray(mcRecipes) && mcRecipes.length > 0) {
+            const firstRecipe = mcRecipes[0];
+            // mcData recipes: inShape rows > 2 means 3x3 grid (requires table)
+            requiresWorkstation = firstRecipe.requiresTable === true
+              || (firstRecipe.inShape && firstRecipe.inShape.length > 2);
+          }
         }
         hasWorkstationInInventory = (invCounts['crafting_table'] ?? 0) > 0;
       } catch {
