@@ -65,7 +65,9 @@ hard_clear_arena() {
   rcon "forceload add ${MIN_X} ${MIN_Z} ${MAX_X} ${MAX_Z}"
   rcon "kill @e[type=!player,x=${ARENA_CX},y=${BOT_Y},z=${ARENA_CZ},distance=..96]"
   rcon "fill ${MIN_X} $((FLOOR_Y + 1)) ${MIN_Z} ${MAX_X} ${CLEAR_TOP_Y} ${MAX_Z} air"
-  rcon "fill ${MIN_X} ${FLOOR_Y} ${MIN_Z} ${MAX_X} ${FLOOR_Y} ${MAX_Z} stone"
+  # Floor is smooth_stone (not mineable as 'stone' by acquire_material)
+  # This ensures the bot targets scenario-placed stone blocks, not the floor.
+  rcon "fill ${MIN_X} ${FLOOR_Y} ${MIN_Z} ${MAX_X} ${FLOOR_Y} ${MAX_Z} smooth_stone"
 }
 
 build_perimeter() {
