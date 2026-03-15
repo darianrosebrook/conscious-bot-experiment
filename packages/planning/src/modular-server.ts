@@ -1174,6 +1174,60 @@ async function injectPrerequisiteTasksForMineIron(task: any): Promise<boolean> {
 // requirement helpers imported from modules/requirements
 
 /**
+ * M5: Advance build checkpoint after verify_module success.
+ *
+ * Creates a BuildCheckpoint, appends to task.metadata.build.checkpoints,
+ * adds the module to completedModules, and increments moduleCursor.
+ *
+ * This is the real checkpoint boundary — only called when verify_module
+ * confirms the world matches the module witness.
+ */
+async function advanceBuildCheckpoint(task: any, verifyStep: any): Promise<void> {
+  const { createBuildCheckpoint, advanceBuildMetadata } = await import('./sterling/build-checkpoint');
+  const buildMeta = task.metadata?.build;
+  if (!buildMeta) {
+    console.warn('[Building:M5] No BuildMetadata on task — skipping checkpoint');
+    return;
+  }
+
+  const moduleId = verifyStep.meta?.moduleId || verifyStep.meta?.args?.moduleId;
+  if (!moduleId) {
+    console.warn('[Building:M5] verify_module step has no moduleId — skipping checkpoint');
+    return;
+  }
+
+  // Get inventory summary for checkpoint
+  const inv = await fetchInventorySnapshot();
+  const inventorySummary: Record<string, number> = {};
+  for (const item of inv) {
+    if (item?.name) inventorySummary[item.name] = (inventorySummary[item.name] ?? 0) + (item.count ?? 0);
+  }
+
+  const checkpoint = createBuildCheckpoint(
+    buildMeta.templateDigest,
+    buildMeta.moduleCursor + 1,
+    [...buildMeta.completedModules, moduleId],
+    buildMeta.stationRegistry ?? [],
+    [{ invariant: 'module_verified', passed: true, evidence: `verify_module ${moduleId} passed` }],
+    inventorySummary,
+  );
+
+  const witness = buildMeta.witnesses?.[moduleId];
+  const advanced = advanceBuildMetadata(buildMeta, moduleId, checkpoint, witness);
+
+  // Persist advanced state
+  task.metadata.build = advanced;
+  taskIntegration.updateTaskMetadata(task.id, { build: advanced });
+
+  console.log(
+    `[Building:M5] Checkpoint committed: module=${moduleId} ` +
+    `checkpointId=${checkpoint.checkpointId.slice(0, 8)} ` +
+    `moduleCursor=${advanced.moduleCursor} ` +
+    `completedModules=[${advanced.completedModules.join(',')}]`
+  );
+}
+
+/**
  * DRY progress recompute and gated completion helper
  */
 async function recomputeProgressAndMaybeComplete(task: any) {
@@ -1208,6 +1262,18 @@ async function recomputeProgressAndMaybeComplete(task: any) {
     const currentStep = task.steps.find((s: any) => !s.done);
     if (currentStep)
       await taskIntegration.completeTaskStep(task.id, currentStep.id);
+
+    // M5: Checkpoint advancement on verify_module success.
+    // When a verify_module step completes, it means the world state
+    // matches the module witness. This is the real checkpoint boundary.
+    if (currentStep?.meta?.leaf === 'verify_module' && currentStep?.meta?.isCheckpoint) {
+      try {
+        await advanceBuildCheckpoint(task, currentStep);
+      } catch (cpErr) {
+        console.error('[Building:M5] Checkpoint advancement failed:', cpErr);
+      }
+    }
+
     const allStepsComplete = task.steps.every((s: any) => s.done);
     if (canComplete && allStepsComplete) {
       taskIntegration.updateTaskProgress(task.id, 1, 'completed');

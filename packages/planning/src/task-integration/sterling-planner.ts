@@ -1387,6 +1387,17 @@ export class SterlingPlanner {
       );
     }
 
+    // ── M5: Checkpointed building for certification slice ──
+    // When the template matches the reduced shelter, use the decomposer
+    // instead of the stub-producing toTaskStepsWithReplan path.
+    if (result.solved && !result.needsMaterials) {
+      const checkpointedSteps = await this._tryCheckpointedBuildPath(
+        taskData, templateId, solverMeta, result,
+      );
+      if (checkpointedSteps) return checkpointedSteps;
+    }
+
+    // Legacy stub path for non-certification templates
     const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);
     return steps.map((s) => {
       const enrichedMeta: Record<string, unknown> = {
@@ -1401,6 +1412,128 @@ export class SterlingPlanner {
       if (args) enrichedMeta.args = args;
       return { ...s, meta: enrichedMeta };
     });
+  }
+
+  /**
+   * M5: Checkpointed building path for the reduced-shelter certification slice.
+   *
+   * Replaces stub building leaves with real place_block + verify_module steps.
+   * Seeds BuildMetadata on first entry, uses computeResumeDecision on re-entry.
+   *
+   * Returns null if the template doesn't match the certification slice,
+   * causing the caller to fall through to the legacy stub path.
+   */
+  private async _tryCheckpointedBuildPath(
+    taskData: Partial<Task>,
+    templateId: string,
+    solverMeta: any,
+    solveResult: any,
+  ): Promise<TaskStep[] | null> {
+    // Only activate for the certification template.
+    // Note: the planner currently uses 'basic_shelter_5x5__p0stub' as templateId,
+    // but the canonical template is 'basic_shelter_5x5'. Accept both.
+    const CERT_TEMPLATE_IDS = ['basic_shelter_5x5', 'basic_shelter_5x5__p0stub', 'reduced_shelter_v0'];
+    if (!CERT_TEMPLATE_IDS.includes(templateId)) return null;
+
+    const { decomposeCheckpointableTemplate } = await import('../sterling/building-decomposer');
+    const { getReducedShelterTemplate, getSimpleShelterTemplate } = await import('../sterling/building-templates-shared');
+    const { initBuildMetadata, computeResumeDecision } = await import('../sterling/build-checkpoint');
+
+    // Select the canonical template
+    const template = templateId === 'reduced_shelter_v0'
+      ? getReducedShelterTemplate()
+      : getSimpleShelterTemplate();
+
+    // Compute site origin from bot context or task metadata
+    const botCtx = await this.fetchBotContext();
+    const siteOrigin = botCtx._unavailable
+      ? { x: 0, y: 64, z: 0 }
+      : {
+          x: Math.floor((taskData.metadata as any)?.currentState?.position?.x ?? 0),
+          y: Math.floor((taskData.metadata as any)?.currentState?.position?.y ?? 64),
+          z: Math.floor((taskData.metadata as any)?.currentState?.position?.z ?? 0),
+        };
+
+    // Check for existing build metadata (re-entry)
+    const existingBuild = (taskData.metadata as any)?.build as import('../types/build-checkpoint').BuildMetadata | undefined;
+
+    if (existingBuild && existingBuild.checkpoints.length > 0) {
+      // Re-entry: use resume decision
+      const siteStillValid = true; // TODO: implement world-state site verification
+      const decision = computeResumeDecision(
+        existingBuild,
+        existingBuild.templateDigest, // Use stored digest for comparison
+        siteStillValid,
+      );
+
+      console.log(
+        `[Building:M5] Resume decision: action=${decision.action} reason=${decision.reason}` +
+        ('fromCursor' in decision ? ` fromCursor=${decision.fromCursor}` : '')
+      );
+
+      if (decision.action === 'replan') {
+        // Template or site changed — fall through to fresh decomposition below
+        console.warn(`[Building:M5] Replanning: ${decision.reason}`);
+      } else if (decision.action === 'continue') {
+        // Skip completed modules, emit only remaining
+        const fromCursor = decision.fromCursor;
+        const decomposed = decomposeCheckpointableTemplate(template, existingBuild.siteSignature.position);
+
+        const remainingModules = decomposed.modules.slice(fromCursor);
+        if (remainingModules.length === 0) {
+          console.log('[Building:M5] All modules completed — nothing to do');
+          return [];
+        }
+
+        const remainingSteps = remainingModules.flatMap(m => m.steps);
+        console.log(
+          `[Building:M5] Resuming from cursor=${fromCursor}: ` +
+          `${remainingModules.length} modules, ${remainingSteps.length} steps remaining`
+        );
+        return remainingSteps;
+      }
+      // repair: typed but not auto-executed for v0 — fall through to replan
+    }
+
+    // Fresh decomposition (first entry or replan)
+    const decomposed = decomposeCheckpointableTemplate(template, siteOrigin);
+
+    // Seed BuildMetadata
+    const siteSignature: import('../types/build-checkpoint').SiteSignature = {
+      position: siteOrigin,
+      facing: template.facing,
+      refCorner: siteOrigin,
+      footprintBounds: {
+        min: siteOrigin,
+        max: {
+          x: siteOrigin.x + 12,
+          y: siteOrigin.y + 5,
+          z: siteOrigin.z + 12,
+        },
+      },
+    };
+
+    const buildMeta = initBuildMetadata(decomposed.templateDigest, siteSignature);
+
+    // Store witnesses keyed by moduleId
+    for (const mod of decomposed.modules) {
+      buildMeta.witnesses[mod.moduleId] = mod.witness;
+    }
+
+    // Persist to task metadata
+    (taskData.metadata as any).build = buildMeta;
+    solverMeta.checkpointedBuild = true;
+    solverMeta.buildTemplateDigest = decomposed.templateDigest;
+
+    console.log(
+      `[Building:M5] Seeded BuildMetadata: template=${template.templateId} ` +
+      `digest=${decomposed.templateDigest.slice(0, 8)} ` +
+      `modules=${decomposed.modules.length} blocks=${decomposed.totalBlocks} ` +
+      `steps=${decomposed.totalSteps} site=(${siteOrigin.x},${siteOrigin.y},${siteOrigin.z})`
+    );
+
+    // Return all checkpoint-aware steps
+    return decomposed.modules.flatMap(m => m.steps);
   }
 
   private async generateAcquisitionStepsFromSterling(
