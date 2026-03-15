@@ -1968,11 +1968,12 @@ async function autonomousTaskExecutor() {
     // Reflex registry: single evaluateTick() replaces both critical preemption
     // and idle-path reflex evaluation. Handles priority ordering, goalKey dedup,
     // and "at most one enqueue per tick" internally. (P1)
-    // Also tick exploration's idle counter before evaluation.
-    if (global.explorationDriveshaft) {
+    // CERT_MODE: suppress autonomous exploration and reflex-driven task creation
+    const certMode = process.env.CERT_MODE === '1';
+    if (global.explorationDriveshaft && !certMode) {
       global.explorationDriveshaft.tick(idleReason !== null);
     }
-    if (global.reflexRegistry) {
+    if (global.reflexRegistry && !certMode) {
       try {
         const executorMode = process.env.EXECUTOR_MODE || 'shadow';
         const isDryRun = executorMode !== 'live';
@@ -4413,25 +4414,43 @@ async function startServer() {
     });
     serverConfig.mountRouter('/', eventStoreRouter);
 
-    // ── Scenario injection endpoint ──────────────────────────────────
-    // Certification scenarios inject goals directly through Sterling's solver
-    // pipeline instead of waiting for idle-episode thought generation.
-    // This goes through the same solver → step → executor path as production.
+    // ── Scenario execution endpoint ─────────────────────────────────
+    // POST /api/scenario/run — inject a scenario objective through an
+    // approved planner authority. Two authorities:
+    //   planner: "sterling" — goal decomposition via Sterling solver
+    //   planner: "fallback-macro" — direct primitive step (no solver)
+    //
+    // Returns: run_id, task_id, authority, objective, steps
+    // The task enters the same executor dispatch path as production tasks.
     const { Router: ScenarioRouter } = await import('express');
     const scenarioRouter = ScenarioRouter();
 
-    scenarioRouter.post('/api/scenario/inject', async (req: any, res: any) => {
+    scenarioRouter.post('/api/scenario/run', async (req: any, res: any) => {
       try {
-        const { goal, action, item, count = 1, scenarioId } = req.body || {};
+        const {
+          planner,     // "sterling" | "fallback-macro"
+          objective,   // { goal: "stone_pickaxe" } | { action: "acquire_material", item: "stone", count: 3 }
+          scenarioId,
+        } = req.body || {};
 
-        if (!goal && !action) {
+        // Validate envelope
+        if (!planner || !objective) {
           return res.status(400).json({
             success: false,
-            error: 'Missing required field: goal (e.g., "stone_pickaxe") or action (e.g., "acquire_material")',
+            error: 'Required: { planner: "sterling"|"fallback-macro", objective: { goal: "..." } | { action: "...", item: "..." } }',
+          });
+        }
+        if (planner !== 'sterling' && planner !== 'fallback-macro') {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid planner: "${planner}". Must be "sterling" or "fallback-macro"`,
           });
         }
 
-        // Fetch current state from MC interface
+        const runId = `cert-${scenarioId || 'manual'}-${Date.now()}`;
+        const runTimestamp = Date.now();
+
+        // ── Fetch current bot state ──────────────────────────────
         const stateRes = await mcFetch('/state', { method: 'GET', timeoutMs: 5000 });
         if (!stateRes?.ok) {
           return res.status(503).json({ success: false, error: 'MC interface unavailable' });
@@ -4442,20 +4461,25 @@ async function startServer() {
         const currentInventory = invData.map((i: any) => ({ name: i.type || i.name, count: i.count }));
         const nearbyBlocks = ws?.nearbyBlocks || [];
 
-        let solveResult: any = null;
         let steps: any[] = [];
+        let authority = planner;
+        let solveResult: any = null;
         let taskTitle = '';
 
-        if (goal) {
-          // Route through tool progression or crafting solver
+        if (planner === 'sterling') {
+          // ── Sterling authority: goal decomposition ─────────────
+          const { goal } = objective;
+          if (!goal) {
+            return res.status(400).json({ success: false, error: 'Sterling planner requires objective.goal' });
+          }
           if (!minecraftCraftingSolver || !sterlingService?.isAvailable()) {
-            return res.status(503).json({ success: false, error: 'Sterling crafting solver unavailable' });
+            return res.status(503).json({ success: false, error: 'Sterling solver unavailable' });
           }
 
           const mcDataModule = await import('minecraft-data');
           const mcData = mcDataModule.default('1.21.9');
 
-          // Try tool progression first for pickaxe goals
+          // Route to tool progression solver for pickaxe goals
           if (goal.includes('pickaxe') && minecraftToolProgressionSolver) {
             const invRecord: Record<string, number> = {};
             for (const i of currentInventory) invRecord[i.name] = (invRecord[i.name] ?? 0) + i.count;
@@ -4464,78 +4488,107 @@ async function startServer() {
             solveResult = await minecraftCraftingSolver.solveCraftingGoal(goal, currentInventory, mcData, nearbyBlocks);
           }
 
-          if (solveResult?.solved && solveResult.steps?.length > 0) {
-            steps = solveResult.steps;
-            taskTitle = `Scenario: craft ${goal}`;
-          } else {
+          if (!solveResult?.solved || !solveResult.steps?.length) {
             return res.json({
               success: false,
+              run_id: runId,
+              authority,
+              objective,
               error: solveResult?.error || `No solution found for ${goal}`,
-              solverOutput: { nodes: solveResult?.totalNodes, duration: solveResult?.durationMs },
+              solver: { nodes: solveResult?.totalNodes, durationMs: solveResult?.durationMs },
             });
           }
-        } else if (action) {
-          // Direct action — create a single-step task
+
+          steps = solveResult.steps;
+          taskTitle = `[cert] ${goal}`;
+
+        } else {
+          // ── Fallback-macro authority: direct primitive ──────────
+          const { action, item, count = 1, args = {} } = objective;
+          if (!action) {
+            return res.status(400).json({ success: false, error: 'Fallback-macro planner requires objective.action' });
+          }
+
           steps = [{
-            id: 'scenario-step-1',
-            action: action,
+            id: `${runId}-step-1`,
             label: `${action}:${item || 'target'}`,
+            action,
             meta: { leaf: action },
-            args: { item: item || undefined, count, ...(req.body.args || {}) },
+            args: { item, count, ...args },
+            status: 'pending',
           }];
-          taskTitle = `Scenario: ${action} ${item || ''}`.trim();
+          taskTitle = `[cert] ${action} ${item || ''}`.trim();
         }
 
-        // Create task and add to queue
-        const taskId = `scenario-${scenarioId || 'manual'}-${Date.now()}`;
+        // ── Create task through TaskIntegration ──────────────────
+        // Use the same addTask path as thought-to-task converter.
+        // Task type is 'sterling_ir' for Sterling or 'scenario' for fallback-macro.
+        const taskId = `scenario-${runId}`;
+        const taskType = planner === 'sterling' ? 'sterling_ir' : 'scenario';
+
+        const normalizedSteps = steps.map((s: any, idx: number) => ({
+          id: s.id || `${runId}-step-${idx + 1}`,
+          action: s.action || s.label?.split(':')[0] || 'unknown',
+          label: s.label || `${s.action}:${s.args?.item || 'target'}`,
+          meta: {
+            leaf: s.meta?.leaf || s.action || s.label?.split(':')[0],
+            ...(s.meta || {}),
+          },
+          args: s.args || {},
+          status: 'pending' as const,
+        }));
+
         const task = {
           id: taskId,
           title: taskTitle,
-          description: taskTitle,
-          type: 'sterling_ir',
+          description: `${taskTitle} (${authority})`,
+          type: taskType,
           priority: 1.0,
           urgency: 1.0,
           progress: 0,
-          status: 'active',
-          source: 'scenario-harness',
-          steps: steps.map((s: any, idx: number) => ({
-            id: s.id || `scenario-step-${idx + 1}`,
-            action: s.action || s.label?.split(':')[0],
-            label: s.label,
-            meta: s.meta || { leaf: s.action || s.label?.split(':')[0] },
-            args: s.args || {},
-            status: 'pending',
-          })),
-          parameters: { scenarioId, goal, action, item },
+          status: 'active' as const,
+          source: 'scenario-harness' as const,
+          steps: normalizedSteps,
+          parameters: { scenarioId, runId, objective },
           metadata: {
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            createdAt: runTimestamp,
+            updatedAt: runTimestamp,
             retryCount: 0,
             maxRetries: 3,
-            childTaskIds: [],
+            childTaskIds: [] as string[],
             category: 'scenario',
-            tags: ['scenario', 'certification', scenarioId].filter(Boolean),
+            tags: ['scenario', 'certification', scenarioId, authority].filter(Boolean),
             source: 'scenario-harness',
+            scenarioAuthority: authority,
+            scenarioRunId: runId,
           },
         };
 
         const addedTask = await taskIntegration.addTask(task as any);
+        const finalTaskId = addedTask?.id || taskId;
 
-        console.log(`[Scenario] Injected task: ${taskId} goal=${goal || action} steps=${steps.length}`);
+        console.log(
+          `[Scenario] run_id=${runId} task_id=${finalTaskId} authority=${authority} ` +
+          `steps=${normalizedSteps.length} objective=${JSON.stringify(objective).slice(0, 100)}`
+        );
 
         res.json({
           success: true,
-          taskId: addedTask?.id || taskId,
-          steps: steps.length,
+          run_id: runId,
+          task_id: finalTaskId,
+          authority,
+          planner,
+          objective,
+          steps: normalizedSteps.length,
           title: taskTitle,
-          solverOutput: solveResult ? {
+          solver: solveResult ? {
             solved: solveResult.solved,
             nodes: solveResult.totalNodes,
-            duration: solveResult.durationMs,
+            durationMs: solveResult.durationMs,
           } : undefined,
         });
       } catch (error) {
-        console.error('[Scenario] Injection failed:', error);
+        console.error('[Scenario] Run failed:', error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

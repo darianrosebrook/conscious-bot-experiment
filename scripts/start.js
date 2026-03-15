@@ -1029,9 +1029,13 @@ async function mainWithProgress() {
                 if (service.name === 'Minecraft Interface' && !baseEnv.MINECRAFT_VERSION) {
                   baseEnv.MINECRAFT_VERSION = '1.21.9';
                 }
-                if (service.name === 'Planning' && !baseEnv.STERLING_IDLE_EPISODES_ENABLED) {
-                  // Disable idle episodes in cert mode to prevent autonomous goal interference
-                  baseEnv.STERLING_IDLE_EPISODES_ENABLED = baseEnv.CERT_MODE === '1' ? 'false' : 'true';
+                if (service.name === 'Planning') {
+                  // CERT_MODE=1 forces idle episodes OFF regardless of other settings
+                  if (baseEnv.CERT_MODE === '1') {
+                    baseEnv.STERLING_IDLE_EPISODES_ENABLED = 'false';
+                  } else if (!baseEnv.STERLING_IDLE_EPISODES_ENABLED) {
+                    baseEnv.STERLING_IDLE_EPISODES_ENABLED = 'true';
+                  }
                 }
                 if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
                   baseEnv.ENABLE_PLANNING_EXECUTOR = '1';
