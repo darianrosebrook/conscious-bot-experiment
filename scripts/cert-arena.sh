@@ -184,7 +184,9 @@ reset_scn_003() {
   reset_base
   place_stone_pad
   give_inv wooden_pickaxe 1
-  info "SCN-003 ready"
+  # Teleport bot directly to south pad so stone is in nearby_blocks
+  rcon "tp ${BOT_NAME} ${ARENA_CX}.5 ${BOT_Y} $((ARENA_CZ + 10)).5"
+  info "SCN-003 ready (bot on south pad)"
 }
 
 reset_scn_004() {

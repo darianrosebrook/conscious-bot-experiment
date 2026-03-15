@@ -1707,8 +1707,7 @@ app.get('/state', async (req, res) => {
         nearbyEntities: (
           ws._minecraftState?.environment?.nearbyEntities ?? []
         ).slice(0, 10),
-        nearbyBlocks: [], // keep empty — abstracted block list not useful for cognition
-        // Solver-facing block summary: raw type names + counts (pre-abstraction)
+        nearbyBlocks: Object.keys(ws._minecraftState?.environment?.nearbyBlockCounts ?? {}),
         nearbyBlockSummary: {
           known: ws._minecraftState?.environment != null,
           types: Object.keys(ws._minecraftState?.environment?.nearbyBlockCounts ?? {}),
