@@ -2032,15 +2032,14 @@ async function autonomousTaskExecutor() {
       circuitBreakerOpen
     );
 
-    // Reflex registry: single evaluateTick() replaces both critical preemption
-    // and idle-path reflex evaluation. Handles priority ordering, goalKey dedup,
-    // and "at most one enqueue per tick" internally. (P1)
-    // CERT_MODE: suppress autonomous exploration and reflex-driven task creation
-    const certMode = process.env.CERT_MODE === '1';
-    if (global.explorationDriveshaft && !certMode) {
+    // Gate all autonomous task creation (exploration, reflexes, idle episodes)
+    // on a single flag. Set STERLING_IDLE_EPISODES_ENABLED=false to suppress.
+    const idleEpisodesEnabled = process.env.STERLING_IDLE_EPISODES_ENABLED === 'true';
+
+    if (global.explorationDriveshaft && idleEpisodesEnabled) {
       global.explorationDriveshaft.tick(idleReason !== null);
     }
-    if (global.reflexRegistry && !certMode) {
+    if (global.reflexRegistry && idleEpisodesEnabled) {
       try {
         const executorMode = process.env.EXECUTOR_MODE || 'shadow';
         const isDryRun = executorMode !== 'live';
@@ -2068,7 +2067,7 @@ async function autonomousTaskExecutor() {
       }
     }
 
-    if (idleReason !== null) {
+    if (idleReason !== null && idleEpisodesEnabled) {
       // Only log once per minute to avoid spam
       if (isVerbose() && (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000)) {
         console.log(
