@@ -4475,26 +4475,32 @@ async function startServer() {
 
         } else {
           // Sterling: { goal: "stone_pickaxe" }
+          // Route through the same planner path as production tasks.
+          // Use 'craft' requirement kind — generateDynamicSteps will call
+          // generateStepsFromSterling which calls the Sterling solver.
           const { goal } = objective;
           if (!goal) {
             return res.status(400).json({ success: false, error: 'Sterling planner requires objective.goal' });
           }
-          // Determine if this is tool progression or crafting
-          const isToolProg = goal.includes('pickaxe') || goal.includes('axe') || goal.includes('sword');
-          requirementCandidate = isToolProg
-            ? { kind: 'tool_progression', targetTool: goal, toolType: 'pickaxe', targetTier: goal.split('_')[0], quantity: 1 }
-            : { kind: 'craft', outputPattern: goal, quantity: 1 };
+          requirementCandidate = {
+            kind: 'craft',
+            outputPattern: goal,
+            quantity: 1,
+          };
           taskTitle = `[cert] ${goal}`;
         }
 
-        // Create task with structured requirement — TaskStore will call
-        // SterlingPlanner.expandTask() which calls resolveRequirement()
-        // → requirementToFallbackPlan() or generateStepsFromSterling()
-        // to produce validated steps in the exact format the executor expects.
-        const taskData = {
+        // Create task with structured requirement.
+        // For fallback-macro: generateDynamicSteps → requirementToFallbackPlan
+        // For sterling: generateDynamicSteps → generateStepsFromSterling → solver
+        // Type determines which planner path addTask uses:
+        // 'mining' → generateDynamicSteps → requirementToFallbackPlan (fallback-macro)
+        // 'crafting' → generateDynamicSteps → generateStepsFromSterling (sterling solver)
+        const taskType = planner === 'sterling' ? 'crafting' : 'mining';
+        const taskData: Record<string, any> = {
           title: taskTitle,
           description: `${taskTitle} (${planner})`,
-          type: planner === 'sterling' ? 'sterling_ir' : 'mining',
+          type: taskType,
           priority: 1.0,
           urgency: 1.0,
           source: 'scenario-harness',
