@@ -109,24 +109,27 @@ clear_workstation_pad() {
   rcon "fill $((x - 4)) $((FLOOR_Y + 1)) $((z - 4)) $((x + 4)) $((FLOOR_Y + 4)) $((z + 4)) air"
 }
 
-# South pad: exposed stone ring adjacent to spawn
+# South pad: stone columns above the floor (not stone AS floor)
 place_stone_pad() {
-  info "Placing exposed stone pad"
+  info "Placing stone columns on south pad"
   local x=${ARENA_CX}
   local z=$((ARENA_CZ + 10))
-  # Restore pad floor to stone first, then place exposed stone targets flush with floor.
-  rcon "fill $((x - 3)) ${FLOOR_Y} $((z - 3)) $((x + 3)) ${FLOOR_Y} $((z + 3)) stone"
-  # Clear air above for face-visible blocks.
-  rcon "fill $((x - 3)) $((FLOOR_Y + 1)) $((z - 3)) $((x + 3)) $((FLOOR_Y + 3)) $((z + 3)) air"
+  # Clear the area first
+  rcon "fill $((x - 4)) $((FLOOR_Y + 1)) $((z - 4)) $((x + 4)) $((FLOOR_Y + 4)) $((z + 4)) air"
+  # Place 4 stone columns (2 blocks tall) around the pad center.
+  # Bot can mine these without falling through the floor.
+  for dx in -2 2; do
+    for dz in -2 2; do
+      rcon "setblock $((x + dx)) $((FLOOR_Y + 1)) $((z + dz)) stone"
+      rcon "setblock $((x + dx)) $((FLOOR_Y + 2)) $((z + dz)) stone"
+    done
+  done
+  # Also place some stone blocks at ground+1 level in a ring
   for pos in \
-    "$((x + 1)) ${FLOOR_Y} ${z}" \
-    "$((x - 1)) ${FLOOR_Y} ${z}" \
-    "${x} ${FLOOR_Y} $((z + 1))" \
-    "${x} ${FLOOR_Y} $((z - 1))" \
-    "$((x + 2)) ${FLOOR_Y} ${z}" \
-    "$((x - 2)) ${FLOOR_Y} ${z}" \
-    "${x} ${FLOOR_Y} $((z + 2))" \
-    "${x} ${FLOOR_Y} $((z - 2))"; do
+    "$((x + 1)) $((FLOOR_Y + 1)) ${z}" \
+    "$((x - 1)) $((FLOOR_Y + 1)) ${z}" \
+    "${x} $((FLOOR_Y + 1)) $((z + 1))" \
+    "${x} $((FLOOR_Y + 1)) $((z - 1))"; do
     rcon "setblock ${pos} stone"
   done
 }

@@ -30,7 +30,7 @@ export const SCN_003: ScenarioManifest = {
     {
       type: 'block_present',
       description: 'Surface stone exists on south pad adjacent pattern',
-      params: { pos: { x: 1001, y: 63, z: 1010 }, block: 'stone' },
+      params: { pos: { x: 1001, y: 64, z: 1010 }, block: 'stone' },
     },
     {
       type: 'inventory_contains',
