@@ -199,19 +199,22 @@ reset_scn_004() {
   reset_base
   # Place stone columns near CENTER (not on distant south pad)
   # so the bot can reach both stone and workstation pad without wandering
-  info "Placing stone columns near center"
-  for dx in -3 3; do
-    for dz in -3 3; do
-      rcon "setblock $((ARENA_CX + dx)) $((FLOOR_Y + 1)) $((ARENA_CZ + dz)) stone"
-      rcon "setblock $((ARENA_CX + dx)) $((FLOOR_Y + 2)) $((ARENA_CZ + dz)) stone"
-    done
-  done
-  # Also place ring at center for easy access
+  info "Placing stone blocks near center (single height, air above)"
+  # Single-height stone blocks with guaranteed air above — the exposed-first
+  # scan requires air above the target block.
   for pos in \
     "$((ARENA_CX + 2)) $((FLOOR_Y + 1)) ${ARENA_CZ}" \
     "$((ARENA_CX - 2)) $((FLOOR_Y + 1)) ${ARENA_CZ}" \
     "${ARENA_CX} $((FLOOR_Y + 1)) $((ARENA_CZ + 2))" \
-    "${ARENA_CX} $((FLOOR_Y + 1)) $((ARENA_CZ - 2))"; do
+    "${ARENA_CX} $((FLOOR_Y + 1)) $((ARENA_CZ - 2))" \
+    "$((ARENA_CX + 3)) $((FLOOR_Y + 1)) $((ARENA_CZ + 3))" \
+    "$((ARENA_CX - 3)) $((FLOOR_Y + 1)) $((ARENA_CZ - 3))" \
+    "$((ARENA_CX + 3)) $((FLOOR_Y + 1)) $((ARENA_CZ - 3))" \
+    "$((ARENA_CX - 3)) $((FLOOR_Y + 1)) $((ARENA_CZ + 3))" \
+    "$((ARENA_CX + 4)) $((FLOOR_Y + 1)) ${ARENA_CZ}" \
+    "$((ARENA_CX - 4)) $((FLOOR_Y + 1)) ${ARENA_CZ}" \
+    "${ARENA_CX} $((FLOOR_Y + 1)) $((ARENA_CZ + 4))" \
+    "${ARENA_CX} $((FLOOR_Y + 1)) $((ARENA_CZ - 4))"; do
     rcon "setblock ${pos} stone"
   done
   clear_workstation_pad
