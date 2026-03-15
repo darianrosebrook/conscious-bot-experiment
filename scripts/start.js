@@ -1030,7 +1030,8 @@ async function mainWithProgress() {
                   baseEnv.MINECRAFT_VERSION = '1.21.9';
                 }
                 if (service.name === 'Planning' && !baseEnv.STERLING_IDLE_EPISODES_ENABLED) {
-                  baseEnv.STERLING_IDLE_EPISODES_ENABLED = 'true';
+                  // Disable idle episodes in cert mode to prevent autonomous goal interference
+                  baseEnv.STERLING_IDLE_EPISODES_ENABLED = baseEnv.CERT_MODE === '1' ? 'false' : 'true';
                 }
                 if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
                   baseEnv.ENABLE_PLANNING_EXECUTOR = '1';

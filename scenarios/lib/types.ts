@@ -121,6 +121,19 @@ export interface ScenarioManifest {
   /** Pre-run invariants — verified before the bot starts */
   preRunInvariants: WorldInvariant[];
 
+  /**
+   * Direct action injection for certification scenarios.
+   * When set, the harness dispatches this action directly to the MC interface
+   * /action endpoint instead of waiting for idle-episode goal selection.
+   * The action goes through the same LeafFactory dispatch path as normal
+   * executor tasks — same validation, same result format.
+   */
+  directAction?: {
+    type: string;
+    parameters: Record<string, unknown>;
+    timeoutMs?: number;
+  };
+
   /** Acceptance criteria — checked after the run */
   acceptance: AcceptanceCriterion[];
 

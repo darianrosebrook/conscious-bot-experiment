@@ -4413,6 +4413,138 @@ async function startServer() {
     });
     serverConfig.mountRouter('/', eventStoreRouter);
 
+    // ── Scenario injection endpoint ──────────────────────────────────
+    // Certification scenarios inject goals directly through Sterling's solver
+    // pipeline instead of waiting for idle-episode thought generation.
+    // This goes through the same solver → step → executor path as production.
+    const { Router: ScenarioRouter } = await import('express');
+    const scenarioRouter = ScenarioRouter();
+
+    scenarioRouter.post('/api/scenario/inject', async (req: any, res: any) => {
+      try {
+        const { goal, action, item, count = 1, scenarioId } = req.body || {};
+
+        if (!goal && !action) {
+          return res.status(400).json({
+            success: false,
+            error: 'Missing required field: goal (e.g., "stone_pickaxe") or action (e.g., "acquire_material")',
+          });
+        }
+
+        // Fetch current state from MC interface
+        const stateRes = await mcFetch('/state', { method: 'GET', timeoutMs: 5000 });
+        if (!stateRes?.ok) {
+          return res.status(503).json({ success: false, error: 'MC interface unavailable' });
+        }
+        const stateJson = await stateRes.json() as any;
+        const ws = stateJson?.data?.worldState || {};
+        const invData = stateJson?.data?.data?.inventory?.items || [];
+        const currentInventory = invData.map((i: any) => ({ name: i.type || i.name, count: i.count }));
+        const nearbyBlocks = ws?.nearbyBlocks || [];
+
+        let solveResult: any = null;
+        let steps: any[] = [];
+        let taskTitle = '';
+
+        if (goal) {
+          // Route through tool progression or crafting solver
+          if (!minecraftCraftingSolver || !sterlingService?.isAvailable()) {
+            return res.status(503).json({ success: false, error: 'Sterling crafting solver unavailable' });
+          }
+
+          const mcDataModule = await import('minecraft-data');
+          const mcData = mcDataModule.default('1.21.9');
+
+          // Try tool progression first for pickaxe goals
+          if (goal.includes('pickaxe') && minecraftToolProgressionSolver) {
+            const invRecord: Record<string, number> = {};
+            for (const i of currentInventory) invRecord[i.name] = (invRecord[i.name] ?? 0) + i.count;
+            solveResult = await minecraftToolProgressionSolver.solveToolProgression(goal, invRecord, nearbyBlocks);
+          } else {
+            solveResult = await minecraftCraftingSolver.solveCraftingGoal(goal, currentInventory, mcData, nearbyBlocks);
+          }
+
+          if (solveResult?.solved && solveResult.steps?.length > 0) {
+            steps = solveResult.steps;
+            taskTitle = `Scenario: craft ${goal}`;
+          } else {
+            return res.json({
+              success: false,
+              error: solveResult?.error || `No solution found for ${goal}`,
+              solverOutput: { nodes: solveResult?.totalNodes, duration: solveResult?.durationMs },
+            });
+          }
+        } else if (action) {
+          // Direct action — create a single-step task
+          steps = [{
+            id: 'scenario-step-1',
+            action: action,
+            label: `${action}:${item || 'target'}`,
+            meta: { leaf: action },
+            args: { item: item || undefined, count, ...(req.body.args || {}) },
+          }];
+          taskTitle = `Scenario: ${action} ${item || ''}`.trim();
+        }
+
+        // Create task and add to queue
+        const taskId = `scenario-${scenarioId || 'manual'}-${Date.now()}`;
+        const task = {
+          id: taskId,
+          title: taskTitle,
+          description: taskTitle,
+          type: 'sterling_ir',
+          priority: 1.0,
+          urgency: 1.0,
+          progress: 0,
+          status: 'active',
+          source: 'scenario-harness',
+          steps: steps.map((s: any, idx: number) => ({
+            id: s.id || `scenario-step-${idx + 1}`,
+            action: s.action || s.label?.split(':')[0],
+            label: s.label,
+            meta: s.meta || { leaf: s.action || s.label?.split(':')[0] },
+            args: s.args || {},
+            status: 'pending',
+          })),
+          parameters: { scenarioId, goal, action, item },
+          metadata: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            retryCount: 0,
+            maxRetries: 3,
+            childTaskIds: [],
+            category: 'scenario',
+            tags: ['scenario', 'certification', scenarioId].filter(Boolean),
+            source: 'scenario-harness',
+          },
+        };
+
+        const addedTask = await taskIntegration.addTask(task as any);
+
+        console.log(`[Scenario] Injected task: ${taskId} goal=${goal || action} steps=${steps.length}`);
+
+        res.json({
+          success: true,
+          taskId: addedTask?.id || taskId,
+          steps: steps.length,
+          title: taskTitle,
+          solverOutput: solveResult ? {
+            solved: solveResult.solved,
+            nodes: solveResult.totalNodes,
+            duration: solveResult.durationMs,
+          } : undefined,
+        });
+      } catch (error) {
+        console.error('[Scenario] Injection failed:', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    });
+
+    serverConfig.mountRouter('/', scenarioRouter);
+
     // Navigation solve endpoint
     // Follows Option A: planning server owns the full scan→solve pipeline.
     // Leaf calls POST /solve-navigation → planning calls /world-scan on mc-interface
