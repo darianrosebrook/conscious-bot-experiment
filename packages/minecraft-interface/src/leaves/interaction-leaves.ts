@@ -1364,7 +1364,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                   const p = origin.offset(dx, dy, dz);
                   if (skipPositions.has(posKey(p))) continue;
                   const b = bot.blockAt(p);
-                  if (b && b.name && b.name.includes(itemPattern)) {
+                  if (b && b.name && b.name === itemPattern) {
                     // Require either LOS (close) or air-exposure (far) to prevent
                     // tunneling through terrain to reach buried blocks.
                     if (r <= DIG_REACH_LOS) {
