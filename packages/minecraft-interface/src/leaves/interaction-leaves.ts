@@ -1337,7 +1337,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
                   const p = origin.offset(dx, dy, dz);
                   if (skipPositions.has(posKey(p))) continue;
                   const b = bot.blockAt(p);
-                  if (!b || !b.name || !b.name.includes(itemPattern)) continue;
+                  if (!b || !b.name || b.name !== itemPattern) continue;
                   // Check exposed: block above must be air (surface-accessible)
                   const above = bot.blockAt(p.offset(0, 1, 0));
                   if (!above || (above.name !== 'air' && above.name !== 'cave_air')) continue;
