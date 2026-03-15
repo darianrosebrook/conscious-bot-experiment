@@ -4500,6 +4500,21 @@ async function startServer() {
           scenarioId,
         } = req.body || {};
 
+        // Clear all existing tasks — scenario harness is sole execution authority
+        const activeTasks = taskIntegration.getActiveTasks();
+        for (const t of activeTasks) {
+          try {
+            taskIntegration.updateTaskProgress(t.id, t.progress || 0, 'failed');
+            taskIntegration.updateTaskMetadata(t.id, {
+              failReason: 'scenario_preempted',
+              blockedReason: 'Preempted by certification scenario',
+            });
+          } catch { /* best-effort */ }
+        }
+        if (activeTasks.length > 0) {
+          console.log(`[Scenario] Preempted ${activeTasks.length} active tasks`);
+        }
+
         // Validate envelope
         if (!planner || !objective) {
           return res.status(400).json({
