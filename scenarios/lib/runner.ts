@@ -473,21 +473,53 @@ export async function evaluateScenario(
   console.log(`\n=== Evaluating: ${manifest.id} — ${manifest.name} ===`);
   console.log(`Run directory: ${runDir}\n`);
 
-  // Read run log
-  const logPath = runLogPath || path.join(process.cwd(), 'run.log');
+  // Read run log — prefer the run-dir copy if it exists (per-run isolation)
+  const runDirLog = path.join(runDir, 'run.log');
+  const logPath = fs.existsSync(runDirLog)
+    ? runDirLog
+    : (runLogPath || path.join(process.cwd(), 'run.log'));
   if (!fs.existsSync(logPath)) {
     console.error(`Run log not found: ${logPath}`);
     return { passed: false, results: [] };
   }
   const runLog = fs.readFileSync(logPath, 'utf-8');
 
-  // Copy run log to artifact directory
-  fs.copyFileSync(logPath, path.join(runDir, 'run.log'));
+  // Copy run log to artifact directory if not already there
+  if (logPath !== runDirLog) {
+    fs.copyFileSync(logPath, runDirLog);
+  }
 
   // Capture final state
   const rawState = await fetchBotState();
   const finalState = rawState ? extractBotSnapshot(rawState) : null;
   writeArtifact(runDir, 'final-state.json', finalState);
+
+  // Capture scenario task state from /tasks (task artifact dump)
+  try {
+    const tasksRes = await fetch(`${BOT_URL.replace(':3005', ':3002')}/tasks`);
+    if (tasksRes.ok) {
+      const tasksData = await tasksRes.json() as any;
+      const allTasks = [
+        ...(tasksData?.tasks?.current || []),
+        ...(tasksData?.tasks?.completed || []),
+        ...(tasksData?.tasks?.failed || []),
+      ];
+      const scenarioTasks = allTasks.filter((t: any) =>
+        t.title?.includes('[cert]') || t.metadata?.scenarioRunId
+      );
+      writeArtifact(runDir, 'task-state.json', scenarioTasks);
+    }
+  } catch {
+    // non-fatal — task state is supplementary evidence
+  }
+
+  // Extract dig coordinates from log for target-approval verification
+  const digCoords = [...runLog.matchAll(/digPos=\(([^)]+)\)/g)]
+    .map(m => {
+      const [x, y, z] = m[1].split(',').map(Number);
+      return { x, y, z };
+    });
+  writeArtifact(runDir, 'dig-coordinates.json', digCoords);
 
   // Check acceptance criteria
   const results = manifest.acceptance.map((c) => checkAcceptance(c, runLog));
@@ -515,6 +547,13 @@ export async function evaluateScenario(
       passed: r.passed,
       detail: r.detail,
     })),
+    evidence: {
+      digCoordinates: digCoords,
+      digCount: digCoords.length,
+      finalInventory: finalState?.inventory || [],
+      harvestSuccessCount: (runLog.match(/harvest_complete/g) || []).length,
+      pickupFailCount: (runLog.match(/pickup_failed_after_dig/g) || []).length,
+    },
     artifacts: fs.readdirSync(runDir),
   };
   writeArtifact(runDir, 'summary.json', summary);
