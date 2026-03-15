@@ -4524,7 +4524,11 @@ async function startServer() {
         // Use the same addTask path as thought-to-task converter.
         // Task type is 'sterling_ir' for Sterling or 'scenario' for fallback-macro.
         const taskId = `scenario-${runId}`;
-        const taskType = planner === 'sterling' ? 'sterling_ir' : 'scenario';
+        // Both authorities produce sterling_ir tasks — the step executor
+        // dispatches steps from sterling_ir tasks that are active.
+        // Fallback-macro tasks have pre-built steps; Sterling tasks have
+        // solver-expanded steps. Both enter the same executor dispatch path.
+        const taskType = 'sterling_ir';
 
         const normalizedSteps = steps.map((s: any, idx: number) => ({
           id: s.id || `${runId}-step-${idx + 1}`,
