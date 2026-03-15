@@ -1680,16 +1680,6 @@ export class AcquireMaterialLeaf implements LeafImpl {
             }
           }
           if (confirmed) break;
-
-          // Fallback: total count increased (catches unexpected drops)
-          const inventoryTotalAfter = bot.inventory.items().reduce(
-            (sum: number, it: any) => sum + (it.count || 1),
-            0
-          );
-          if (inventoryTotalAfter > inventoryTotalBefore) {
-            confirmed = true;
-            break;
-          }
           confirmPolls++;
           await new Promise((r) => setTimeout(r, 50));
         }
