@@ -4606,7 +4606,7 @@ async function startServer() {
         // addTask leaves non-sterling_ir tasks in 'pending' status, but
         // scenario tasks have pre-expanded steps and should be active.
         if (addedTask && addedTask.status === 'pending' && addedTask.steps?.length > 0) {
-          taskIntegration.updateTaskProgress(addedTask.id, 0, 'active');
+          (addedTask as any).status = 'active';
         }
 
         console.log(
