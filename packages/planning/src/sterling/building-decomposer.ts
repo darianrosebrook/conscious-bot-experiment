@@ -16,6 +16,7 @@
  * @author @darianrosebrook
  */
 
+import { createHash } from 'node:crypto';
 import type { TaskStep } from '../types/task-step';
 import type { ModuleWitnessV1 } from '../types/build-checkpoint';
 import { buildModuleWitness } from './build-checkpoint';
@@ -170,7 +171,6 @@ export function decomposeTemplate(
   }
 
   // Compute template digest from all block positions + types
-  const { createHash } = require('node:crypto');
   const canonical = JSON.stringify(
     blocks.map(b => `${b.position.x},${b.position.y},${b.position.z}:${b.blockType}`).sort(),
   );
@@ -244,7 +244,22 @@ export function decomposeCheckpointableTemplate(
       },
     }));
 
-    // Insert verify_module checkpoint step after module's placements
+    // Generate witness from canonical placements (before verify step so we can embed it)
+    const witness = buildModuleWitness(
+      moduleId,
+      siteOrigin,
+      template.facing,
+      sorted.map(block => ({
+        dx: block.position.x,
+        dy: block.position.y,
+        dz: block.position.z,
+        blockId: block.blockType,
+      })),
+    );
+
+    // Insert verify_module checkpoint step with embedded witness.
+    // The witness is embedded directly so the leaf is self-describing and
+    // replayable without needing a separate metadata lookup at dispatch time.
     steps.push({
       id: `step-${now}-verify-${globalOrder}`,
       label: `Checkpoint: verify module ${moduleId}`,
@@ -258,21 +273,20 @@ export function decomposeCheckpointableTemplate(
         isCheckpoint: true,
         moduleId,
         templateId: template.templateId,
+        args: {
+          moduleId,
+          templateId: template.templateId,
+          witness: {
+            moduleId: witness.moduleId,
+            refCorner: witness.refCorner,
+            facing: witness.facing,
+            expectedPlacements: witness.expectedPlacements,
+            requiredEmpty: witness.requiredEmpty,
+          },
+          witnessDigest: witness.witnessDigest,
+        },
       },
     });
-
-    // Generate witness from canonical placements
-    const witness = buildModuleWitness(
-      moduleId,
-      siteOrigin,
-      template.facing,
-      sorted.map(block => ({
-        dx: block.position.x,
-        dy: block.position.y,
-        dz: block.position.z,
-        blockId: block.blockType,
-      })),
-    );
 
     result.push({ moduleId, blocks: sorted, steps, witness });
   }

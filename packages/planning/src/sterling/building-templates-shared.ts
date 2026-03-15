@@ -165,12 +165,12 @@ export function getSimpleShelterTemplate(): CheckpointableTemplate {
 // ============================================================================
 
 /**
- * Reduced shelter — just foundation + first wall course.
+ * Reduced shelter — foundation + walls (3 courses).
  * The minimal slice for M5-v0 checkpoint proof.
  *
- * 2 modules, ~41 blocks. Small enough to test quickly, complex enough
- * to have a meaningful checkpoint boundary (foundation verified before
- * wall placement starts).
+ * 2 modules, 71 blocks (25 foundation + 46 walls). Small enough to
+ * test quickly, complex enough to have a meaningful checkpoint boundary
+ * (foundation verified before wall placement starts).
  */
 export function getReducedShelterTemplate(): CheckpointableTemplate {
   const full = getSimpleShelterTemplate();

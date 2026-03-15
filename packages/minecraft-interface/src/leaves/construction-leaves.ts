@@ -1,14 +1,16 @@
 /**
- * Construction Leaves - P0 stub leaves for building domain
+ * Construction Leaves
  *
- * These leaves implement the building execution pipeline but do NOT mutate
- * inventory or world state. They check material presence (read-only) and
- * emit telemetry via `wouldConsume` / `stub: true` fields.
- *
- * Integrity constraints:
- * - No inventory mutation in leaves
- * - No world mutation (no block placement/clearing)
+ * P0 stub leaves (PrepareSite, BuildModule, PlaceFeature):
+ * - Do NOT mutate inventory or world state
+ * - Check material presence (read-only) and emit telemetry
  * - Results report what WOULD happen, not what DID happen
+ *
+ * M5 real leaves (VerifyModule):
+ * - Reads world state via bot.blockAt() to verify block placements
+ * - Compares expected placements from ModuleWitnessV1 against actual world
+ * - Returns structured diff (missing, wrong, unexpectedFills)
+ * - This is the checkpoint boundary — persistence only valid after verification
  *
  * @author @darianrosebrook
  */
@@ -436,15 +438,16 @@ export class VerifyModuleLeaf implements LeafImpl {
           actual: actualName,
         });
       } else if (actualName !== ep.blockId) {
-        // Handle slab variants: oak_slab may appear as oak_slab regardless of waterlogged state
-        const isSlabMatch = actualName.includes(ep.blockId) || ep.blockId.includes(actualName);
-        if (!isSlabMatch) {
-          wrong.push({
-            pos: { x: absPos.x, y: absPos.y, z: absPos.z },
-            expected: ep.blockId,
-            actual: actualName,
-          });
-        }
+        // Exact match required. Block state variants (waterlogged slabs,
+        // powered doors, etc.) share the same block name in mineflayer,
+        // so exact name comparison is sufficient. Substring matching was
+        // removed because it risks false positives (e.g. 'oak' matching
+        // 'oak_slab' or 'oak_planks').
+        wrong.push({
+          pos: { x: absPos.x, y: absPos.y, z: absPos.z },
+          expected: ep.blockId,
+          actual: actualName,
+        });
       }
     }
 
