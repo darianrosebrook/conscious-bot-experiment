@@ -225,6 +225,12 @@ export class KeepAliveIntegration {
       return null;
     }
 
+    // CERT_MODE: suppress all autonomous thought generation so scenario
+    // harness is the sole execution authority during certification runs.
+    if (process.env.CERT_MODE === '1') {
+      return null;
+    }
+
     // Cache bot state for vitals re-routing in onThought()
     this.lastBotState = botState;
 
