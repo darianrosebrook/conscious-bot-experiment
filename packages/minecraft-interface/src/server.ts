@@ -121,6 +121,7 @@ import {
   PrepareSiteLeaf,
   BuildModuleLeaf,
   PlaceFeatureLeaf,
+  VerifyModuleLeaf,
 } from './leaves/construction-leaves';
 
 // =============================================================================
@@ -1117,11 +1118,12 @@ async function registerCoreLeaves() {
       new EnvironmentalControlLeaf(),
     ];
 
-    // Register construction leaves (P0 stubs — no inventory/world mutation)
+    // Register construction leaves (P0 stubs + M5 verify_module)
     const constructionLeaves = [
       new PrepareSiteLeaf(),
       new BuildModuleLeaf(),
       new PlaceFeatureLeaf(),
+      new VerifyModuleLeaf(),
     ];
 
     const allLeaves = [

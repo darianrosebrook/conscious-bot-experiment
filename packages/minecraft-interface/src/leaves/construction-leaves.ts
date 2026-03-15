@@ -19,6 +19,7 @@ import {
   LeafResult,
   LeafSpec,
 } from '@conscious-bot/core';
+import { Vec3 } from 'vec3';
 
 // ============================================================================
 // Prepare Site Leaf
@@ -349,6 +350,145 @@ export class PlaceFeatureLeaf implements LeafImpl {
         retries: 0,
         timeouts: 0,
       },
+    };
+  }
+}
+
+// ============================================================================
+// Verify Module Leaf (M5 — real world scanning)
+// ============================================================================
+
+/**
+ * Verifies a module's postconditions by scanning the world for expected
+ * block placements from ModuleWitnessV1.
+ *
+ * This is the checkpoint boundary: a checkpoint is only valid if
+ * verify_module confirms the world matches the witness. Returns a
+ * structured diff of missing, wrong, and unexpected blocks.
+ *
+ * NOT a stub — this does real world reads via bot.blockAt().
+ */
+export class VerifyModuleLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'verify_module',
+    version: '1.0.0',
+    description: 'Verify module postconditions against world state (M5 checkpoint boundary)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        moduleId: { type: 'string' },
+        templateId: { type: 'string' },
+        witness: {
+          type: 'object',
+          description: 'ModuleWitnessV1 with expectedPlacements and requiredEmpty',
+        },
+      },
+      required: ['moduleId', 'witness'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        moduleId: { type: 'string' },
+        postconditionsMet: { type: 'boolean' },
+        diff: { type: 'object' },
+        scannedPositions: { type: 'number' },
+      },
+    },
+    timeoutMs: 10000,
+    retries: 0,
+    permissions: ['sense'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const startTime = ctx.now();
+    const { moduleId, witness } = args;
+
+    if (!moduleId || !witness) {
+      return {
+        status: 'failure',
+        error: { code: 'invalid_input', retryable: false, detail: 'moduleId and witness are required' },
+        metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+      };
+    }
+
+    const bot = ctx.bot;
+    const refCorner = witness.refCorner || { x: 0, y: 0, z: 0 };
+    const expectedPlacements = witness.expectedPlacements || [];
+    const requiredEmpty = witness.requiredEmpty || [];
+
+    const missing: Array<{ pos: { x: number; y: number; z: number }; expected: string; actual: string }> = [];
+    const wrong: Array<{ pos: { x: number; y: number; z: number }; expected: string; actual: string }> = [];
+
+    // Check expected placements
+    for (const ep of expectedPlacements) {
+      const absPos = new Vec3(
+        refCorner.x + ep.dx,
+        refCorner.y + ep.dy,
+        refCorner.z + ep.dz,
+      );
+      const block = bot.blockAt(absPos);
+      const actualName = block?.name ?? 'unknown';
+
+      if (!block || actualName === 'air' || actualName === 'cave_air') {
+        missing.push({
+          pos: { x: absPos.x, y: absPos.y, z: absPos.z },
+          expected: ep.blockId,
+          actual: actualName,
+        });
+      } else if (actualName !== ep.blockId) {
+        // Handle slab variants: oak_slab may appear as oak_slab regardless of waterlogged state
+        const isSlabMatch = actualName.includes(ep.blockId) || ep.blockId.includes(actualName);
+        if (!isSlabMatch) {
+          wrong.push({
+            pos: { x: absPos.x, y: absPos.y, z: absPos.z },
+            expected: ep.blockId,
+            actual: actualName,
+          });
+        }
+      }
+    }
+
+    // Check required empty positions
+    const unexpectedFills: Array<{ pos: { x: number; y: number; z: number }; actual: string }> = [];
+    for (const re of requiredEmpty) {
+      const absPos = new Vec3(
+        refCorner.x + re.dx,
+        refCorner.y + re.dy,
+        refCorner.z + re.dz,
+      );
+      const block = bot.blockAt(absPos);
+      if (block && block.name !== 'air' && block.name !== 'cave_air' && block.name !== 'void_air') {
+        unexpectedFills.push({
+          pos: { x: absPos.x, y: absPos.y, z: absPos.z },
+          actual: block.name,
+        });
+      }
+    }
+
+    const postconditionsMet = missing.length === 0 && wrong.length === 0 && unexpectedFills.length === 0;
+    const scannedPositions = expectedPlacements.length + requiredEmpty.length;
+
+    const durationMs = ctx.now() - startTime;
+
+    console.log(
+      `[Building] verify_module: moduleId=${moduleId} passed=${postconditionsMet} ` +
+      `scanned=${scannedPositions} missing=${missing.length} wrong=${wrong.length} ` +
+      `unexpectedFills=${unexpectedFills.length}`
+    );
+
+    return {
+      status: postconditionsMet ? 'success' : 'failure',
+      result: {
+        moduleId,
+        postconditionsMet,
+        diff: {
+          missing,
+          wrong,
+          unexpectedFills,
+        },
+        scannedPositions,
+      },
+      metrics: { durationMs, retries: 0, timeouts: 0 },
     };
   }
 }

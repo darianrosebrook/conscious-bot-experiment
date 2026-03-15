@@ -10,7 +10,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { decomposeTemplate, type PlacedBlock } from '../building-decomposer';
+import { decomposeTemplate, decomposeCheckpointableTemplate, type PlacedBlock } from '../building-decomposer';
+import { getReducedShelterTemplate } from '../building-templates-shared';
 
 // ── Simple Shelter fixture (reduced from dashboard template) ──
 
@@ -210,5 +211,95 @@ describe('M5: Building Decomposer', () => {
       const r2 = decomposeTemplate('shelter_v0', modified, SITE_ORIGIN);
       expect(r1.templateDigest).not.toBe(r2.templateDigest);
     });
+  });
+});
+
+// ── Template-aware decomposition tests ──
+
+describe('M5: Checkpointable Template Decomposition', () => {
+  it('uses canonical module boundaries from the template', () => {
+    const template = getReducedShelterTemplate();
+    const result = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+
+    // Module IDs come from the template, not Y-layer heuristics
+    const moduleIds = result.modules.map(m => m.moduleId);
+    expect(moduleIds).toEqual(['foundation_5x5', 'walls_cobble_3h']);
+  });
+
+  it('inserts verify_module checkpoint steps between modules', () => {
+    const template = getReducedShelterTemplate();
+    const result = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+
+    for (const module of result.modules) {
+      const lastStep = module.steps[module.steps.length - 1];
+      expect((lastStep.meta as any).leaf).toBe('verify_module');
+      expect((lastStep.meta as any).isCheckpoint).toBe(true);
+      expect((lastStep.meta as any).moduleId).toBe(module.moduleId);
+    }
+  });
+
+  it('placement steps precede checkpoint step within each module', () => {
+    const template = getReducedShelterTemplate();
+    const result = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+
+    for (const module of result.modules) {
+      const placeSteps = module.steps.filter(s => (s.meta as any).leaf === 'place_block');
+      const verifySteps = module.steps.filter(s => (s.meta as any).leaf === 'verify_module');
+
+      expect(placeSteps.length).toBeGreaterThan(0);
+      expect(verifySteps.length).toBe(1);
+
+      // All place_block orders < verify_module order
+      const maxPlaceOrder = Math.max(...placeSteps.map(s => s.order));
+      expect(verifySteps[0].order).toBeGreaterThan(maxPlaceOrder);
+    }
+  });
+
+  it('foundation witness has 25 cobblestone placements', () => {
+    const template = getReducedShelterTemplate();
+    const result = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+
+    const foundation = result.modules.find(m => m.moduleId === 'foundation_5x5')!;
+    expect(foundation.witness.expectedPlacements.length).toBe(25);
+    expect(foundation.witness.expectedPlacements.every(p => p.blockId === 'cobblestone')).toBe(true);
+  });
+
+  it('template digest is deterministic from canonical source', () => {
+    const template = getReducedShelterTemplate();
+    const r1 = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+    const r2 = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+    expect(r1.templateDigest).toBe(r2.templateDigest);
+  });
+
+  it('gravity compliance: all blocks have support from prior placements', () => {
+    const template = getReducedShelterTemplate();
+    const result = decomposeCheckpointableTemplate(template, SITE_ORIGIN);
+
+    const placed = new Set<string>();
+    // Ground is solid
+    for (let x = -5; x <= 20; x++) {
+      for (let z = -5; z <= 20; z++) {
+        placed.add(`${SITE_ORIGIN.x + x},${SITE_ORIGIN.y - 1},${SITE_ORIGIN.z + z}`);
+      }
+    }
+
+    const allSteps = result.modules.flatMap(m => m.steps);
+    for (const step of allSteps) {
+      const pos = (step.meta as any)?.args?.pos;
+      if (!pos) continue; // verify_module steps have no pos
+
+      const adjacentKeys = [
+        `${pos.x},${pos.y - 1},${pos.z}`,
+        `${pos.x + 1},${pos.y},${pos.z}`,
+        `${pos.x - 1},${pos.y},${pos.z}`,
+        `${pos.x},${pos.y},${pos.z + 1}`,
+        `${pos.x},${pos.y},${pos.z - 1}`,
+      ];
+
+      const hasSupport = adjacentKeys.some(k => placed.has(k));
+      expect(hasSupport, `Block at (${pos.x},${pos.y},${pos.z}) has no support`).toBe(true);
+
+      placed.add(`${pos.x},${pos.y},${pos.z}`);
+    }
   });
 });

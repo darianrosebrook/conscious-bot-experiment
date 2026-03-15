@@ -19,6 +19,7 @@
 import type { TaskStep } from '../types/task-step';
 import type { ModuleWitnessV1 } from '../types/build-checkpoint';
 import { buildModuleWitness } from './build-checkpoint';
+import type { CheckpointableTemplate } from './building-templates-shared';
 
 // ============================================================================
 // Types
@@ -178,6 +179,114 @@ export function decomposeTemplate(
   return {
     modules: result,
     totalBlocks: blocks.length,
+    totalSteps: globalOrder - 1,
+    templateDigest,
+  };
+}
+
+// ============================================================================
+// Template-Aware Decomposition (uses canonical module boundaries)
+// ============================================================================
+
+/**
+ * Decompose a CheckpointableTemplate into per-module steps and witnesses.
+ *
+ * Unlike decomposeTemplate (which infers modules from Y-layers), this
+ * uses the template's canonical module definitions. This ensures the
+ * decomposer, planner, and solver all agree on module identity, ordering,
+ * and geometry.
+ *
+ * Also inserts verify_module checkpoint steps between modules.
+ */
+export function decomposeCheckpointableTemplate(
+  template: CheckpointableTemplate,
+  siteOrigin: { x: number; y: number; z: number },
+): DecompositionResult {
+  const result: DecomposedModule[] = [];
+  let globalOrder = 1;
+  const now = Date.now();
+  const allBlocks: PlacedBlock[] = [];
+
+  for (const moduleId of template.constructionOrder) {
+    const moduleDef = template.modules.find(m => m.moduleId === moduleId);
+    if (!moduleDef || moduleDef.placements.length === 0) continue;
+
+    allBlocks.push(...moduleDef.placements);
+
+    // Sort placements bottom-to-top for gravity compliance
+    const sorted = [...moduleDef.placements].sort((a, b) => {
+      if (a.position.y !== b.position.y) return a.position.y - b.position.y;
+      if (a.position.z !== b.position.z) return a.position.z - b.position.z;
+      return a.position.x - b.position.x;
+    });
+
+    // Generate place_block steps with absolute world coordinates
+    const steps: TaskStep[] = sorted.map((block) => ({
+      id: `step-${now}-place-${globalOrder}`,
+      label: `Place ${block.blockType} at (${siteOrigin.x + block.position.x},${siteOrigin.y + block.position.y},${siteOrigin.z + block.position.z})`,
+      done: false,
+      order: globalOrder++,
+      estimatedDuration: 3000,
+      meta: {
+        domain: 'building',
+        leaf: 'place_block',
+        executable: true,
+        moduleId,
+        templateId: template.templateId,
+        args: {
+          item: block.blockType,
+          pos: {
+            x: siteOrigin.x + block.position.x,
+            y: siteOrigin.y + block.position.y,
+            z: siteOrigin.z + block.position.z,
+          },
+        },
+      },
+    }));
+
+    // Insert verify_module checkpoint step after module's placements
+    steps.push({
+      id: `step-${now}-verify-${globalOrder}`,
+      label: `Checkpoint: verify module ${moduleId}`,
+      done: false,
+      order: globalOrder++,
+      estimatedDuration: 2000,
+      meta: {
+        domain: 'building',
+        leaf: 'verify_module',
+        executable: true,
+        isCheckpoint: true,
+        moduleId,
+        templateId: template.templateId,
+      },
+    });
+
+    // Generate witness from canonical placements
+    const witness = buildModuleWitness(
+      moduleId,
+      siteOrigin,
+      template.facing,
+      sorted.map(block => ({
+        dx: block.position.x,
+        dy: block.position.y,
+        dz: block.position.z,
+        blockId: block.blockType,
+      })),
+    );
+
+    result.push({ moduleId, blocks: sorted, steps, witness });
+  }
+
+  // Template digest from all canonical placements
+  const { createHash } = require('node:crypto');
+  const canonical = JSON.stringify(
+    allBlocks.map(bl => `${bl.position.x},${bl.position.y},${bl.position.z}:${bl.blockType}`).sort(),
+  );
+  const templateDigest = createHash('sha256').update(canonical).digest('hex').slice(0, 16);
+
+  return {
+    modules: result,
+    totalBlocks: allBlocks.length,
     totalSteps: globalOrder - 1,
     templateDigest,
   };
