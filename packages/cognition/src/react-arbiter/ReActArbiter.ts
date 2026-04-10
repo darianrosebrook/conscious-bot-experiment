@@ -424,7 +424,14 @@ Keep your reflection concise and actionable.`;
         trimmed.toLowerCase().includes('tool:') ||
         trimmed.toLowerCase().includes('action:')
       ) {
-        selectedTool = trimmed.split(':')[1]?.trim() || '';
+        // Same colon-split caveat as the args parser below: split(':')
+        // splits on every colon, so a tool name like `mcp:filesystem:write`
+        // (namespaced MCP tool names are legal) would silently truncate
+        // to `mcp` and fall through to fuzzy-match. Take everything
+        // after the FIRST colon so the full label reaches the registry.
+        const toolColonIdx = trimmed.indexOf(':');
+        selectedTool =
+          toolColonIdx >= 0 ? trimmed.slice(toolColonIdx + 1).trim() : '';
       } else if (
         trimmed.toLowerCase().includes('args:') ||
         trimmed.toLowerCase().includes('parameters:')

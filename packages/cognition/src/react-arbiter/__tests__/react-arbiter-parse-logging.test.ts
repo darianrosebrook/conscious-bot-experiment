@@ -151,4 +151,60 @@ describe('ReActArbiter — parseReActResponse error-path logging', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('Strategy 2 — tool name colon-split regression', () => {
+    it('extracts colon-containing tool names without truncation', () => {
+      // Historical bug (sibling of the args-line bug): the Tool: label
+      // used `trimmed.split(':')[1]?.trim()`, which splits on EVERY
+      // colon. A legitimately colon-containing tool name like
+      // `mcp:filesystem:write` (namespaced MCP tool names are legal)
+      // would be silently truncated to `mcp` before the registry
+      // lookup, causing every colon-named tool to fall through to
+      // fuzzy-match. The fix at ReActArbiter.ts:427 uses
+      // indexOf(':') + slice to take everything after the FIRST colon.
+      //
+      // This test drives parseReActResponse with a colon-containing
+      // tool name in the Tool: line and asserts the full name
+      // reaches `selectedTool` instead of being truncated at the
+      // first inner colon.
+      const responseWithColonTool = [
+        'Tool: mcp:filesystem:write',
+        'Args: {"path": "/tmp/test.txt", "content": "hello"}',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithColonTool
+      );
+
+      // Before the fix: selectedTool === 'mcp' (truncated).
+      // After the fix: selectedTool === 'mcp:filesystem:write' (full).
+      expect(result.selectedTool).toBe('mcp:filesystem:write');
+      // And args should also round-trip correctly — verifies the two
+      // colon-split fixes work together on the same response.
+      expect(result.args).toEqual({
+        path: '/tmp/test.txt',
+        content: 'hello',
+      });
+      // Neither of the two parse paths should have logged.
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('still handles simple (no-colon) tool names correctly', () => {
+      // Negative regression check — make sure the indexOf(':') + slice
+      // change didn't break the common case of a tool name with no
+      // internal colons.
+      const responseWithSimpleTool = [
+        'Tool: chat',
+        'Args: {"message": "hello world"}',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithSimpleTool
+      );
+
+      expect(result.selectedTool).toBe('chat');
+      expect(result.args).toEqual({ message: 'hello world' });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
 });
