@@ -3,6 +3,20 @@
  * recent thoughts, mark processed, and SSE streaming.
  *
  * Supports eval isolation via evalRunId filtering (AC-ISO-01, AC-ISO-02, AC-ISO-03).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * Naming note: "keepalive" in this file refers to the SSE protocol comment-
+ * frame mechanism (`: keepalive\n\n`) that prevents HTTP intermediaries and
+ * browsers from timing out a long-lived EventSource connection. It has
+ * NOTHING to do with:
+ *   - `Connection: keep-alive` (HTTP/1.1 persistent connection directive,
+ *     set at res.setHeader below — that's just stock SSE boilerplate)
+ *   - `packages/cognition/src/keep-alive/` (an unrelated bot-idle goal-
+ *     emission subsystem; see the quarantine note at the top of that
+ *     directory's index.ts)
+ * The word collides across three meanings. This file only touches the
+ * first one.
+ * ────────────────────────────────────────────────────────────────────────────
  */
 
 import { Router, Request, Response } from 'express';
@@ -19,6 +33,74 @@ import { logStressAtBoundary } from '../stress-boundary-logger';
 import { createServerLogger } from '../server-utils/server-logger';
 
 const sseLogger = createServerLogger({ subsystem: 'cognitive-stream-routes' });
+
+/**
+ * SSE keepalive interval (ms). Exported as a constant so tests can reuse it
+ * and so the production default is visible in one place.
+ */
+export const SSE_KEEPALIVE_INTERVAL_MS = 30_000;
+
+/**
+ * Minimal shape of what startSseKeepalive needs to write to — kept narrower
+ * than Express's Response type so the helper can be exercised in tests with
+ * a hand-rolled fake that only provides `write`.
+ */
+export interface SseWritable {
+  write(chunk: string): boolean;
+}
+
+/**
+ * Start a per-client SSE keepalive loop.
+ *
+ * Sends a `: keepalive\n\n` SSE comment frame on the given writable every
+ * `intervalMs` milliseconds (default 30s). SSE clients ignore comment frames,
+ * but their presence prevents HTTP intermediaries (proxies, browsers, load
+ * balancers) from timing out an otherwise-idle event stream.
+ *
+ * On a write failure — which typically indicates the client has disconnected
+ * uncleanly (TCP reset mid-write, proxy timeout, browser crash) — this helper:
+ *   1. Logs an `sse_keepalive_write_failed` event at debug level
+ *   2. Clears its own interval
+ *   3. Calls the caller-provided `onUnrecoverableError` callback so the
+ *      caller can remove the client from its connection set
+ *
+ * Clean disconnects (client closes the request normally) are NOT handled
+ * here — the route handler's `req.on('close', ...)` listener owns that path
+ * and is responsible for clearing the returned interval handle.
+ *
+ * This function is extracted from the inline `setInterval` body for
+ * testability: callers can pass a fake writable whose `write` throws
+ * deterministically, use `vi.useFakeTimers()` to advance past `intervalMs`,
+ * and assert on the `onUnrecoverableError` spy.
+ */
+export function startSseKeepalive(
+  res: SseWritable,
+  onUnrecoverableError: () => void,
+  intervalMs: number = SSE_KEEPALIVE_INTERVAL_MS
+): NodeJS.Timeout {
+  const interval = setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`);
+    } catch (e) {
+      // Unclean disconnects (TCP reset mid-write, client crash, proxy
+      // timeout) land here. Clean disconnects are handled by the caller's
+      // `req.on('close')` listener and never reach this catch, so anything
+      // we see here is interesting for diagnosing dashboard drop-offs.
+      // Debug level to avoid flooding during known-bad network conditions.
+      sseLogger.debug('SSE keepalive write failed — client likely gone', {
+        event: 'sse_keepalive_write_failed',
+        tags: ['sse', 'keepalive', 'debug'],
+        fields: {
+          error: e instanceof Error ? e.message : String(e),
+          errorName: e instanceof Error ? e.name : undefined,
+        },
+      });
+      clearInterval(interval);
+      onUnrecoverableError();
+    }
+  }, intervalMs);
+  return interval;
+}
 
 export interface CognitiveStreamRouteDeps {
   state: CognitionMutableState;
@@ -143,29 +225,13 @@ export function createCognitiveStreamRoutes(
     });
     res.write(`data: ${initMessage}\n\n`);
 
-    // Send keepalive every 30 seconds
-    const keepaliveInterval = setInterval(() => {
-      try {
-        res.write(`: keepalive\n\n`);
-      } catch (e) {
-        // Unclean disconnects (TCP reset mid-write, client crash, proxy
-        // timeout) land here. Clean disconnects are handled by the
-        // req.on('close') handler below and never reach this catch, so
-        // anything we see here is interesting for diagnosing dashboard
-        // drop-offs. Debug level to avoid flooding during known-bad
-        // network conditions.
-        sseLogger.debug('SSE keepalive write failed — client likely gone', {
-          event: 'sse_keepalive_write_failed',
-          tags: ['sse', 'keepalive', 'debug'],
-          fields: {
-            error: e instanceof Error ? e.message : String(e),
-            errorName: e instanceof Error ? e.name : undefined,
-          },
-        });
-        clearInterval(keepaliveInterval);
-        sseClients.delete(res);
-      }
-    }, 30000);
+    // Send keepalive every 30 seconds — extracted to startSseKeepalive()
+    // for testability. The helper owns the interval and logging; we own
+    // the client-set cleanup via the onUnrecoverableError callback and the
+    // req.on('close') listener below.
+    const keepaliveInterval = startSseKeepalive(res, () => {
+      sseClients.delete(res);
+    });
 
     // Clean up on disconnect
     req.on('close', () => {
