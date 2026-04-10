@@ -10,6 +10,11 @@
 import { LLMInterface, LLMContext } from '../cognitive-core/llm-interface';
 import { AgentModeler } from './agent-modeler';
 import { AgentModel, Intention } from './types';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const tomLogger = createServerLogger({
+  subsystem: 'theory-of-mind-engine',
+});
 
 // ============================================================================
 // JSON Parsing Utilities (robust extraction from LLM output)
@@ -751,8 +756,17 @@ Respond in JSON format.`,
         timestamp: Date.now(),
       };
     } catch (error) {
-      // Emit structured error for observability (not just console.error)
-      console.error('Failed to parse mental state inference:', error);
+      tomLogger.warn('Failed to parse mental state inference LLM response', {
+        event: 'tom_mental_state_parse_failed',
+        tags: ['social-cognition', 'theory-of-mind', 'parse', 'warn'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          agentId,
+          responseSnippet: response.slice(0, 200),
+        },
+      });
+      // Preserve the structured event emission for subscribers that
+      // bind to the dedicated TomParseFailedEvent topic.
       this.emitParseFailedEvent?.('parseMentalStateInference', response, error);
       return this.createEmptyMentalStateInference(agentId);
     }
@@ -777,7 +791,15 @@ Respond in JSON format.`,
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.error('Failed to parse action prediction:', error);
+      tomLogger.warn('Failed to parse action prediction LLM response', {
+        event: 'tom_action_prediction_parse_failed',
+        tags: ['social-cognition', 'theory-of-mind', 'parse', 'warn'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          agentId,
+          responseSnippet: response.slice(0, 200),
+        },
+      });
       this.emitParseFailedEvent?.('parseActionPrediction', response, error);
       return this.createEmptyActionPrediction(agentId);
     }
@@ -804,7 +826,16 @@ Respond in JSON format.`,
         limitationsNoted: parsed.limitations || [],
       };
     } catch (error) {
-      console.warn('Failed to parse perspective simulation:', error);
+      tomLogger.warn('Failed to parse perspective simulation LLM response', {
+        event: 'tom_perspective_parse_failed',
+        tags: ['social-cognition', 'theory-of-mind', 'parse', 'warn'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          agentId,
+          scenarioId: (scenario as any)?.id,
+          responseSnippet: response.slice(0, 200),
+        },
+      });
       return this.createEmptyPerspectiveSimulation(agentId, scenario);
     }
   }
@@ -828,7 +859,16 @@ Respond in JSON format.`,
         implications: parsed.implications || [],
       };
     } catch (error) {
-      console.warn('Failed to parse false belief detection:', error);
+      tomLogger.warn('Failed to parse false belief detection LLM response', {
+        event: 'tom_false_belief_parse_failed',
+        tags: ['social-cognition', 'theory-of-mind', 'parse', 'warn'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          agentId,
+          beliefDomain,
+          responseSnippet: response.slice(0, 200),
+        },
+      });
       return this.createEmptyFalseBeliefDetection(agentId, beliefDomain);
     }
   }
@@ -851,7 +891,16 @@ Respond in JSON format.`,
         complexityLevel: parsed.complexity || 1,
       };
     } catch (error) {
-      console.warn('Failed to parse meta-reasoning:', error);
+      tomLogger.warn('Failed to parse meta-reasoning LLM response', {
+        event: 'tom_meta_reasoning_parse_failed',
+        tags: ['social-cognition', 'theory-of-mind', 'parse', 'warn'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          agentId,
+          reasoningTarget,
+          responseSnippet: response.slice(0, 200),
+        },
+      });
       return this.createEmptyMetaReasoning(agentId, reasoningTarget);
     }
   }

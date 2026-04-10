@@ -46,6 +46,11 @@ import {
 } from '../bot-state-cache';
 import { logStressAtBoundary } from '../stress-boundary-logger';
 import { updateStressFromIntrusion } from '../interoception-store';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const processRoutesLogger = createServerLogger({
+  subsystem: 'process-routes',
+});
 
 export interface ProcessRouteDeps {
   state: CognitionMutableState;
@@ -492,8 +497,24 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
                   updateBotStateCache(freshState);
                 }
               })
-              .catch(() => {
-                /* Non-blocking — stale cache is acceptable */
+              .catch((e) => {
+                // Stale cache is acceptable for social-interaction routing,
+                // but we still want a trace when the refresh fails so we can
+                // distinguish "MC endpoint down" from "MC endpoint returned
+                // malformed JSON" in post-mortems. Debug level to avoid
+                // noise during expected brief unavailability windows.
+                processRoutesLogger.debug(
+                  'Bot state cache refresh failed — using stale cache',
+                  {
+                    event: 'mc_state_refresh_failed',
+                    tags: ['mc', 'cache', 'debug'],
+                    fields: {
+                      error: e instanceof Error ? e.message : String(e),
+                      errorName: e instanceof Error ? e.name : undefined,
+                      label: 'mc/state-social',
+                    },
+                  }
+                );
               });
           }
 

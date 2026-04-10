@@ -10,6 +10,9 @@
 import { z } from 'zod';
 import { LLMInterface } from '../cognitive-core/llm-interface';
 import { auditLogger } from '../audit/thought-action-audit-logger';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const reactLogger = createServerLogger({ subsystem: 'react-arbiter' });
 
 // ============================================================================
 // Types
@@ -395,8 +398,16 @@ Keep your reflection concise and actionable.`;
           };
         }
       } catch (e) {
-        console.warn(
-          '[ReActArbiter] JSON parsing failed, trying fallback methods'
+        reactLogger.warn(
+          'ReAct JSON parsing failed, trying fallback methods',
+          {
+            event: 'react_arbiter_json_parse_failed',
+            tags: ['react-arbiter', 'parse', 'warn'],
+            fields: {
+              error: e instanceof Error ? e.message : String(e),
+              responseSnippet: jsonMatch[0].slice(0, 200),
+            },
+          }
         );
       }
     }
@@ -419,13 +430,25 @@ Keep your reflection concise and actionable.`;
         trimmed.toLowerCase().includes('parameters:')
       ) {
         try {
-          const argsText = trimmed.split(':')[1]?.trim() || '{}';
+          // Take everything after the FIRST colon, not split on every
+          // colon — JSON objects contain colons between keys and values
+          // (e.g. {"x": 1}), and splitting on all colons would truncate
+          // the payload at the first key boundary and fail to parse
+          // every non-trivial args line.
+          const colonIdx = trimmed.indexOf(':');
+          const argsText = colonIdx >= 0
+            ? trimmed.slice(colonIdx + 1).trim() || '{}'
+            : '{}';
           args = JSON.parse(argsText);
         } catch (e) {
-          console.warn(
-            '[ReActArbiter] Failed to parse args from line:',
-            trimmed
-          );
+          reactLogger.warn('ReAct failed to parse args from line', {
+            event: 'react_arbiter_args_parse_failed',
+            tags: ['react-arbiter', 'parse', 'warn'],
+            fields: {
+              error: e instanceof Error ? e.message : String(e),
+              line: trimmed.slice(0, 200),
+            },
+          });
         }
       } else if (trimmed && !selectedTool) {
         thoughts += trimmed + ' ';

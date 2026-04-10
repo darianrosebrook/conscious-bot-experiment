@@ -9,6 +9,11 @@
 
 import { LLMInterface, LLMContext } from '../cognitive-core/llm-interface';
 import { AgentModeler } from './agent-modeler';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const relationshipLogger = createServerLogger({
+  subsystem: 'relationship-manager',
+});
 
 // ============================================================================
 // Relationship Core Types
@@ -1278,7 +1283,19 @@ Respond in JSON format.`,
         trustTrajectory: parsed.trajectory || 'stable',
       };
     } catch (error) {
-      console.warn('Failed to parse trust assessment:', error);
+      relationshipLogger.warn(
+        'Failed to parse trust assessment LLM response',
+        {
+          event: 'relationship_trust_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            agentId,
+            domain,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyTrustAssessment(agentId, domain);
     }
   }
@@ -1300,7 +1317,18 @@ Respond in JSON format.`,
         growth_potential: parsed.growthPotential || 0.5,
       };
     } catch (error) {
-      console.warn('Failed to parse relationship quality:', error);
+      relationshipLogger.warn(
+        'Failed to parse relationship quality LLM response',
+        {
+          event: 'relationship_quality_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            agentId: relationship?.agentId,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyRelationshipQuality();
     }
   }
@@ -1320,7 +1348,17 @@ Respond in JSON format.`,
         stability: parsed.stability || 0.5,
       };
     } catch (error) {
-      console.warn('Failed to parse relationship trajectory:', error);
+      relationshipLogger.warn(
+        'Failed to parse relationship trajectory LLM response',
+        {
+          event: 'relationship_trajectory_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyTrajectory();
     }
   }

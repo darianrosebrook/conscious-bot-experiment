@@ -16,6 +16,9 @@ import type { CognitionMutableState } from '../cognition-state';
 import type { IntrusiveThoughtProcessor } from '../intrusive-thought-processor';
 import { updateStressFromIntrusion } from '../interoception-store';
 import { logStressAtBoundary } from '../stress-boundary-logger';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const sseLogger = createServerLogger({ subsystem: 'cognitive-stream-routes' });
 
 export interface CognitiveStreamRouteDeps {
   state: CognitionMutableState;
@@ -144,7 +147,21 @@ export function createCognitiveStreamRoutes(
     const keepaliveInterval = setInterval(() => {
       try {
         res.write(`: keepalive\n\n`);
-      } catch {
+      } catch (e) {
+        // Unclean disconnects (TCP reset mid-write, client crash, proxy
+        // timeout) land here. Clean disconnects are handled by the
+        // req.on('close') handler below and never reach this catch, so
+        // anything we see here is interesting for diagnosing dashboard
+        // drop-offs. Debug level to avoid flooding during known-bad
+        // network conditions.
+        sseLogger.debug('SSE keepalive write failed — client likely gone', {
+          event: 'sse_keepalive_write_failed',
+          tags: ['sse', 'keepalive', 'debug'],
+          fields: {
+            error: e instanceof Error ? e.message : String(e),
+            errorName: e instanceof Error ? e.name : undefined,
+          },
+        });
         clearInterval(keepaliveInterval);
         sseClients.delete(res);
       }

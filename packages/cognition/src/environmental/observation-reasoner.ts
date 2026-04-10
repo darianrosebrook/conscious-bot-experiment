@@ -158,7 +158,31 @@ export class ObservationReasoner {
         maxTokens: observationConfig.maxTokens,
         signal: abortController.signal,
       });
-      llmPromise.catch(() => {}); // Swallow AbortError when we timeout so no unhandled rejection
+      // This handler exists solely to prevent an unhandled-rejection warning
+      // when the timeout race below wins and we abort the LLM call. We must
+      // NOT swallow real LLM errors here — those need to reach the outer
+      // try/catch via Promise.race so the fallback path in createFallback()
+      // can record them. That works because Promise.race resolves/rejects
+      // with whichever promise settles first; if llmPromise rejects with a
+      // real error before the timeout fires, the outer await will see it
+      // and the error will land in the outer catch. This handler only
+      // matters when the timeout wins: at that point, abortController.abort()
+      // causes llmPromise to reject with an AbortError that has nowhere to
+      // go (the race has already resolved with the timeout's rejection),
+      // which Node would otherwise log as an unhandled rejection.
+      llmPromise.catch((e: unknown) => {
+        // Only AbortError is expected here. Anything else is load-bearing
+        // diagnostic information that we'd silently lose — log it so
+        // reviewers can spot if the race invariant ever breaks.
+        const name = e instanceof Error ? e.name : '';
+        if (name !== 'AbortError') {
+          console.warn(
+            `[ObservationReasoner] Unexpected late rejection from llmPromise after race resolved: ${
+              e instanceof Error ? e.message : String(e)
+            }`
+          );
+        }
+      });
 
       // INTERMEDIATE FIX: Track both timeout IDs to prevent leak
       let raceTimeoutId: NodeJS.Timeout | null = null;

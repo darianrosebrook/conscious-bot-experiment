@@ -9,6 +9,11 @@
 
 import { LLMInterface, LLMContext } from '../cognitive-core/llm-interface';
 import { AgentModeler } from './agent-modeler';
+import { createServerLogger } from '../server-utils/server-logger';
+
+const socialLearnerLogger = createServerLogger({
+  subsystem: 'social-learner',
+});
 
 // ============================================================================
 // Social Learning Core Types
@@ -787,7 +792,18 @@ Respond in JSON format.`,
         learningGaps: parsed.gaps || [],
       };
     } catch (error) {
-      console.warn('Failed to parse strategy identification:', error);
+      socialLearnerLogger.warn(
+        'Failed to parse strategy identification LLM response',
+        {
+          event: 'social_strategy_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            observationCount: observations?.length ?? 0,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyStrategyIdentification();
     }
   }
@@ -807,7 +823,18 @@ Respond in JSON format.`,
         complianceRewards: parsed.complianceRewards || [],
       };
     } catch (error) {
-      console.warn('Failed to parse norm inference:', error);
+      socialLearnerLogger.warn(
+        'Failed to parse norm inference LLM response',
+        {
+          event: 'social_norm_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            interactionCount: interactions?.length ?? 0,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyNormInference();
     }
   }
@@ -833,7 +860,19 @@ Respond in JSON format.`,
         learningChallenges: parsed.challenges || [],
       };
     } catch (error) {
-      console.warn('Failed to parse imitation learning:', error);
+      socialLearnerLogger.warn(
+        'Failed to parse imitation learning LLM response',
+        {
+          event: 'social_imitation_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            targetBehavior,
+            expertAgent,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyImitationLearning(targetBehavior, expertAgent);
     }
   }
@@ -856,7 +895,18 @@ Respond in JSON format.`,
         confidence: parsed.confidence || 0.5,
       };
     } catch (error) {
-      console.warn('Failed to parse behavior adaptation:', error);
+      socialLearnerLogger.warn(
+        'Failed to parse behavior adaptation LLM response',
+        {
+          event: 'social_adaptation_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            originalBehaviorId: (original as any)?.id,
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyBehaviorAdaptation(original, context);
     }
   }
@@ -873,7 +923,17 @@ Respond in JSON format.`,
         recommendations: parsed.recommendations || [],
       };
     } catch (error) {
-      console.warn('Failed to parse behavior analysis:', error);
+      socialLearnerLogger.warn(
+        'Failed to parse behavior analysis LLM response',
+        {
+          event: 'social_behavior_analysis_parse_failed',
+          tags: ['social-cognition', 'parse', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            responseSnippet: response.slice(0, 200),
+          },
+        }
+      );
       return this.createEmptyBehaviorAnalysis();
     }
   }
