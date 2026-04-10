@@ -5,6 +5,27 @@
  * (but not compelling) goal emission during idle periods.
  *
  * @author @darianrosebrook
+ *
+ * ============================================================================
+ * QUARANTINE: keep-alive-rename  →  see ./QUARANTINE.md
+ * ============================================================================
+ *
+ * THIS MODULE IS MISNAMED. It is a bot idle-episode GOAL EMISSION loop that
+ * calls the LLM to decide whether to generate an autonomous goal during idle
+ * time. It is NOT an HTTP/SSE/server-hot keepalive in any sense of the word.
+ *
+ * The name collision with those other "keepalive" meanings is the root cause
+ * of at least one prior LLM-agent confabulation. This module is scheduled
+ * for rename/scrub review.
+ *
+ * Before modifying anything in this directory, read `./QUARANTINE.md` — it
+ * documents what the module actually does, what it is NOT, the naming
+ * history, the current gating lever (`STERLING_IDLE_EPISODES_ENABLED`),
+ * and the candidate scrub plans.
+ *
+ * Grep for `QUARANTINE: keep-alive-rename` from the repo root to find every
+ * file currently marked for this review.
+ * ============================================================================
  */
 
 // Controller

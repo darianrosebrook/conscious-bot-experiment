@@ -93,6 +93,12 @@ export type {
 } from './llm-output-sanitizer';
 
 // Keep-Alive Module
+// QUARANTINE: keep-alive-rename — this module is misnamed. It is a bot
+// idle-episode goal-emission loop (calls the LLM to decide whether to
+// generate an autonomous goal during idle time), NOT an HTTP/SSE/server-hot
+// keepalive. It is gated behind STERLING_IDLE_EPISODES_ENABLED. Scheduled
+// for rename/scrub review. See packages/cognition/src/keep-alive/QUARANTINE.md
+// for the full reasoning, naming history, and candidate replacement names.
 export {
   KeepAliveController,
   detectIdle,

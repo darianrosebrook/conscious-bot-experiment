@@ -1,6 +1,23 @@
 /**
  * Keep-Alive Controller
  *
+ * QUARANTINE: keep-alive-rename  →  see ./QUARANTINE.md
+ *
+ * THIS CLASS IS MISNAMED. It is a bot idle-episode GOAL EMISSION loop that
+ * calls the LLM to decide whether to generate an autonomous goal, NOT a
+ * keepalive in any HTTP/SSE/server-hot sense. The name is scheduled for
+ * scrubbing/rename review.
+ *
+ * Before changing this file, read `./QUARANTINE.md` for what the module
+ * actually does, what it is NOT, the naming history, the current gating
+ * lever (STERLING_IDLE_EPISODES_ENABLED), and the candidate scrub plans.
+ *
+ * Treat changes with care. This is a load-bearing autonomy pathway gated
+ * behind STERLING_IDLE_EPISODES_ENABLED, and renaming it is a cross-package
+ * refactor involving planning/.
+ *
+ * ----------------------------------------------------------------------------
+ *
  * Provides a non-injective pathway that allows (but does not compel) goal emission.
  *
  * Key invariants:
