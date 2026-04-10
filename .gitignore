@@ -148,7 +148,9 @@ packages/dashboard/data/cognitive-thoughts*.json
 run.log
 post-fix-run.log
 bot-activities.log
+stress-boundary.log
 packages/cognition/stress-boundary.log
+intero-history.jsonl
 packages/cognition/intero-history.jsonl
 .sterling-e2e.log
 .mlx-e2e.log
