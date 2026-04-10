@@ -1141,7 +1141,15 @@ const server = app.listen(port, () => {
             tags: ['llm', 'health'],
             fields: { healthUrl },
           });
-          llmInterface.preloadModel().catch(() => {});
+          llmInterface.preloadModel().catch((error) => {
+            serverLogger.warn('LLM preload failed', {
+              event: 'llm_preload_failed',
+              tags: ['llm', 'preload', 'warn'],
+              fields: {
+                error: error instanceof Error ? error.message : String(error),
+              },
+            });
+          });
         } else {
           serverLogger.warn('LLM backend health check returned non-OK', {
             event: 'llm_health_non_ok',

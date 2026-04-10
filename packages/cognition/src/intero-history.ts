@@ -55,15 +55,29 @@ function appendLine(snapshot: InteroSnapshot): void {
         return; // The current snapshot is already in history array; it was
         // added before appendLine is called, so it's in `recent`.
       }
-    } catch {
-      // File doesn't exist yet, that's fine
+    } catch (statErr) {
+      // ENOENT is expected on first write — the file hasn't been created yet.
+      // Any other error (EACCES, EIO, EROFS) indicates a real problem we
+      // should surface so the outer catch can log it with filesystem context.
+      const e = statErr as NodeJS.ErrnoException;
+      if (e?.code !== 'ENOENT') {
+        throw statErr;
+      }
     }
     fs.appendFileSync(PERSIST_PATH, line);
-  } catch {
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
     interoLogger.warn('Failed to append intero history line', {
       event: 'intero_history_append_failed',
       tags: ['intero-history', 'warn'],
-      fields: { line: line.trim() },
+      fields: {
+        line: line.trim(),
+        code: e?.code,
+        errno: e?.errno,
+        syscall: e?.syscall,
+        path: e?.path ?? PERSIST_PATH,
+        message: e instanceof Error ? e.message : String(e),
+      },
     });
   }
 }

@@ -9,6 +9,11 @@
 
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
+import { createServerLogger } from './server-utils/server-logger';
+
+const intrusiveLogger = createServerLogger({
+  subsystem: 'intrusive-thought-processor',
+});
 
 const PLANNING_INGEST_DEBUG_400 = process.env.PLANNING_INGEST_DEBUG_400 === '1';
 
@@ -91,7 +96,7 @@ interface MCPClient {
 }
 
 // Simple HTTP-based MCP client that connects to the planning server's MCP endpoints
-class PlanningMCPClient implements MCPClient {
+export class PlanningMCPClient implements MCPClient {
   constructor(private baseUrl: string = 'http://localhost:3002') {}
 
   async callTool<T = any>(name: string, args: any): Promise<T> {
@@ -106,7 +111,12 @@ class PlanningMCPClient implements MCPClient {
       throw new Error(`MCP tool call failed: ${response.status}`);
     }
 
-    const result = (await response.json()) as any;
+    let result: any;
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error(`MCP tool ${name} returned invalid JSON`, { cause: e });
+    }
     return result.data || result;
   }
 
@@ -121,7 +131,12 @@ class PlanningMCPClient implements MCPClient {
       throw new Error(`Failed to list MCP tools: ${response.status}`);
     }
 
-    const result = (await response.json()) as any;
+    let result: any;
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error('MCP listTools returned invalid JSON', { cause: e });
+    }
     return result.tools?.map((tool: any) => tool.name) || [];
   }
 
@@ -137,7 +152,14 @@ class PlanningMCPClient implements MCPClient {
       throw new Error(`Failed to read MCP resource ${uri}: ${response.status}`);
     }
 
-    const result = (await response.json()) as any;
+    let result: any;
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error(`MCP resource ${uri} returned invalid JSON`, {
+        cause: e,
+      });
+    }
     return result.data || result;
   }
 }
@@ -403,7 +425,21 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     if (spec) {
       const reg = await this.config.mcp
         ?.callTool('register_option', spec)
-        .catch(() => null);
+        .catch((e) => {
+          intrusiveLogger.warn(
+            'MCP register_option failed, falling back to shadow proposal',
+            {
+              event: 'mcp_register_option_failed',
+              tags: ['mcp', 'register-option', 'warn'],
+              fields: {
+                error: e instanceof Error ? e.message : String(e),
+                specId: spec?.id,
+                specVersion: spec?.version,
+              },
+            }
+          );
+          return null;
+        });
       if (reg && (reg as any).status === 'success') {
         return {
           kind: 'option',
@@ -559,7 +595,17 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   ): Promise<{ name: string; maxMs: number }> {
     const policy = await this.config.mcp
       ?.readResource<any>('policy://buckets')
-      .catch(() => null);
+      .catch((e) => {
+        intrusiveLogger.warn(
+          'MCP policy://buckets read failed, using default bucket policy',
+          {
+            event: 'mcp_policy_read_failed',
+            tags: ['mcp', 'policy', 'warn'],
+            fields: { error: e instanceof Error ? e.message : String(e) },
+          }
+        );
+        return null;
+      });
     const buckets = policy ?? {
       Tactical: { maxMs: 60_000 },
       Short: { maxMs: 240_000 },
