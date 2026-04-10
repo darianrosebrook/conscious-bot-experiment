@@ -69,6 +69,7 @@ import { THOUGHT_CYCLE_MS } from './server-utils/constants';
 import { ObservationQueueItem } from './server-utils/observation-helpers';
 import { createThoughtStreamHelpers } from './server-utils/thought-stream-helpers';
 import { createServerLogger } from './server-utils/server-logger';
+import { preloadLlmWithLogging } from './server-utils/llm-preload-helper';
 
 // Route modules
 import { createSystemRoutes } from './routes/system-routes';
@@ -1141,15 +1142,10 @@ const server = app.listen(port, () => {
             tags: ['llm', 'health'],
             fields: { healthUrl },
           });
-          llmInterface.preloadModel().catch((error) => {
-            serverLogger.warn('LLM preload failed', {
-              event: 'llm_preload_failed',
-              tags: ['llm', 'preload', 'warn'],
-              fields: {
-                error: error instanceof Error ? error.message : String(error),
-              },
-            });
-          });
+          // Fire-and-forget: preloadLlmWithLogging always resolves (it
+          // catches internally and emits `llm_preload_failed` on failure).
+          // Extracted to server-utils/llm-preload-helper.ts for testability.
+          void preloadLlmWithLogging(llmInterface, serverLogger);
         } else {
           serverLogger.warn('LLM backend health check returned non-OK', {
             event: 'llm_health_non_ok',
