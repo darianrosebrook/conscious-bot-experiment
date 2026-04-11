@@ -4,9 +4,9 @@
  * Complements react-arbiter-parse-logging.test.ts — that file drives
  * the private `parseReActResponse` directly via `(arbiter as any)`.
  * THIS file drives the public `reason()` method with a stubbed LLM
- * instance, exercising the four error/fallback branches inside
- * `reason()` that were migrated from `console.warn` / `console.error`
- * to structured `reactLogger` calls as part of item 4 of the cognition
+ * instance, exercising the error/fallback branches inside `reason()`
+ * that were migrated from `console.warn` / `console.error` to
+ * structured `reactLogger` calls as part of item 4 of the cognition
  * error-handling audit:
  *
  *   1. `react_arbiter_no_tool_selected` — parser succeeded but produced
@@ -19,24 +19,31 @@
  *   3. `react_arbiter_no_fuzzy_match` — unknown tool AND no fuzzy match
  *      in the registry. Falls through to chat fallback.
  *
- *   4. `react_arbiter_reason_failed` — `callLLM` rethrew (LLM rejected),
- *      caught by the outer try/catch in `reason()`. NOTE: this branch
- *      ALSO causes `react_arbiter_llm_call_failed` to fire from the
- *      inner `callLLM` wrapper, so a single LLM rejection produces two
- *      structured logs. This dual-log behavior is pre-existing (the old
- *      `console.error` code also double-logged) and intentional for
- *      now — the test fences it rather than papering over it.
+ *   4. `react_arbiter_reason_failed` — the LLM rejected, caught by the
+ *      outer try/catch in `reason()`. SINGLE-log now: the inner
+ *      `callLLM` wrapper no longer logs on rejection (it used to emit
+ *      `react_arbiter_llm_call_failed` and rethrow, producing a
+ *      dual-log cascade for every LLM failure). The outer caller's log
+ *      has richer context (task title), so the inner log was pure
+ *      noise. This test fences the single-log contract — if someone
+ *      reintroduces the inner log, this test will fail with a count
+ *      mismatch and they should read the `callLLM` docstring before
+ *      updating the assertion.
  *
  * Plus two more exercised via public methods:
  *
  *   5. `react_arbiter_reflection_failed` — `reflect()` rethrow path.
- *      ALSO dual-logs because `reflect()` goes through the same
- *      `callLLM` wrapper as `reason()`. Fenced by the same
- *      "expect both logs" assertion pattern.
+ *      SAME single-log contract as reason(): only the outer
+ *      reflection_failed log fires, because `callLLM` no longer logs.
+ *
  *   6. `react_arbiter_task_steps_failed` — `generateTaskSteps()` rethrow.
  *      SINGLE-log because `generateTaskSteps()` calls
- *      `this.llm.generateResponse(...)` directly, bypassing `callLLM`.
- *      This asymmetry is pre-existing and the test documents it.
+ *      `this.llm.generateResponse(...)` directly, bypassing `callLLM`
+ *      entirely. Unchanged by the dual-log fix.
+ *
+ * All three methods now emit exactly one structured error per LLM
+ * rejection. The `react_arbiter_llm_call_failed` event no longer
+ * exists in the codebase — grep confirms it.
  *
  * Strategy: `vi.hoisted + vi.mock('../../server-utils/server-logger')`
  * captures the module-scoped `reactLogger` spy at import time. Each
@@ -252,15 +259,20 @@ describe('ReActArbiter.reason() — error-path logging', () => {
     });
   });
 
-  describe('react_arbiter_reason_failed + react_arbiter_llm_call_failed (dual-log)', () => {
-    it('fires BOTH error logs when the LLM rejects inside reason()', async () => {
-      // Intentionally documents the pre-existing dual-log behavior:
-      // callLLM's inner try/catch logs `react_arbiter_llm_call_failed`
-      // and rethrows; reason's outer try/catch logs
-      // `react_arbiter_reason_failed` and falls back to chat. This
-      // test fences BOTH logs — if a future refactor consolidates to
-      // one, update this test and the helper comments at the top of
-      // ReActArbiter.ts.
+  describe('react_arbiter_reason_failed (single-log, no dual-log cascade)', () => {
+    it('fires exactly ONE error log when the LLM rejects inside reason()', async () => {
+      // Fences the single-log contract after item 5 of the cognition
+      // error-handling audit removed the inner `callLLM` log. Before
+      // the fix, a single LLM rejection produced two error logs
+      // (`react_arbiter_llm_call_failed` from the inner wrapper and
+      // `react_arbiter_reason_failed` from the outer catch) because
+      // both try/catches fired for the same root cause. The inner
+      // log was noise — the outer log has richer context (task
+      // title, fallback behavior) — so it was removed.
+      //
+      // If this assertion count changes, read ReActArbiter.callLLM's
+      // docstring before updating the test: someone may have
+      // reintroduced the inner log that the audit removed.
       const boom = new Error('LLM backend 503');
       const llm = {
         generateResponse: vi.fn().mockRejectedValue(boom),
@@ -272,26 +284,22 @@ describe('ReActArbiter.reason() — error-path logging', () => {
       expect(step.selectedTool).toBe('chat');
       expect(step.thoughts).toContain('Error during reasoning');
 
-      // Two errors: llm_call_failed first (inner), reason_failed second (outer).
-      expect(errorSpy).toHaveBeenCalledTimes(2);
+      // Exactly one error: the outer reason_failed log.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
 
-      const [innerMsg, innerCtx] = errorSpy.mock.calls[0];
-      expect(innerMsg).toContain('LLM call failed');
-      expect(innerCtx).toMatchObject({
-        event: 'react_arbiter_llm_call_failed',
-        tags: ['react-arbiter', 'llm', 'error'],
-      });
-      expect(innerCtx.fields.error).toBe('LLM backend 503');
-      expect(innerCtx.fields.errorName).toBe('Error');
-
-      const [outerMsg, outerCtx] = errorSpy.mock.calls[1];
-      expect(outerMsg).toContain('ReAct reasoning failed');
-      expect(outerCtx).toMatchObject({
+      const [message, context] = errorSpy.mock.calls[0];
+      expect(message).toContain('ReAct reasoning failed');
+      expect(context).toMatchObject({
         event: 'react_arbiter_reason_failed',
         tags: ['react-arbiter', 'reason', 'error'],
       });
-      expect(outerCtx.fields.error).toBe('LLM backend 503');
-      expect(outerCtx.fields.taskTitle).toBe('test task');
+      expect(context.fields.error).toBe('LLM backend 503');
+      expect(context.fields.errorName).toBe('Error');
+      expect(context.fields.taskTitle).toBe('test task');
+
+      // Critical: the removed inner event must not appear.
+      const events = errorSpy.mock.calls.map((call) => call[1]?.event);
+      expect(events).not.toContain('react_arbiter_llm_call_failed');
 
       // No warns in this pure-error path.
       expect(warnSpy).not.toHaveBeenCalled();
@@ -329,20 +337,12 @@ describe('ReActArbiter.reflect() — error-path logging', () => {
     arbiter = new ReActArbiter(defaultConfig as any);
   });
 
-  it('fires BOTH react_arbiter_llm_call_failed and react_arbiter_reflection_failed when the LLM rejects', async () => {
-    // reflect() calls the private `this.callLLM(...)` wrapper (not
-    // `this.llm.generateResponse` directly), so a rejection produces
-    // the same dual-log pattern as reason():
-    //
-    //   1. callLLM's inner catch logs `react_arbiter_llm_call_failed`
-    //      and rethrows
-    //   2. reflect's outer catch logs `react_arbiter_reflection_failed`
-    //      and rethrows to the caller
-    //
-    // This is pre-existing behavior (the old console.error code also
-    // double-logged via callLLM + the rethrow path) and is documented
-    // here so any future consolidation is a conscious decision that
-    // requires updating this test.
+  it('fires exactly ONE react_arbiter_reflection_failed log when the LLM rejects', async () => {
+    // reflect() calls the private `this.callLLM(...)` wrapper, which
+    // after the item-5 dual-log removal no longer logs on rejection.
+    // Only the outer reflect() catch logs. Single-log contract — same
+    // shape as reason() above. If this assertion count changes, read
+    // ReActArbiter.callLLM's docstring before updating the test.
     const boom = new Error('reflection LLM timeout');
     const llm = {
       generateResponse: vi.fn().mockRejectedValue(boom),
@@ -354,27 +354,22 @@ describe('ReActArbiter.reflect() — error-path logging', () => {
       arbiter.reflect([], 'failure', ['something went wrong'])
     ).rejects.toThrow('reflection LLM timeout');
 
-    // Two error logs: inner llm_call_failed, outer reflection_failed.
-    expect(errorSpy).toHaveBeenCalledTimes(2);
+    // Exactly one error: the outer reflection_failed log.
+    expect(errorSpy).toHaveBeenCalledTimes(1);
 
-    const [innerMsg, innerCtx] = errorSpy.mock.calls[0];
-    expect(innerMsg).toContain('LLM call failed');
-    expect(innerCtx).toMatchObject({
-      event: 'react_arbiter_llm_call_failed',
-      tags: ['react-arbiter', 'llm', 'error'],
-    });
-    expect(innerCtx.fields.error).toBe('reflection LLM timeout');
-    expect(innerCtx.fields.errorName).toBe('Error');
-
-    const [outerMsg, outerCtx] = errorSpy.mock.calls[1];
-    expect(outerMsg).toContain('Reflection generation failed');
-    expect(outerCtx).toMatchObject({
+    const [message, context] = errorSpy.mock.calls[0];
+    expect(message).toContain('Reflection generation failed');
+    expect(context).toMatchObject({
       event: 'react_arbiter_reflection_failed',
       tags: ['react-arbiter', 'reflection', 'error'],
     });
-    expect(outerCtx.fields.error).toBe('reflection LLM timeout');
-    expect(outerCtx.fields.errorName).toBe('Error');
-    expect(outerCtx.fields.outcome).toBe('failure');
+    expect(context.fields.error).toBe('reflection LLM timeout');
+    expect(context.fields.errorName).toBe('Error');
+    expect(context.fields.outcome).toBe('failure');
+
+    // Critical: the removed inner event must not appear.
+    const events = errorSpy.mock.calls.map((call) => call[1]?.event);
+    expect(events).not.toContain('react_arbiter_llm_call_failed');
   });
 });
 

@@ -369,27 +369,23 @@ Write a numbered list. Each step must be a concrete action (move/look/collect/mi
   }
 
   /**
-   * Call LLM with prompt and options
+   * Call LLM with prompt and options.
+   *
+   * Note: this wrapper DOES NOT log on rejection. Every caller of
+   * `callLLM` has its own try/catch that logs a domain-specific event
+   * (`react_arbiter_reason_failed`, `react_arbiter_reflection_failed`)
+   * with richer context (task title, outcome, etc.) than a generic
+   * "LLM call failed" could provide. An inner log here would just
+   * duplicate the outer caller's log for the same root cause — a
+   * "dual-log cascade" that inflates grep noise without adding signal.
+   *
+   * If you add a new caller of `callLLM`, you MUST add an outer
+   * try/catch in that caller and log the failure there. Do not
+   * reintroduce the inner log as a "safety net" — the rethrow path
+   * is the contract.
    */
   private async callLLM(prompt: string, options?: any): Promise<any> {
-    try {
-      const response = await this.llm.generateResponse(
-        prompt,
-        undefined,
-        options
-      );
-      return response;
-    } catch (error) {
-      reactLogger.error('LLM call failed', {
-        event: 'react_arbiter_llm_call_failed',
-        tags: ['react-arbiter', 'llm', 'error'],
-        fields: {
-          error: error instanceof Error ? error.message : String(error),
-          errorName: error instanceof Error ? error.name : undefined,
-        },
-      });
-      throw error;
-    }
+    return await this.llm.generateResponse(prompt, undefined, options);
   }
 
   /**
