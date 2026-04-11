@@ -2170,20 +2170,36 @@ async function autonomousTaskExecutor() {
               );
             }
           } else if (decision.kind === 'no_policy') {
-            // Sterling had no policy. Record provenance but don't retry.
+            // Sterling had no policy — legitimate response (bot is fully
+            // healthy, equipped, no threats, priority ladder returned
+            // None). Log at a visible level so regressions (e.g. sudden
+            // jump in no_policy rate) are noticeable in runtime captures.
+            console.log(
+              `[IdleEngine] no_policy decision — reason=${decision.reason}`
+            );
             getGoldenRunRecorder().recordIdleGoalRequest(decision.runId, {
               decision_kind: 'no_policy',
               reason: decision.reason,
             });
           } else if (decision.kind === 'sterling_unavailable') {
+            // Sterling unreachable or client misconfigured. This is an
+            // ALERT, not normal operation — operators need to see it in
+            // stdout immediately (the previous "silent recorder write"
+            // design let a connect()-never-called bug hide for two
+            // capture cycles during Phase 2 runtime verification).
+            console.warn(
+              `[IdleEngine] sterling_unavailable — reason=${decision.reason}`
+            );
             getGoldenRunRecorder().recordIdleGoalRequest(decision.runId, {
               decision_kind: 'sterling_unavailable',
               reason: decision.reason,
             });
           } else if (decision.kind === 'in_flight') {
-            // Nothing to record — no new request was made.
+            // Expected control-flow event (previous request still pending).
+            // No log, no recorder call — logging this would spam every tick.
           } else if (decision.kind === 'cooldown') {
-            // Nothing to record — no new request was made.
+            // Expected control-flow event (recent successful acknowledge,
+            // within the minInterval window). No log, no recorder call.
           }
         } catch (error) {
           console.error('[IdleEngine] requestGoal failed:', error);
@@ -4054,32 +4070,19 @@ async function startServer() {
       );
     }
 
-    // Initialize IdleEngine — Phase 2 of the keep-alive cauterize-and-regrow.
-    // Unconditional: no env gate. The class is always constructed because
-    // Sterling's _select_idle_goal() is deterministic and IdleEngine is a
-    // thin courier around it (no LLM call, ~250 lines, no shared state with
-    // other subsystems). If operators need to disable idle-state autonomous
-    // goal emission, the call site in the autonomous executor is the place
-    // to add a gate, not here.
-    try {
-      // Dynamic import of the cognition-exported Sterling client. We pass
-      // it to IdleEngine via constructor injection so the class stays
-      // mockable in tests (IdleEngineClient is a narrow one-method
-      // interface) without needing to know about getDefaultLanguageIOClient.
-      const { getDefaultLanguageIOClient: getClient } = await import('@conscious-bot/cognition');
-      const sterlingClient = getClient();
-      global.idleEngine = new IdleEngine(sterlingClient, {
-        minIntervalBetweenRequestsMs: 60_000,
-        sterlingReduceTimeoutMs: 12_000,
-        modelId: 'idle-episode',
-      });
-      console.log('[Planning] IdleEngine initialized');
-    } catch (error) {
-      console.warn('[Planning] Failed to initialize IdleEngine:', error);
-      // Not fatal — the onIdle call site checks `global.idleEngine` before
-      // calling requestGoal, so a null idleEngine means the executor's
-      // idle branch is a no-op (the Phase 1 behavioral floor).
-    }
+    // NOTE: IdleEngine initialization has been MOVED to after
+    // createSterlingBootstrap() below. The old placement here (before
+    // sterling-bootstrap) was load-bearingly wrong: sterling-bootstrap
+    // is what calls `setDefaultTransport(sterlingTransportAdapter)` and
+    // `setDefaultLanguageIOClient(new SterlingLanguageIOClient())`, so
+    // calling `getDefaultLanguageIOClient()` BEFORE sterling-bootstrap
+    // runs returns a client whose transport is still the stock
+    // MockLanguageIOTransport. IdleEngine would then hold a reference
+    // to the mock-wired client and every `requestGoal` would hit the
+    // mock's "semantically empty" fall-through, producing `no_policy`
+    // decisions with reason='No committed goal (no explicit [GOAL: ...]
+    // tag found)'. Discovered during Phase 2 runtime verification (4th
+    // capture capture file bfqzofrv0).
 
     // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
     if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {
@@ -4213,6 +4216,52 @@ async function startServer() {
     minecraftBuildingSolver = sterling.minecraftBuildingSolver;
     minecraftToolProgressionSolver = sterling.minecraftToolProgressionSolver;
     minecraftNavigationSolver = sterling.minecraftNavigationSolver;
+
+    // Initialize IdleEngine — Phase 2 of the keep-alive cauterize-and-regrow.
+    // Unconditional: no env gate. The class is always constructed because
+    // Sterling's _select_idle_goal() is deterministic and IdleEngine is a
+    // thin courier around it (no LLM call, ~250 lines, no shared state with
+    // other subsystems). If operators need to disable idle-state autonomous
+    // goal emission, the call site in the autonomous executor is the place
+    // to add a gate, not here.
+    //
+    // CRITICAL ORDERING: this block MUST run AFTER createSterlingBootstrap()
+    // above, because that function is what calls setDefaultTransport() with
+    // the real SterlingTransportAdapter AND setDefaultLanguageIOClient()
+    // with a pre-connected SterlingLanguageIOClient. Calling
+    // getDefaultLanguageIOClient() BEFORE sterling-bootstrap returns a
+    // client wired to the stock MockLanguageIOTransport, and every
+    // subsequent reduce() call hits the mock's "semantically empty"
+    // fall-through. Discovered during Phase 2 runtime verification (see
+    // the explanatory comment at the old IdleEngine init site above for
+    // the full diagnosis trail).
+    try {
+      // Dynamic import of the cognition-exported Sterling client. We pass
+      // it to IdleEngine via constructor injection so the class stays
+      // mockable in tests (IdleEngineClient is a narrow one-method
+      // interface) without needing to know about getDefaultLanguageIOClient.
+      const { getDefaultLanguageIOClient: getClient } = await import('@conscious-bot/cognition');
+      const sterlingClient = getClient();
+      // `SterlingLanguageIOClient` starts with `connected: false` and its
+      // `reduce()` method early-returns `STERLING_UNAVAILABLE` whenever
+      // `isAvailable()` returns false. sterling-bootstrap already called
+      // `connect()` on the default client, but we call it again here as
+      // an idempotent safety net in case the dynamic import resolved to
+      // a different instance. The method is a flag flip with no network
+      // work (the transport handles real connections separately).
+      await sterlingClient.connect();
+      global.idleEngine = new IdleEngine(sterlingClient, {
+        minIntervalBetweenRequestsMs: 60_000,
+        sterlingReduceTimeoutMs: 12_000,
+        modelId: 'idle-episode',
+      });
+      console.log('[Planning] IdleEngine initialized');
+    } catch (error) {
+      console.warn('[Planning] Failed to initialize IdleEngine:', error);
+      // Not fatal — the onIdle call site checks `global.idleEngine` before
+      // calling requestGoal, so a null idleEngine means the executor's
+      // idle branch is a no-op (the Phase 1 behavioral floor).
+    }
 
     // Create MCP leaf registry for MCP integration
     const registry = new MCPLeafRegistry();
