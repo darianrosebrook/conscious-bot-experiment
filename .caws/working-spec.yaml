@@ -56,4 +56,3 @@ observability:
   traces: []
 rollback:
   - "Disable ENABLE_DEV_ENDPOINTS or remove golden run recording"
-  - "Disable STERLING_IDLE_EPISODES_ENABLED"

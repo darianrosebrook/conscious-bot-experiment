@@ -1,5 +1,14 @@
 # Change Impact Map: PR4 Phase 3 Planning Migration
 
+> **SUPERSEDED — archived for history.** The keep-alive-integration.ts
+> file listed below (line 9) was deleted in the keep-alive cauterization
+> work that followed this PR (see
+> docs/planning/run-doom-loop-working-spec.md Phase 1B closing note).
+> This document is retained as a historical decision record; do not use
+> it as a reference for current planning-package architecture. The
+> idle-episode emission pathway it documents will be replaced in Phase 2
+> by a new IdleEngine component.
+
 ## Touched Modules
 - packages/planning/src/task-integration/thought-to-task-converter.ts
 - packages/planning/src/task-integration/task-management-handler.ts

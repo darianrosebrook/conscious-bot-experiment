@@ -7,20 +7,24 @@
   - Record expansion + verification for golden runs.
 - packages/planning/src/modular-server.ts
   - Record dispatch for golden runs.
-- packages/planning/src/modules/keep-alive-integration.ts
-  - Idle episode → Sterling reduction → thought emission.
 - packages/planning/src/golden-run-recorder.ts
   - New recorder module.
 - packages/planning/src/task-integration/thought-to-task-converter.ts
   - Propagate goldenRun metadata into created tasks.
-- packages/cognition/src/keep-alive/keep-alive-controller.ts (if needed)
-  - Optional idle episode trigger hooks (no semantics).
 - scripts/docs-boundary-lint.js
   - No change.
+
+Historical note: this impact map originally listed
+packages/planning/src/modules/keep-alive-integration.ts and
+packages/cognition/src/keep-alive/keep-alive-controller.ts as idle-episode
+trigger surfaces. Both files have been deleted as part of the keep-alive
+cauterization (see docs/planning/run-doom-loop-working-spec.md Phase 1B
+closing note). The idle-episode emission pathway will be reintroduced in
+Phase 2 via a new IdleEngine component in the planning package.
 
 ## Data / Artifacts
 - artifacts/golden-run/golden-<run_id>.json
 
 ## Roll-forward / Rollback
-- Roll-forward: enable ENABLE_DEV_ENDPOINTS and STERLING_IDLE_EPISODES_ENABLED.
-- Rollback: disable env flags or revert new endpoints/recorder.
+- Roll-forward: enable ENABLE_DEV_ENDPOINTS.
+- Rollback: disable env flag or revert new endpoints/recorder.
