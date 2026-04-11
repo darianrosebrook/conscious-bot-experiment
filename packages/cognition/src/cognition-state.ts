@@ -6,7 +6,7 @@
  * fields by reference or via accessor functions to router factories.
  */
 
-import type { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
+import type { SocialMemoryManager } from '@conscious-bot/memory';
 
 export interface CognitionMutableState {
   cognitiveThoughts: any[];

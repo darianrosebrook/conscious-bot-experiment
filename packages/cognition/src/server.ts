@@ -58,7 +58,7 @@ import {
 } from './stress-axis-computer';
 import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
 import { SocialAwarenessManager } from './social-awareness-manager';
-import { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
+import { SocialMemoryManager } from '@conscious-bot/memory';
 
 // Extracted modules
 import { CognitiveStreamLogger } from './cognitive-stream-logger';

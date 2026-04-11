@@ -48,8 +48,14 @@ export * from './memory-decay-manager';
 // Tool Efficiency and Learning
 export * from './tool-efficiency-memory';
 
-// Social Memory
-export * from './social-memory-manager';
+// Social Memory — re-exports the `social/social-memory-manager.ts`
+// variant (KnowledgeGraphCore-backed with gradual forgetting and
+// redaction). The earlier flat `./social-memory-manager.ts` variant
+// (zod-schema trust/reputation tracker) was deleted as dead code in
+// the cognition error-handling audit — it had zero workspace
+// importers and its types collided with the nested variant's types,
+// which blocked downstream consumers from using the workspace import.
+export * from './social/social-memory-manager';
 
 // Spatial Memory
 export * from './spatial-memory-manager';

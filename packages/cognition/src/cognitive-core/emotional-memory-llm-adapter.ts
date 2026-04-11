@@ -20,7 +20,7 @@ import {
   SelfNarrativeConstructor,
   SelfNarrative,
   IdentityMemoryGuardian,
-} from '../../../memory/src/index';
+} from '@conscious-bot/memory';
 
 /**
  * Emotional context for LLM adaptation

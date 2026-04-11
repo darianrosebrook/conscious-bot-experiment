@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express';
-import type { SocialMemoryManager } from '../../../memory/src/social/social-memory-manager';
+import type { SocialMemoryManager } from '@conscious-bot/memory';
 
 export interface SocialMemoryRouteDeps {
   getSocialMemoryManager: () => SocialMemoryManager | null;
