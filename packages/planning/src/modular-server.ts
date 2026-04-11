@@ -4079,10 +4079,11 @@ async function startServer() {
     // runs returns a client whose transport is still the stock
     // MockLanguageIOTransport. IdleEngine would then hold a reference
     // to the mock-wired client and every `requestGoal` would hit the
-    // mock's "semantically empty" fall-through, producing `no_policy`
-    // decisions with reason='No committed goal (no explicit [GOAL: ...]
-    // tag found)'. Discovered during Phase 2 runtime verification (4th
-    // capture capture file bfqzofrv0).
+    // mock's "semantically empty" fall-through, producing no_policy
+    // decisions with the mock's default `blockReason` from
+    // `execution-gate.ts:getExecutionBlockReason` (the fallback message
+    // shown when there is no committed goal and no advisory). Discovered
+    // during Phase 2 runtime verification (4th capture file bfqzofrv0).
 
     // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
     if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {

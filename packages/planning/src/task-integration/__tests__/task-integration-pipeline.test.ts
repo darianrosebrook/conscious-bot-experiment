@@ -20,26 +20,46 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { isIntentLeaf } from '../../modules/leaf-arg-contracts';
 import { canonicalize } from '../../sterling/solve-bundle';
 
-// Mock external dependencies before importing TaskIntegration
-vi.mock('@conscious-bot/core', () => ({
-  createServiceClients: () => ({
-    minecraft: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no minecraft')),
-    },
-    cognition: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no cognition')),
-    },
-    planning: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no planning')),
-    },
-    memory: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no memory')),
-    },
-    dashboard: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no dashboard')),
-    },
-  }),
-}));
+// Mock external dependencies before importing TaskIntegration.
+//
+// IMPORTANT: we use `importOriginal` here so the mock is PARTIAL — only
+// `createServiceClients` is replaced with a fake; everything else the
+// production code imports from `@conscious-bot/core` (isVerbose, logging
+// helpers, type guards, etc.) passes through from the real module. This
+// prevents a recurring class of bug where production adds a new import
+// from the core package and tests start failing with "X is not a
+// function" because the mock factory was a full replacement that
+// didn't know about the new symbol.
+//
+// The specific trigger for this rewrite: `task-integration.ts:1727`
+// calls `isVerbose()` from `@conscious-bot/core`, which was added in
+// a prior session. The old full-replacement factory didn't export
+// `isVerbose`, so every test that constructed a TaskIntegration and
+// called addTask() would throw in finalizeNewTask() when the logger
+// check fired.
+vi.mock('@conscious-bot/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@conscious-bot/core')>();
+  return {
+    ...actual,
+    createServiceClients: () => ({
+      minecraft: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no minecraft')),
+      },
+      cognition: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no cognition')),
+      },
+      planning: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no planning')),
+      },
+      memory: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no memory')),
+      },
+      dashboard: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no dashboard')),
+      },
+    }),
+  };
+});
 
 // Mock CognitiveStreamClient to prevent network calls
 vi.mock('../../modules/cognitive-stream-client', () => ({

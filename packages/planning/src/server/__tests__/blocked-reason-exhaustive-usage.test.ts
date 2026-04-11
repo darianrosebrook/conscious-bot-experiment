@@ -66,6 +66,40 @@ const SEPARATE_TAXONOMY_REASONS: Record<string, { taxonomy: string; definedIn: s
     taxonomy: 'ExecutorActionValidation',
     definedIn: 'planning/src/modular-server.ts',
   },
+
+  // task-integration.ts expansion-failure code. Returned when
+  // sterlingExecutorService.buildResolveRequest(...) returns null because
+  // the bot state snapshot isn't available at expansion time. Used as a
+  // `blocked_reason` on golden-run expansion records and as a
+  // task-level block reason, but is NOT a BLOCKED_REASON_REGISTRY entry
+  // because the registry is for task-block-evaluator ingestion codes,
+  // not for expansion-layer infra failures.
+  blocked_bot_context_unavailable: {
+    taxonomy: 'ExpansionBlockReason',
+    definedIn: 'task-integration.ts',
+  },
+
+  // sterling-planner.ts uses this as a `meta.source` provenance tag on
+  // TaskStep objects generated in response to a Sterling `blocked_info`
+  // signal (missing prereqs identified by the solver). It identifies
+  // the origin of the step, not a blocked-reason code — the scanner
+  // matches it only because the string literally starts with `blocked_`.
+  blocked_info_prereq: {
+    taxonomy: 'PrereqSourceTag',
+    definedIn: 'task-integration/sterling-planner.ts',
+  },
+
+  // idle-engine/idle-episode-payload.ts uses `blocked_tasks` as a JSON
+  // field name on the IDLE_EPISODE_V1 wire contract (snake_case to match
+  // Sterling's Python parser expectations). The scanner catches it
+  // because the JSDoc at the top of the file references the field in
+  // a backtick-wrapped inline code block. It's a payload field name,
+  // not a blocked-reason code, and is forwarded to Sterling's idle-
+  // episode reducer as part of executor state passthrough.
+  blocked_tasks: {
+    taxonomy: 'PayloadFieldName',
+    definedIn: 'idle-engine/idle-episode-payload.ts',
+  },
 };
 
 // ============================================================================

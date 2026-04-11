@@ -9,10 +9,20 @@ import {
   type ReadinessConfig,
 } from '../execution-readiness';
 
-// Mock resilientFetch at the module level
-vi.mock('@conscious-bot/core', () => ({
-  resilientFetch: vi.fn(),
-}));
+// Mock resilientFetch at the module level.
+//
+// IMPORTANT: partial mock via `importOriginal` — only `resilientFetch`
+// is replaced; everything else the production code imports from
+// `@conscious-bot/core` (isVerbose, logging helpers, etc.) passes
+// through from the real module. See the matching comment in
+// task-integration-pipeline.test.ts for the full rationale.
+vi.mock('@conscious-bot/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@conscious-bot/core')>();
+  return {
+    ...actual,
+    resilientFetch: vi.fn(),
+  };
+});
 
 import { resilientFetch } from '@conscious-bot/core';
 const mockResilientFetch = vi.mocked(resilientFetch);

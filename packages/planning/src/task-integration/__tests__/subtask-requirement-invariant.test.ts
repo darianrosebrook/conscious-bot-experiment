@@ -13,26 +13,37 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock external dependencies before importing
-vi.mock('@conscious-bot/core', () => ({
-  createServiceClients: () => ({
-    minecraft: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no minecraft')),
-    },
-    cognition: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no cognition')),
-    },
-    planning: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no planning')),
-    },
-    memory: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no memory')),
-    },
-    dashboard: {
-      get: vi.fn().mockRejectedValue(new Error('mock: no dashboard')),
-    },
-  }),
-}));
+// Mock external dependencies before importing.
+//
+// IMPORTANT: partial mock via `importOriginal` — only `createServiceClients`
+// is replaced; everything else the production code imports from
+// `@conscious-bot/core` (isVerbose, logging helpers, etc.) passes through
+// from the real module. See the matching comment in
+// task-integration-pipeline.test.ts for the full rationale and bug
+// history (same fix, same reason, same file pattern).
+vi.mock('@conscious-bot/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@conscious-bot/core')>();
+  return {
+    ...actual,
+    createServiceClients: () => ({
+      minecraft: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no minecraft')),
+      },
+      cognition: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no cognition')),
+      },
+      planning: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no planning')),
+      },
+      memory: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no memory')),
+      },
+      dashboard: {
+        get: vi.fn().mockRejectedValue(new Error('mock: no dashboard')),
+      },
+    }),
+  };
+});
 
 vi.mock('../../modules/cognitive-stream-client', () => ({
   CognitiveStreamClient: class {
