@@ -79,17 +79,6 @@ export type GoldenRunReport = {
     /** WS-level request_id used for the final expandByDigest call (differs from request_id when retries occurred). */
     final_request_id?: string;
   };
-  idle_episode?: {
-    client_request_id?: string;
-    request_id?: string;
-    timeout_origin?: 'client' | 'server';
-    status?: 'ok' | 'blocked' | 'error';
-    reason?: string;
-    committed_ir_digest?: string;
-    schema_version?: string;
-    envelope_id?: string | null;
-    duration_ms?: number;
-  };
   task?: {
     task_id?: string;
     dedupe_key?: string | null;
@@ -579,14 +568,6 @@ export class GoldenRunRecorder {
   recordRuntime(runId: string, data: GoldenRunReport['runtime']): void {
     if (!runId) return;
     this.update(runId, { runtime: data ?? {} });
-  }
-
-  recordIdleEpisode(
-    runId: string,
-    data: GoldenRunReport['idle_episode']
-  ): void {
-    if (!runId) return;
-    this.update(runId, { idle_episode: data ?? {} });
   }
 
   recordTask(runId: string, data: GoldenRunReport['task']): void {

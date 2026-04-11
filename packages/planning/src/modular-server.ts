@@ -8,12 +8,9 @@
  */
 
 // Global type declarations
-// Note: keepAliveIntegration uses a generic type to avoid dist/src type conflicts
 declare global {
   var lastIdleEvent: number | undefined;
   var lastNoTasksLog: number | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var keepAliveIntegration: any;
   var lastUserCommand: number | undefined;
 }
 
@@ -68,10 +65,6 @@ import {
   PlanningSystem,
 } from './modules/planning-endpoints';
 import { MCPIntegration } from './modules/mcp-integration';
-import {
-  createKeepAliveIntegration,
-  type KeepAliveIntegration,
-} from './modules/keep-alive-integration';
 import { getGoldenRunRecorder, toDispatchResult } from './golden-run-recorder';
 import { buildFailureSignature } from './task-lifecycle/failure-signature';
 import { getLoopBreaker } from './task-lifecycle/loop-breaker';
@@ -112,8 +105,10 @@ import {
 import { normalizeInventory } from './modules/normalize-inventory';
 
 /**
- * Get current bot state for keep-alive context.
- * Returns a minimal state object suitable for the keep-alive integration.
+ * Get current bot state snapshot.
+ * Returns a minimal state object. Originally built for the deleted keep-alive
+ * integration; retained because it's a generally-useful minimal bot state
+ * accessor and Phase 2's IdleEngine will likely use it.
  *
  * Uses the /state endpoint which returns bot state in data.data structure.
  */
@@ -2099,49 +2094,16 @@ async function autonomousTaskExecutor() {
         );
       }
 
-      // Keep-alive integration: trigger intention check on idle (LF-9)
-      // Fires on 'no_tasks' (true idle) AND 'blocked_on_prereq' (all tasks blocked).
-      // The latter prevents a single blocked task from suppressing autonomy forever.
-      const keepAliveEligibleReasons = new Set(['no_tasks', 'blocked_on_prereq']);
-      if (
-        global.keepAliveIntegration?.isActive() &&
-        keepAliveEligibleReasons.has(idleReason ?? '')
-      ) {
-        try {
-          // Get bot state for keep-alive context
-          const botState = await getBotState().catch(() => ({}));
-          const pendingPlanningSterlingIrCount = activeTasks.filter(
-            (task) =>
-              task.type === 'sterling_ir' && task.status === 'pending_planning'
-          ).length;
-
-          // Build blocked task summaries for Sterling context
-          const blockedTasks = activeTasks
-            .filter((t) => t.metadata?.blockedReason)
-            .map((t) => ({
-              taskId: t.id,
-              blockedReason: t.metadata.blockedReason,
-              nextEligibleAt: t.metadata.nextEligibleAt,
-            }));
-
-          const result = await global.keepAliveIntegration.onIdle(
-            {
-              activeTasks: activeTasks.length,
-              eligibleTasks: eligibleTasks.length,
-              idleReason,
-              circuitBreakerOpen,
-              lastUserCommand: global.lastUserCommand || 0,
-              recentTaskConversions: 0, // Tracked internally by integration
-              pendingPlanningSterlingIrCount,
-              blockedTasks,
-            },
-            botState
-          );
-
-        } catch (error) {
-          console.error('[AUTONOMOUS EXECUTOR] Keep-alive tick failed:', error);
-        }
-      }
+      // IdleEngine call site removed as part of the keep-alive cauterization
+      // (see docs/planning/run-doom-loop-working-spec.md Phase 1B closing note).
+      // When the executor reports idle, it logs and returns. Phase 2 of the
+      // cauterize-and-regrow work will reintroduce an idle-state goal requester
+      // (`IdleEngine`) that asks Sterling for a goal via the structured
+      // `idle_episode_v1` reducer — without the intention-check LLM loop, the
+      // KeepAliveController, the KeepAliveThought abstraction, or the
+      // vitals-rerouting rescue path that the old system required. Until then,
+      // the bot stands still when idle, which is the pre-keep-alive behavioral
+      // floor and is intentional for this transitional commit range.
 
       // NOTE: Hunger driveshaft + exploration evaluation is now handled by
       // the reflexRegistry.evaluateTick() call BEFORE the idle gate (above).
@@ -3574,25 +3536,6 @@ serverConfig.addEndpoint('get', '/world-state', (req, res) => {
   }
 });
 
-// Keep-alive diagnostics endpoint
-serverConfig.addEndpoint('get', '/keep-alive/status', (_req, res) => {
-  const integration = global.keepAliveIntegration;
-  if (!integration) {
-    res.json({
-      initialized: false,
-      reason: 'Keep-alive integration not created',
-      globalExists: 'keepAliveIntegration' in global,
-    });
-    return;
-  }
-  const state = integration.getState();
-  res.json({
-    initialized: true,
-    active: integration.isActive(),
-    state,
-  });
-});
-
 // Hunger driveshaft diagnostics endpoint
 serverConfig.addEndpoint('get', '/reflexes/hunger/status', (_req, res) => {
   const driveshaft = global.hungerDriveshaft;
@@ -3659,74 +3602,6 @@ serverConfig.addEndpoint('get', '/reflexes/status', (_req, res) => {
 // Metadata drops diagnostics endpoint (P11)
 serverConfig.addEndpoint('get', '/reflexes/diagnostics/metadata-drops', (_req, res) => {
   res.json({ count: global.metadataDropCount ?? 0 });
-});
-
-// Keep-alive force tick endpoint (diagnostic only)
-serverConfig.addEndpoint('post', '/keep-alive/force-tick', async (req, res) => {
-  const integration = global.keepAliveIntegration;
-  if (!integration || !integration.isActive()) {
-    res.status(400).json({
-      error: 'Keep-alive integration not active',
-    });
-    return;
-  }
-
-  try {
-    // Create minimal context for forced tick
-    const result = await integration.onIdle(
-      {
-        activeTasks: 0,
-        eligibleTasks: 0,
-        idleReason: 'no_tasks',
-        circuitBreakerOpen: false,
-        lastUserCommand: 0,
-        recentTaskConversions: 0,
-        pendingPlanningSterlingIrCount: 0,
-      },
-      {
-        // Minimal bot state
-        health: 20,
-        food: 20,
-        position: { x: 0, y: 64, z: 0 },
-        biome: 'plains',
-        timeOfDay: 6000,
-        inventory: [
-          { name: 'oak_log', count: 4, displayName: 'Oak Log' },
-          { name: 'cobblestone', count: 16, displayName: 'Cobblestone' },
-        ],
-      }
-    );
-
-    res.json({
-      success: true,
-      result: result
-        ? {
-            ticked: result.ticked,
-            skipped: result.skipped,
-            skipReason: result.skipReason,
-            thought: result.thought
-              ? {
-                  id: result.thought.id,
-                  content: result.thought.content?.slice(0, 200),
-                  eligibility: result.thought.eligibility,
-                  groundingResult: result.thought.groundingResult
-                    ? {
-                        pass: result.thought.groundingResult.pass,
-                        reason: result.thought.groundingResult.reason,
-                      }
-                    : null,
-                }
-              : null,
-          }
-        : null,
-    });
-  } catch (error) {
-    console.error('[Keep-alive force-tick] Error:', error);
-    res.status(500).json({
-      error: 'Force tick failed',
-      message: (error as Error).message,
-    });
-  }
 });
 
 // Sterling health endpoint
@@ -4094,31 +3969,15 @@ async function startServer() {
       );
     }
 
-    // Initialize keep-alive integration for intention checking during idle
-    try {
-      global.keepAliveIntegration = await createKeepAliveIntegration({
-        enabled: process.env.KEEPALIVE_ENABLED !== 'false',
-        baseIntervalMs: parseInt(
-          process.env.KEEPALIVE_INTERVAL_MS || '120000',
-          10
-        ),
-        cognitionServiceUrl:
-          process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
-        enableSterlingIdleEpisodes:
-          process.env.STERLING_IDLE_EPISODES_ENABLED === 'true',
-        idleEpisodeCooldownMs: parseInt(
-          process.env.STERLING_IDLE_EPISODES_COOLDOWN_MS || '300000',
-          10
-        ),
-        idleEpisodeTimeoutMs: parseInt(
-          process.env.STERLING_IDLE_EPISODES_TIMEOUT_MS || '12000',
-          10
-        ),
-      });
-      console.log('[Planning] Keep-alive integration initialized');
-    } catch (error) {
-      console.warn('[Planning] Failed to initialize keep-alive integration:', error);
-    }
+    // IdleEngine initialization removed as part of the keep-alive cauterization.
+    // The old KeepAliveIntegration was deleted because it layered a parallel
+    // LLM-based decision loop on top of the executor's real task pipeline,
+    // producing shadow decisions that competed with in-flight operations.
+    // Phase 2 of this work will introduce IdleEngine: a minimal component that
+    // asks Sterling's `idle_episode_v1` reducer for a goal when the executor
+    // reports idle, with no LLM call, no thought abstraction, and no cooldown
+    // gymnastics. Until Phase 2 lands, idle states are a no-op on the executor
+    // side; the bot stands still until a user command or reflex fires.
 
     // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
     if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {

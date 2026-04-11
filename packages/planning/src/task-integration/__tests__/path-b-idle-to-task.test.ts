@@ -64,7 +64,12 @@ function makeIdleThought(overrides: Partial<CognitiveStreamThought> = {}): Cogni
     context: {
       emotionalState: 'neutral',
       confidence: 0.5,
-      cognitiveSystem: 'keepalive',
+      // Phase 2 will replace this with 'idle_engine' when IdleEngine lands.
+      // For now the string is retained as a historical test fixture — the
+      // converter doesn't semantically key on this field, so the value is
+      // cosmetic. The 5-gate contract that this test actually exercises
+      // is driven entirely by metadata.reduction.reducerResult.
+      cognitiveSystem: 'idle',
     },
     metadata: {
       thoughtType: 'idle-episode',

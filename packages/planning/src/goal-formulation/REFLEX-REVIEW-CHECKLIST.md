@@ -203,7 +203,7 @@ Deferred until stacking reflex #2. Tracked as Gap-4.
 
 ### Gap-4: Multiple getBotState() Calls Per Tick
 
-**Current behavior:** Up to 3 calls per tick: keep-alive, critical preemption check, idle evaluation. Plus another on task completion.
+**Current behavior:** Up to 2 calls per tick: critical preemption check, idle evaluation. Plus another on task completion. (Historical note: a third call from the deleted keep-alive integration was removed in the Phase 1 cauterization. Phase 2's IdleEngine will share the idle-evaluation getBotState rather than adding a new one.)
 
 **Impact:** Performance overhead and I/O flake amplification. Acceptable with 1 reflex, problematic with 3+.
 

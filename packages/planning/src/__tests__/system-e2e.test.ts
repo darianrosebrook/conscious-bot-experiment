@@ -848,8 +848,11 @@ describe.skipIf(!SYSTEM_E2E)('System E2E: Cross-service pipelines', () => {
             (t: any) =>
               !existingIds.has(t.id) &&
               t.type === 'sterling_ir' &&
-              (t.metadata?.goldenRun?.source?.includes('idle') ||
-                t.metadata?.goldenRun?.source?.includes('keep_alive'))
+              // Phase 2's IdleEngine will tag tasks with `idle_engine` or similar.
+              // The broader `includes('idle')` check still catches it.
+              // The legacy `keep_alive` source has been removed — no code path
+              // emits it anymore after the cauterization.
+              t.metadata?.goldenRun?.source?.includes('idle')
           );
           return newTask ?? null;
         },
@@ -859,7 +862,10 @@ describe.skipIf(!SYSTEM_E2E)('System E2E: Cross-service pipelines', () => {
       if (!idleTask) {
         steps.push({
           action: 'no idle task appeared within 120s',
-          detail: 'Keep-alive may be disabled or cycle too long',
+          // Expected to skip until IdleEngine (Phase 2 of the cauterize-and-
+          // regrow work) lands. Between keep-alive deletion and IdleEngine
+          // introduction, no autonomous idle task emission exists.
+          detail: 'IdleEngine not yet reintroduced; idle emission is a no-op',
         });
         scenarios.push({
           name,

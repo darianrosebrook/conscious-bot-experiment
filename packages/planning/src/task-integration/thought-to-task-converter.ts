@@ -64,16 +64,6 @@ export interface ConvertThoughtToTaskDeps {
   };
 }
 
-/**
- * Process-local registry for keepalive transient drops.
- * Tracks first-seen time for keepalive thoughts dropped with no goal-prop,
- * so we can bound retries by TTL without mutating the thought object
- * (which doesn't persist across HTTP fetches).
- */
-const keepaliveDropRegistry = new Map<string, number>();
-const KEEPALIVE_DROP_TTL_MS = 120_000; // 2 minutes
-const KEEPALIVE_DROP_REGISTRY_MAX = 100;
-
 /** Recent digest hashes for 5-minute dedup window */
 const recentDigestHashes = new Map<string, number>();
 const DIGEST_DEDUP_WINDOW_MS = 5 * 60 * 1000;
@@ -296,7 +286,6 @@ function pruneCooldownEntries(): void {
 export function __resetDedupStateForTests(): void {
   recentDigestHashes.clear();
   recentFailedCategories.clear();
-  keepaliveDropRegistry.clear();
 }
 
 /** Dedup metrics for observability. */
@@ -509,55 +498,17 @@ export async function convertThoughtToTask(
         'dropped_missing_schema_version',
         'dropped_semantically_empty',
       ]);
-      // dropped_no_goal_prop is NOT deterministic for keep-alive thoughts:
-      // vitals may become re-routable when botState arrives.
-      // However, transient drops are bounded to prevent churn:
-      // - TTL: mark processed after 2 minutes (botState should have arrived by then)
-      // - Budget: mark processed after 3 conversion attempts
-      const isKeepAlive = (thought as any).metadata?.source === 'keepalive';
-      const isTransientKeepAliveDrop =
-        reductionCheck.decision === 'dropped_no_goal_prop' && isKeepAlive;
-
-      if (isTransientKeepAliveDrop) {
-        // TTL-only bounding via process-local registry.
-        // We do NOT mutate thought.metadata (it doesn't persist across HTTP fetches).
-        // Instead, track first-seen time in a module-scoped map.
-        const now = Date.now();
-
-        // Normalize timestamp defensively — thought.timestamp may be missing, non-numeric,
-        // or an ISO string from a different serialization path.
-        const rawTs = thought.timestamp;
-        const parsedTs = typeof rawTs === 'number' ? rawTs
-          : typeof rawTs === 'string' ? Date.parse(rawTs)
-          : NaN;
-        // Floor at Sept 2020 — a timestamp of 0 (uninitialized field) would cause
-        // immediate TTL expiry (elapsed ≈ 56 years) and silent thought drop.
-        const MIN_VALID_TIMESTAMP = 1_600_000_000_000;
-        const ts = Number.isFinite(parsedTs) && parsedTs > MIN_VALID_TIMESTAMP ? parsedTs : now;
-
-        // Use whichever is older: thought creation time or first time we saw this drop
-        if (!keepaliveDropRegistry.has(thought.id)) {
-          keepaliveDropRegistry.set(thought.id, Math.min(ts, now));
-          // Prune registry if it grows too large (evict oldest entries)
-          if (keepaliveDropRegistry.size > KEEPALIVE_DROP_REGISTRY_MAX) {
-            const entries = [...keepaliveDropRegistry.entries()].sort((a, b) => a[1] - b[1]);
-            for (const [k] of entries.slice(0, entries.length - KEEPALIVE_DROP_REGISTRY_MAX)) {
-              keepaliveDropRegistry.delete(k);
-            }
-          }
-        }
-
-        const firstSeenAt = keepaliveDropRegistry.get(thought.id)!;
-        const elapsed = now - firstSeenAt;
-
-        if (elapsed >= KEEPALIVE_DROP_TTL_MS) {
-          // TTL expired — mark processed to prevent infinite churn
-          await deps.markThoughtAsProcessed(thought.id);
-          keepaliveDropRegistry.delete(thought.id);
-        }
-        // Otherwise: leave unprocessed so keep-alive can retry when botState arrives
-      } else if (deterministic.has(reductionCheck.decision) ||
-          (reductionCheck.decision === 'dropped_no_goal_prop' && !isKeepAlive)) {
+      // dropped_no_goal_prop is now deterministic for ALL sources.
+      // Before the keep-alive cauterization, keep-alive thoughts used a TTL-
+      // based transient drop registry to allow vitals rerouting to catch up —
+      // but that was a compensation for pathway 3 (the intention-check LLM
+      // loop) producing thoughts without committed goal-props. Now that
+      // pathway 3 is deleted, every keep-alive-like source (IdleEngine in
+      // Phase 2) will only post thoughts that already have a Sterling-
+      // committed goal-prop attached, so the "transient drop" escape hatch
+      // is unreachable and has been removed.
+      if (deterministic.has(reductionCheck.decision) ||
+          reductionCheck.decision === 'dropped_no_goal_prop') {
         await deps.markThoughtAsProcessed(thought.id);
       }
       const r: ConvertThoughtResult = { task: null, decision: reductionCheck.decision, reason: reductionCheck.reason };
@@ -682,8 +633,6 @@ export async function convertThoughtToTask(
 
     const addedTask = await deps.addTask(task);
     await deps.markThoughtAsProcessed(thought.id);
-    // Clean up keepalive drop registry if this thought previously had transient drops
-    keepaliveDropRegistry.delete(thought.id);
     logTaskIngestion({ _diag_version: 1, source: 'thought_converter', task_id: task.id, decision: 'created', task_type: 'sterling_ir' });
     const r: ConvertThoughtResult = { task: addedTask, decision: 'created' };
     logConversionDecision(thought, r);

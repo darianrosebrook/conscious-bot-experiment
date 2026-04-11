@@ -37,7 +37,6 @@ const ALLOWLIST_PATTERNS: Array<(p: string) => boolean> = [
   (p) => p === 'memory-integration.ts',
   (p) => p === 'modules/action-plan-backend.ts',
   (p) => p === 'modules/cognitive-stream-client.ts',
-  (p) => p === 'modules/keep-alive-integration.ts',
   (p) => p === 'modules/mc-client.ts',
   (p) => p === 'modules/mcp-integration.ts',
   (p) => p === 'modules/requirements.ts',

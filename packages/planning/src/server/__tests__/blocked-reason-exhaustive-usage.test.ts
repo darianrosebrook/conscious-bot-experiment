@@ -40,18 +40,19 @@ const SEPARATE_TAXONOMY_REASONS: Record<string, { taxonomy: string; definedIn: s
     definedIn: 'goals/goal-hold-manager.ts',
   },
 
-  // modular-server.ts / keep-alive-integration.ts IdleReason union
+  // modular-server.ts IdleReason union
   // Note: registry has `waiting_on_prereq`; this is the idle-level equivalent
   blocked_on_prereq: {
     taxonomy: 'IdleReason',
     definedIn: 'modular-server.ts',
   },
 
-  // keep-alive-integration.ts fallback
-  // Note: registry has `no_mapped_action`; this is the keep-alive fallback equivalent
+  // Sterling-side block reason (emitted by intent_reducer_v1 when the
+  // reducer cannot commit a goal). Surfaces via the language-io client's
+  // ReduceResult.blockReason field. TS side only consumes it.
   blocked_no_action: {
-    taxonomy: 'KeepAliveFallback',
-    definedIn: 'modules/keep-alive-integration.ts',
+    taxonomy: 'SterlingBlockReason',
+    definedIn: 'sterling/python/core/linguistics/reducers/intent_reducer_v1.py',
   },
 
   // golden-run-recorder.ts feature flag (not a blocked reason at all)

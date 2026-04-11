@@ -125,52 +125,13 @@ describe('no-immortal-tasks invariant', () => {
 // ============================================================================
 // 2. Idle suppression decision codes
 // ============================================================================
-
-describe('idle episode decision code coverage', () => {
-  // We can't import the actual trySterlingIdleEpisode method here without
-  // standing up the full KeepAliveIntegration class, but we CAN verify
-  // that the type exists with the expected variants and that the
-  // suppression/emission variants are well-partitioned.
-
-  // IdleEpisodeDecision is a TypeScript union type — cannot be tested at runtime.
-  // The naming convention below documents the expected variants and catches drift
-  // if someone adds a variant that doesn't follow the naming pattern.
-
-  it('emission variants follow "emitted_" naming convention', () => {
-    const emissionVariants = ['emitted_executable', 'emitted_blocked', 'emitted_error'];
-    for (const v of emissionVariants) {
-      expect(v.startsWith('emitted_')).toBe(true);
-    }
-    // All emission variants are distinct
-    expect(new Set(emissionVariants).size).toBe(emissionVariants.length);
-  });
-
-  it('suppression variants follow "suppressed_" naming convention', () => {
-    const suppressionVariants = [
-      'suppressed_in_flight',
-      'suppressed_lease_cooldown',
-      'suppressed_hourly_cap',
-      'suppressed_pending_planning',
-    ];
-    for (const v of suppressionVariants) {
-      expect(v.startsWith('suppressed_')).toBe(true);
-    }
-    expect(new Set(suppressionVariants).size).toBe(suppressionVariants.length);
-  });
-
-  it('emission and suppression sets are disjoint', () => {
-    const emission = new Set(['emitted_executable', 'emitted_blocked', 'emitted_error']);
-    const suppression = new Set([
-      'suppressed_in_flight',
-      'suppressed_lease_cooldown',
-      'suppressed_hourly_cap',
-      'suppressed_pending_planning',
-    ]);
-    for (const v of emission) {
-      expect(suppression.has(v), `"${v}" should not be in both sets`).toBe(false);
-    }
-  });
-});
+//
+// Previously tested the `IdleEpisodeDecision` union from the deleted
+// `keep-alive-integration.ts`. The keep-alive subsystem has been cauterized;
+// Phase 2 of the cauterize-and-regrow work will reintroduce an `IdleEngine`
+// with its own decision type. When that lands, add a new describe block here
+// that asserts the IdleEngine decision type's naming convention and that
+// emission/suppression variant sets are disjoint.
 
 // ============================================================================
 // 3. Executor ordering: blocked evaluation before retry, retry before selection
