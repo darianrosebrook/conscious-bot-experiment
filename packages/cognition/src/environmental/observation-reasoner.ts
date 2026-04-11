@@ -5,6 +5,8 @@ import { auditLogger } from '../audit/thought-action-audit-logger';
 import { logStressAtBoundary } from '../stress-boundary-logger';
 import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
+import { createServerLogger } from '../server-utils/server-logger';
+import { callLlmWithRaceTimeout } from './llm-race-helper';
 
 const Vec3Schema = z.object({
   x: z.number(),
@@ -109,6 +111,7 @@ export class ObservationReasoner {
   private disabled: boolean;
   private timeoutMs: number;
   private redactPrecision: number;
+  private logger = createServerLogger({ subsystem: 'observation-reasoner' });
 
   constructor(llm: LLMInterface, options: ObservationReasonerOptions = {}) {
     this.llm = llm;
@@ -140,11 +143,6 @@ export class ObservationReasoner {
     const prompt = this.buildPrompt(sanitised, stressContext);
 
     const startTime = Date.now();
-    const abortController = new AbortController();
-    const abortTimeoutId = setTimeout(
-      () => abortController.abort(),
-      this.timeoutMs
-    );
 
     try {
       console.log(
@@ -152,59 +150,21 @@ export class ObservationReasoner {
       );
 
       const observationConfig = getLLMConfig('observation');
-      const llmPromise = this.llm.generateResponse(prompt.prompt, undefined, {
-        systemPrompt: prompt.system,
-        temperature: observationConfig.temperature,
-        maxTokens: observationConfig.maxTokens,
-        signal: abortController.signal,
-      });
-      // This handler exists solely to prevent an unhandled-rejection warning
-      // when the timeout race below wins and we abort the LLM call. We must
-      // NOT swallow real LLM errors here — those need to reach the outer
-      // try/catch via Promise.race so the fallback path in createFallback()
-      // can record them. That works because Promise.race resolves/rejects
-      // with whichever promise settles first; if llmPromise rejects with a
-      // real error before the timeout fires, the outer await will see it
-      // and the error will land in the outer catch. This handler only
-      // matters when the timeout wins: at that point, abortController.abort()
-      // causes llmPromise to reject with an AbortError that has nowhere to
-      // go (the race has already resolved with the timeout's rejection),
-      // which Node would otherwise log as an unhandled rejection.
-      llmPromise.catch((e: unknown) => {
-        // Only AbortError is expected here. Anything else is load-bearing
-        // diagnostic information that we'd silently lose — log it so
-        // reviewers can spot if the race invariant ever breaks.
-        const name = e instanceof Error ? e.name : '';
-        if (name !== 'AbortError') {
-          console.warn(
-            `[ObservationReasoner] Unexpected late rejection from llmPromise after race resolved: ${
-              e instanceof Error ? e.message : String(e)
-            }`
-          );
-        }
-      });
-
-      // INTERMEDIATE FIX: Track both timeout IDs to prevent leak
-      let raceTimeoutId: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<LLMResponse>((_, reject) => {
-        raceTimeoutId = setTimeout(
-          () => reject(new Error('LLM observation reasoning timed out')),
-          this.timeoutMs
-        );
-      });
-
-      const llmResponse = await Promise.race<LLMResponse>([
-        llmPromise,
-        timeoutPromise,
-      ]);
+      const llmResponse = await callLlmWithRaceTimeout(
+        this.llm,
+        {
+          prompt: prompt.prompt,
+          systemPrompt: prompt.system,
+          temperature: observationConfig.temperature,
+          maxTokens: observationConfig.maxTokens,
+          timeoutMs: this.timeoutMs,
+        },
+        this.logger
+      );
 
       console.log(
         `[ObservationReasoner] LLM response received: ${llmResponse.text.substring(0, 100)}...`
       );
-
-      // INTERMEDIATE FIX: Clear both timeouts to prevent leak
-      clearTimeout(abortTimeoutId);
-      if (raceTimeoutId) clearTimeout(raceTimeoutId);
 
       const insight = this.parseLLMResponse(llmResponse.text);
 
@@ -256,8 +216,6 @@ export class ObservationReasoner {
         llmResponse,
       };
     } catch (error) {
-      // INTERMEDIATE FIX: Clear both timeouts in error path too
-      clearTimeout(abortTimeoutId);
       const reason =
         error instanceof Error ? error.message : 'Unknown observation error';
       console.log(
