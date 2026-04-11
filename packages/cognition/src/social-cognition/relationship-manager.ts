@@ -691,7 +691,19 @@ Respond in JSON format.`,
       );
       return this.parseTrustAssessment(response.text, agentId, trustDomain);
     } catch (error) {
-      console.warn(`Failed to calculate trust for ${agentId}:`, error);
+      relationshipLogger.warn(
+        'Failed to calculate trust — using empty assessment fallback',
+        {
+          event: 'relationship_trust_llm_failed',
+          tags: ['relationship', 'trust', 'llm', 'warn'],
+          fields: {
+            agentId,
+            trustDomain,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyTrustAssessment(agentId, trustDomain);
     }
   }
@@ -737,9 +749,17 @@ Respond in JSON format.`,
       );
       return this.parseRelationshipQuality(response.text, relationship);
     } catch (error) {
-      console.warn(
-        `Failed to assess relationship quality for ${agentId}:`,
-        error
+      relationshipLogger.warn(
+        'Failed to assess relationship quality — using empty fallback',
+        {
+          event: 'relationship_quality_llm_failed',
+          tags: ['relationship', 'quality', 'llm', 'warn'],
+          fields: {
+            agentId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyRelationshipQuality();
     }
@@ -789,9 +809,18 @@ Respond in JSON format.`,
       );
       return this.parseRelationshipTrajectory(response.text);
     } catch (error) {
-      console.warn(
-        `Failed to predict relationship trajectory for ${agentId}:`,
-        error
+      relationshipLogger.warn(
+        'Failed to predict relationship trajectory — using empty fallback',
+        {
+          event: 'relationship_trajectory_llm_failed',
+          tags: ['relationship', 'trajectory', 'llm', 'warn'],
+          fields: {
+            agentId,
+            hypotheticalInteractionCount: hypotheticalInteractions.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyTrajectory();
     }

@@ -277,7 +277,18 @@ Identify learnable behaviors and strategies.`;
 
       return this.parseLearnedBehaviors(response.text);
     } catch (error) {
-      console.error('Error learning behaviors:', error);
+      socialLearnerLogger.warn(
+        'Failed to learn behaviors — returning empty array',
+        {
+          event: 'social_learner_behaviors_llm_failed',
+          tags: ['social-learner', 'behaviors', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -299,7 +310,18 @@ Identify recurring patterns and strategies.`;
 
       return this.parsePatterns(response.text);
     } catch (error) {
-      console.error('Error recognizing patterns:', error);
+      socialLearnerLogger.warn(
+        'Failed to recognize patterns — returning empty array',
+        {
+          event: 'social_learner_patterns_llm_failed',
+          tags: ['social-learner', 'patterns', 'llm', 'warn'],
+          fields: {
+            historyLength: behaviorHistory.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -321,7 +343,18 @@ Identify social norms and expectations.`;
 
       return this.parseNorms(response.text);
     } catch (error) {
-      console.error('Error inferring norms:', error);
+      socialLearnerLogger.warn(
+        'Failed to infer norms — returning empty array',
+        {
+          event: 'social_learner_norms_llm_failed',
+          tags: ['social-learner', 'norms', 'llm', 'warn'],
+          fields: {
+            interactionCount: interactions.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -419,7 +452,18 @@ Respond in JSON format.`,
         strategyObservations
       );
     } catch (error) {
-      console.warn('Failed to identify successful strategies:', error);
+      socialLearnerLogger.warn(
+        'Failed to identify successful strategies — using empty fallback',
+        {
+          event: 'social_learner_strategies_llm_failed',
+          tags: ['social-learner', 'strategies', 'llm', 'warn'],
+          fields: {
+            observationCount: strategyObservations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyStrategyIdentification();
     }
   }
@@ -487,7 +531,18 @@ Respond in JSON format.`,
 
       return inference;
     } catch (error) {
-      console.warn('Failed to infer social norms:', error);
+      socialLearnerLogger.warn(
+        'Failed to infer social norms — using empty fallback',
+        {
+          event: 'social_learner_norm_inference_llm_failed',
+          tags: ['social-learner', 'norm-inference', 'llm', 'warn'],
+          fields: {
+            interactionCount: socialInteractions.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyNormInference();
     }
   }
@@ -568,9 +623,18 @@ Respond in JSON format.`,
 
       return imitation;
     } catch (error) {
-      console.warn(
-        `Failed to learn through imitation: ${targetBehavior}`,
-        error
+      socialLearnerLogger.warn(
+        'Failed to learn through imitation — using empty fallback',
+        {
+          event: 'social_learner_imitation_llm_failed',
+          tags: ['social-learner', 'imitation', 'llm', 'warn'],
+          fields: {
+            targetBehavior,
+            expertAgent,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyImitationLearning(targetBehavior, expertAgent);
     }
@@ -630,7 +694,18 @@ Respond in JSON format.`,
 
       return adaptation;
     } catch (error) {
-      console.warn('Failed to adapt learned behavior:', error);
+      socialLearnerLogger.warn(
+        'Failed to adapt learned behavior — using empty fallback',
+        {
+          event: 'social_learner_adaptation_llm_failed',
+          tags: ['social-learner', 'adaptation', 'llm', 'warn'],
+          fields: {
+            learnedBehaviorId: learnedBehavior.behaviorId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyBehaviorAdaptation(learnedBehavior, newContext);
     }
   }
@@ -679,7 +754,19 @@ Respond in JSON format.`,
       );
       return this.parseBehaviorAnalysis(response.text);
     } catch (error) {
-      console.warn('Failed to analyze behavior for learning:', error);
+      socialLearnerLogger.warn(
+        'Failed to analyze behavior for learning — using empty fallback',
+        {
+          event: 'social_learner_behavior_analysis_llm_failed',
+          tags: ['social-learner', 'behavior-analysis', 'llm', 'warn'],
+          fields: {
+            observerId: observedBehavior.observerId,
+            observedAgent: observedBehavior.observedAgent,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyBehaviorAnalysis();
     }
   }

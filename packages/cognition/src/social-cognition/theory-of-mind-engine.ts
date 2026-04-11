@@ -421,7 +421,17 @@ Predict specific intentions the agent is likely to have.`;
 
       return this.parseIntentions(response.text);
     } catch (error) {
-      console.error('Error predicting intentions:', error);
+      tomLogger.warn(
+        'Failed to predict intentions — returning empty array',
+        {
+          event: 'tom_intentions_llm_failed',
+          tags: ['theory-of-mind', 'intentions', 'llm', 'warn'],
+          fields: {
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -459,7 +469,18 @@ Provide the agent's perspective on this situation.`;
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.error('Error simulating perspective:', error);
+      tomLogger.warn(
+        'Failed to simulate perspective (prose-mode) — using empty fallback',
+        {
+          event: 'tom_perspective_prose_llm_failed',
+          tags: ['theory-of-mind', 'perspective', 'llm', 'warn'],
+          fields: {
+            agentId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return this.createEmptyPerspective(agentId);
     }
   }
@@ -509,9 +530,17 @@ Respond in JSON format.`,
       );
       return this.parsePerspectiveSimulation(response.text, agentId, scenario);
     } catch (error) {
-      console.warn(
-        `Failed to simulate perspective for agent ${agentId}:`,
-        error
+      tomLogger.warn(
+        'Failed to simulate perspective (scenario-mode) — using empty fallback',
+        {
+          event: 'tom_perspective_scenario_llm_failed',
+          tags: ['theory-of-mind', 'perspective', 'scenario', 'llm', 'warn'],
+          fields: {
+            agentId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyPerspectiveSimulation(agentId, scenario);
     }
@@ -565,9 +594,18 @@ Respond in JSON format.`,
         beliefDomain
       );
     } catch (error) {
-      console.warn(
-        `Failed to detect false beliefs for agent ${agentId}:`,
-        error
+      tomLogger.warn(
+        'Failed to detect false beliefs — using empty fallback',
+        {
+          event: 'tom_false_beliefs_llm_failed',
+          tags: ['theory-of-mind', 'false-beliefs', 'llm', 'warn'],
+          fields: {
+            agentId,
+            beliefDomain,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyFalseBeliefDetection(agentId, beliefDomain);
     }
@@ -621,9 +659,18 @@ Respond in JSON format.`,
       );
       return this.parseMetaReasoning(response.text, agentId, reasoningTarget);
     } catch (error) {
-      console.warn(
-        `Failed to reason about agent reasoning for ${agentId}:`,
-        error
+      tomLogger.warn(
+        'Failed to reason about agent reasoning — using empty fallback',
+        {
+          event: 'tom_meta_reasoning_llm_failed',
+          tags: ['theory-of-mind', 'meta-reasoning', 'llm', 'warn'],
+          fields: {
+            agentId,
+            reasoningTarget,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyMetaReasoning(agentId, reasoningTarget);
     }
@@ -674,9 +721,17 @@ Respond in JSON format.`,
       );
       return this.parseMentalStateInference(response.text, agentModel.agentId);
     } catch (error) {
-      console.warn(
-        `Failed to infer mental state for agent ${agentModel.agentId}:`,
-        error
+      tomLogger.warn(
+        'Failed to infer mental state — using empty fallback',
+        {
+          event: 'tom_mental_state_llm_failed',
+          tags: ['theory-of-mind', 'mental-state', 'llm', 'warn'],
+          fields: {
+            agentId: agentModel.agentId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyMentalStateInference(agentModel.agentId);
     }
@@ -725,9 +780,17 @@ Respond in JSON format.`,
       );
       return this.parseActionPrediction(response.text, agentModel.agentId);
     } catch (error) {
-      console.warn(
-        `Failed to predict actions for agent ${agentModel.agentId}:`,
-        error
+      tomLogger.warn(
+        'Failed to predict agent actions — using empty fallback',
+        {
+          event: 'tom_action_prediction_llm_failed',
+          tags: ['theory-of-mind', 'action-prediction', 'llm', 'warn'],
+          fields: {
+            agentId: agentModel.agentId,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
       );
       return this.createEmptyActionPrediction(agentModel.agentId);
     }

@@ -8,6 +8,7 @@
  */
 
 import { LLMInterface } from '../cognitive-core/llm-interface';
+import { createServerLogger } from '../server-utils/server-logger';
 import {
   AgentModel,
   Entity,
@@ -23,6 +24,10 @@ import {
   PersonalityAssessment,
   Intention,
 } from './types';
+
+const agentModelerLogger = createServerLogger({
+  subsystem: 'agent-modeler',
+});
 
 /**
  * Configuration for agent modeler
@@ -283,7 +288,18 @@ Provide specific capabilities based on observed behaviors.`;
         growth_potential: 0.6,
       };
     } catch (error) {
-      console.error('Error inferring capabilities:', error);
+      agentModelerLogger.warn(
+        'Failed to infer capabilities — using empty fallback',
+        {
+          event: 'agent_modeler_capabilities_llm_failed',
+          tags: ['agent-modeler', 'capabilities', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return {
         domains: [],
         overallCapability: 0.5,
@@ -363,7 +379,18 @@ Provide a concise personality description based on observed behaviors.`;
         development_areas: [],
       };
     } catch (error) {
-      console.error('Error inferring personality:', error);
+      agentModelerLogger.warn(
+        'Failed to infer personality — using empty fallback',
+        {
+          event: 'agent_modeler_personality_llm_failed',
+          tags: ['agent-modeler', 'personality', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return {
         traits: [],
         confidence: 0.5,
@@ -407,7 +434,18 @@ Provide specific beliefs based on observed behaviors.`;
 
       return this.parseList(response.text);
     } catch (error) {
-      console.error('Error inferring beliefs:', error);
+      agentModelerLogger.warn(
+        'Failed to infer beliefs — returning empty array',
+        {
+          event: 'agent_modeler_beliefs_llm_failed',
+          tags: ['agent-modeler', 'beliefs', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -444,7 +482,18 @@ Provide specific goals based on observed behaviors.`;
 
       return this.parseList(response.text);
     } catch (error) {
-      console.error('Error inferring goals:', error);
+      agentModelerLogger.warn(
+        'Failed to infer goals — returning empty array',
+        {
+          event: 'agent_modeler_goals_llm_failed',
+          tags: ['agent-modeler', 'goals', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -480,7 +529,18 @@ Provide specific emotions based on observed behaviors.`;
 
       return this.parseList(response.text);
     } catch (error) {
-      console.error('Error inferring emotions:', error);
+      agentModelerLogger.warn(
+        'Failed to infer emotions — returning empty array',
+        {
+          event: 'agent_modeler_emotions_llm_failed',
+          tags: ['agent-modeler', 'emotions', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -531,7 +591,18 @@ Provide specific behavioral descriptions.`;
         confidence: 0.8,
       }));
     } catch (error) {
-      console.error('Error extracting behaviors:', error);
+      agentModelerLogger.warn(
+        'Failed to extract behaviors — returning empty array',
+        {
+          event: 'agent_modeler_behaviors_llm_failed',
+          tags: ['agent-modeler', 'behaviors', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -572,7 +643,18 @@ Provide specific intention predictions.`;
 
       return this.parseList(response.text);
     } catch (error) {
-      console.error('Error predicting intentions:', error);
+      agentModelerLogger.warn(
+        'Failed to predict intentions — returning empty array',
+        {
+          event: 'agent_modeler_intentions_llm_failed',
+          tags: ['agent-modeler', 'intentions', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return [];
     }
   }
@@ -609,7 +691,18 @@ Provide a concise context analysis.`;
 
       return response.text.trim();
     } catch (error) {
-      console.error('Error analyzing context:', error);
+      agentModelerLogger.warn(
+        'Failed to analyze social context — using fallback text',
+        {
+          event: 'agent_modeler_context_llm_failed',
+          tags: ['agent-modeler', 'context', 'llm', 'warn'],
+          fields: {
+            observationCount: observations.length,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return 'Unknown context';
     }
   }
@@ -644,7 +737,19 @@ Provide a concise, descriptive summary of the agent.`;
 
       return response.text.trim();
     } catch (error) {
-      console.error('Error generating description:', error);
+      agentModelerLogger.warn(
+        'Failed to generate agent description — using fallback text',
+        {
+          event: 'agent_modeler_description_llm_failed',
+          tags: ['agent-modeler', 'description', 'llm', 'warn'],
+          fields: {
+            entityId: entity.id,
+            entityType: entity.type,
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+          },
+        }
+      );
       return `A ${entity.type} named ${entity.name}`;
     }
   }
