@@ -319,7 +319,7 @@ the four "keepalive" meanings each have one unambiguous home.
 ## Files in scope for the scrub
 
 Grep for `QUARANTINE: keep-alive-rename` to find every file currently
-marked. As of the initial quarantine-marking commit the set is:
+marked. As of the planning-side banner commit the set is:
 
 - `packages/cognition/src/keep-alive/index.ts` (this directory's
   public export barrel, carries a short quarantine pointer)
@@ -329,6 +329,10 @@ marked. As of the initial quarantine-marking commit the set is:
   barrel re-exporting `KeepAliveController`, carries a one-line
   quarantine pointer)
 - `packages/cognition/src/keep-alive/QUARANTINE.md` (this document)
+- `packages/planning/src/modules/keep-alive-integration.ts` (the
+  planning-side bridge that dynamically imports KeepAliveController
+  and drives it from the idle-detection pipeline — carries a full
+  banner pointing at this QUARANTINE.md via relative path)
 
 Not currently marked but in scope for the scrub if/when it happens:
 
@@ -338,7 +342,6 @@ Not currently marked but in scope for the scrub if/when it happens:
 - `packages/cognition/src/keep-alive/__tests__/idle-detector.test.ts`
 - `packages/cognition/src/keep-alive/__tests__/intention-check-prompt.test.ts`
 - `packages/cognition/src/keep-alive/__tests__/sterling-runtime-integration.test.ts`
-- `packages/planning/src/modules/keep-alive-integration.ts`
 - `packages/planning/src/modules/__tests__/idle-episode-eligibility.test.ts`
 - `packages/planning/src/modules/__tests__/keep-alive-vitals-goal-binding.test.ts`
 - `scripts/start.js` (the `STERLING_IDLE_EPISODES_ENABLED` default)

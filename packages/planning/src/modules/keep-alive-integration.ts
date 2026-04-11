@@ -1,6 +1,29 @@
 /**
  * Keep-Alive Integration Module
  *
+ * QUARANTINE: keep-alive-rename  →  see
+ *   ../../../cognition/src/keep-alive/QUARANTINE.md
+ *
+ * THIS MODULE IS MISNAMED. It is the planning-side bridge for a bot
+ * idle-episode GOAL EMISSION loop that calls the LLM to decide whether
+ * to generate an autonomous goal, NOT a keepalive in any HTTP/SSE/
+ * server-hot sense. The name is scheduled for scrubbing/rename review.
+ *
+ * Before changing this file, read the QUARANTINE.md at the path above
+ * for what the module actually does, what it is NOT, the naming
+ * history, the current gating lever (STERLING_IDLE_EPISODES_ENABLED,
+ * checked below via this.config.enableSterlingIdleEpisodes), and the
+ * candidate scrub plans.
+ *
+ * This file is the planning-side counterpart to
+ * `packages/cognition/src/keep-alive/keep-alive-controller.ts`. Any
+ * rename must update both sides simultaneously. The grep marker
+ * `QUARANTINE: keep-alive-rename` in this banner matches the same
+ * marker in the cognition-side banners so a single grep from the
+ * repo root finds every quarantined file across both packages.
+ *
+ * ----------------------------------------------------------------------------
+ *
  * Integrates the keep-alive intention check loop with the planning system.
  * This module bridges the cognition keep-alive controller with the
  * autonomous executor's idle detection.
