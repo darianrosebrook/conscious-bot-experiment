@@ -172,7 +172,14 @@ export class ReActArbiter {
 
       // Validate that we have at most one tool call
       if (!step.selectedTool) {
-        console.warn('[ReActArbiter] No tool selected, using fallback');
+        reactLogger.warn('No tool selected, using fallback', {
+          event: 'react_arbiter_no_tool_selected',
+          tags: ['react-arbiter', 'fallback', 'warn'],
+          fields: {
+            taskTitle: context.task?.title,
+            thoughtsSnippet: step.thoughts?.slice(0, 200),
+          },
+        });
         // Fallback to safe default action
         return {
           thoughts: step.thoughts || 'Unable to parse tool selection',
@@ -186,9 +193,13 @@ export class ReActArbiter {
 
       // Validate tool exists in registry - use fuzzy matching as fallback
       if (!this.toolRegistry.has(step.selectedTool)) {
-        console.warn(
-          `[ReActArbiter] Unknown tool: ${step.selectedTool}, attempting fuzzy match`
-        );
+        reactLogger.warn('Unknown tool, attempting fuzzy match', {
+          event: 'react_arbiter_unknown_tool',
+          tags: ['react-arbiter', 'fuzzy-match', 'warn'],
+          fields: {
+            requestedTool: step.selectedTool,
+          },
+        });
 
         // Try to find closest matching tool
         const availableTools = Array.from(this.toolRegistry.keys());
@@ -204,9 +215,14 @@ export class ReActArbiter {
           );
           step.selectedTool = closeMatch;
         } else {
-          console.warn(
-            `[ReActArbiter] No match found for ${step.selectedTool}, falling back to chat`
-          );
+          reactLogger.warn('No fuzzy match found, falling back to chat', {
+            event: 'react_arbiter_no_fuzzy_match',
+            tags: ['react-arbiter', 'fallback', 'warn'],
+            fields: {
+              requestedTool: step.selectedTool,
+              availableToolCount: availableTools.length,
+            },
+          });
           return {
             thoughts: step.thoughts,
             selectedTool: 'chat',
@@ -248,7 +264,15 @@ export class ReActArbiter {
 
       return step;
     } catch (error) {
-      console.error('[ReActArbiter] ReAct reasoning failed:', error);
+      reactLogger.error('ReAct reasoning failed', {
+        event: 'react_arbiter_reason_failed',
+        tags: ['react-arbiter', 'reason', 'error'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+          taskTitle: context.task?.title,
+        },
+      });
 
       // Fallback: return safe default instead of throwing
       return {
@@ -287,7 +311,15 @@ export class ReActArbiter {
 
       return reflection;
     } catch (error) {
-      console.error('Reflection generation failed:', error);
+      reactLogger.error('Reflection generation failed', {
+        event: 'react_arbiter_reflection_failed',
+        tags: ['react-arbiter', 'reflection', 'error'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+          outcome,
+        },
+      });
       throw error;
     }
   }
@@ -323,7 +355,15 @@ Write a numbered list. Each step must be a concrete action (move/look/collect/mi
       });
       return response.text;
     } catch (error) {
-      console.error('Task step generation failed:', error);
+      reactLogger.error('Task step generation failed', {
+        event: 'react_arbiter_task_steps_failed',
+        tags: ['react-arbiter', 'task-steps', 'error'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+          taskTitle: task?.title,
+        },
+      });
       throw error;
     }
   }
@@ -340,7 +380,14 @@ Write a numbered list. Each step must be a concrete action (move/look/collect/mi
       );
       return response;
     } catch (error) {
-      console.error('LLM call failed:', error);
+      reactLogger.error('LLM call failed', {
+        event: 'react_arbiter_llm_call_failed',
+        tags: ['react-arbiter', 'llm', 'error'],
+        fields: {
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+        },
+      });
       throw error;
     }
   }
@@ -418,12 +465,20 @@ Keep your reflection concise and actionable.`;
     let selectedTool = '';
     let args: Record<string, any> = {};
 
+    // Anchored label regexes (fix for the prose-substring matching bug).
+    // Prior code used `trimmed.toLowerCase().includes('tool:')` which
+    // would falsely match any prose line containing the substring
+    // "tool:" — e.g. "I think I should use a good tool: the axe" would
+    // be treated as a Tool: label line and "the axe" would be extracted
+    // as the selected tool. Anchoring to line start (after trim) with
+    // `^tool:` or `^action:` makes the matcher reject prose and only
+    // fire on actual labeled lines. Same fix applies to args/parameters.
+    const TOOL_LABEL_RE = /^(tool|action):/i;
+    const ARGS_LABEL_RE = /^(args|parameters):/i;
+
     for (const line of lines) {
       const trimmed = line.trim();
-      if (
-        trimmed.toLowerCase().includes('tool:') ||
-        trimmed.toLowerCase().includes('action:')
-      ) {
+      if (TOOL_LABEL_RE.test(trimmed)) {
         // Same colon-split caveat as the args parser below: split(':')
         // splits on every colon, so a tool name like `mcp:filesystem:write`
         // (namespaced MCP tool names are legal) would silently truncate
@@ -432,10 +487,7 @@ Keep your reflection concise and actionable.`;
         const toolColonIdx = trimmed.indexOf(':');
         selectedTool =
           toolColonIdx >= 0 ? trimmed.slice(toolColonIdx + 1).trim() : '';
-      } else if (
-        trimmed.toLowerCase().includes('args:') ||
-        trimmed.toLowerCase().includes('parameters:')
-      ) {
+      } else if (ARGS_LABEL_RE.test(trimmed)) {
         try {
           // Take everything after the FIRST colon, not split on every
           // colon — JSON objects contain colons between keys and values

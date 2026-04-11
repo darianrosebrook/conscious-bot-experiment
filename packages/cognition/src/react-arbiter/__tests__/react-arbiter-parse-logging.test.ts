@@ -207,4 +207,134 @@ describe('ReActArbiter — parseReActResponse error-path logging', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('Strategy 2 — prose-substring false match regression', () => {
+    // Historical bug: `trimmed.toLowerCase().includes('tool:')` matched
+    // any prose line containing the substring "tool:" — e.g.,
+    //
+    //   "I think the right tool: for this is the axe"
+    //
+    // would be treated as a Tool: label line, indexOf(':') would point
+    // at the colon after "tool", and `slice(colonIdx + 1).trim()` would
+    // extract "for this is the axe" as selectedTool. That's a false
+    // positive that sends prose into the tool-registry path and silently
+    // selects a garbage tool (or falls through to chat fallback) even
+    // when the LLM never intended to emit a tool label.
+    //
+    // Fix: anchor the label match to the start of the line with
+    // `/^(tool|action):/i`. Similar fix for args/parameters.
+    //
+    // These tests would have failed before the fix — every one either
+    // selects the wrong tool, selects an empty string, or emits a
+    // spurious warn.
+
+    it('ignores prose containing "tool:" as a substring mid-sentence', () => {
+      // Prose line that has "tool:" somewhere after whitespace. The old
+      // .includes() match would split at the first colon and extract
+      // "for this is the axe" as selectedTool.
+      const responseWithProse = [
+        'Reasoning: I think the right tool: for this is the axe.',
+        'Tool: chat',
+        'Args: {"message": "hi"}',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(responseWithProse);
+
+      // The ONLY valid Tool: label is the second line. The first line
+      // starts with "Reasoning:" (not "tool:" or "action:") and should
+      // be treated as prose — contributing to thoughts, not overriding
+      // selectedTool.
+      expect(result.selectedTool).toBe('chat');
+      expect(result.args).toEqual({ message: 'hi' });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores prose containing "action:" as a substring mid-sentence', () => {
+      // Same regression guard for the `action:` alternation branch.
+      const responseWithActionProse = [
+        'My next action: depends on what I see.',
+        'Tool: chat',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithActionProse
+      );
+
+      expect(result.selectedTool).toBe('chat');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('still matches a line starting with "Action:" (the alternation branch)', () => {
+      // Positive control for the `/^(tool|action):/i` alternation —
+      // a line that starts with "Action: <name>" should still select
+      // that tool, because the original code supported Action: as an
+      // alias for Tool:. If my regex dropped the alternation, this
+      // test would fail with selectedTool === '' (empty).
+      const responseWithActionLabel = ['Action: chat'].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithActionLabel
+      );
+
+      expect(result.selectedTool).toBe('chat');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('is case-insensitive on the label (matches "tool:" and "TOOL:")', () => {
+      // The regex uses /i so it should match any case. Fence against a
+      // refactor that drops the /i flag.
+      const lowerResponse = ['tool: chat'].join('\n');
+      const upperResponse = ['TOOL: chat'].join('\n');
+
+      const lowerResult = (arbiter as any).parseReActResponse(lowerResponse);
+      const upperResult = (arbiter as any).parseReActResponse(upperResponse);
+
+      expect(lowerResult.selectedTool).toBe('chat');
+      expect(upperResult.selectedTool).toBe('chat');
+    });
+
+    it('ignores prose containing "args:" as a substring mid-sentence', () => {
+      // The same prose-substring bug applied to the args/parameters
+      // branch. Before the fix, a prose line like
+      //   "Here are my args: I want to dig"
+      // would be treated as an Args: line, JSON.parse would throw on
+      // "I want to dig", and a spurious react_arbiter_args_parse_failed
+      // warn would fire. The new ARGS_LABEL_RE anchors to line start
+      // and rejects prose.
+      const responseWithArgsProse = [
+        'Tool: chat',
+        'Some reasoning here. The args: I want to send are simple.',
+        'Args: {"message": "hi"}',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithArgsProse
+      );
+
+      // Only the third line is a real Args: label. It parses fine.
+      expect(result.selectedTool).toBe('chat');
+      expect(result.args).toEqual({ message: 'hi' });
+      // Critical: the prose line must NOT have triggered a parse error.
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('still matches a line starting with "Parameters:" (the args alternation branch)', () => {
+      // Positive control for the `/^(args|parameters):/i` alternation.
+      // If my regex dropped the `parameters` branch (e.g., became
+      // `/^args:/i`), this test would fail with args === {} because
+      // the line would fall through as prose.
+      const responseWithParamsLabel = [
+        'Tool: chat',
+        'Parameters: {"message": "hi"}',
+      ].join('\n');
+
+      const result = (arbiter as any).parseReActResponse(
+        responseWithParamsLabel
+      );
+
+      expect(result.selectedTool).toBe('chat');
+      expect(result.args).toEqual({ message: 'hi' });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
 });
