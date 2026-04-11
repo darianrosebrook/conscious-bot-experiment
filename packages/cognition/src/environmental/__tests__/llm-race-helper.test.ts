@@ -53,6 +53,10 @@ import type { LLMResponse } from '../../cognitive-core/llm-interface';
 /**
  * Minimal fake LLMResponse. The helper only touches the promise shape;
  * the response contents are opaque to it, so a minimal object is fine.
+ *
+ * Note: `timestamp` is required by the `LLMResponse` interface, so we
+ * include it here even though the race helper never reads it. This
+ * keeps the fake type-correct under `tsc --noEmit -p tsconfig.test.json`.
  */
 function makeLlmResponse(text: string): LLMResponse {
   return {
@@ -66,6 +70,7 @@ function makeLlmResponse(text: string): LLMResponse {
       finishReason: 'stop',
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     },
+    timestamp: Date.now(),
   };
 }
 

@@ -1,4 +1,43 @@
 {
+  // Test-mode compilation config. Extends the production tsconfig but
+  // includes test files (which the production config excludes).
+  //
+  // KNOWN ISSUE: running `tsc --noEmit -p tsconfig.test.json` produces
+  // 103 cross-package rootDir errors (TS6059 + TS6307) from FOUR
+  // production files that import from `@conscious-bot/memory` via
+  // relative paths instead of the workspace package import:
+  //
+  //   - src/cognition-state.ts (line 9)
+  //   - src/server.ts (line 61)
+  //   - src/cognitive-core/emotional-memory-llm-adapter.ts (line 23)
+  //   - src/routes/social-memory-routes.ts (line 6)
+  //
+  // All four import `SocialMemoryManager` (or related types) via paths
+  // like `'../../memory/src/social/social-memory-manager'`. Each
+  // relative import drags the entire transitive `memory/src` graph
+  // into this project's compilation, and tsc complains because those
+  // files are outside the production tsconfig's `rootDir: "./src"`.
+  //
+  // The 103 errors do NOT affect runtime behavior — vitest uses its
+  // own SWC-based transform pipeline that does not enforce rootDir.
+  // The full cognition vitest suite runs cleanly (919+ tests passing
+  // at the time of writing). The errors only appear when manually
+  // running `tsc --noEmit` against this config.
+  //
+  // The proper fix is to migrate the four imports to the workspace
+  // form (`@conscious-bot/memory`), but that is BLOCKED by a design
+  // question: there are TWO `SocialMemoryManager` classes in the
+  // memory package — one at `memory/src/social-memory-manager.ts`
+  // (re-exported via `memory/src/index.ts`) and one at
+  // `memory/src/social/social-memory-manager.ts` (NOT re-exported).
+  // The four cognition imports point at the NESTED one. Migrating to
+  // `@conscious-bot/memory` would change which class cognition uses,
+  // which is a behavioral change that needs review by someone who
+  // understands the dual-class design intent.
+  //
+  // Production typecheck via `tsc --noEmit -p tsconfig.json` is
+  // unaffected by this issue and should continue to be the gating
+  // typecheck for CI. This test config is a secondary check.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true
