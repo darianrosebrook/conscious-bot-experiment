@@ -1,9 +1,19 @@
 /**
- * E2E Verification Contract — 8 checkpoints on GoldenRunReport.
+ * E2E Verification Contract — 7 checkpoints on GoldenRunReport.
  *
  * Each checkpoint proves a specific layer of the control plane was exercised.
  * `validateE2EContract(report)` returns `{ passed, missing }` for tests
  * and dashboard inspection.
+ *
+ * Historical note: this contract previously had 8 checkpoints including
+ * `idle_detection`, which verified that the golden-run report contained
+ * an `idle_episode` field populated by the deleted keep-alive subsystem's
+ * `trySterlingIdleEpisode` pathway. Both the `idle_episode` schema field
+ * on GoldenRunReport and the subsystem that populated it have been
+ * deleted as part of the keep-alive cauterization. When Phase 2's
+ * IdleEngine lands it will likely add a new checkpoint (and a new
+ * corresponding schema field on the golden-run report) — at that point
+ * the count returns to 8. Until then, the contract is 7.
  *
  * @author @darianrosebrook
  */
@@ -15,7 +25,6 @@ import type { GoldenRunReport } from '../golden-run-recorder';
 // ---------------------------------------------------------------------------
 
 export type E2ECheckpoint =
-  | 'idle_detection'
   | 'sterling_reduction'
   | 'task_creation'
   | 'expansion_success'
@@ -40,16 +49,6 @@ export interface E2EContractResult {
 // ---------------------------------------------------------------------------
 // Checkpoint evaluators
 // ---------------------------------------------------------------------------
-
-function checkIdleDetection(report: GoldenRunReport): CheckpointResult {
-  // idle_episode is at top-level on the report (if the system detected idle and initiated reduction)
-  const hasIdleEvidence = report.idle_episode != null;
-  return {
-    checkpoint: 'idle_detection',
-    passed: hasIdleEvidence,
-    detail: hasIdleEvidence ? 'idle_episode present' : 'no idle_episode',
-  };
-}
 
 function checkSterlingReduction(report: GoldenRunReport): CheckpointResult {
   const requested = (report as Record<string, unknown>).sterling_expand_requested != null
@@ -144,7 +143,6 @@ function checkLoopBreakerEvaluated(report: GoldenRunReport): CheckpointResult {
 // ---------------------------------------------------------------------------
 
 const ALL_EVALUATORS: Array<(r: GoldenRunReport) => CheckpointResult> = [
-  checkIdleDetection,
   checkSterlingReduction,
   checkTaskCreation,
   checkExpansionSuccess,
@@ -155,8 +153,11 @@ const ALL_EVALUATORS: Array<(r: GoldenRunReport) => CheckpointResult> = [
 ];
 
 /**
- * Validate all 8 E2E checkpoints against a GoldenRunReport.
+ * Validate all 7 E2E checkpoints against a GoldenRunReport.
  * Returns overall pass/fail and the list of missing checkpoints.
+ * (The eighth checkpoint, `idle_detection`, was deleted along with
+ * the keep-alive subsystem. Phase 2's IdleEngine will likely add a
+ * replacement checkpoint under a new name.)
  */
 export function validateE2EContract(report: GoldenRunReport): E2EContractResult {
   const results = ALL_EVALUATORS.map((fn) => fn(report));

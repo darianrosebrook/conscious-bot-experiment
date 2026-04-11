@@ -11,16 +11,20 @@ import {
 } from '../e2e-verification-contract';
 import type { GoldenRunReport } from '../../golden-run-recorder';
 
-/** Minimal report that passes all 8 checkpoints. */
+/** Minimal report that passes all 7 checkpoints.
+ *
+ * Historical note: this helper previously included an `idle_episode`
+ * field and the contract had 8 checkpoints. Both were deleted as part
+ * of the keep-alive cauterization. See e2e-verification-contract.ts
+ * for the rationale. Phase 2's IdleEngine will likely add a
+ * replacement checkpoint and its corresponding schema field.
+ */
 function makeFullReport(): GoldenRunReport {
   return {
     schema_version: 'golden_run_report_v1',
     run_id: 'test-run-1',
     created_at: Date.now(),
     updated_at: Date.now(),
-    idle_episode: {
-      reason: 'no_tasks',
-    },
     task: {
       task_id: 'task-1',
       status: 'active',
@@ -50,11 +54,11 @@ function makeFullReport(): GoldenRunReport {
 }
 
 describe('validateE2EContract', () => {
-  it('full report passes all 8 checkpoints', () => {
+  it('full report passes all 7 checkpoints', () => {
     const result = validateE2EContract(makeFullReport());
     expect(result.passed).toBe(true);
     expect(result.missing).toHaveLength(0);
-    expect(result.results).toHaveLength(8);
+    expect(result.results).toHaveLength(7);
     result.results.forEach((r) => expect(r.passed).toBe(true));
   });
 
@@ -67,40 +71,31 @@ describe('validateE2EContract', () => {
     };
     const result = validateE2EContract(empty);
     expect(result.passed).toBe(false);
-    // tool_diagnostics and world_change now pass conditionally when no steps exist
-    expect(result.missing).toHaveLength(6);
+    // tool_diagnostics and world_change pass conditionally when no steps exist.
+    // With 7 total checkpoints and 2 conditional passes on empty report,
+    // 5 checkpoints should be missing (was 6 when idle_detection existed).
+    expect(result.missing).toHaveLength(5);
     expect(result.missing).not.toContain('tool_diagnostics');
     expect(result.missing).not.toContain('world_change');
   });
 
   it('reports specific missing checkpoints', () => {
     const report = makeFullReport();
-    delete report.idle_episode;
     report.loop_breaker_evaluated = undefined as any;
 
     const result = validateE2EContract(report);
     expect(result.passed).toBe(false);
-    expect(result.missing).toContain('idle_detection');
     expect(result.missing).toContain('loop_breaker_evaluated');
-    expect(result.missing).toHaveLength(2);
+    expect(result.missing).toHaveLength(1);
   });
 });
 
 describe('individual checkpoints', () => {
-  it('idle_detection: passes with idle_episode', () => {
-    const report = makeFullReport();
-    const result = validateE2EContract(report);
-    const cp = result.results.find((r) => r.checkpoint === 'idle_detection');
-    expect(cp?.passed).toBe(true);
-  });
-
-  it('idle_detection: fails without idle_episode', () => {
-    const report = makeFullReport();
-    delete report.idle_episode;
-    const result = validateE2EContract(report);
-    const cp = result.results.find((r) => r.checkpoint === 'idle_detection');
-    expect(cp?.passed).toBe(false);
-  });
+  // Historical note: two `idle_detection` test cases were removed here as
+  // part of the keep-alive cauterization. They asserted that the checkpoint
+  // passed with `idle_episode` present and failed without it. The checkpoint
+  // itself has been deleted; Phase 2's IdleEngine will likely add a new
+  // checkpoint (under a different name) with its own test coverage.
 
   it('task_creation: passes with task_id', () => {
     const report = makeFullReport();
