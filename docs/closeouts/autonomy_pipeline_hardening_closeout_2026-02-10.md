@@ -1,5 +1,15 @@
 # Autonomy Pipeline Hardening — Closeout
 
+> **Partially superseded.** The blocked-reason taxonomy table below references
+> `keep-alive-integration.ts` as the source of `blocked_on_prereq` and
+> `blocked_no_action`. That file has been deleted as part of the keep-alive
+> cauterization (see docs/planning/run-doom-loop-working-spec.md Phase 1B
+> closing note). The reason codes themselves are still valid: `blocked_on_
+> prereq` now lives in `modular-server.ts` only, and `blocked_no_action` is
+> a Sterling-side emission (intent_reducer_v1.py, not TS). The rest of this
+> closeout (test hermeticity, fixture contract, exploration trace, executor
+> health) is unaffected.
+
 **Scope**: Blocked-reason taxonomy, test hermeticity, cross-repo fixture contract, exploration trace, executor health
 **Date**: 2026-02-10
 **Commits**: `1ab4561` (hardening), `6ee4d16` (Sterling reframe)

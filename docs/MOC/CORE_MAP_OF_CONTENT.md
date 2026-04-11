@@ -3,6 +3,16 @@
 **Author**: @darianrosebrook
 **Generated**: 2026-02-07 17:02:12
 
+> **Stale-entries note**: this MOC is a generated snapshot from 2026-02-07.
+> Several entries under `cognition/src/keep-alive/` and
+> `planning/src/modules/keep-alive-integration.ts` describe files that have
+> been deleted as part of the keep-alive cauterization (see
+> docs/planning/run-doom-loop-working-spec.md Phase 1B closing note). They
+> will disappear the next time this document is regenerated. Do not
+> hand-edit the entries — the CSV and JSON siblings of this file share the
+> same stale data and editing them in isolation creates divergence with
+> the generator.
+
 This document provides a comprehensive index of modules in `packages/`, organized by category.
 Each entry includes path, description, classes, functions, and staleness assessment.
 

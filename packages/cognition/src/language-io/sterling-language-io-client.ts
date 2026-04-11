@@ -172,10 +172,14 @@ export class SterlingLanguageIOClient extends EventEmitter {
 
   constructor(config: LanguageIOClientConfig = {}) {
     super();
+    // Note: previously also honored STERLING_IDLE_EPISODES_TIMEOUT_MS as
+    // a fallback. That env var was specific to the deleted keep-alive
+    // idle-episode pathway and no longer has any setter in the codebase
+    // (scripts/start.js no longer defaults it, the keep-alive-integration
+    // that consumed it has been deleted). The fallback was dead code;
+    // removed as part of the cauterization.
     const envReduceTimeoutRaw =
-      process.env.STERLING_LANGUAGE_IO_REDUCE_TIMEOUT_MS ??
-      process.env.STERLING_IDLE_EPISODES_TIMEOUT_MS ??
-      '';
+      process.env.STERLING_LANGUAGE_IO_REDUCE_TIMEOUT_MS ?? '';
     const envReduceTimeout = Number.parseInt(envReduceTimeoutRaw, 10);
     this.config = {
       url: config.url || process.env.STERLING_WS_URL || 'ws://localhost:8766',

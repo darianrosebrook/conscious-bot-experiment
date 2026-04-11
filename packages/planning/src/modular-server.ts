@@ -2027,14 +2027,26 @@ async function autonomousTaskExecutor() {
       circuitBreakerOpen
     );
 
-    // Gate all autonomous task creation (exploration, reflexes, idle episodes)
-    // on a single flag. Set STERLING_IDLE_EPISODES_ENABLED=false to suppress.
-    const idleEpisodesEnabled = process.env.STERLING_IDLE_EPISODES_ENABLED === 'true';
+    // Gate all autonomous task creation (exploration, reflexes, and — once
+    // Phase 2's IdleEngine lands — idle-episode emission) on a single flag.
+    //
+    // Historical note: this flag was previously named STERLING_IDLE_EPISODES_
+    // ENABLED because it was introduced for the now-deleted keep-alive
+    // idle-episode pathway. It has since been repurposed as a master
+    // autonomous-task-creation gate (exploration driveshaft + reflex registry
+    // evaluateTick) with a misleading name. Renamed here to AUTONOMOUS_TASK_
+    // CREATION_ENABLED to reflect its actual purpose. The legacy
+    // STERLING_IDLE_EPISODES_ENABLED name is still honored as a fallback so
+    // existing deployments don't break silently — remove the fallback when
+    // all operational environments have migrated.
+    const autonomousTaskCreationEnabled =
+      process.env.AUTONOMOUS_TASK_CREATION_ENABLED === 'true' ||
+      process.env.STERLING_IDLE_EPISODES_ENABLED === 'true';
 
-    if (global.explorationDriveshaft && idleEpisodesEnabled) {
+    if (global.explorationDriveshaft && autonomousTaskCreationEnabled) {
       global.explorationDriveshaft.tick(idleReason !== null);
     }
-    if (global.reflexRegistry && idleEpisodesEnabled) {
+    if (global.reflexRegistry && autonomousTaskCreationEnabled) {
       try {
         const executorMode = process.env.EXECUTOR_MODE || 'shadow';
         const isDryRun = executorMode !== 'live';
@@ -2062,7 +2074,7 @@ async function autonomousTaskExecutor() {
       }
     }
 
-    if (idleReason !== null && idleEpisodesEnabled) {
+    if (idleReason !== null && autonomousTaskCreationEnabled) {
       // Only log once per minute to avoid spam
       if (isVerbose() && (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000)) {
         console.log(

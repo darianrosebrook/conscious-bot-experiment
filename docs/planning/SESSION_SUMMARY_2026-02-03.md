@@ -1,5 +1,15 @@
 # Session Summary: Keep-Alive Pipeline & End-to-End Bot Functionality
 
+> **Superseded and archived.** This session summary describes debugging of
+> the keep-alive intention-check pipeline and adds the `/api/llm/generate`
+> cognition endpoint specifically for that pipeline to consume. The entire
+> keep-alive subsystem — including this pipeline, the controller, the
+> integration, the diagnostic script, and the `/api/llm/generate` endpoint
+> added here — has been deleted as part of the keep-alive cauterization
+> (see docs/planning/run-doom-loop-working-spec.md Phase 1B closing note).
+> This document is retained as a historical record of what the subsystem
+> was before deletion; do not use it as a reference for current architecture.
+
 > Status: Legacy (pre-Pattern-A). This summary reflects the goal-tag pipeline prior to Sterling
 > semantic authority. For current routing/execution rules, see
 > `docs/planning/sterling-boundary-contract.md` and `contracts/sterling-executor.yaml`.

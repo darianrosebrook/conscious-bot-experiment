@@ -1029,6 +1029,12 @@ async function mainWithProgress() {
                 if (service.name === 'Minecraft Interface' && !baseEnv.MINECRAFT_VERSION) {
                   baseEnv.MINECRAFT_VERSION = '1.21.9';
                 }
+                if (service.name === 'Planning' && !baseEnv.AUTONOMOUS_TASK_CREATION_ENABLED) {
+                  // Master gate for exploration driveshaft + reflex registry.
+                  // Legacy name was STERLING_IDLE_EPISODES_ENABLED; see
+                  // modular-server.ts for the rename rationale.
+                  baseEnv.AUTONOMOUS_TASK_CREATION_ENABLED = 'true';
+                }
                 if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
                   baseEnv.ENABLE_PLANNING_EXECUTOR = '1';
                 }
@@ -1535,6 +1541,12 @@ async function mainVerbose() {
     }
     if (service.name === 'Minecraft Interface' && !baseEnv.MINECRAFT_VERSION) {
       baseEnv.MINECRAFT_VERSION = '1.21.9';
+    }
+    if (service.name === 'Planning' && !baseEnv.AUTONOMOUS_TASK_CREATION_ENABLED) {
+      // Master gate for exploration driveshaft + reflex registry.
+      // Legacy name was STERLING_IDLE_EPISODES_ENABLED; see
+      // modular-server.ts for the rename rationale.
+      baseEnv.AUTONOMOUS_TASK_CREATION_ENABLED = 'true';
     }
     if (service.name === 'Planning' && !baseEnv.ENABLE_PLANNING_EXECUTOR) {
       baseEnv.ENABLE_PLANNING_EXECUTOR = '1';

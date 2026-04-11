@@ -100,7 +100,46 @@ Files modified:
 * `packages/planning/src/modular-server.ts` — wire `getThreatSnapshot` into executor context
 * `packages/planning/src/executor/__tests__/sterling-step-executor.test.ts` — 8 new tests
 
-B) Keep-alive vitals → Sterling reduce re-route — **SHIPPED**
+B) Keep-alive vitals → Sterling reduce re-route — **SHIPPED, THEN CAUTERIZED**
+
+> **Closing note (cauterize-and-regrow, Phase 1).** The keep-alive subsystem
+> described below has been deleted in full. The vitals rescue pathway (B2
+> `trySterlingVitalsReduce`) was the right idea — it routed around the LLM
+> intention-check loop to ask Sterling's structured `idle_episode_v1`
+> reducer for a goal directly — but the intention-check loop it was rescuing
+> (pathway 3, the `KeepAliveController` in `cognition/src/keep-alive/`) was
+> a parallel LLM-based decision-making system that produced shadow decisions
+> competing with the executor's real task pipeline. Rather than keep
+> patching the loop, the entire subsystem was deleted:
+>
+> - `packages/cognition/src/keep-alive/` (entire directory, 9 files, ~2,400 lines)
+> - `packages/planning/src/modules/keep-alive-integration.ts` (868 lines)
+> - `packages/planning/src/modules/__tests__/keep-alive-vitals-goal-binding.test.ts` (590 lines)
+> - `packages/planning/src/modules/__tests__/idle-episode-eligibility.test.ts` (224 lines)
+> - `packages/cognition/src/server.ts` `/api/llm/generate` endpoint (34 lines)
+> - `packages/planning/src/modular-server.ts` `/keep-alive/status` and `/keep-alive/force-tick` diagnostic endpoints
+> - `packages/planning/src/task-integration/thought-to-task-converter.ts` keepalive special case (`keepaliveDropRegistry`, TTL, isKeepAlive branch)
+> - `packages/planning/src/golden-run-recorder.ts` `idle_episode` schema field and `recordIdleEpisode()` method
+> - `scripts/verify-keepalive-runtime.ts` (258 lines)
+> - `STERLING_IDLE_EPISODES_ENABLED` and sibling env vars from `scripts/start.js`
+>
+> Behavioral floor after deletion: when the executor reports idle, it logs
+> and returns. No autonomous goal emission until Phase 2 lands. This is
+> the pre-keep-alive behavioral baseline and is intentional for the
+> transition window.
+>
+> **Phase 2 will reintroduce an `IdleEngine` component in the planning
+> package** that asks Sterling's `idle_episode_v1` reducer for a goal when
+> the executor reports idle, with no LLM intention check, no thought
+> abstraction, and no cross-package type surface. It directly seeds
+> structured tasks on the planning task list (skipping the thought-to-task
+> converter round-trip). The pure intention of this Phase 1B work — "when
+> the bot is idle, ask Sterling what to do" — is preserved; only the
+> specific implementation has been cauterized.
+>
+> The rest of this section (Phase 1B's original implementation notes) is
+> retained below as a historical decision record. Do not use it as a
+> reference for current code.
 
 Goal
 Urgent vitals thoughts (low health/food) must produce actionable tasks rather than being dropped with `dropped_no_goal_prop`. Sterling remains the sole semantic authority for `committed_goal_prop_id`.

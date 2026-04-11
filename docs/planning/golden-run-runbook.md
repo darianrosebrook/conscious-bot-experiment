@@ -1,5 +1,15 @@
 # Golden Run Runbook (STIR-510)
 
+> **Stage 2 deprecated.** The Stage 2 "source proof" (idle → Sterling → task)
+> was built around the `KeepAliveIntegration` idle-episode pathway, which has
+> been deleted as part of the keep-alive cauterization (see
+> docs/planning/run-doom-loop-working-spec.md Phase 1B closing note). Stage 1
+> (the sink-proof manual-injection path) is unchanged and remains the
+> canonical way to exercise golden-run recording. Stage 2 will be rewritten
+> when IdleEngine lands in Phase 2 of the cauterize-and-regrow work. Until
+> then, skip Stage 2 sections; they reference deleted code and deleted env
+> vars.
+
 ## Purpose
 Prove end-to-end routing and execution for `sterling_ir` tasks with a durable artifact.
 
@@ -13,7 +23,7 @@ For executor shadow proof (golden run without Minecraft):
 - `ENABLE_TASK_TYPE_BRIDGE=1` (allows `task_type_craft` etc.; dev/golden only)
 - `EXECUTOR_SKIP_READINESS=1` (dev/golden only: start executor without minecraft/memory/dashboard; skip bot/health checks in shadow mode so shadow steps are recorded)
 
-Stage 2 only:
+Stage 2 only (DEPRECATED — see header note above; env vars no longer consumed):
 - `STERLING_IDLE_EPISODES_ENABLED=true`
 - `STERLING_IDLE_EPISODES_COOLDOWN_MS=300000` (optional)
 - `STERLING_IDLE_EPISODES_TIMEOUT_MS=12000` (optional)
