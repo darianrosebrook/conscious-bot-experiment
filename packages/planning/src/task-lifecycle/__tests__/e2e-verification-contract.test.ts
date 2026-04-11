@@ -11,13 +11,15 @@ import {
 } from '../e2e-verification-contract';
 import type { GoldenRunReport } from '../../golden-run-recorder';
 
-/** Minimal report that passes all 7 checkpoints.
+/** Minimal report that passes all 8 checkpoints.
  *
- * Historical note: this helper previously included an `idle_episode`
- * field and the contract had 8 checkpoints. Both were deleted as part
- * of the keep-alive cauterization. See e2e-verification-contract.ts
- * for the rationale. Phase 2's IdleEngine will likely add a
- * replacement checkpoint and its corresponding schema field.
+ * Phase 2 note: the `idle_goal_request` field was added as part of the
+ * cauterize-and-regrow work. It replaces the deleted `idle_episode`
+ * field from the old keep-alive subsystem. Same checkpoint count (8),
+ * different schema shape, honest provenance tagging — decision_kind
+ * carries the IdleEngine tagged-union variant so operators can
+ * distinguish "goal succeeded" from "Sterling had no policy" from
+ * "Sterling was unavailable."
  */
 function makeFullReport(): GoldenRunReport {
   return {
@@ -25,6 +27,12 @@ function makeFullReport(): GoldenRunReport {
     run_id: 'test-run-1',
     created_at: Date.now(),
     updated_at: Date.now(),
+    idle_goal_request: {
+      decision_kind: 'goal',
+      committed_ir_digest: 'ir_test_digest',
+      committed_goal_prop_id: 'prop_test',
+      duration_ms: 42,
+    },
     task: {
       task_id: 'task-1',
       status: 'active',
@@ -54,11 +62,11 @@ function makeFullReport(): GoldenRunReport {
 }
 
 describe('validateE2EContract', () => {
-  it('full report passes all 7 checkpoints', () => {
+  it('full report passes all 8 checkpoints', () => {
     const result = validateE2EContract(makeFullReport());
     expect(result.passed).toBe(true);
     expect(result.missing).toHaveLength(0);
-    expect(result.results).toHaveLength(7);
+    expect(result.results).toHaveLength(8);
     result.results.forEach((r) => expect(r.passed).toBe(true));
   });
 
@@ -72,30 +80,59 @@ describe('validateE2EContract', () => {
     const result = validateE2EContract(empty);
     expect(result.passed).toBe(false);
     // tool_diagnostics and world_change pass conditionally when no steps exist.
-    // With 7 total checkpoints and 2 conditional passes on empty report,
-    // 5 checkpoints should be missing (was 6 when idle_detection existed).
-    expect(result.missing).toHaveLength(5);
+    // With 8 total checkpoints and 2 conditional passes on empty report,
+    // 6 checkpoints should be missing.
+    expect(result.missing).toHaveLength(6);
     expect(result.missing).not.toContain('tool_diagnostics');
     expect(result.missing).not.toContain('world_change');
   });
 
   it('reports specific missing checkpoints', () => {
     const report = makeFullReport();
+    delete report.idle_goal_request;
     report.loop_breaker_evaluated = undefined as any;
 
     const result = validateE2EContract(report);
     expect(result.passed).toBe(false);
+    expect(result.missing).toContain('idle_goal_requested');
     expect(result.missing).toContain('loop_breaker_evaluated');
-    expect(result.missing).toHaveLength(1);
+    expect(result.missing).toHaveLength(2);
   });
 });
 
 describe('individual checkpoints', () => {
-  // Historical note: two `idle_detection` test cases were removed here as
-  // part of the keep-alive cauterization. They asserted that the checkpoint
-  // passed with `idle_episode` present and failed without it. The checkpoint
-  // itself has been deleted; Phase 2's IdleEngine will likely add a new
-  // checkpoint (under a different name) with its own test coverage.
+  it('idle_goal_requested: passes with idle_goal_request present', () => {
+    const report = makeFullReport();
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'idle_goal_requested');
+    expect(cp?.passed).toBe(true);
+    expect(cp?.detail).toContain('decision=goal');
+  });
+
+  it('idle_goal_requested: fails without idle_goal_request', () => {
+    const report = makeFullReport();
+    delete report.idle_goal_request;
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'idle_goal_requested');
+    expect(cp?.passed).toBe(false);
+  });
+
+  it('idle_goal_requested: passes even when decision was no_policy', () => {
+    // The checkpoint verifies that IdleEngine RAN, not that it succeeded.
+    // no_policy is a legitimate IdleEngine response (Sterling had nothing
+    // to commit). The checkpoint should still pass as long as provenance
+    // was recorded.
+    const report = makeFullReport();
+    report.idle_goal_request = {
+      decision_kind: 'no_policy',
+      reason: 'no_committed_goal_prop',
+      duration_ms: 35,
+    };
+    const result = validateE2EContract(report);
+    const cp = result.results.find((r) => r.checkpoint === 'idle_goal_requested');
+    expect(cp?.passed).toBe(true);
+    expect(cp?.detail).toContain('decision=no_policy');
+  });
 
   it('task_creation: passes with task_id', () => {
     const report = makeFullReport();

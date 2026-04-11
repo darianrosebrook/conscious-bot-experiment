@@ -1,19 +1,18 @@
 /**
- * E2E Verification Contract — 7 checkpoints on GoldenRunReport.
+ * E2E Verification Contract — 8 checkpoints on GoldenRunReport.
  *
  * Each checkpoint proves a specific layer of the control plane was exercised.
  * `validateE2EContract(report)` returns `{ passed, missing }` for tests
  * and dashboard inspection.
  *
- * Historical note: this contract previously had 8 checkpoints including
- * `idle_detection`, which verified that the golden-run report contained
- * an `idle_episode` field populated by the deleted keep-alive subsystem's
- * `trySterlingIdleEpisode` pathway. Both the `idle_episode` schema field
- * on GoldenRunReport and the subsystem that populated it have been
- * deleted as part of the keep-alive cauterization. When Phase 2's
- * IdleEngine lands it will likely add a new checkpoint (and a new
- * corresponding schema field on the golden-run report) — at that point
- * the count returns to 8. Until then, the contract is 7.
+ * Historical note: this contract previously had an `idle_detection`
+ * checkpoint that verified the deleted keep-alive subsystem's
+ * `trySterlingIdleEpisode` pathway populated an `idle_episode` field
+ * on the golden-run report. The keep-alive subsystem and its schema
+ * field were deleted in Phase 1 of the cauterize-and-regrow work, and
+ * the checkpoint temporarily shrank to 7. Phase 2 (this commit) replaces
+ * it with `idle_goal_requested`, which verifies the new IdleEngine
+ * component populated its own `idle_goal_request` schema field.
  *
  * @author @darianrosebrook
  */
@@ -25,6 +24,7 @@ import type { GoldenRunReport } from '../golden-run-recorder';
 // ---------------------------------------------------------------------------
 
 export type E2ECheckpoint =
+  | 'idle_goal_requested'
   | 'sterling_reduction'
   | 'task_creation'
   | 'expansion_success'
@@ -49,6 +49,25 @@ export interface E2EContractResult {
 // ---------------------------------------------------------------------------
 // Checkpoint evaluators
 // ---------------------------------------------------------------------------
+
+/**
+ * Verify that the IdleEngine fired at least once during the run by
+ * checking for the presence of `idle_goal_request` provenance on the
+ * golden-run report. Presence alone is sufficient — we don't inspect
+ * the decision kind here because the checkpoint is about "the component
+ * ran," not "the component succeeded." Downstream checkpoints (task_
+ * creation, expansion_success, etc.) cover the success paths.
+ */
+function checkIdleGoalRequested(report: GoldenRunReport): CheckpointResult {
+  const hasIdleGoalRequest = report.idle_goal_request != null;
+  return {
+    checkpoint: 'idle_goal_requested',
+    passed: hasIdleGoalRequest,
+    detail: hasIdleGoalRequest
+      ? `idle_goal_request present (decision=${report.idle_goal_request?.decision_kind ?? 'unknown'})`
+      : 'no idle_goal_request',
+  };
+}
 
 function checkSterlingReduction(report: GoldenRunReport): CheckpointResult {
   const requested = (report as Record<string, unknown>).sterling_expand_requested != null
@@ -143,6 +162,7 @@ function checkLoopBreakerEvaluated(report: GoldenRunReport): CheckpointResult {
 // ---------------------------------------------------------------------------
 
 const ALL_EVALUATORS: Array<(r: GoldenRunReport) => CheckpointResult> = [
+  checkIdleGoalRequested,
   checkSterlingReduction,
   checkTaskCreation,
   checkExpansionSuccess,
@@ -153,11 +173,8 @@ const ALL_EVALUATORS: Array<(r: GoldenRunReport) => CheckpointResult> = [
 ];
 
 /**
- * Validate all 7 E2E checkpoints against a GoldenRunReport.
+ * Validate all 8 E2E checkpoints against a GoldenRunReport.
  * Returns overall pass/fail and the list of missing checkpoints.
- * (The eighth checkpoint, `idle_detection`, was deleted along with
- * the keep-alive subsystem. Phase 2's IdleEngine will likely add a
- * replacement checkpoint under a new name.)
  */
 export function validateE2EContract(report: GoldenRunReport): E2EContractResult {
   const results = ALL_EVALUATORS.map((fn) => fn(report));

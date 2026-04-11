@@ -79,6 +79,26 @@ export type GoldenRunReport = {
     /** WS-level request_id used for the final expandByDigest call (differs from request_id when retries occurred). */
     final_request_id?: string;
   };
+  /**
+   * IdleEngine provenance — present when an idle-state goal request was
+   * made via the IdleEngine component. This is the Phase 2 replacement
+   * for the deleted `idle_episode` field (which belonged to the deleted
+   * keep-alive subsystem). See packages/planning/src/idle-engine/.
+   */
+  idle_goal_request?: {
+    /** Sterling reducer outputs (present on goal/no_policy decisions). */
+    committed_ir_digest?: string;
+    committed_goal_prop_id?: string | null;
+    schema_version?: string;
+    /** Sterling envelope id for cross-service tracing. */
+    envelope_id?: string | null;
+    /** Round-trip duration of the client.reduce() call. */
+    duration_ms?: number;
+    /** Decision kind from IdleEngine's tagged union. */
+    decision_kind?: 'goal' | 'no_policy' | 'sterling_unavailable' | 'in_flight' | 'cooldown';
+    /** Reason field for non-goal decisions (blockReason, error code, etc.). */
+    reason?: string;
+  };
   task?: {
     task_id?: string;
     dedupe_key?: string | null;
@@ -568,6 +588,19 @@ export class GoldenRunRecorder {
   recordRuntime(runId: string, data: GoldenRunReport['runtime']): void {
     if (!runId) return;
     this.update(runId, { runtime: data ?? {} });
+  }
+
+  /**
+   * Record an IdleEngine goal request outcome. The Phase 2 replacement
+   * for the deleted `recordIdleEpisode` method — see the `idle_goal_request`
+   * field definition in the GoldenRunReport interface above for shape.
+   */
+  recordIdleGoalRequest(
+    runId: string,
+    data: GoldenRunReport['idle_goal_request']
+  ): void {
+    if (!runId) return;
+    this.update(runId, { idle_goal_request: data ?? {} });
   }
 
   recordTask(runId: string, data: GoldenRunReport['task']): void {

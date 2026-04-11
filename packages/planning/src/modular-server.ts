@@ -12,6 +12,14 @@ declare global {
   var lastIdleEvent: number | undefined;
   var lastNoTasksLog: number | undefined;
   var lastUserCommand: number | undefined;
+  /**
+   * IdleEngine instance. Constructed at startup, consumed by the
+   * autonomous executor's onIdle branch. Unconditional — no env gate.
+   * Typed as `any` to avoid src/ vs dist/ nominal conflicts in
+   * `declare global` (same pattern as `reflexRegistry` below at line 237).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  var idleEngine: any;
 }
 
 /**
@@ -65,6 +73,7 @@ import {
   PlanningSystem,
 } from './modules/planning-endpoints';
 import { MCPIntegration } from './modules/mcp-integration';
+import { IdleEngine, type IdleGoalDecision } from './idle-engine';
 import { getGoldenRunRecorder, toDispatchResult } from './golden-run-recorder';
 import { buildFailureSignature } from './task-lifecycle/failure-signature';
 import { getLoopBreaker } from './task-lifecycle/loop-breaker';
@@ -2106,16 +2115,80 @@ async function autonomousTaskExecutor() {
         );
       }
 
-      // IdleEngine call site removed as part of the keep-alive cauterization
-      // (see docs/planning/run-doom-loop-working-spec.md Phase 1B closing note).
-      // When the executor reports idle, it logs and returns. Phase 2 of the
-      // cauterize-and-regrow work will reintroduce an idle-state goal requester
-      // (`IdleEngine`) that asks Sterling for a goal via the structured
-      // `idle_episode_v1` reducer — without the intention-check LLM loop, the
-      // KeepAliveController, the KeepAliveThought abstraction, or the
-      // vitals-rerouting rescue path that the old system required. Until then,
-      // the bot stands still when idle, which is the pre-keep-alive behavioral
-      // floor and is intentional for this transitional commit range.
+      // IdleEngine call site — Phase 2 of the keep-alive cauterize-and-regrow.
+      // See packages/planning/src/idle-engine/idle-engine.ts for the class.
+      //
+      // Eligibility: only fire on 'no_tasks' or 'blocked_on_prereq'. Other
+      // idle reasons (backoff, circuit_breaker, manual_pause) are transient
+      // executor states where the bot is already responding to work.
+      const IDLE_ENGINE_ELIGIBLE_REASONS = new Set(['no_tasks', 'blocked_on_prereq']);
+      if (
+        global.idleEngine &&
+        IDLE_ENGINE_ELIGIBLE_REASONS.has(idleReason ?? '')
+      ) {
+        try {
+          const botState = await getBotState().catch(() => ({}));
+          const blockedTasks = activeTasks
+            .filter((t) => t.metadata?.blockedReason)
+            .map((t) => ({
+              taskId: t.id,
+              blockedReason: t.metadata.blockedReason,
+              nextEligibleAt: t.metadata.nextEligibleAt,
+            }));
+
+          const decision: IdleGoalDecision = await global.idleEngine.requestGoal(
+            {
+              idleReason: idleReason!,
+              activeTasks: activeTasks.length,
+              eligibleTasks: eligibleTasks.length,
+              blockedTasks,
+            },
+            botState
+          );
+
+          if (decision.kind === 'goal') {
+            // Seed the task directly. No thought round-trip, no converter.
+            const createdTask = await taskIntegration.addTask(decision.taskSeed);
+            if (createdTask) {
+              // Acknowledge only on successful task creation. If addTask
+              // returned null (dedupe rejection, etc.), do NOT acknowledge
+              // — the next tick will retry immediately instead of being
+              // stuck behind the cooldown gate.
+              global.idleEngine.acknowledgeTaskCreated(decision.runId);
+              // Record provenance for the golden-run checkpoint.
+              getGoldenRunRecorder().recordIdleGoalRequest(decision.runId, {
+                decision_kind: 'goal',
+                committed_ir_digest: decision.committedIrDigest,
+                committed_goal_prop_id: decision.committedGoalPropId,
+              });
+              console.log(
+                `[IdleEngine] seeded task ${createdTask.id} from Sterling goal ${decision.committedGoalPropId}`
+              );
+            } else {
+              console.log(
+                `[IdleEngine] Sterling returned goal ${decision.committedGoalPropId} but addTask returned null — will retry next tick`
+              );
+            }
+          } else if (decision.kind === 'no_policy') {
+            // Sterling had no policy. Record provenance but don't retry.
+            getGoldenRunRecorder().recordIdleGoalRequest(decision.runId, {
+              decision_kind: 'no_policy',
+              reason: decision.reason,
+            });
+          } else if (decision.kind === 'sterling_unavailable') {
+            getGoldenRunRecorder().recordIdleGoalRequest(decision.runId, {
+              decision_kind: 'sterling_unavailable',
+              reason: decision.reason,
+            });
+          } else if (decision.kind === 'in_flight') {
+            // Nothing to record — no new request was made.
+          } else if (decision.kind === 'cooldown') {
+            // Nothing to record — no new request was made.
+          }
+        } catch (error) {
+          console.error('[IdleEngine] requestGoal failed:', error);
+        }
+      }
 
       // NOTE: Hunger driveshaft + exploration evaluation is now handled by
       // the reflexRegistry.evaluateTick() call BEFORE the idle gate (above).
@@ -3981,15 +4054,32 @@ async function startServer() {
       );
     }
 
-    // IdleEngine initialization removed as part of the keep-alive cauterization.
-    // The old KeepAliveIntegration was deleted because it layered a parallel
-    // LLM-based decision loop on top of the executor's real task pipeline,
-    // producing shadow decisions that competed with in-flight operations.
-    // Phase 2 of this work will introduce IdleEngine: a minimal component that
-    // asks Sterling's `idle_episode_v1` reducer for a goal when the executor
-    // reports idle, with no LLM call, no thought abstraction, and no cooldown
-    // gymnastics. Until Phase 2 lands, idle states are a no-op on the executor
-    // side; the bot stands still until a user command or reflex fires.
+    // Initialize IdleEngine — Phase 2 of the keep-alive cauterize-and-regrow.
+    // Unconditional: no env gate. The class is always constructed because
+    // Sterling's _select_idle_goal() is deterministic and IdleEngine is a
+    // thin courier around it (no LLM call, ~250 lines, no shared state with
+    // other subsystems). If operators need to disable idle-state autonomous
+    // goal emission, the call site in the autonomous executor is the place
+    // to add a gate, not here.
+    try {
+      // Dynamic import of the cognition-exported Sterling client. We pass
+      // it to IdleEngine via constructor injection so the class stays
+      // mockable in tests (IdleEngineClient is a narrow one-method
+      // interface) without needing to know about getDefaultLanguageIOClient.
+      const { getDefaultLanguageIOClient: getClient } = await import('@conscious-bot/cognition');
+      const sterlingClient = getClient();
+      global.idleEngine = new IdleEngine(sterlingClient, {
+        minIntervalBetweenRequestsMs: 60_000,
+        sterlingReduceTimeoutMs: 12_000,
+        modelId: 'idle-episode',
+      });
+      console.log('[Planning] IdleEngine initialized');
+    } catch (error) {
+      console.warn('[Planning] Failed to initialize IdleEngine:', error);
+      // Not fatal — the onIdle call site checks `global.idleEngine` before
+      // calling requestGoal, so a null idleEngine means the executor's
+      // idle branch is a no-op (the Phase 1 behavioral floor).
+    }
 
     // Initialize reflex system (gated by ENABLE_AUTONOMY_REFLEXES)
     if (process.env.ENABLE_AUTONOMY_REFLEXES === 'true') {
