@@ -23,16 +23,7 @@
         "eval_ack_result",
         "eval_ack_mismatch",
         "eval_summary",
-        "eval_error",
-        "keepalive_tick",
-        "keepalive_thought",
-        "keepalive_steady_state",
-        "keepalive_skip_cooldown",
-        "keepalive_skip_not_idle",
-        "keepalive_bypass",
-        "keepalive_perception_refresh",
-        "keepalive_circuit_open",
-        "keepalive_violation"
+        "eval_error"
       ]
     },
     "timestamp_ms": {

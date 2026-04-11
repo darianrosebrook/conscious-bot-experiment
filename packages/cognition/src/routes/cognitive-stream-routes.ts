@@ -7,15 +7,15 @@
  * ────────────────────────────────────────────────────────────────────────────
  * Naming note: "keepalive" in this file refers to the SSE protocol comment-
  * frame mechanism (`: keepalive\n\n`) that prevents HTTP intermediaries and
- * browsers from timing out a long-lived EventSource connection. It has
- * NOTHING to do with:
- *   - `Connection: keep-alive` (HTTP/1.1 persistent connection directive,
- *     set at res.setHeader below — that's just stock SSE boilerplate)
- *   - `packages/cognition/src/keep-alive/` (an unrelated bot-idle goal-
- *     emission subsystem; see the quarantine note at the top of that
- *     directory's index.ts)
- * The word collides across three meanings. This file only touches the
- * first one.
+ * browsers from timing out a long-lived EventSource connection. It is
+ * separate from `Connection: keep-alive` (the HTTP/1.1 persistent-connection
+ * directive set at res.setHeader below — that's just stock SSE boilerplate).
+ *
+ * Historical note: a third meaning used to live at packages/cognition/src/
+ * keep-alive/ — a bot-idle goal-emission subsystem that was cauterized and
+ * deleted. That directory no longer exists. If you find any stale references
+ * to it in this codebase, they are fossils from before the deletion and can
+ * be safely removed.
  * ────────────────────────────────────────────────────────────────────────────
  */
 

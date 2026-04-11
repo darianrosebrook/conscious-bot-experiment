@@ -36,17 +36,12 @@ export type EvalEventType =
   | 'eval_ack_mismatch'
   // Summary
   | 'eval_summary'
-  | 'eval_error'
-  // Keep-alive events
-  | 'keepalive_tick'
-  | 'keepalive_thought'
-  | 'keepalive_steady_state'
-  | 'keepalive_skip_cooldown'
-  | 'keepalive_skip_not_idle'
-  | 'keepalive_bypass'
-  | 'keepalive_perception_refresh'
-  | 'keepalive_circuit_open'
-  | 'keepalive_violation';
+  | 'eval_error';
+// Historical note: 9 keepalive_* event types were removed as part of the
+// keep-alive cauterization. They were emitted only by the deleted
+// KeepAliveController and had no other consumers. If Phase 2's IdleEngine
+// needs eval-level events, they should be added here under an idle_engine_*
+// prefix with a single source of truth.
 
 /**
  * Run context included in events.

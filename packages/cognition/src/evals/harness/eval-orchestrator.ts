@@ -479,7 +479,11 @@ async function runScenario(
 
 /**
  * Build prompt for LLM from situation frame.
- * Uses the same prompt structure as keep-alive intention check.
+ * Uses a non-injective prompt that allows (but does not compel) goal emission.
+ * (Historical note: this prompt structure was originally shared with the
+ * deleted keep-alive intention-check template. It remains appropriate for
+ * eval scenarios where the LLM observes a frame and optionally emits a
+ * [GOAL: ...] tag; the prompt does not depend on the deleted subsystem.)
  */
 function buildPrompt(frameText: string): string {
   return `You are observing the current situation. Based ONLY on the facts provided:

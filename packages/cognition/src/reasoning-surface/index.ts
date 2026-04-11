@@ -299,7 +299,12 @@ function handleFallbackResult(
  * Map Sterling reducer result to pipeline result.
  *
  * This translates Sterling's semantic output into the shape expected
- * by downstream consumers (KeepAliveController, etc.).
+ * by downstream consumers. (Historical note: the original downstream
+ * consumer was KeepAliveController, which has been deleted as part of
+ * the keep-alive cauterization. This mapping is retained because it
+ * remains the canonical Sterling-result-to-pipeline-result adapter for
+ * any consumer that drives the reasoning surface — Phase 2's IdleEngine
+ * will likely use it unchanged.)
  */
 function mapSterlingResultToPipelineResult(
   _rawOutput: string,

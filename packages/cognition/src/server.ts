@@ -1018,53 +1018,15 @@ app.use(
 );
 
 // ============================================================================
-// LLM Generation Endpoint (for keep-alive integration)
-// ============================================================================
-
-/**
- * Simple LLM generation endpoint for keep-alive intention checking.
- * This allows the planning service's keep-alive integration to generate
- * thoughts via the cognition service's LLM interface.
- */
-app.post('/api/llm/generate', async (req, res) => {
-  const { prompt } = req.body;
-
-  if (!prompt || typeof prompt !== 'string') {
-    res.status(400).json({ error: 'Missing or invalid prompt' });
-    return;
-  }
-
-  try {
-    // Use the LLM interface to generate a response
-    const response = await llmInterface.generateInternalThought(prompt, {
-      currentGoals: [],
-      recentMemories: [],
-      agentState: {},
-    });
-
-    res.json({
-      text: response.text,
-      content: response.text,
-      confidence: response.confidence,
-      model: response.model,
-      metadata: response.metadata,
-    });
-  } catch (error) {
-    serverLogger.error('LLM generate error', {
-      event: 'llm_generate_error',
-      tags: ['llm', 'generate', 'error'],
-      fields: { error: error instanceof Error ? error.message : String(error) },
-    });
-    res.status(500).json({
-      error: 'LLM generation failed',
-      message: (error as Error).message,
-    });
-  }
-});
-
-// ============================================================================
 // Process error handlers
 // ============================================================================
+// Note: the /api/llm/generate endpoint that previously lived here was
+// created specifically for the deleted keep-alive integration to call.
+// It had exactly one consumer in the entire workspace; when the keep-alive
+// subsystem was cauterized, this endpoint became dead code and was removed.
+// If a future component needs generic LLM generation via HTTP, it should
+// reintroduce the endpoint with a clear consumer contract rather than
+// resurrecting this one.
 
 process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {

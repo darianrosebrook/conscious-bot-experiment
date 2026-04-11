@@ -92,34 +92,10 @@ export type {
   SanitizationFlags,
 } from './llm-output-sanitizer';
 
-// Keep-Alive Module
-// QUARANTINE: keep-alive-rename — this module is misnamed. It is a bot
-// idle-episode goal-emission loop (calls the LLM to decide whether to
-// generate an autonomous goal during idle time), NOT an HTTP/SSE/server-hot
-// keepalive. It is gated behind STERLING_IDLE_EPISODES_ENABLED. Scheduled
-// for rename/scrub review. See packages/cognition/src/keep-alive/QUARANTINE.md
-// for the full reasoning, naming history, and candidate replacement names.
-export {
-  KeepAliveController,
-  detectIdle,
-  buildIdleContext,
-  estimateThreatLevel,
-  renderIntentionCheckPrompt,
-  getIntentionCheckVariants,
-  validateNonInjectivePrompt,
-  DEFAULT_IDLE_CONFIG,
-  DEFAULT_KEEPALIVE_CONFIG,
-} from './keep-alive';
-export type {
-  KeepAliveConfig,
-  KeepAliveContext,
-  KeepAliveTickResult,
-  KeepAliveThought,
-  IdleContext,
-  IdleDecision,
-  IdleDetectorConfig,
-  IntentionCheckVariant,
-} from './keep-alive';
+// Keep-Alive module deleted — see docs/planning/run-doom-loop-working-spec.md
+// Phase 1B closing note for the cauterize-and-regrow rationale. Phase 2 of
+// the work will introduce IdleEngine in the planning package as a minimal
+// replacement (no LLM intention-check loop, no cross-package type surface).
 
 // Reasoning Surface (production code boundary)
 export {

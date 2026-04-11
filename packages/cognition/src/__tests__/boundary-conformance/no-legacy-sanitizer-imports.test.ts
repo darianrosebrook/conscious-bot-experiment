@@ -13,10 +13,13 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Modules that should NOT import from llm-output-sanitizer
+// Modules that should NOT import from llm-output-sanitizer.
+// Historical note: the keep-alive module was previously enforced here;
+// it has been deleted as part of the keep-alive cauterization. The
+// fs.existsSync() guard below would skip it harmlessly, but removing
+// the entry keeps the allowlist honest.
 const ENFORCED_MODULES = [
   path.resolve(__dirname, '../../cognitive-core'),
-  path.resolve(__dirname, '../../keep-alive'),
   path.resolve(__dirname, '../../server-utils'),
   path.resolve(__dirname, '../../environmental'),
   path.resolve(__dirname, '../../social-cognition'),
