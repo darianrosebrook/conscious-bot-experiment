@@ -47,6 +47,7 @@ import {
 import { logStressAtBoundary } from '../stress-boundary-logger';
 import { updateStressFromIntrusion } from '../interoception-store';
 import { createServerLogger } from '../server-utils/server-logger';
+import { refreshBotStateCacheFromMc } from './bot-state-refresh-helper';
 
 const processRoutesLogger = createServerLogger({
   subsystem: 'process-routes',
@@ -480,42 +481,14 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
           if (botStateCacheAgeMs() > STALE_THRESHOLD_MS) {
             const mcUrl =
               process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
-            resilientFetch(`${mcUrl}/state`, { label: 'mc/state-social' })
-              .then(async (freshRes) => {
-                if (freshRes?.ok) {
-                  const freshBot = (await freshRes.json()) as any;
-                  const rawState = freshBot?.data || {};
-                  const innerData = rawState.data || {};
-                  const rawInventory = innerData.inventory;
-                  const inventory = Array.isArray(rawInventory)
-                    ? rawInventory
-                    : Array.isArray(rawInventory?.items)
-                      ? rawInventory.items
-                      : [];
-                  const gameMode = rawState.worldState?.player?.gameMode;
-                  const freshState = { ...innerData, inventory, gameMode };
-                  updateBotStateCache(freshState);
-                }
-              })
-              .catch((e) => {
-                // Stale cache is acceptable for social-interaction routing,
-                // but we still want a trace when the refresh fails so we can
-                // distinguish "MC endpoint down" from "MC endpoint returned
-                // malformed JSON" in post-mortems. Debug level to avoid
-                // noise during expected brief unavailability windows.
-                processRoutesLogger.debug(
-                  'Bot state cache refresh failed — using stale cache',
-                  {
-                    event: 'mc_state_refresh_failed',
-                    tags: ['mc', 'cache', 'debug'],
-                    fields: {
-                      error: e instanceof Error ? e.message : String(e),
-                      errorName: e instanceof Error ? e.name : undefined,
-                      label: 'mc/state-social',
-                    },
-                  }
-                );
-              });
+            // Fire-and-forget: refreshBotStateCacheFromMc always resolves,
+            // so stale cache is acceptable and no unhandled rejection risk.
+            void refreshBotStateCacheFromMc(
+              resilientFetch,
+              mcUrl,
+              updateBotStateCache,
+              processRoutesLogger
+            );
           }
 
           const cachedPos = stateForChat?.state?.position;
