@@ -122,6 +122,36 @@ export type {
 export { IntentSchema, PlanStepSchema, ActionResultSchema } from './types';
 
 // ============================================================================
+// Service Seam Schemas (runtime-enforced wire contracts)
+// ============================================================================
+
+export {
+  Vec3Schema,
+  MinecraftItemSchema,
+  PositionedBlockSchema,
+  NearbyEntitySchema,
+  InventorySchema,
+  FullWorldStateSchema,
+  BasicWorldStateSchema,
+  FlatStateProjectionSchema,
+  PlanningContextSchema,
+  FullStateDataSchema,
+  BasicStateDataSchema,
+  DegradedStateDataSchema,
+  WorldStateEnvelopeSchema,
+  ActionRequestSchema,
+  ActionResponseSchema,
+} from './schemas';
+export type {
+  WorldStateEnvelope,
+  FullStateData,
+  BasicStateData,
+  DegradedStateData,
+  ActionRequest,
+  ActionResponse,
+} from './schemas';
+
+// ============================================================================
 // Constants and Utilities
 // ============================================================================
 

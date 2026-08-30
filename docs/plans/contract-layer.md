@@ -1,6 +1,6 @@
 # Contract Layer — Single Source of Truth for Capabilities + Enforced Seams
 
-**Status:** Phases 1–2 complete; Phase 3 next
+**Status:** Phases 1–2 complete; Phase 3 increment 1 complete (/state, /action)
 **Author:** @darianrosebrook
 
 ## Problem
@@ -71,11 +71,32 @@ leaf implementations in `minecraft-interface`) stays code.
   synonyms (craft, craft_item, collect_items_enhanced) remain hand-written,
   with a load-time collision guard.
 
-### Phase 3 — Enforce service seams
-- Revive `contracts/*.yaml` (or replace with Zod schemas) as the source of truth for
-  `/state`, `/action`, perception, and memory boundaries.
-- Add runtime validation at each seam + a contract test that validates a captured
-  fixture against the schema (catches the `nearbyBlocks` class of drift).
+### Phase 3 — Enforce service seams (increment 1: /state + /action)
+- Zod schemas in `executor-contracts/src/schemas/service-seams.ts` are the
+  source of truth for the minecraft-interface HTTP seams (the `contracts/*.yaml`
+  specs never covered `/state`; the drifted TS type was the de-facto contract).
+  Schemas encode wire truth: all three 200 branches of `/state` (full, minimal,
+  degraded) as a discriminated union with passthrough tolerance for additive
+  fields, and the `/action` request/response envelopes.
+- Runtime validation at the producer: `/state` payloads pass
+  `WorldStateEnvelopeSchema` via `respondWithState` (fail-closed — a payload
+  that violates the seam answers 500 with the schema issues instead of serving
+  a shape consumers crash on); `/action` requests pass `ActionRequestSchema`
+  before dispatch. Envelope literals live in
+  `minecraft-interface/src/world-state-response.ts` so tests exercise the real
+  assembly, not a copy.
+- Fixtures: `world-state-full-captured.json` is generated from the builder and
+  shared across packages (producer golden + consumer contract);
+  `world-state-drifted-legacy.json` is the real pre-fix response captured from
+  the running server — a permanent negative fixture asserting the historical
+  `nearbyBlocks` drift stays invalid, on both sides of the seam.
+- Consumer side: planning validates the captured payload against the same
+  schema and pins its unwrap path (`data.worldState.environment.nearbyBlocks`
+  with positioned blocks).
+- Remaining seams (next increment): perception (minecraft-interface →
+  cognition `POST /process`, spec'd in `contracts/cognition-observation.yaml`,
+  produced by `observation-mapper.ts` + `bot-adapter.ts`) and memory
+  (`contracts/memory-api.yaml`, service on :3001).
 
 ### Phase 4 — Replace governance ratchets with derived checks
 - Collapse `reachability-governance` / `drift-guard` / runbook counts into checks

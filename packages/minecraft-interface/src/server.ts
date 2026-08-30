@@ -53,6 +53,15 @@ import {
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
 
+// /state seam assembly + schema gate (Phase 3 contract layer)
+import {
+  respondWithState,
+  buildFullStateEnvelope,
+  buildBasicStateEnvelope,
+  buildDegradedEnvelope,
+} from './world-state-response';
+import { ActionRequestSchema } from '@conscious-bot/executor-contracts';
+
 // Connection lifecycle authority (Phase 0 restructure)
 import { ConnectionManager } from './connection-manager';
 
@@ -1542,53 +1551,11 @@ app.get('/state', async (req, res) => {
     // If minecraftInterface is null or botAdapter fails, create a minimal response
     if (!minecraftInterface || !botStatus?.connected) {
       // Return basic bot state from execution status
-      const basicState = {
-        worldState: {
-          player: {
-            position: executionStatus?.bot?.position || { x: 0, y: 64, z: 0 },
-            health: executionStatus?.bot?.health || 20,
-            food: executionStatus?.bot?.food || 20,
-            experience: 0,
-            gameMode: executionStatus?.bot?.gameMode || 'survival',
-            dimension: executionStatus?.bot?.dimension || 'overworld',
-          },
-          inventory: {
-            items: [], // This will be populated with actual bot inventory items
-            totalSlots: 36,
-            usedSlots: 0,
-          },
-          environment: {
-            timeOfDay: 0,
-            isRaining: false,
-            nearbyBlocks: [],
-            nearbyEntities: [],
-          },
-          server: {
-            playerCount: 1,
-            difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
-            version: executionStatus?.bot?.server?.version || '1.21.9',
-          },
-        },
-        planningContext: {
-          currentGoals: [],
-          activeTasks: [],
-          recentEvents: [],
-          emotionalState: {
-            confidence: 0.5,
-            anxiety: 0.1,
-            excitement: 0.3,
-            caution: 0.2,
-          },
-        },
-      };
-
-      return res.json({
-        success: true,
-        status: isAlive ? 'connected' : 'dead',
-        data: basicState,
-        isAlive,
-        _meta: { minimal: true, reason: 'bot_unavailable' },
-      });
+      respondWithState(
+        res,
+        buildBasicStateEnvelope(executionStatus, isAlive)
+      );
+      return;
     }
 
     let bot: Bot | null = null;
@@ -1600,41 +1567,13 @@ app.get('/state', async (req, res) => {
         error instanceof Error ? error.message : error
       );
       // Return minimal state if bot is not available; consumers can check _meta.minimal
-      return res.json({
-        success: true,
-        status: 'disconnected',
-        data: {
-          position: { x: 0, y: 64, z: 0 },
-          health: 0,
-          food: 0,
-          inventory: {
-            items: [],
-            totalSlots: 36,
-            usedSlots: 0,
-          },
-        },
-        isAlive: false,
-        _meta: { minimal: true, reason: 'disconnected' },
-      });
+      respondWithState(res, buildDegradedEnvelope('disconnected'));
+      return;
     }
 
     if (!bot) {
-      return res.json({
-        success: true,
-        status: 'disconnected',
-        data: {
-          position: { x: 0, y: 64, z: 0 },
-          health: 0,
-          food: 0,
-          inventory: {
-            items: [],
-            totalSlots: 36,
-            usedSlots: 0,
-          },
-        },
-        isAlive: false,
-        _meta: { minimal: true, reason: 'disconnected' },
-      });
+      respondWithState(res, buildDegradedEnvelope('disconnected'));
+      return;
     }
 
     // Gate world-state extraction on bot.entity/position so we do not call
@@ -1677,83 +1616,13 @@ app.get('/state', async (req, res) => {
       });
     }
 
-    // Convert to format expected by cognition system — use real ws fields
+    // Assemble the /state envelope (literal lifted to world-state-response.ts)
+    // and send it through the seam-schema gate.
     const biome = detectBiome(bot);
-    const convertedState = {
-      worldState: {
-        player: {
-          position: {
-            x: ws.playerPosition[0],
-            y: ws.playerPosition[1],
-            z: ws.playerPosition[2],
-          },
-          health: ws.health,
-          food: ws.hunger,
-          experience: ws._minecraftState?.player?.experience ?? 0,
-          gameMode: ws._minecraftState?.player?.gameMode ?? 'survival',
-          dimension: ws._minecraftState?.player?.dimension ?? 'overworld',
-        },
-        environment: {
-          timeOfDay: ws.timeOfDay,
-          weather: ws.weather,
-          biome: biome.name,
-          biomeTemperature: biome.temperature,
-          biomeHumidity: biome.humidity,
-          biomeCategory: biome.category,
-          nearbyLogs: ws.nearbyLogs ?? 0,
-          nearbyOres: ws.nearbyOres ?? 0,
-          nearbyWater: ws.nearbyWater ?? 0,
-          nearbyHostiles: ws.nearbyHostiles ?? 0,
-          nearbyPassives: ws.nearbyPassives ?? 0,
-          // Positioned blocks (name + coordinates) — kept alongside the string
-          // name list at worldState.nearbyBlocks so consumers that need
-          // positions (mini-map) don't have to guess.
-          nearbyBlocks: ws._minecraftState?.environment?.nearbyBlocks ?? [],
-        },
-        nearbyEntities: (
-          ws._minecraftState?.environment?.nearbyEntities ?? []
-        ).slice(0, 10),
-        nearbyBlocks: Object.keys(ws._minecraftState?.environment?.nearbyBlockCounts ?? {}),
-        nearbyBlockSummary: {
-          known: ws._minecraftState?.environment != null,
-          types: Object.keys(ws._minecraftState?.environment?.nearbyBlockCounts ?? {}),
-          counts: ws._minecraftState?.environment?.nearbyBlockCounts ?? {},
-          scannedAt: Date.now(),
-        },
-      },
-      status: 'connected',
-      data: {
-        position: {
-          x: ws.playerPosition[0],
-          y: ws.playerPosition[1],
-          z: ws.playerPosition[2],
-        },
-        health: ws.health,
-        food: ws.hunger,
-        inventory: inventoryState,
-        // Environment data surfaced for cognition to read directly
-        timeOfDay: ws.timeOfDay,
-        weather: ws.weather,
-        biome: biome.name,
-        biomeTemperature: biome.temperature,
-        biomeHumidity: biome.humidity,
-        biomeCategory: biome.category,
-        dimension: ws._minecraftState?.player?.dimension ?? 'overworld',
-        nearbyHostiles: ws.nearbyHostiles ?? 0,
-        nearbyPassives: ws.nearbyPassives ?? 0,
-        nearbyLogs: ws.nearbyLogs ?? 0,
-        nearbyOres: ws.nearbyOres ?? 0,
-        nearbyWater: ws.nearbyWater ?? 0,
-      },
-      isAlive: ws.health > 0,
-    };
-
-    res.json({
-      success: true,
-      status: isAlive ? 'connected' : 'dead',
-      data: convertedState,
-      isAlive,
-    });
+    respondWithState(
+      res,
+      buildFullStateEnvelope(ws, biome, inventoryState, isAlive)
+    );
   } catch (error) {
     console.error('[minecraft-interface] Failed to get bot state:', error);
     res.status(500).json({
@@ -1837,14 +1706,19 @@ app.post('/action', async (req, res) => {
       });
     }
 
-    const { type, parameters } = req.body;
-
-    if (!type) {
+    // Seam gate: the action request envelope must match the contract before
+    // the type is dispatched (per-action param checks happen downstream).
+    const parsedAction = ActionRequestSchema.safeParse(req.body);
+    if (!parsedAction.success) {
       return res.status(400).json({
         success: false,
-        message: 'Action type is required',
+        message: 'Invalid action request',
+        issues: parsedAction.error.issues
+          .slice(0, 8)
+          .map((i) => ({ path: i.path.join('.'), message: i.message })),
       });
     }
+    const { type, parameters } = parsedAction.data;
 
     // Create a plan step for the action
     const planStep = {

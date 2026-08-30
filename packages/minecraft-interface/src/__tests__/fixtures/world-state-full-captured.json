@@ -1,0 +1,118 @@
+{
+  "success": true,
+  "status": "connected",
+  "data": {
+    "worldState": {
+      "player": {
+        "position": {
+          "x": -112.5,
+          "y": 98,
+          "z": 128.6751479927217
+        },
+        "health": 6.5,
+        "food": 18,
+        "experience": 7,
+        "gameMode": "survival",
+        "dimension": "overworld"
+      },
+      "environment": {
+        "timeOfDay": 6000,
+        "weather": "clear",
+        "biome": "forest",
+        "biomeTemperature": 0.7,
+        "biomeHumidity": 0.8,
+        "biomeCategory": "forest",
+        "nearbyLogs": 12,
+        "nearbyOres": 3,
+        "nearbyWater": 1,
+        "nearbyHostiles": 0,
+        "nearbyPassives": 4,
+        "nearbyBlocks": [
+          {
+            "name": "oak_log",
+            "type": "oak_log",
+            "position": {
+              "x": 1,
+              "y": 64,
+              "z": 2
+            },
+            "hardness": 2,
+            "tool": "axe"
+          },
+          {
+            "type": "grass_block",
+            "position": {
+              "x": 0,
+              "y": 63,
+              "z": 0
+            }
+          }
+        ]
+      },
+      "nearbyEntities": [
+        {
+          "id": 123,
+          "type": "cow",
+          "name": "Cow",
+          "position": {
+            "x": 2,
+            "y": 64,
+            "z": 3
+          },
+          "health": 10
+        }
+      ],
+      "nearbyBlocks": [
+        "oak_log",
+        "grass_block"
+      ],
+      "nearbyBlockSummary": {
+        "known": true,
+        "types": [
+          "oak_log",
+          "grass_block"
+        ],
+        "counts": {
+          "oak_log": 3,
+          "grass_block": 40
+        },
+        "scannedAt": 0
+      }
+    },
+    "status": "connected",
+    "data": {
+      "position": {
+        "x": -112.5,
+        "y": 98,
+        "z": 128.6751479927217
+      },
+      "health": 6.5,
+      "food": 18,
+      "inventory": {
+        "items": [
+          {
+            "type": "dirt",
+            "count": 12,
+            "slot": 0
+          }
+        ],
+        "totalSlots": 36,
+        "usedSlots": 1
+      },
+      "timeOfDay": 6000,
+      "weather": "clear",
+      "biome": "forest",
+      "biomeTemperature": 0.7,
+      "biomeHumidity": 0.8,
+      "biomeCategory": "forest",
+      "dimension": "overworld",
+      "nearbyHostiles": 0,
+      "nearbyPassives": 4,
+      "nearbyLogs": 12,
+      "nearbyOres": 3,
+      "nearbyWater": 1
+    },
+    "isAlive": true
+  },
+  "isAlive": true
+}
