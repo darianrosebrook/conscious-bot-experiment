@@ -5,6 +5,10 @@ import {
   normalizeActionParams,
   buildActionTypeToLeafMap,
 } from '../action-contract-registry';
+import {
+  LEAF_MANIFEST,
+  deriveActionContracts,
+} from '@conscious-bot/executor-contracts';
 
 describe('resolveLeafName', () => {
   it('resolves acquire_material to acquire_material', () => {
@@ -308,5 +312,51 @@ describe('buildActionTypeToLeafMap', () => {
   it('has an entry for every key in ACTION_CONTRACTS', () => {
     const map = buildActionTypeToLeafMap();
     expect(Object.keys(map).length).toBe(Object.keys(ACTION_CONTRACTS).length);
+  });
+});
+
+describe('manifest provenance', () => {
+  it('derives every manifest leaf contract, and only those', () => {
+    const expected = deriveActionContracts();
+    const manifestDerivedKeys = new Set(Object.keys(expected));
+    // The registry = manifest-derived keys + the declared legacy section.
+    for (const key of manifestDerivedKeys) {
+      expect(ACTION_CONTRACTS[key]).toEqual(expected[key]);
+    }
+    // Every non-manifest key must be one of the declared legacy actions.
+    const LEGACY_KEYS = new Set([
+      'craft',
+      'craft_item',
+      'collect_items_enhanced',
+      'mine_block',
+      'gather_resources',
+      'scan_environment',
+    ]);
+    for (const key of Object.keys(ACTION_CONTRACTS)) {
+      if (!manifestDerivedKeys.has(key)) {
+        expect(LEGACY_KEYS.has(key), `undeclared registry key "${key}"`).toBe(true);
+      }
+    }
+  });
+
+  it('never registers an entry under a manifest leaf name via the legacy section', () => {
+    // The legacy section's collision guard throws at import time; this pins
+    // the invariant explicitly so the failure message is self-explanatory.
+    const manifestLeafNames = new Set(
+      LEAF_MANIFEST.filter((e) => !e.intent).map((e) => e.name)
+    );
+    for (const key of ['craft', 'craft_item', 'collect_items_enhanced', 'mine_block', 'gather_resources', 'scan_environment']) {
+      expect(manifestLeafNames.has(key)).toBe(false);
+    }
+  });
+
+  it('expands pure legacy aliases to identical contract data', () => {
+    expect(ACTION_CONTRACTS['smelt_item']).toEqual(ACTION_CONTRACTS['smelt']);
+    expect(ACTION_CONTRACTS['navigate']).toEqual(ACTION_CONTRACTS['move_to']);
+  });
+
+  it('routes move_to to the sterling_navigate handler target', () => {
+    expect(ACTION_CONTRACTS['move_to']?.leafName).toBe('sterling_navigate');
+    expect(ACTION_CONTRACTS['move_to']?.dispatchMode).toBe('handler');
   });
 });

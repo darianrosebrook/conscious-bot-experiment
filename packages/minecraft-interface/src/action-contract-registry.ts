@@ -2,78 +2,36 @@
  * Action Contract Registry — single source of truth for action→leaf routing,
  * parameter aliasing, and deprecated key warnings.
  *
- * Data-driven — no switch statements, no drift. All normalization is
- * table-driven from ACTION_CONTRACTS.
+ * Per-leaf contracts (aliases, defaults, required keys, dispatch mode) derive
+ * from the shared leaf manifest in `@conscious-bot/executor-contracts`.
+ * This file keeps only the entries that are NOT leaf identity:
+ * - raw /action endpoint legacy synonyms whose data diverges from the leaf's
+ *   own contract (craft, craft_item, collect_items_enhanced), and
+ * - non-leaf handler actions that never were Sterling leaves
+ *   (mine_block, gather_resources, scan_environment).
+ * A collision between the two sections fails fast at module load.
  */
 
-export interface ActionContract {
-  /** Canonical leaf name this action routes to */
-  leafName: string;
-  /** Parameter renames: { fromKey: toKey } */
-  aliases: Record<string, string>;
-  /** Keys to silently strip (leaf doesn't support them) */
-  stripKeys?: string[];
-  /** Keys that are deprecated — log a warning if present */
-  deprecatedKeys?: string[];
-  /** Default values to inject if missing */
-  defaults?: Record<string, unknown>;
-  /**
-   * How Phase 1 should dispatch this action:
-   * - 'leaf': Route directly to leaf via dispatchToLeaf (default)
-   * - 'handler': Always route to dedicated handler method (skips generic leaf dispatch)
-   * - 'guarded': Route to leaf unless a semantic guard redirects to handler
-   */
-  dispatchMode?: 'leaf' | 'handler' | 'guarded';
-  /**
-   * Keys that must be present (non-null) after normalization.
-   * Enforced in all dispatch paths (Phase 1, Phase 2 legacy, handler-mode).
-   * Missing keys cause immediate fail-closed rejection before the leaf runs.
-   */
-  requiredKeys?: string[];
-}
+import {
+  deriveActionContracts,
+  type DerivedActionContract,
+} from '@conscious-bot/executor-contracts';
 
-export const ACTION_CONTRACTS: Record<string, ActionContract> = {
-  // --- Pattern 2 actions (currently bypass leaves) ---
-  acquire_material: {
-    leafName: 'acquire_material',
-    aliases: { blockType: 'item' },
-    defaults: { count: 1, radius: 32 },
-    requiredKeys: ['item'],
-  },
-  place_block: {
-    leafName: 'place_block',
-    aliases: { block_type: 'item' },
-    stripKeys: ['placement', 'count'],
-    deprecatedKeys: ['placement'],
-    dispatchMode: 'guarded',
-    requiredKeys: ['item'],
-  },
-  consume_food: {
-    leafName: 'consume_food',
-    aliases: {},
-    defaults: { food_type: 'any', amount: 1 },
-  },
-  collect_items_enhanced: {
-    leafName: 'collect_items',
-    aliases: { item: 'itemName', maxSearchTime: 'timeout' },
-    stripKeys: ['exploreOnFail'],
-    deprecatedKeys: ['exploreOnFail'],
-    dispatchMode: 'guarded',
-    // DEPRECATED: No Sterling step emits collect_items_enhanced. action-mapping
-    // no longer remaps anything to it. This contract only exists for raw /action
-    // endpoint callers. Track handler hits via the deprecation log in
-    // executeCollectItemsEnhanced; remove contract + handler when hits reach zero.
-  },
-  // --- Existing routed actions (document their contracts) ---
-  // craft_recipe is the canonical crafting action. Routes to CraftRecipeLeaf.
-  craft_recipe: {
-    leafName: 'craft_recipe',
-    aliases: { item: 'recipe', quantity: 'qty' },
-    defaults: { qty: 1 },
-    requiredKeys: ['recipe'],
-  },
-  // Legacy synonyms — route to handler for backward compat with non-Sterling callers.
-  // Sterling pipeline uses craft_recipe directly (no remap).
+export type ActionContract = DerivedActionContract;
+
+/**
+ * Legacy raw /action endpoint entries that are not manifest leaf identity.
+ * - craft / craft_item: legacy synonyms routing to the handler for
+ *   backward compat with non-Sterling callers (the Sterling pipeline uses
+ *   craft_recipe directly, which dispatches as a leaf).
+ * - collect_items_enhanced: DEPRECATED — no Sterling step emits it. Only for
+ *   raw /action endpoint callers. Track handler hits via the deprecation log
+ *   in executeCollectItemsEnhanced; remove when hits reach zero.
+ * - mine_block / gather_resources / scan_environment: handler-mode actions
+ *   outside the leaf vocabulary (registry entries exist for parameter
+ *   normalization and routing trace instrumentation).
+ */
+const LEGACY_ACTION_CONTRACTS: Record<string, ActionContract> = {
   craft: {
     leafName: 'craft_recipe',
     aliases: { item: 'recipe', quantity: 'qty' },
@@ -86,168 +44,12 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     defaults: { qty: 1 },
     dispatchMode: 'handler',
   },
-  smelt: {
-    leafName: 'smelt',
-    aliases: { item: 'input', quantity: 'qty' },
-    defaults: { fuel: 'coal' },
-    dispatchMode: 'handler',
-  },
-  smelt_item: {
-    leafName: 'smelt',
-    aliases: { item: 'input', quantity: 'qty' },
-    defaults: { fuel: 'coal' },
-    dispatchMode: 'handler',
-  },
-  collect_items: {
+  collect_items_enhanced: {
     leafName: 'collect_items',
-    aliases: { item: 'itemName' },
-    defaults: {},
-  },
-  sleep: { leafName: 'sleep', aliases: {}, defaults: {} },
-  find_resource: { leafName: 'find_resource', aliases: {}, defaults: { radius: 32 } },
-  equip_tool: { leafName: 'equip_tool', aliases: {}, defaults: {} },
-  introspect_recipe: {
-    leafName: 'introspect_recipe',
-    aliases: {},
-    defaults: {},
-  },
-  place_workstation: {
-    leafName: 'place_workstation',
-    aliases: {},
-    defaults: {},
-  },
-  prepare_site: { leafName: 'prepare_site', aliases: {}, defaults: {} },
-  build_module: { leafName: 'build_module', aliases: {}, defaults: {} },
-  place_feature: { leafName: 'place_feature', aliases: {}, defaults: {} },
-
-  // ── Sensing / read-only ──
-  sense_hostiles: {
-    leafName: 'sense_hostiles',
-    aliases: {},
-    defaults: { radius: 16 },
-  },
-  get_light_level: {
-    leafName: 'get_light_level',
-    aliases: {},
-    defaults: {},
-  },
-  get_block_at: {
-    leafName: 'get_block_at',
-    aliases: {},
-    defaults: {},
-    requiredKeys: ['position'],
-  },
-
-  // ── Movement / liveness ──
-  chat: { leafName: 'chat', aliases: {}, defaults: {} },
-  wait: { leafName: 'wait', aliases: {}, defaults: {} },
-  step_forward_safely: {
-    leafName: 'step_forward_safely',
-    aliases: {},
-    defaults: { distance: 1 },
-  },
-
-  // ── Combat ──
-  attack_entity: {
-    leafName: 'attack_entity',
-    aliases: {},
-    defaults: { radius: 16, duration: 30000 },
-  },
-  hunt_animal: {
-    leafName: 'hunt_animal',
-    aliases: {},
-    defaults: { animal_type: 'any', radius: 32 },
-  },
-  equip_weapon: {
-    leafName: 'equip_weapon',
-    aliases: {},
-    defaults: { preferredType: 'any' },
-  },
-  retreat_from_threat: {
-    leafName: 'retreat_from_threat',
-    aliases: {},
-    defaults: { retreatDistance: 16 },
-  },
-  retreat_and_block: {
-    leafName: 'retreat_and_block',
-    aliases: {},
-    defaults: { retreatDistance: 10 },
-  },
-
-  // ── Items / inventory ──
-  use_item: {
-    leafName: 'use_item',
-    aliases: {},
-    defaults: { quantity: 1 },
-    requiredKeys: ['item'],
-  },
-  manage_inventory: {
-    leafName: 'manage_inventory',
-    aliases: {},
-    defaults: {},
-    requiredKeys: ['action'],
-  },
-
-  // ── Torch / lighting ──
-  place_torch_if_needed: {
-    leafName: 'place_torch_if_needed',
-    aliases: {},
-    defaults: { lightThreshold: 7 },
-  },
-  place_torch: {
-    leafName: 'place_torch',
-    aliases: {},
-    defaults: {},
-  },
-
-  // ── Farming ──
-  till_soil: {
-    leafName: 'till_soil',
-    aliases: {},
-    defaults: { radius: 8 },
-  },
-  manage_farm: {
-    leafName: 'manage_farm',
-    aliases: {},
-    defaults: { radius: 16 },
-  },
-  harvest_crop: {
-    leafName: 'harvest_crop',
-    aliases: {},
-    defaults: { radius: 8 },
-  },
-
-  // ── World interaction ──
-  interact_with_block: {
-    leafName: 'interact_with_block',
-    aliases: {},
-    defaults: {},
-    requiredKeys: ['position'],
-  },
-
-  // ── Phase 2 handler-mode actions (registry entries for validation + routing trace) ──
-  // These use dedicated handler methods; the registry entry ensures they participate
-  // in parameter normalization and routing trace instrumentation.
-  dig_block: {
-    leafName: 'dig_block',
-    aliases: { position: 'pos' },
-    defaults: { tool: 'axe' },
-    // dig_block is remapped to acquire_material at the Sterling pipeline level
-    // (stepToLeafExecution). This contract only applies to raw /action endpoint
-    // callers. Handler is kept for backward compat with non-Sterling callers.
-    dispatchMode: 'handler',
-  },
-  navigate: {
-    leafName: 'sterling_navigate',
-    aliases: {},
-    defaults: {},
-    dispatchMode: 'handler',
-  },
-  move_to: {
-    leafName: 'sterling_navigate',
-    aliases: {},
-    defaults: {},
-    dispatchMode: 'handler',
+    aliases: { item: 'itemName', maxSearchTime: 'timeout' },
+    stripKeys: ['exploreOnFail'],
+    deprecatedKeys: ['exploreOnFail'],
+    dispatchMode: 'guarded',
   },
   mine_block: {
     leafName: 'mine_block',
@@ -267,15 +69,28 @@ export const ACTION_CONTRACTS: Record<string, ActionContract> = {
     defaults: {},
     dispatchMode: 'handler',
   },
-  // Emitted by Sterling solver when no observed mine targets match the goal's
-  // dependency chain. The bot should explore to find the needed resources,
-  // then the task will be re-planned with updated observations.
-  explore_for_resources: {
-    leafName: 'explore_for_resources',
-    aliases: {},
-    defaults: { radius: 64 },
-    dispatchMode: 'handler',
-  },
+};
+
+const MANIFEST_DERIVED_CONTRACTS = deriveActionContracts();
+
+// Fail fast if a legacy entry shadows a manifest-derived key — the legacy
+// section must only hold non-leaf action types.
+for (const key of Object.keys(LEGACY_ACTION_CONTRACTS)) {
+  if (key in MANIFEST_DERIVED_CONTRACTS) {
+    throw new Error(
+      `[action-contract-registry] legacy entry "${key}" collides with a manifest-derived contract`
+    );
+  }
+}
+
+/**
+ * Action → contract registry. Manifest-derived leaf contracts first, then the
+ * non-overlapping legacy section (raw /action endpoint synonyms + non-leaf
+ * handler actions).
+ */
+export const ACTION_CONTRACTS: Record<string, ActionContract> = {
+  ...MANIFEST_DERIVED_CONTRACTS,
+  ...LEGACY_ACTION_CONTRACTS,
 };
 
 /**

@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@conscious-bot/core": "workspace:*",
+    "@conscious-bot/executor-contracts": "workspace:*",
     "@conscious-bot/planning": "workspace:*",
     "@conscious-bot/world": "workspace:*",
     "@tweenjs/tween.js": "^23.1.1",

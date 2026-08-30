@@ -1,393 +1,282 @@
 /**
- * Canonical leaf arg contracts — single source of truth for fallback planning.
+ * Canonical leaf arg contracts — validates args shape before execution.
  *
- * Validates args shape before execution and maps resolved requirements
- * to valid leaf step metadata.
+ * The `fields` descriptors live in the shared leaf manifest
+ * (`@conscious-bot/executor-contracts`); this module registers the custom
+ * `validate()` predicates, which stay code because their error messages and
+ * cross-field rules are behavioral. A leaf must be declared in the manifest;
+ * the cross-check test fails if the predicate registry and the manifest
+ * disagree.
  */
 
 import { mapBTActionToMinecraft } from './action-mapping';
+import {
+  deriveKnownLeaves,
+  deriveIntentLeaves,
+  deriveLeafContractEntries,
+  LEAF_MANIFEST,
+} from '@conscious-bot/executor-contracts';
+
+/** Registered args validator: null if valid, error string if invalid. */
+export type LeafArgsValidator = (args: Record<string, unknown>) => string | null;
 
 export interface LeafArgContract {
   leafName: string;
   /** Validates args shape. Returns null if valid, error string if invalid. */
-  validate(args: Record<string, unknown>): string | null;
+  validate: LeafArgsValidator;
   /**
    * Structural descriptor of required/optional fields for contract hashing.
-   * Used by computeLeafRegistryDigest to detect contract changes.
+ * Used by computeLeafRegistryDigest to detect contract changes.
    * Format: `["fieldName:type", ...]` where type is 'string' | 'number' | 'any'.
    * Prefix with '?' for optional: `"?fieldName:type"`.
+   * Derived from the shared leaf manifest.
    */
   fields: string[];
 }
 
-const CONTRACTS: Record<string, LeafArgContract> = {
-  dig_block: {
-    leafName: 'dig_block',
-    fields: ['?blockType:string', '?pos:any'],
-    validate: (args) => {
-      if (!args.blockType && !args.pos)
-        return 'dig_block requires blockType or pos';
-      return null;
-    },
+/**
+ * Args validators keyed by leaf name. Every executable manifest leaf must
+ * appear here exactly once — enforced by validateArgContractCoverage().
+ */
+const LEAF_ARG_VALIDATORS: Record<string, LeafArgsValidator> = {
+  dig_block: (args) => {
+    if (!args.blockType && !args.pos)
+      return 'dig_block requires blockType or pos';
+    return null;
   },
-  craft_recipe: {
-    leafName: 'craft_recipe',
-    fields: ['recipe:string', '?qty:number'],
-    validate: (args) => {
-      if (!args.recipe || typeof args.recipe !== 'string')
-        return 'craft_recipe requires recipe (string)';
-      return null;
-    },
+  craft_recipe: (args) => {
+    if (!args.recipe || typeof args.recipe !== 'string')
+      return 'craft_recipe requires recipe (string)';
+    return null;
   },
-  smelt: {
-    leafName: 'smelt',
-    fields: ['input:string'],
-    validate: (args) => {
-      if (!args.input || typeof args.input !== 'string')
-        return 'smelt requires input (string)';
-      return null;
-    },
+  smelt: (args) => {
+    if (!args.input || typeof args.input !== 'string')
+      return 'smelt requires input (string)';
+    return null;
   },
-  place_block: {
-    leafName: 'place_block',
-    fields: ['item:string'],
-    validate: (args) => {
-      if (!args.item || typeof args.item !== 'string')
-        return 'place_block requires item (string)';
-      return null;
-    },
+  place_block: (args) => {
+    if (!args.item || typeof args.item !== 'string')
+      return 'place_block requires item (string)';
+    return null;
   },
-  place_workstation: {
-    leafName: 'place_workstation',
-    fields: ['workstation:string'],
-    validate: (args) => {
-      if (!args.workstation || typeof args.workstation !== 'string')
-        return 'place_workstation requires workstation (string)';
-      const valid = ['crafting_table', 'furnace', 'blast_furnace'];
-      if (!valid.includes(args.workstation as string))
-        return `place_workstation: unknown workstation '${args.workstation}'`;
-      return null;
-    },
+  place_workstation: (args) => {
+    if (!args.workstation || typeof args.workstation !== 'string')
+      return 'place_workstation requires workstation (string)';
+    const valid = ['crafting_table', 'furnace', 'blast_furnace'];
+    if (!valid.includes(args.workstation as string))
+      return `place_workstation: unknown workstation '${args.workstation}'`;
+    return null;
   },
-  build_module: {
-    leafName: 'build_module',
-    fields: ['moduleId:string'],
-    validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string')
-        return 'build_module requires moduleId (string)';
-      return null;
-    },
+  build_module: (args) => {
+    if (!args.moduleId || typeof args.moduleId !== 'string')
+      return 'build_module requires moduleId (string)';
+    return null;
   },
-  acquire_material: {
-    leafName: 'acquire_material',
-    fields: ['item:string', '?count:number'],
-    validate: (args) => {
-      if (!args.item || typeof args.item !== 'string')
-        return 'acquire_material requires item (string)';
-      return null;
-    },
+  acquire_material: (args) => {
+    if (!args.item || typeof args.item !== 'string')
+      return 'acquire_material requires item (string)';
+    return null;
   },
-  replan_building: {
-    leafName: 'replan_building',
-    fields: ['templateId:string'],
-    validate: (args) => {
-      if (!args.templateId || typeof args.templateId !== 'string')
-        return 'replan_building requires templateId (string)';
-      return null;
-    },
+  replan_building: (args) => {
+    if (!args.templateId || typeof args.templateId !== 'string')
+      return 'replan_building requires templateId (string)';
+    return null;
   },
-  replan_exhausted: {
-    leafName: 'replan_exhausted',
-    fields: ['templateId:string'],
-    validate: (args) => {
-      if (!args.templateId || typeof args.templateId !== 'string')
-        return 'replan_exhausted requires templateId (string)';
-      return null;
-    },
+  replan_exhausted: (args) => {
+    if (!args.templateId || typeof args.templateId !== 'string')
+      return 'replan_exhausted requires templateId (string)';
+    return null;
   },
-  prepare_site: {
-    leafName: 'prepare_site',
-    fields: ['moduleId:string'],
-    validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string')
-        return 'prepare_site requires moduleId (string)';
-      return null;
-    },
+  prepare_site: (args) => {
+    if (!args.moduleId || typeof args.moduleId !== 'string')
+      return 'prepare_site requires moduleId (string)';
+    return null;
   },
-  place_feature: {
-    leafName: 'place_feature',
-    fields: ['moduleId:string'],
-    validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string')
-        return 'place_feature requires moduleId (string)';
-      return null;
-    },
+  place_feature: (args) => {
+    if (!args.moduleId || typeof args.moduleId !== 'string')
+      return 'place_feature requires moduleId (string)';
+    return null;
   },
-  verify_module: {
-    leafName: 'verify_module',
-    fields: ['moduleId:string', 'witness:object'],
-    validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string')
-        return 'verify_module requires moduleId (string)';
-      if (!args.witness || typeof args.witness !== 'object')
-        return 'verify_module requires witness (object with expectedPlacements)';
-      return null;
-    },
+  verify_module: (args) => {
+    if (!args.moduleId || typeof args.moduleId !== 'string')
+      return 'verify_module requires moduleId (string)';
+    if (!args.witness || typeof args.witness !== 'object')
+      return 'verify_module requires witness (object with expectedPlacements)';
+    return null;
   },
-  building_step: {
-    leafName: 'building_step',
-    fields: ['moduleId:string'],
-    validate: (args) => {
-      if (!args.moduleId || typeof args.moduleId !== 'string')
-        return 'building_step requires moduleId (string)';
-      return null;
-    },
+  building_step: (args) => {
+    if (!args.moduleId || typeof args.moduleId !== 'string')
+      return 'building_step requires moduleId (string)';
+    return null;
   },
-  collect_items: {
-    leafName: 'collect_items',
-    fields: ['?itemName:string'],
-    validate: (args) => {
-      if (args.itemName !== undefined && typeof args.itemName !== 'string')
-        return 'collect_items: itemName must be a string if provided';
-      return null;
-    },
+  collect_items: (args) => {
+    if (args.itemName !== undefined && typeof args.itemName !== 'string')
+      return 'collect_items: itemName must be a string if provided';
+    return null;
   },
-  interact_with_entity: {
-    leafName: 'interact_with_entity',
-    fields: ['entityType:string', '?entityId:string', '?entityPosition:any'],
-    validate: (args) => {
-      if (!args.entityType || typeof args.entityType !== 'string')
-        return 'interact_with_entity requires entityType (string)';
-      // entityId/entityPosition optional — leaf resolves nearest matching entity at runtime.
-      // At planning time (acquisition solver), only entityType is known.
-      return null;
-    },
+  interact_with_entity: (args) => {
+    if (!args.entityType || typeof args.entityType !== 'string')
+      return 'interact_with_entity requires entityType (string)';
+    // entityId/entityPosition optional — leaf resolves nearest matching entity at runtime.
+    // At planning time (acquisition solver), only entityType is known.
+    return null;
   },
-  open_container: {
-    leafName: 'open_container',
-    fields: ['?containerType:string', '?position:any'],
-    validate: (_args) => {
-      // containerType and position both optional — leaf resolves nearest container at runtime.
-      // If neither provided, defaults to containerType='chest'.
-      return null;
-    },
+  open_container: (_args) => {
+    // containerType and position both optional — leaf resolves nearest container at runtime.
+    // If neither provided, defaults to containerType='chest'.
+    return null;
   },
 
   // ── Smoke-test / liveness leaves ──
-  // These have action mappings and are used for basic executor proofs.
-  chat: {
-    leafName: 'chat',
-    fields: ['?message:string'],
-    validate: (args) => {
-      if (args.message !== undefined && typeof args.message !== 'string')
-        return 'chat: message must be a string';
-      if (typeof args.message === 'string' && args.message.length > 256)
-        return 'chat: message exceeds 256 characters';
-      return null;
-    },
+  chat: (args) => {
+    if (args.message !== undefined && typeof args.message !== 'string')
+      return 'chat: message must be a string';
+    if (typeof args.message === 'string' && args.message.length > 256)
+      return 'chat: message exceeds 256 characters';
+    return null;
   },
-  wait: {
-    leafName: 'wait',
-    fields: ['?duration:number'],
-    validate: (args) => {
-      if (args.duration !== undefined) {
-        if (typeof args.duration !== 'number')
-          return 'wait: duration must be a number';
-        if (args.duration < 0 || args.duration > 30_000)
-          return 'wait: duration must be 0-30000 ms';
-      }
-      return null;
-    },
+  wait: (args) => {
+    if (args.duration !== undefined) {
+      if (typeof args.duration !== 'number')
+        return 'wait: duration must be a number';
+      if (args.duration < 0 || args.duration > 30_000)
+        return 'wait: duration must be 0-30000 ms';
+    }
+    return null;
   },
-  step_forward_safely: {
-    leafName: 'step_forward_safely',
-    fields: ['?distance:number'],
-    validate: (args) => {
-      if (args.distance !== undefined) {
-        if (typeof args.distance !== 'number')
-          return 'step_forward_safely: distance must be a number';
-        if (args.distance < 0 || args.distance > 20)
-          return 'step_forward_safely: distance must be 0-20 blocks';
-      }
-      return null;
-    },
+  step_forward_safely: (args) => {
+    if (args.distance !== undefined) {
+      if (typeof args.distance !== 'number')
+        return 'step_forward_safely: distance must be a number';
+      if (args.distance < 0 || args.distance > 20)
+        return 'step_forward_safely: distance must be 0-20 blocks';
+    }
+    return null;
   },
-  move_to: {
-    leafName: 'move_to',
-    fields: ['?target:any', '?pos:any', '?distance:number'],
-    validate: (args) => {
-      // move_to accepts target OR pos OR just distance for relative movement
-      // action-mapping falls back to 'exploration_target' if neither provided
-      return null;
-    },
+  move_to: (_args) => {
+    // move_to accepts target OR pos OR just distance for relative movement
+    // action-mapping falls back to 'exploration_target' if neither provided
+    return null;
   },
 
   // ── Sensing / read-only leaves ──
-  sense_hostiles: {
-    leafName: 'sense_hostiles',
-    fields: ['?radius:number', '?includePassive:any'],
-    validate: () => null,
+  sense_hostiles: () => null,
+  get_light_level: () => null,
+  get_block_at: (args) => (args.position ? null : 'get_block_at requires position'),
+  find_resource: (args) => {
+    if (!args.blockType || typeof args.blockType !== 'string')
+      return 'find_resource requires blockType (string)';
+    return null;
   },
-  get_light_level: {
-    leafName: 'get_light_level',
-    fields: ['?position:any'],
-    validate: () => null,
-  },
-  get_block_at: {
-    leafName: 'get_block_at',
-    fields: ['position:any'],
-    validate: (args) => args.position ? null : 'get_block_at requires position',
-  },
-  find_resource: {
-    leafName: 'find_resource',
-    fields: ['blockType:string', '?radius:number', '?maxResults:number', '?partialMatch:any'],
-    validate: (args) => {
-      if (!args.blockType || typeof args.blockType !== 'string')
-        return 'find_resource requires blockType (string)';
-      return null;
-    },
-  },
-  introspect_recipe: {
-    leafName: 'introspect_recipe',
-    fields: ['output:string'],
-    validate: (args) => {
-      if (!args.output || typeof args.output !== 'string')
-        return 'introspect_recipe requires output (string)';
-      return null;
-    },
+  introspect_recipe: (args) => {
+    if (!args.output || typeof args.output !== 'string')
+      return 'introspect_recipe requires output (string)';
+    return null;
   },
 
   // ── Survival / consumable leaves ──
-  consume_food: {
-    leafName: 'consume_food',
-    fields: ['?food_type:string', '?amount:number'],
-    validate: () => null,
-  },
-  sleep: {
-    leafName: 'sleep',
-    fields: [],
-    validate: () => null,
-  },
+  consume_food: () => null,
+  sleep: () => null,
 
   // ── Torch / lighting ──
-  place_torch_if_needed: {
-    leafName: 'place_torch_if_needed',
-    fields: ['?lightThreshold:number', '?position:any'],
-    validate: () => null,
-  },
-  place_torch: {
-    leafName: 'place_torch',
-    fields: ['?position:any'],
-    validate: () => null,
-  },
+  place_torch_if_needed: () => null,
+  place_torch: () => null,
 
   // ── Combat leaves ──
-  attack_entity: {
-    leafName: 'attack_entity',
-    fields: ['?entityId:string', '?radius:number', '?duration:number', '?retreatHealth:number'],
-    validate: () => null,
-  },
-  hunt_animal: {
-    leafName: 'hunt_animal',
-    fields: ['?animal_type:string', '?radius:number'],
-    validate: () => null,
-  },
-  equip_weapon: {
-    leafName: 'equip_weapon',
-    fields: ['?preferredType:string', '?fallbackToHand:any'],
-    validate: () => null,
-  },
-  retreat_from_threat: {
-    leafName: 'retreat_from_threat',
-    fields: ['?retreatDistance:number', '?safeRadius:number'],
-    validate: () => null,
-  },
-  retreat_and_block: {
-    leafName: 'retreat_and_block',
-    fields: ['?retreatDistance:number', '?blockType:string'],
-    validate: () => null,
-  },
+  attack_entity: () => null,
+  hunt_animal: () => null,
+  equip_weapon: () => null,
+  retreat_from_threat: () => null,
+  retreat_and_block: () => null,
 
   // ── Equipment leaves ──
-  equip_tool: {
-    leafName: 'equip_tool',
-    fields: ['?material:string', '?toolType:string', '?fallbackToHand:any'],
-    validate: () => null,
-  },
+  equip_tool: () => null,
 
   // ── Item / inventory leaves ──
-  use_item: {
-    leafName: 'use_item',
-    fields: ['item:string', '?quantity:number', '?hand:string'],
-    validate: (args) => {
-      if (!args.item || typeof args.item !== 'string')
-        return 'use_item requires item (string)';
-      return null;
-    },
+  use_item: (args) => {
+    if (!args.item || typeof args.item !== 'string')
+      return 'use_item requires item (string)';
+    return null;
   },
-  manage_inventory: {
-    leafName: 'manage_inventory',
-    fields: ['action:string', '?keepItems:any'],
-    validate: (args) => {
-      if (!args.action || typeof args.action !== 'string')
-        return 'manage_inventory requires action (string)';
-      const validActions = ['sort', 'compact', 'drop_unwanted', 'keep_essentials', 'organize'];
-      if (!validActions.includes(args.action as string))
-        return `manage_inventory: action must be one of ${validActions.join(', ')}`;
-      return null;
-    },
+  manage_inventory: (args) => {
+    if (!args.action || typeof args.action !== 'string')
+      return 'manage_inventory requires action (string)';
+    const validActions = ['sort', 'compact', 'drop_unwanted', 'keep_essentials', 'organize'];
+    if (!validActions.includes(args.action as string))
+      return `manage_inventory: action must be one of ${validActions.join(', ')}`;
+    return null;
   },
 
   // ── Farming leaves ──
-  till_soil: {
-    leafName: 'till_soil',
-    fields: ['?position:any', '?radius:number'],
-    validate: () => null,
-  },
-  manage_farm: {
-    leafName: 'manage_farm',
-    fields: ['?action:string', '?cropType:string', '?radius:number'],
-    validate: () => null,
-  },
-  harvest_crop: {
-    leafName: 'harvest_crop',
-    fields: ['?position:any', '?radius:number'],
-    validate: () => null,
-  },
+  till_soil: () => null,
+  manage_farm: () => null,
+  harvest_crop: () => null,
 
   // ── World interaction ──
-  interact_with_block: {
-    leafName: 'interact_with_block',
-    fields: ['position:any', '?interactionType:string', '?radius:number'],
-    validate: (args) => {
-      if (args.position === undefined || args.position === null)
-        return 'interact_with_block requires position';
-      return null;
-    },
+  interact_with_block: (args) => {
+    if (args.position === undefined || args.position === null)
+      return 'interact_with_block requires position';
+    return null;
   },
 
   // ── Perception-driven exploration ──
   // Emitted by the solver when no observed mine targets match the goal's
   // dependency chain. The bot must explore/look to find the needed resources
   // before re-planning.
-  explore_for_resources: {
-    leafName: 'explore_for_resources',
-    fields: ['?resource_tags:any', '?goal_item:string', '?reason:string'],
-    validate: () => null,
-  },
+  explore_for_resources: () => null,
 };
 
-/** Canonical set of executable leaves the executor may dispatch. Unknown leaves are rejected in strict mode.
- *  Intent-level leaves (task_type_*) are NOT in this set — see INTENT_LEAVES. */
-export const KNOWN_LEAVES = new Set(Object.keys(CONTRACTS));
+/** Manifest-derived fields descriptors keyed by leaf name (built once). */
+const FIELDS_BY_LEAF: ReadonlyMap<string, string[]> = new Map(
+  deriveLeafContractEntries()
+);
+
+/** Assembled contract for a leaf: manifest fields + registered validator. */
+function assembleContract(leafName: string): LeafArgContract | null {
+  const fields = FIELDS_BY_LEAF.get(leafName);
+  const validate = LEAF_ARG_VALIDATORS[leafName];
+  if (!fields || !validate) return null;
+  return { leafName, validate, fields };
+}
+
+/**
+ * Canonical set of executable leaves the executor may dispatch.
+ * Derived from the shared leaf manifest (single source of truth); intent-level
+ * leaves (task_type_*) are NOT in this set — see INTENT_LEAVES.
+ */
+export const KNOWN_LEAVES: Set<string> = new Set(deriveKnownLeaves());
 
 /**
  * Returns leaf contract entries as `[leafName, fields]` pairs for digest computation.
- * The fields array is the structural descriptor used by computeLeafRegistryDigest
- * to detect contract changes (not just leaf name changes).
+ * Derived from the shared leaf manifest; the fields array is the structural
+ * descriptor used by computeLeafRegistryDigest to detect contract changes
+ * (not just leaf name changes).
  */
 export function getLeafContractEntries(): Array<[string, string[]]> {
-  return Object.entries(CONTRACTS).map(([name, contract]) => [name, contract.fields]);
+  return deriveLeafContractEntries();
+}
+
+/**
+ * Cross-checks the args validator registry against the shared leaf manifest.
+ * Returns a list of violations (empty = consistent).
+ * - every executable manifest leaf must have a registered validator
+ * - every registered validator must belong to an executable manifest leaf
+ */
+export function validateArgContractCoverage(): string[] {
+  const violations: string[] = [];
+  for (const entry of LEAF_MANIFEST) {
+    if (entry.intent) continue;
+    if (!LEAF_ARG_VALIDATORS[entry.name]) {
+      violations.push(`executable leaf "${entry.name}" has no registered args validator`);
+    }
+  }
+  const executable = deriveKnownLeaves();
+  for (const leafName of Object.keys(LEAF_ARG_VALIDATORS)) {
+    if (!executable.has(leafName)) {
+      violations.push(`args validator "${leafName}" is not an executable manifest leaf`);
+    }
+  }
+  return violations;
 }
 
 // ============================================================================
@@ -402,18 +291,8 @@ export function getLeafContractEntries(): Array<[string, string[]]> {
  * Structurally separate from KNOWN_LEAVES to prevent intent labels from
  * masquerading as executable leaves in the executor pipeline.
  */
-export const INTENT_LEAVES = new Set<string>([
-  'task_type_craft',
-  'task_type_mine',
-  'task_type_explore',
-  'task_type_navigate',
-  'task_type_build',
-  'task_type_collect',
-  'task_type_gather',
-  'task_type_attack',
-  'task_type_find',
-  'task_type_check',
-]);
+/** Intent leaves (task_type_*) — derived from the shared leaf manifest. */
+export const INTENT_LEAVES: Set<string> = new Set(deriveIntentLeaves());
 
 /** Returns true if the leaf is a recognized intent leaf (not executable). */
 export function isIntentLeaf(leafName: string): boolean {
@@ -449,13 +328,13 @@ export function validateLeafArgs(
   args: Record<string, unknown>,
   strictMode = false
 ): string | null {
-  const contract = CONTRACTS[leafName];
+  const contract = assembleContract(leafName);
   if (!contract) {
     if (strictMode) {
       if (INTENT_LEAVES.has(leafName)) {
         return `intent leaf '${leafName}' is not executable — intent leaves (task_type_*) cannot be dispatched; they require translation to an executable leaf`;
       }
-      return `unknown leaf '${leafName}' — no execution contract registered (strict mode). Add a LeafArgContract entry in leaf-arg-contracts.ts`;
+      return `unknown leaf '${leafName}' — no execution contract registered (strict mode). Declare the leaf in the executor-contracts leaf manifest and register its args validator in leaf-arg-contracts.ts`;
     }
     return null;
   }

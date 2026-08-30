@@ -1,5 +1,9 @@
 import { logOptimizer } from './logging';
 import { InventoryItem, findWoodPrefix, nextToolUpgrade, bestToolName } from './inventory-helpers';
+import {
+  deriveLeafActionMappings,
+  type LeafActionMapping,
+} from '@conscious-bot/executor-contracts';
 
 /** Nav lease metadata injected via reserved __nav namespace. */
 export interface NavLeaseNav {
@@ -277,6 +281,157 @@ function normalizeRecipeId(raw: string | undefined): { id: string | null; raw?: 
   return { id: normalized };
 }
 
+// ============================================================================
+// Leaf dispatch — derived from the shared leaf manifest
+// ============================================================================
+
+/** Planning-side action mappings keyed by leaf name (from the manifest). */
+const LEAF_ACTION_MAPPINGS: ReadonlyMap<string, LeafActionMapping> =
+  deriveLeafActionMappings();
+
+/** Input aliases accepted at the mapping boundary (legacy spellings). */
+const LEAF_NAME_ALIASES: Record<string, string> = {
+  dig_blocks: 'dig_block',
+};
+
+interface LeafTransformResult {
+  parameters: Record<string, any>;
+  debug?: unknown;
+}
+
+/**
+ * Custom per-leaf arg transforms. The manifest declares *that* a leaf maps
+ * (and to what type/timeout); these functions own *how* args become action
+ * parameters. Leaves without an entry pass args through as-is.
+ */
+const LEAF_ARG_TRANSFORMS: Record<
+  string,
+  (args: Record<string, any>, debugInfo: object) => LeafTransformResult
+> = {
+  // dig_block is a position-required primitive: "dig this specific block."
+  // If you want search+pathfind+dig+collect, use acquire_material directly.
+  // Fail closed on missing pos — no silent behavior substitution.
+  dig_block: (args, debugInfo) => {
+    const pos = args.position || args.pos;
+    if (!pos || typeof pos !== 'object') {
+      return { parameters: { _error: 'missing_required_arg:pos' }, debug: debugInfo };
+    }
+    return {
+      parameters: {
+        pos,
+        tool: args.tool || 'axe',
+        blockType: args.blockType,
+      },
+    };
+  },
+  // No remap — collect_items routes to CollectItemsLeaf (dropped-item pickup).
+  // Previously remapped to collect_items_enhanced with exploreOnFail, which
+  // triggered a handler-path spiral scan. Leaf dispatch is now the canonical path.
+  collect_items: (args) => ({
+    parameters: {
+      itemName: args.itemName || args.item || args.blockType,
+      radius: args.radius || 16,
+      maxItems: args.maxItems || 10,
+      timeout: args.timeout || args.maxSearchTime || 15000,
+    },
+  }),
+  acquire_material: (args, debugInfo) => {
+    const item = args.itemName || args.item || args.blockType;
+    if (!item || typeof item !== 'string') {
+      return { parameters: { _error: 'missing_required_arg:item' }, debug: debugInfo };
+    }
+    return {
+      parameters: {
+        item,
+        count: args.count ?? args.quantity ?? 1,
+      },
+    };
+  },
+  place_block: (args) => ({
+    parameters: {
+      block_type: args.blockType || args.block_type || args.item || 'stone',
+      count: args.count || 1,
+      placement: args.placement || 'around_player',
+      position: args.position || args.pos,
+    },
+  }),
+  move_to: (args) => ({
+    parameters: {
+      target: args.target || args.pos || 'exploration_target',
+      distance: args.distance || 10,
+    },
+  }),
+  // No remap — craft_recipe routes directly to CraftRecipeLeaf via contract.
+  // Previously remapped to 'craft' which forced handler dispatch (executeCraftItem),
+  // bypassing the leaf and its toolDiagnostics.
+  craft_recipe: (args, debugInfo) => {
+    const { id: recipeId, raw: recipeRaw } = normalizeRecipeId(
+      args.recipe || args.item
+    );
+    if (!recipeId) {
+      return {
+        parameters: { _error: `invalid_recipe_id:${recipeRaw ?? 'missing'}` },
+        debug: debugInfo,
+      };
+    }
+    return {
+      parameters: {
+        recipe: recipeId,
+        qty: args.qty || args.quantity || 1,
+        ...(recipeRaw ? { _recipe_raw: recipeRaw } : {}),
+      },
+    };
+  },
+  smelt: (args) => ({
+    parameters: {
+      item: args.item || args.recipe || args.input,
+      quantity: args.qty || args.quantity || 1,
+      fuel: args.fuel || 'coal',
+    },
+  }),
+  place_workstation: (args) => ({
+    parameters: { workstation: args.workstation || 'crafting_table' },
+  }),
+  chat: (args) => ({
+    parameters: { message: (args.message || 'Hello!').slice(0, 256) },
+  }),
+  wait: (args) => ({
+    parameters: { duration: args.duration || 2000 },
+  }),
+  step_forward_safely: (args) => ({
+    parameters: { distance: args.distance || 1 },
+  }),
+};
+
+/**
+ * Build the minecraft action for a leaf from its manifest mapping, applying
+ * the custom arg transform when one is registered.
+ */
+function mapLeafAction(
+  leafName: string,
+  args: Record<string, any>,
+  debugInfo: object
+): { type: string; parameters: Record<string, any>; debug?: unknown; timeout?: number } | null {
+  const mapping = LEAF_ACTION_MAPPINGS.get(leafName);
+  if (!mapping) return null;
+  const type = mapping.type ?? leafName;
+  const timeout =
+    mapping.timeout !== undefined ? { timeout: mapping.timeout } : {};
+  const transform = LEAF_ARG_TRANSFORMS[leafName];
+  if (!transform) {
+    // Passthrough: parameters pass through as-is; the action-contract-registry
+    // owns defaults, aliases, and required-key enforcement at runtime.
+    return { type, parameters: { ...args }, ...timeout };
+  }
+  const { parameters, debug } = transform(args, debugInfo);
+  return {
+    type,
+    parameters,
+    ...(debug !== undefined ? { debug } : {}),
+    ...timeout,
+  };
+}
+
 export function mapBTActionToMinecraft(
   tool: string,
   args: Record<string, any>,
@@ -294,6 +449,9 @@ export function mapBTActionToMinecraft(
   const debugInfo = { originalAction: tool, normalizedTool, args: args };
 
   switch (normalizedTool) {
+    // ── Legacy BT / cognitive-reflection actions (not leaf vocabulary) ──
+    // These remap to canonical minecraft action types. Every case that changes
+    // the action type MUST call warnTypeRemap() before returning.
     case 'scan_for_trees':
       warnTypeRemap('scan_for_trees', 'scan_environment');
       return {
@@ -331,58 +489,6 @@ export function mapBTActionToMinecraft(
         },
         timeout: 30000,
       };
-    case 'dig_blocks':
-    case 'dig_block': {
-      // dig_block is a position-required primitive: "dig this specific block."
-      // If you want search+pathfind+dig+collect, use acquire_material directly.
-      // Fail closed on missing pos — no silent behavior substitution.
-      const pos = args.position || args.pos;
-      if (!pos || typeof pos !== 'object') {
-        return {
-          type: 'dig_block',
-          parameters: { _error: 'missing_required_arg:pos' },
-          debug: debugInfo,
-        };
-      }
-      return {
-        type: 'dig_block',
-        parameters: {
-          pos,
-          tool: args.tool || 'axe',
-          blockType: args.blockType,
-        },
-      };
-    }
-    case 'collect_items':
-      // No remap — collect_items routes to CollectItemsLeaf (dropped-item pickup).
-      // Previously remapped to collect_items_enhanced with exploreOnFail, which
-      // triggered a handler-path spiral scan. Leaf dispatch is now the canonical path.
-      return {
-        type: 'collect_items',
-        parameters: {
-          itemName: args.itemName || args.item || args.blockType,
-          radius: args.radius || 16,
-          maxItems: args.maxItems || 10,
-          timeout: args.timeout || args.maxSearchTime || 15000,
-        },
-      };
-    case 'acquire_material': {
-      const item = args.itemName || args.item || args.blockType;
-      if (!item || typeof item !== 'string') {
-        return {
-          type: 'acquire_material',
-          parameters: { _error: 'missing_required_arg:item' },
-          debug: debugInfo,
-        };
-      }
-      return {
-        type: 'acquire_material',
-        parameters: {
-          item,
-          count: args.count ?? args.quantity ?? 1,
-        },
-      };
-    }
     case 'clear_3x3_area':
       warnTypeRemap('clear_3x3_area', 'mine_block');
       return {
@@ -435,58 +541,6 @@ export function mapBTActionToMinecraft(
         };
       }
     }
-    case 'place_block':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: args.blockType || args.block_type || args.item || 'stone',
-          count: args.count || 1,
-          placement: args.placement || 'around_player',
-          position: args.position || args.pos,
-        },
-      };
-    case 'move_to':
-      return {
-        type: 'move_to',
-        parameters: {
-          target: args.target || args.pos || 'exploration_target',
-          distance: args.distance || 10,
-        },
-      };
-    case 'craft_recipe': {
-      // No remap — craft_recipe routes directly to CraftRecipeLeaf via contract.
-      // Previously remapped to 'craft' which forced handler dispatch (executeCraftItem),
-      // bypassing the leaf and its toolDiagnostics.
-      const { id: recipeId, raw: recipeRaw } = normalizeRecipeId(
-        args.recipe || args.item
-      );
-      if (!recipeId) {
-        return {
-          type: 'craft_recipe',
-          parameters: {
-            _error: `invalid_recipe_id:${recipeRaw ?? 'missing'}`,
-          },
-          debug: debugInfo,
-        };
-      }
-      return {
-        type: 'craft_recipe',
-        parameters: {
-          recipe: recipeId,
-          qty: args.qty || args.quantity || 1,
-          ...(recipeRaw ? { _recipe_raw: recipeRaw } : {}),
-        },
-      };
-    }
-    case 'smelt':
-      return {
-        type: 'smelt',
-        parameters: {
-          item: args.item || args.recipe || args.input,
-          quantity: args.qty || args.quantity || 1,
-          fuel: args.fuel || 'coal',
-        },
-      };
     case 'place_door':
       warnTypeRemap('place_door', 'place_block');
       return {
@@ -498,17 +552,7 @@ export function mapBTActionToMinecraft(
           position: args.position || 'front_center',
         },
       };
-    case 'place_torch':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 5000 };
-    case 'wait':
-      return { type: 'wait', parameters: { duration: args.duration || 2000 } };
-    case 'step_forward_safely':
-      warnTypeRemap('step_forward_safely', 'move_forward');
-      return {
-        type: 'move_forward',
-        parameters: { distance: args.distance || 1 },
-        timeout: 5000,
-      };
+
     // Cognitive reflection generated actions — all remap to canonical types
     case 'move_and_gather':
       warnTypeRemap('move_and_gather', 'gather_resources');
@@ -548,77 +592,15 @@ export function mapBTActionToMinecraft(
           action: 'assess_threats',
         },
       };
-    case 'place_workstation':
-      return {
-        type: 'place_workstation',
-        parameters: {
-          workstation: args.workstation || 'crafting_table',
-        },
-      };
-    case 'chat':
-      return {
-        type: 'chat',
-        parameters: {
-          message: (args.message || 'Hello!').slice(0, 256),
-        },
-        timeout: 5000,
-      };
-
-    // ── Passthrough leaves ──────────────────────────────────────────
-    // These cases exist solely to prove the mapping exists (strict mode).
-    // Parameters pass through as-is; the action-contract-registry owns
-    // defaults, aliases, and required-key enforcement at runtime.
-    // Timeouts are leaf-appropriate caps for the planning-side poll.
-    case 'sense_hostiles':
-    case 'get_light_level':
-    case 'get_block_at':
-    case 'find_resource':
-    case 'introspect_recipe':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
-
-    case 'consume_food':
-    case 'sleep':
-    case 'place_torch_if_needed':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
-
-    case 'attack_entity':
-    case 'hunt_animal':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 60000 };
-
-    case 'equip_weapon':
-    case 'equip_tool':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 5000 };
-
-    case 'retreat_from_threat':
-    case 'retreat_and_block':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
-
-    case 'use_item':
-    case 'open_container':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
-
-    case 'manage_inventory':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
-
-    case 'till_soil':
-    case 'harvest_crop':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 15000 };
-
-    case 'manage_farm':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 30000 };
-
-    case 'interact_with_block':
-      return { type: normalizedTool, parameters: { ...args }, timeout: 10000 };
-
-    case 'explore_for_resources':
-      return { type: 'explore_for_resources', parameters: { ...args }, timeout: 30000 };
-
-    default:
-      if (strict) return null;
-      return { type: normalizedTool, parameters: args, debug: debugInfo };
   }
 
-  // Unreachable — all cases return.
-  // Tripwire: every case that changes the action type MUST call warnTypeRemap().
-  // If you add a new case that remaps, add warnTypeRemap(from, to) before the return.
+  // ── Leaf dispatch: manifest mapping + optional custom arg transform ──
+  // Which leaves map, to what action type, and with what timeout derive from
+  // the shared leaf manifest. Shadow-only leaves have no mapping here.
+  const leafName = LEAF_NAME_ALIASES[normalizedTool] ?? normalizedTool;
+  const leafAction = mapLeafAction(leafName, args, debugInfo);
+  if (leafAction) return leafAction;
+
+  if (strict) return null;
+  return { type: normalizedTool, parameters: args, debug: debugInfo };
 }

@@ -8,7 +8,7 @@ export default defineConfig({
     testTimeout: 30000,
     clearMocks: true,
     restoreMocks: true,
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'src/__tests__/**/*.{ts,tsx}'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'dist-simple', 'dist-demo'],
     setupFiles: ['src/__tests__/setup.ts'],
   },

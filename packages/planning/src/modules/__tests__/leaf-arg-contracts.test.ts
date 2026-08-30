@@ -9,9 +9,14 @@ import {
   isIntentLeaf,
   isStepDispatchable,
   getLeafContractEntries,
+  validateArgContractCoverage,
 } from '../leaf-arg-contracts';
 import { mapBTActionToMinecraft } from '../action-mapping';
 import { isExecStepMeta, isIntentStepMeta } from '../../types/task-step';
+import {
+  validateLeafManifest,
+  deriveShadowOnlyLeaves,
+} from '@conscious-bot/executor-contracts';
 
 describe('validateLeafArgs', () => {
   it('accepts valid dig_block args with blockType', () => {
@@ -346,65 +351,18 @@ describe('requirementToLeafMeta', () => {
   });
 });
 
-describe('KNOWN_LEAVES', () => {
-  it('contains all expected executable leaf names', () => {
-    const expected = [
-      'dig_block',
-      'craft_recipe',
-      'smelt',
-      'place_block',
-      'place_workstation',
-      'build_module',
-      'acquire_material',
-      'replan_building',
-      'replan_exhausted',
-      'prepare_site',
-      'place_feature',
-      'building_step',
-      'collect_items',
-      'interact_with_entity',
-      'open_container',
-      // Smoke-test / liveness leaves (have action mappings)
-      'chat',
-      'wait',
-      'step_forward_safely',
-      'move_to',
-      // Sensing / read-only
-      'sense_hostiles',
-      'get_light_level',
-      'get_block_at',
-      'find_resource',
-      'introspect_recipe',
-      // Survival / consumable
-      'consume_food',
-      'sleep',
-      // Torch / lighting
-      'place_torch_if_needed',
-      'place_torch',
-      // Combat
-      'attack_entity',
-      'hunt_animal',
-      'equip_weapon',
-      'retreat_from_threat',
-      'retreat_and_block',
-      // Equipment
-      'equip_tool',
-      // Item / inventory
-      'use_item',
-      'manage_inventory',
-      // Farming
-      'till_soil',
-      'manage_farm',
-      'harvest_crop',
-      // World interaction
-      'interact_with_block',
-      // Perception-driven exploration
-      'explore_for_resources',
-    ];
-    expect(KNOWN_LEAVES.size).toBe(expected.length);
-    for (const leaf of expected) {
-      expect(KNOWN_LEAVES.has(leaf)).toBe(true);
-    }
+describe('KNOWN_LEAVES (derived from shared leaf manifest)', () => {
+  it('manifest is internally consistent', () => {
+    expect(validateLeafManifest()).toEqual([]);
+  });
+
+  it('args validator registry matches the manifest exactly', () => {
+    expect(validateArgContractCoverage()).toEqual([]);
+  });
+
+  it('every executable leaf has an args contract, and vice versa', () => {
+    const contractNames = getLeafContractEntries().map(([name]) => name).sort();
+    expect([...KNOWN_LEAVES].sort()).toEqual(contractNames);
   });
 
   it('does NOT contain intent leaves (task_type_*)', () => {
@@ -412,11 +370,26 @@ describe('KNOWN_LEAVES', () => {
       expect(KNOWN_LEAVES.has(intentLeaf)).toBe(false);
     }
   });
+
+  it('contains key capability leaves', () => {
+    for (const leaf of [
+      'dig_block',
+      'craft_recipe',
+      'hunt_animal',
+      'verify_module',
+      'explore_for_resources',
+      'acquire_material',
+      'build_module',
+    ]) {
+      expect(KNOWN_LEAVES.has(leaf)).toBe(true);
+    }
+  });
 });
 
-describe('INTENT_LEAVES', () => {
-  it('contains all expected intent leaf names from Sterling expand-by-digest', () => {
-    const expected = [
+describe('INTENT_LEAVES (derived from shared leaf manifest)', () => {
+  it('contains the ten task_type_* intent leaves', () => {
+    expect(INTENT_LEAVES.size).toBe(10);
+    for (const leaf of [
       'task_type_craft',
       'task_type_mine',
       'task_type_explore',
@@ -427,9 +400,7 @@ describe('INTENT_LEAVES', () => {
       'task_type_attack',
       'task_type_find',
       'task_type_check',
-    ];
-    expect(INTENT_LEAVES.size).toBe(10);
-    for (const leaf of expected) {
+    ]) {
       expect(INTENT_LEAVES.has(leaf)).toBe(true);
     }
   });
@@ -729,6 +700,8 @@ function stubValue(fieldType: string, fieldName: string): unknown {
       return 1;
     case 'any':
       return { x: 0, y: 64, z: 0 }; // position-like
+    case 'object':
+      return { expectedPlacements: [] }; // witness-like
     default:
       return 'fallback';
   }
@@ -907,24 +880,11 @@ describe('fields[] ↔ validate() coherence (contract invariant)', () => {
 
 describe('KNOWN_LEAVES ↔ action-mapping alignment', () => {
   // Leaves that intentionally have NO action mapping. They are valid in
-  // CONTRACTS for arg validation in shadow mode but cannot dispatch in live
-  // mode yet. Reasons:
-  //   - replan_*: trigger replanning, not bot actions
-  //   - build_module/prepare_site/place_feature/building_step: building
-  //     system not yet wired to bot action layer
-  //   - interact_with_entity/open_container: entity interaction not yet wired
-  //
-  // When action mappings are added for these, remove them from this set —
-  // the test will start asserting they're dispatchable.
-  const NO_MAPPING_LEAVES = new Set([
-    'replan_building',
-    'replan_exhausted',
-    'build_module',
-    'prepare_site',
-    'place_feature',
-    'building_step',
-    'interact_with_entity',
-  ]);
+  // Shadow-only leaves: have a contract for arg validation but no action
+  // mapping yet (not dispatchable in live mode). Derived from the shared leaf
+  // manifest — when a mapping is added, declare it in the leaf's `action`
+  // entry there.
+  const NO_MAPPING_LEAVES = deriveShadowOnlyLeaves();
 
   for (const leaf of KNOWN_LEAVES) {
     if (NO_MAPPING_LEAVES.has(leaf)) {
@@ -971,6 +931,7 @@ function getMinimalValidArgs(leaf: string): Record<string, unknown> {
     prepare_site: { moduleId: 'foundation' },
     place_feature: { moduleId: 'door' },
     building_step: { moduleId: 'roof' },
+    verify_module: { moduleId: 'basic_shelter', witness: { expectedPlacements: [] } },
     replan_building: { templateId: 'test' },
     replan_exhausted: { templateId: 'test' },
     collect_items: {},
