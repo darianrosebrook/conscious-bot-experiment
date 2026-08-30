@@ -39,6 +39,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 
+// Load .env file if present — must run BEFORE any env-dependent config below
+// (e.g. sterlingAvailable, MLX model selection) so .env values are visible.
+const envPath = path.join(projectRoot, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        const value = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
+  }
+  console.log('\x1b[32m Loaded environment from .env\x1b[0m');
+}
+
 // Parse command line arguments
 const args = process.argv.slice(2);
 // Default is progress mode (progress bars during boot, streaming logs after)
@@ -195,6 +216,7 @@ const sterlingScript = path.join(
   'sterling_unified_server.py'
 );
 const sterlingAvailable =
+  process.env.STERLING_ENABLED !== 'false' &&
   fs.existsSync(sterlingDir) &&
   fs.existsSync(sterlingPython) &&
   fs.existsSync(sterlingScript);
@@ -209,26 +231,6 @@ const umapAvailable =
   fs.existsSync(umapDir) &&
   fs.existsSync(umapScript) &&
   fs.existsSync(umapRequirements);
-
-// Load .env file if present
-const envPath = path.join(path.dirname(__dirname), '.env');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf-8');
-  for (const line of envContent.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx > 0) {
-        const key = trimmed.slice(0, eqIdx).trim();
-        const value = trimmed.slice(eqIdx + 1).trim();
-        if (!process.env[key]) {
-          process.env[key] = value;
-        }
-      }
-    }
-  }
-  console.log('\x1b[32m Loaded environment from .env\x1b[0m');
-}
 
 // Colors for output
 const colors = {
@@ -319,7 +321,14 @@ let services = [
   {
     name: 'MLX-LM Sidecar',
     command: './venv-mlx/bin/python',
-    args: ['mlx_server.py', '--port', '5002'],
+    args: [
+      'mlx_server.py',
+      '--port',
+      '5002',
+      '--generation-model',
+      process.env.MLX_GENERATION_MODEL ||
+        path.join(projectRoot, '..', 'models', 'Olmo-3-7B-Instruct'),
+    ],
     port: 5002,
     healthUrl: 'http://localhost:5002/health',
     description: 'MLX-LM inference and embedding server for Apple Silicon',

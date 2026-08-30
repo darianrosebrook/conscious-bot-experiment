@@ -10,6 +10,8 @@ const {
   mockClientConnect,
   mockClientQuery,
   mockClientEnd,
+  mockPoolConstructor,
+  mockClientConstructor,
 } = vi.hoisted(() => {
   const poolConnectClient = { query: vi.fn(), release: vi.fn() };
   return {
@@ -20,20 +22,14 @@ const {
     mockClientConnect: vi.fn(),
     mockClientQuery: vi.fn(),
     mockClientEnd: vi.fn(),
+    mockPoolConstructor: vi.fn(),
+    mockClientConstructor: vi.fn(),
   };
 });
 
 vi.mock('pg', () => ({
-  Pool: vi.fn().mockImplementation(() => ({
-    query: mockPoolQuery,
-    connect: mockPoolConnect,
-    end: mockPoolEnd,
-  })),
-  Client: vi.fn().mockImplementation(() => ({
-    connect: mockClientConnect,
-    query: mockClientQuery,
-    end: mockClientEnd,
-  })),
+  Pool: mockPoolConstructor,
+  Client: mockClientConstructor,
 }));
 
 import { PlanningEventStore } from '../planning-event-store.js';
@@ -77,6 +73,19 @@ function baseConfig() {
 describe('PlanningEventStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Re-arm the pg constructors — vitest `restoreMocks: true` resets their
+    // implementations between tests, so re-apply them here.
+    mockPoolConstructor.mockImplementation(() => ({
+      query: mockPoolQuery,
+      connect: mockPoolConnect,
+      end: mockPoolEnd,
+    }));
+    mockClientConstructor.mockImplementation(() => ({
+      connect: mockClientConnect,
+      query: mockClientQuery,
+      end: mockClientEnd,
+    }));
 
     // Re-setup default mock implementations after clearAllMocks
     mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });

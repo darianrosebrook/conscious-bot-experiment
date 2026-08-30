@@ -1993,7 +1993,7 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { item, blockType, count = 1 } = action.parameters;
+    const { item, blockType, count = 1, pos } = action.parameters;
     const targetBlock = item || blockType;
     if (!targetBlock) {
       return { success: false, error: 'acquire_material requires item or blockType' };
@@ -2004,25 +2004,38 @@ export class ActionTranslator {
     const deadline = Date.now() + timeout;
     // Minecraft dig reach is ~4.5 blocks; navigate if farther than this
     const DIG_REACH = 4.0;
+    let mined = false;
+
+    // When the caller already located the block (e.g. exploration perception),
+    // use its position directly instead of re-scanning via raycast.
+    const knownPos: Vec3 | undefined =
+      pos && typeof pos.x === 'number'
+        ? new Vec3(pos.x, pos.y, pos.z)
+        : undefined;
 
     while (remaining > 0 && Date.now() < deadline) {
-      // Step 1: Find the nearest matching block
+      // Step 1: Find the nearest matching block (unless caller supplied one)
       let blockPos: Vec3;
-      try {
-        blockPos = this.findNearestVisibleBlock(targetBlock);
-      } catch (e) {
-        if (collected.length > 0) break;
-        return {
-          success: false,
-          error: `No visible ${targetBlock} found nearby`,
-          data: { collected },
-        };
+      if (knownPos) {
+        blockPos = knownPos;
+      } else {
+        try {
+          blockPos = this.findNearestVisibleBlock(targetBlock);
+        } catch (e) {
+          if (collected.length > 0 || mined) break;
+          return {
+            success: false,
+            error: `No visible ${targetBlock} found nearby`,
+            data: { collected, mined },
+          };
+        }
       }
 
-      // Step 2: Pathfind to within reach if too far away
+      // Step 2: Pathfind to within reach if too far away.
+      // Skip when the caller supplied a position (it already navigated there).
       const botPos = this.bot.entity.position;
       const dist = botPos.distanceTo(blockPos);
-      if (dist > DIG_REACH) {
+      if (dist > DIG_REACH && !knownPos) {
         console.log(
           `[AcquireMaterial] Block ${targetBlock} at ${blockPos} is ${dist.toFixed(1)} blocks away -- pathfinding to reach`
         );
@@ -2051,18 +2064,19 @@ export class ActionTranslator {
 
       // Step 3: Dig the block (now within reach)
       const digResult = await this.executeDigBlock(
-        { type: 'dig_block', parameters: { blockType: targetBlock } },
+        { type: 'dig_block', parameters: { blockType: targetBlock, pos: { x: blockPos.x, y: blockPos.y, z: blockPos.z } } },
         Math.min(15000, deadline - Date.now())
       );
 
       if (!digResult.success) {
-        if (collected.length > 0) break;
+        if (collected.length > 0 || mined) break;
         return {
           success: false,
           error: `Failed to mine ${targetBlock}: ${digResult.error}`,
-          data: { collected },
+          data: { collected, mined },
         };
       }
+      mined = true;
 
       // Step 4: Brief pause for drops to spawn
       await new Promise((r) => setTimeout(r, 300));
@@ -2087,12 +2101,15 @@ export class ActionTranslator {
       }
 
       remaining--;
+      // A caller-supplied position is a single known block — one pass only.
+      if (knownPos) break;
     }
 
     return {
-      success: collected.length > 0,
+      success: mined,
       data: {
         collected,
+        mined,
         totalCollected: collected.reduce((s, i) => s + i.count, 0),
         requested: count,
       },
@@ -3596,7 +3613,7 @@ export class ActionTranslator {
             const acquireResult = await this.executeAcquireMaterial(
               {
                 type: 'acquire_material',
-                parameters: { item: closest.name ?? itemsArr[0], count: 1 },
+                parameters: { item: closest.name ?? itemsArr[0], count: 1, pos: { x: blockPos.x, y: blockPos.y, z: blockPos.z } },
                 timeout: 10000,
               },
               10000
@@ -3752,7 +3769,7 @@ export class ActionTranslator {
                 const acquireResult = await this.executeAcquireMaterial(
                   {
                     type: 'acquire_material',
-                    parameters: { item: tag, count: 1 },
+                    parameters: { item: tag, count: 1, pos: { x: found.position.x, y: found.position.y, z: found.position.z } },
                     timeout: 10000,
                   },
                   10000
@@ -3902,7 +3919,7 @@ export class ActionTranslator {
                   const acquireResult = await this.executeAcquireMaterial(
                     {
                       type: 'acquire_material',
-                      parameters: { item: matchedBlockType, count: 1 },
+                      parameters: { item: matchedBlockType, count: 1, pos: { x: nearest.x, y: nearest.y, z: nearest.z } },
                       timeout: 10000,
                     },
                     10000

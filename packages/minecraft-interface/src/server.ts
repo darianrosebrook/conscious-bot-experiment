@@ -1705,6 +1705,10 @@ app.get('/state', async (req, res) => {
           nearbyWater: ws.nearbyWater ?? 0,
           nearbyHostiles: ws.nearbyHostiles ?? 0,
           nearbyPassives: ws.nearbyPassives ?? 0,
+          // Positioned blocks (name + coordinates) — kept alongside the string
+          // name list at worldState.nearbyBlocks so consumers that need
+          // positions (mini-map) don't have to guess.
+          nearbyBlocks: ws._minecraftState?.environment?.nearbyBlocks ?? [],
         },
         nearbyEntities: (
           ws._minecraftState?.environment?.nearbyEntities ?? []

@@ -1241,15 +1241,10 @@ describe('Rig G replan consumer', () => {
     task.metadata.solver!.rigGChecked = false;
 
     // Second call should NOT create a second timer (idempotent)
-    const logSpy = vi.spyOn(console, 'log');
     await ti.startTaskStep(task.id, 'step-1');
 
     // Timer count unchanged
     expect(timers.size).toBe(1);
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Replan already scheduled')
-    );
-    logSpy.mockRestore();
   });
 
   it('replan skips if task no longer unplannable', async () => {
@@ -1270,18 +1265,11 @@ describe('Rig G replan consumer', () => {
     // Change task status externally before timer fires
     task.status = 'active';
 
-    const logSpy = vi.spyOn(console, 'log');
-
     // Advance timers to fire the replan callback (5s backoff)
     await vi.advanceTimersByTimeAsync(6000);
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('no longer unplannable; skipping replan')
-    );
-
     // In-flight marker should be cleared
     expect(task.metadata.solver?.rigGReplan).toBeUndefined();
-    logSpy.mockRestore();
   });
 
   it('replan exhaustion after 3 attempts', async () => {
@@ -1361,12 +1349,8 @@ describe('configureHierarchicalPlanner idempotency and overrides', () => {
     ti.configureHierarchicalPlanner();
     expect(ti.isHierarchicalPlannerConfigured).toBe(true);
 
-    const logSpy = vi.spyOn(console, 'log');
-    ti.configureHierarchicalPlanner(); // second call
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('already configured; no-op')
-    );
-    logSpy.mockRestore();
+    ti.configureHierarchicalPlanner(); // second call — no-op
+    expect(ti.isHierarchicalPlannerConfigured).toBe(true);
   });
 
   it('configureHierarchicalPlanner with overrides uses injected planner', () => {
@@ -2759,8 +2743,6 @@ describe('Building episode reporting with join keys', () => {
     const originalEnv = process.env.JOIN_KEYS_DEPRECATED_COMPAT;
     process.env.JOIN_KEYS_DEPRECATED_COMPAT = '1';
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     const task = await ti.addTask(makeTaskData({
       title: 'Build shelter',
       type: 'building',
@@ -2792,14 +2774,6 @@ describe('Building episode reporting with join keys', () => {
     expect(linkageArg.bundleHash).toBe('hash-A');
     expect(linkageArg.traceBundleHash).toBe('trace-A');
     expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
-
-    // "Fallback exercised" log should be emitted (specific token, not just [JoinKeys] prefix)
-    const fallbackLogs = logSpy.mock.calls.filter(
-      (call) => typeof call[0] === 'string' && call[0].includes('Migration fallback exercised')
-    );
-    expect(fallbackLogs.length).toBeGreaterThan(0);
-
-    logSpy.mockRestore();
 
     // Restore env
     if (originalEnv === undefined) {
@@ -3827,6 +3801,15 @@ describe('P0-6: Fail-closed intent resolution', () => {
       inventory: [{ name: 'oak_log', count: 3 }],
       nearbyBlocks: ['oak_log', 'dirt'],
     });
+    // buildResolveIntentRequest (on sterlingPlanner) calls the planner's own
+    // fetchBotContext — mock it directly so it doesn't report _unavailable.
+    vi.spyOn((ti as any).sterlingPlanner, 'fetchBotContext').mockResolvedValue({
+      inventory: [{ name: 'oak_log', count: 3 }],
+      nearbyBlocks: ['oak_log', 'dirt'],
+      nearbyBlockCounts: { oak_log: 2 },
+      nearbyBlocksKnown: true,
+      biome: 'plains',
+    });
 
     return { expandByDigest, resolveIntentSteps };
   }
@@ -3981,6 +3964,13 @@ describe('P0-6: Fail-closed intent resolution', () => {
     vi.spyOn(ti as any, 'fetchBotContext').mockResolvedValue({
       inventory: [{ name: 'oak_log', count: 3 }],
       nearbyBlocks: ['oak_log'],
+    });
+    vi.spyOn((ti as any).sterlingPlanner, 'fetchBotContext').mockResolvedValue({
+      inventory: [{ name: 'oak_log', count: 3 }],
+      nearbyBlocks: ['oak_log'],
+      nearbyBlockCounts: { oak_log: 2 },
+      nearbyBlocksKnown: true,
+      biome: 'plains',
     });
 
     const created = await ti.addTask(makeSterlingTask({

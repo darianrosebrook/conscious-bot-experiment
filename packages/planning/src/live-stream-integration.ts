@@ -324,7 +324,9 @@ export class LiveStreamIntegration extends EventEmitter {
       const position = minecraftData.data.position ||
         minecraftData.data.worldState?.playerPosition || { x: 0, y: 64, z: 0 };
       const entities = minecraftData.data.worldState?.nearbyEntities || [];
-      const blocks = minecraftData.data.worldState?.nearbyBlocks || [];
+      // Positioned blocks live under environment.nearbyBlocks (objects with
+      // {type, position}); worldState.nearbyBlocks is a bare name list.
+      const blocks = minecraftData.data.worldState?.environment?.nearbyBlocks || [];
 
       // Process nearby entities
       const nearbyEntities = entities
@@ -485,6 +487,12 @@ export class LiveStreamIntegration extends EventEmitter {
    * Calculate distance between two positions
    */
   private calculateDistance(pos1: any, pos2: any): number {
+    // Some /state entries (e.g. nearbyBlocks is currently a list of block-name
+    // strings) lack a position object — treat them as infinitely far so the
+    // radius filter drops them instead of throwing.
+    if (!pos1 || !pos2 || typeof pos1 !== 'object' || typeof pos2 !== 'object') {
+      return Number.POSITIVE_INFINITY;
+    }
     const dx = (pos1.x || 0) - (pos2.x || 0);
     const dy = (pos1.y || 0) - (pos2.y || 0);
     const dz = (pos1.z || 0) - (pos2.z || 0);

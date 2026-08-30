@@ -164,11 +164,15 @@ describe('Reduction Gate Contract', () => {
 
   describe('with reduction client returning isExecutable:false', () => {
     const blockingClient: ReductionClient = {
-      reduceOptionProposal: vi.fn().mockResolvedValue({
+      reduceOptionProposal: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.mocked(blockingClient.reduceOptionProposal).mockResolvedValue({
         isExecutable: false,
         blockReason: 'semantic_violation',
-      } satisfies ReductionResult),
-    };
+      } satisfies ReductionResult);
+    });
 
     it('requestOptionProposal returns null', async () => {
       const flow = new DynamicCreationFlow(registry, createMockLLM());
@@ -208,10 +212,14 @@ describe('Reduction Gate Contract', () => {
 
   describe('with reduction client throwing an error', () => {
     const throwingClient: ReductionClient = {
-      reduceOptionProposal: vi.fn().mockRejectedValue(
-        new Error('Sterling connection refused')
-      ),
+      reduceOptionProposal: vi.fn(),
     };
+
+    beforeEach(() => {
+      vi.mocked(throwingClient.reduceOptionProposal).mockRejectedValue(
+        new Error('Sterling connection refused')
+      );
+    });
 
     it('requestOptionProposal returns null (fail-closed)', async () => {
       const flow = new DynamicCreationFlow(registry, createMockLLM());
@@ -267,8 +275,12 @@ describe('Reduction Gate Contract', () => {
     };
 
     const allowingClient: ReductionClient = {
-      reduceOptionProposal: vi.fn().mockResolvedValue(allowingResult),
+      reduceOptionProposal: vi.fn(),
     };
+
+    beforeEach(() => {
+      vi.mocked(allowingClient.reduceOptionProposal).mockResolvedValue(allowingResult);
+    });
 
     it('requestOptionProposal returns the proposal with reductionProvenance', async () => {
       const flow = new DynamicCreationFlow(registry, createMockLLM());

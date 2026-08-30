@@ -232,8 +232,9 @@ describe('BaseDomainSolver Phase 1 identity fields', () => {
     }
   });
 
-  it('does NOT include identity fields when toggle is OFF (default)', async () => {
-    // Toggle OFF by default (env var not set)
+  it('does NOT include identity fields when toggle is explicitly OFF (STERLING_REPORT_IDENTITY_FIELDS=0)', async () => {
+    // Default is ON (G3 closure); setting 0 explicitly disables identity fields.
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '0';
     const linkage: EpisodeLinkage = {
       bundleHash: 'b-hash',
       traceBundleHash: 't-hash',

@@ -23,6 +23,9 @@ export default defineConfig({
     alias: [
       // Redirect utils.electron.js → utils.web.js
       { find: '../utils/utils.electron.js', replacement: path.resolve(__dirname, 'utils/utils.web.js') },
+      // Node's `events` builtin is externalized to an empty stub in the browser
+      // bundle — alias it to a minimal browser-safe EventEmitter shim.
+      { find: 'events', replacement: path.resolve(__dirname, 'utils/event-emitter.js') },
     ],
   },
   worker: {
