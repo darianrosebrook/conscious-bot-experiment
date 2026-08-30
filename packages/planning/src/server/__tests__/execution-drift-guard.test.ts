@@ -203,6 +203,7 @@ describe('Execution Drift Guard', () => {
     // pathfinder.goto() must only appear in:
     // - action-translator.ts (inside withNavLease closures or executeNavigate)
     // - interaction-leaves.ts (leaf implementations, called via dispatchToLeaf)
+    // - combat-leaves.ts (leaf implementations, loot pickup navigation)
     // - navigation-bridge.ts (the bridge that owns pathfinder)
     // - standalone*.ts (non-prod testing)
     // - __tests__/ (excluded by scanFiles)
@@ -210,6 +211,7 @@ describe('Execution Drift Guard', () => {
     const hits = scanFiles(MC_INTERFACE_SRC, '.ts', pattern, [
       'action-translator.ts',
       'interaction-leaves.ts',
+      'combat-leaves.ts',
       'navigation-bridge.ts',
       'standalone',
     ]);
@@ -266,13 +268,14 @@ describe('Execution Drift Guard', () => {
     }
   });
 
-  it('action-translator.ts has exactly 7 pathfinder.goto() calls (count ratchet)', () => {
+  it('action-translator.ts has exactly 8 pathfinder.goto() calls (count ratchet)', () => {
     // Complements the proximity heuristic: the heuristic catches ungated gotos,
     // this count lock catches "new goto added at all." If you legitimately add a
     // new goto, update this count AND ensure the proximity test passes (i.e. it's
     // inside withNavLease).
-    // 5 original + 2 for explore-for-resources block pathing (perception + spiral)
-    const EXPECTED_GOTO_COUNT = 7;
+    // 5 core navigation + 3 explore-for-resources block pathing
+    // (perception scan, spiral navigation, resource-tag scanning)
+    const EXPECTED_GOTO_COUNT = 8;
     const filePath = path.join(MC_INTERFACE_SRC, 'action-translator.ts');
     const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
     // Match the full call-site pattern (this.bot.pathfinder.goto) on non-comment lines

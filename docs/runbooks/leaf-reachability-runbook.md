@@ -48,9 +48,9 @@ These derive four leaf states:
 
 | State | Meaning | Count |
 |-------|---------|-------|
-| **Produced + Proven** | Full autonomous pipeline with E2E dispatch proof | 21 |
+| **Produced + Proven** | Full autonomous pipeline with E2E dispatch proof | 22 |
 | **Produced, not Proven** | Producer exists but no E2E dispatch assertion (tracked via waiver) | 0 |
-| **Contracted-only** | Contract + mapping exist, but no autonomous producer emits it (manual/API only) | 19 |
+| **Contracted-only** | Contract + mapping exist, but no autonomous producer emits it (manual/API only) | 20 |
 | **Orphaned** | Leaf class exists in MC interface but no contract, no producer, no mapping | 7 |
 
 **Governance invariants** (enforced by `reachability-governance.test.ts`):
@@ -62,9 +62,9 @@ These derive four leaf states:
 
 ---
 
-## Full Leaf Inventory (40 leaves in KNOWN_LEAVES + 7 orphans)
+## Full Leaf Inventory (42 leaves in KNOWN_LEAVES + 7 orphans)
 
-### Produced + Proven leaves (21) — Full E2E dispatch-chain proof
+### Produced + Proven leaves (22) — Full E2E dispatch-chain proof
 
 | # | Leaf | Producer(s) | Dispatch Proof Test | Notes |
 |---|------|-------------|---------------------|-------|
@@ -89,34 +89,36 @@ These derive four leaf states:
 | 19 | `introspect_recipe` | Executor prereq injection (programmatic) | `executor-task-loop-e2e` | Programmatic-only: `ctx.introspectRecipe()` during craft_recipe pre-check |
 | 20 | `interact_with_entity` | Acquisition solver (trade strategy) | `acquisition-dispatch-chain-e2e` | Resolver-style: `entityType` only at planning time |
 | 21 | `open_container` | Acquisition solver (loot strategy) | `acquisition-dispatch-chain-e2e` | Resolver-style: `containerType` only at planning time |
+| 22 | `hunt_animal` | Sterling bootstrap (gather→food theme) | `gather-food-dispatch-chain-e2e` | Passive-animal hunting for food |
 
 ### Produced, not Proven leaves (0) — Waiver required
 
 All previously waivered leaves are now proven. No active waivers remain.
 
-### Contracted-only leaves (19) — No autonomous producer
+### Contracted-only leaves (20) — No autonomous producer
 
 | # | Leaf | Has Contract | Has Action Mapping | Why No Producer |
 |---|------|:---:|:---:|------|
-| 22 | `dig_block` | Yes | Yes | Deprecated. `stepToLeafExecution` rewrites → `acquire_material`. Direct dispatch needs `pos`. |
-| 23 | `collect_items` | Yes | Yes | `acquire_material` handles collection internally |
-| 24 | `place_torch_if_needed` | Yes | Yes | No exploration/lighting driveshaft exists |
-| 25 | `place_torch` | Yes | Yes | Used in Tier B smoke chain manually only |
-| 26 | `retreat_and_block` | Yes | Yes | Safety monitor uses `navigate`/`move_forward`, not this |
-| 27 | `retreat_from_threat` | Yes | Yes | Safety monitor uses `navigate` for flee, not this |
-| 28 | `sense_hostiles` | Yes | Yes | Used internally by safety monitor assessment, not as task step |
-| 29 | `get_light_level` | Yes | Yes | Utility leaf — no step producer |
-| 30 | `get_block_at` | Yes | Yes | Utility leaf — no step producer |
-| 31 | `find_resource` | Yes | Yes | Removed from `_lower_gather`; `acquire_material` handles search internally |
-| 32 | `manage_inventory` | Yes | Yes | No inventory management driveshaft |
-| 33 | `use_item` | Yes | Yes | No producer emits use_item steps |
-| 34 | `equip_tool` | Yes | Yes | **Reclassified**: `AcquireMaterialLeaf.selectBestTool()` (interaction-leaves.ts:1402) already auto-equips before digging. No executor-side injection needed. |
-| 35 | `till_soil` | Yes | Yes | No farming driveshaft |
-| 36 | `harvest_crop` | Yes | Yes | No farming driveshaft |
-| 37 | `manage_farm` | Yes | Yes | No farming driveshaft |
-| 38 | `interact_with_block` | Yes | Yes | No producer emits interact_with_block steps |
-| 39 | `chat` | Yes | Yes | Smoke path only, not autonomous |
-| 40 | `wait` | Yes | Yes | Smoke path only, not autonomous |
+| 23 | `dig_block` | Yes | Yes | Deprecated. `stepToLeafExecution` rewrites → `acquire_material`. Direct dispatch needs `pos`. |
+| 24 | `collect_items` | Yes | Yes | `acquire_material` handles collection internally |
+| 25 | `place_torch_if_needed` | Yes | Yes | No exploration/lighting driveshaft exists |
+| 26 | `place_torch` | Yes | Yes | Used in Tier B smoke chain manually only |
+| 27 | `retreat_and_block` | Yes | Yes | Safety monitor uses `navigate`/`move_forward`, not this |
+| 28 | `retreat_from_threat` | Yes | Yes | Safety monitor uses `navigate` for flee, not this |
+| 29 | `sense_hostiles` | Yes | Yes | Used internally by safety monitor assessment, not as task step |
+| 30 | `get_light_level` | Yes | Yes | Utility leaf — no step producer |
+| 31 | `get_block_at` | Yes | Yes | Utility leaf — no step producer |
+| 32 | `find_resource` | Yes | Yes | Removed from `_lower_gather`; `acquire_material` handles search internally |
+| 33 | `manage_inventory` | Yes | Yes | No inventory management driveshaft |
+| 34 | `use_item` | Yes | Yes | No producer emits use_item steps |
+| 35 | `equip_tool` | Yes | Yes | **Reclassified**: `AcquireMaterialLeaf.selectBestTool()` (interaction-leaves.ts:1402) already auto-equips before digging. No executor-side injection needed. |
+| 36 | `till_soil` | Yes | Yes | No farming driveshaft |
+| 37 | `harvest_crop` | Yes | Yes | No farming driveshaft |
+| 38 | `manage_farm` | Yes | Yes | No farming driveshaft |
+| 39 | `interact_with_block` | Yes | Yes | No producer emits interact_with_block steps |
+| 40 | `chat` | Yes | Yes | Smoke path only, not autonomous |
+| 41 | `wait` | Yes | Yes | Smoke path only, not autonomous |
+| 42 | `verify_module` | Yes | No (shadow-only) | Building verification leaf — no autonomous producer; dispatched via stepToLeafExecution only |
 
 ### UNCONTRACTED leaves (7) — Not dispatchable (by design or by gap)
 

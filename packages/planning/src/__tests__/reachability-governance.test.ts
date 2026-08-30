@@ -102,6 +102,8 @@ const PRODUCED_LEAVES: Readonly<Record<string, ProducedBySpec>> = {
   acquire_material:     { entryPoints: ['EP-1', 'EP-2', 'EP-3', 'EP-4'] },
   // EP-1 + EP-5: bootstrap (food) + hunger driveshaft
   consume_food:         { entryPoints: ['EP-1', 'EP-5'] },
+  // EP-1: bootstrap lowering (gather→food theme)
+  hunt_animal:          { entryPoints: ['EP-1'] },
   // EP-2: Sterling Solver (crafting, tool progression, building)
   craft_recipe:         { entryPoints: ['EP-2', 'EP-3', 'EP-4'] },
   smelt:                { entryPoints: ['EP-2'] },
@@ -142,6 +144,11 @@ const PROOFS: Readonly<Record<string, readonly ProofSpec[]>> = {
     kind: 'executor_executeTool',
     testFile: 'packages/planning/src/__tests__/gather-food-dispatch-chain-e2e.test.ts',
     expectedDispatch: 'minecraft.acquire_material',
+  }],
+  hunt_animal: [{
+    kind: 'executor_executeTool',
+    testFile: 'packages/planning/src/__tests__/gather-food-dispatch-chain-e2e.test.ts',
+    expectedDispatch: 'minecraft.hunt_animal',
   }],
   consume_food: [{
     kind: 'executor_executeTool',

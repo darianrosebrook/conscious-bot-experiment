@@ -95,6 +95,27 @@ export {
 export { LeafFactory, createLeafFactory } from './leaf-factory';
 
 // ============================================================================
+// Leaf Manifest (single source of truth for capability identity)
+// ============================================================================
+
+export {
+  LEAF_MANIFEST,
+  deriveKnownLeaves,
+  deriveIntentLeaves,
+  deriveShadowOnlyLeaves,
+  deriveLeafContractEntries,
+  deriveLeafActionMappings,
+  deriveActionContracts,
+  validateLeafManifest,
+} from './leaf-manifest';
+export type {
+  LeafManifestEntry,
+  LeafActionMapping,
+  LeafActionContract,
+  DerivedActionContract,
+} from './leaf-manifest';
+
+// ============================================================================
 // Zod Schemas for Validation
 // ============================================================================
 
