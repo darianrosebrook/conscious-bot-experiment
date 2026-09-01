@@ -30,7 +30,12 @@ services:
     environment:
       EULA: "TRUE"
       VERSION: "1.21.9"
-      # ONLINE_MODE=FALSE for bot testing (custom skins require TRUE + Mojang auth)
+      # ONLINE_MODE=FALSE for bot testing (custom skins require TRUE + Mojang auth).
+      # Coupled to minecraft-config/ops.json: an offline server derives each
+      # player's UUID from MD5("OfflinePlayer:" + name) rather than using their
+      # Mojang UUID, and the op list is matched by UUID, not name. ops.json
+      # therefore holds offline UUIDs. Flipping this to TRUE silently voids
+      # every op entry until they are regenerated as Mojang UUIDs.
       ONLINE_MODE: "FALSE"
       ALLOW_FLIGHT: "TRUE"
       GAMEMODE: survival

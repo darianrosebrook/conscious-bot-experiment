@@ -1,18 +1,18 @@
 [
   {
-    "uuid": "82fc446f-5660-4ba0-97ab-8db81d831cdc",
+    "uuid": "229dfc64-f9f1-3139-a35c-bd616d8e8ca5",
     "name": "Heliotropism",
     "level": 4,
     "bypassesPlayerLimit": true
   },
   {
-    "uuid": "b9a41e5d-4572-4417-b87a-f061ba9b2972",
+    "uuid": "548cc3df-9a7e-3b12-ac16-3fccca2bcf0e",
     "name": "Sterling",
     "level": 4,
     "bypassesPlayerLimit": true
   },
   {
-    "uuid": "f422b669-98bd-4d6e-a492-195f71f8efb2",
+    "uuid": "d8bec455-d984-3267-bb6c-e7dc34269a0c",
     "name": "BotSterling",
     "level": 4,
     "bypassesPlayerLimit": false
