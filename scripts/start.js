@@ -817,27 +817,52 @@ async function setupUMAPEnvironment() {
   }
 }
 
+/**
+ * Probe Docker once and memoize the verdict.
+ *
+ * Both startup flows consult this: the Listr progress flow (via its `skip`
+ * predicate) and the plain-log flow below. Keeping one probe means a missing
+ * binary or a stopped daemon degrades to a warning in either path, rather than
+ * only in whichever flow happened to carry its own guard.
+ *
+ * @returns {{ available: boolean, reason: string }}
+ */
+let dockerAvailabilityCache = null;
+function dockerAvailability() {
+  if (dockerAvailabilityCache) return dockerAvailabilityCache;
+
+  try {
+    execSync('docker --version', { stdio: 'ignore' });
+  } catch {
+    dockerAvailabilityCache = {
+      available: false,
+      reason: 'Docker is not installed or not in PATH',
+    };
+    return dockerAvailabilityCache;
+  }
+
+  try {
+    execSync('docker info', { stdio: 'ignore' });
+  } catch {
+    dockerAvailabilityCache = {
+      available: false,
+      reason: 'Docker daemon is not running',
+    };
+    return dockerAvailabilityCache;
+  }
+
+  dockerAvailabilityCache = { available: true, reason: 'ok' };
+  return dockerAvailabilityCache;
+}
+
 // Docker compose management
 async function startDockerServices() {
   log('\nStarting Docker services...', colors.cyan);
 
-  // Check if Docker is available
-  try {
-    execSync('docker --version', { stdio: 'ignore' });
-  } catch {
+  const availability = dockerAvailability();
+  if (!availability.available) {
     log(
-      ' ⚠️  Docker is not installed or not in PATH — skipping Docker services',
-      colors.yellow
-    );
-    return;
-  }
-
-  // Check if Docker daemon is running
-  try {
-    execSync('docker info', { stdio: 'ignore' });
-  } catch {
-    log(
-      ' ⚠️  Docker daemon is not running — skipping Docker services',
+      ` ⚠️  ${availability.reason} — skipping Docker services`,
       colors.yellow
     );
     return;
@@ -968,12 +993,34 @@ async function mainWithProgress() {
       },
       {
         title: 'Docker Services',
-        skip: () => process.argv.includes('--skip-docker'),
+        skip: () => {
+          if (process.argv.includes('--skip-docker')) {
+            return 'Skipped (--skip-docker)';
+          }
+          const availability = dockerAvailability();
+          return availability.available
+            ? false
+            : `${availability.reason} (skipped)`;
+        },
         task: async (ctx, task) => {
           task.output = 'Starting Postgres and Minecraft...';
-          execSync('docker compose up -d', { cwd: projectRoot, stdio: 'pipe' });
+          try {
+            execSync('docker compose up -d', {
+              cwd: projectRoot,
+              stdio: 'pipe',
+            });
+            task.title = 'Docker Services (Running)';
+          } catch (error) {
+            // Docker is up but compose could not bring everything online — a
+            // host port already bound is the common case. Report it and let the
+            // remaining startup tasks run; aborting here strands the whole boot.
+            const detail = (error.stderr?.toString() || error.message || '')
+              .trim()
+              .split('\n')
+              .pop();
+            task.title = `Docker Services (degraded: ${detail})`;
+          }
           await wait(2000);
-          task.title = 'Docker Services (Running)';
         },
       },
       {
