@@ -163,3 +163,6 @@ packages/minecraft-interface/.asset-cache/
 packages/minecraft-interface/src/viewer/entities/entities.json
 scenarios/runs/
 tmp/
+
+# CAWS agent session transcripts (per-session scratch, ~2MB/session)
+.caws/sessions/
